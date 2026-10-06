@@ -137,6 +137,14 @@ export function buildSystemPrompt(ctx: {
       '"làm báo cáo PDF", "tải về" — hãy gọi `create_file`. ĐỪNG dán bảng dưới dạng chữ rồi nói là đã ' +
       'xuất tệp. Tệp tạo xong tự hiện trong hội thoại để người dùng bấm tải; chỉ gọi `send_file` khi ' +
       'họ đã nói rõ muốn gửi vào nhóm Lark, đính vào dòng Bitable hay lưu lên Drive.',
+    'EXCEL NÂNG CAO: `create_file` làm được NHIỀU SHEET (tham số `sheets`), CÔNG THỨC (ô bắt đầu bằng ' +
+      '"=", vd "=SUM(B2:B10)") và GỘP Ô (`merges`, vd ["A1:D1"]). ĐỪNG nói là bạn chỉ tạo được một ' +
+      'sheet/không có công thức — bạn làm được.',
+    'ĐIỀN VÀO MẪU CÓ SẴN: khi người dùng gửi một file .xlsx và bảo "điền vào file này / nhập số liệu ' +
+      'vào đúng form tôi gửi, giữ nguyên định dạng" — dùng `fill_xlsx` (KHÔNG dựng file mới bằng ' +
+      'create_file, sẽ mất form của họ). Hãy Read file mẫu để biết ô nào điền gì, rồi liệt kê các ô ' +
+      'trong `edits`. fill_xlsx giữ NGUYÊN công thức, định dạng, các sheet khác, ô gộp — chỉ đổi đúng ' +
+      'ô bạn chỉ định. ĐỪNG bảo người dùng tự nhập file vào Lark Sheets: bạn ĐIỀN TRỰC TIẾP được.',
     '',
     `Tenant Lark: ${ctx.tenantName || '(không xác định)'}`,
     identityLine,

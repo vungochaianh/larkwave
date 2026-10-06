@@ -17,6 +17,10 @@ export function setAttachmentDir(dir: string | null): void {
   if (dir !== ATTACH_DIR) resetBitableContext();
   ATTACH_DIR = dir;
 }
+/** Thư mục chứa tệp người dùng ĐÍNH KÈM lượt này — `fill_xlsx` đọc tệp mẫu từ đây (có kiểm phạm vi). */
+export function getAttachmentDir(): string | null {
+  return ATTACH_DIR;
+}
 
 /** Bao nhiêu chữ trả thẳng vào hội thoại. Nhiều hơn thì agent tự Read tệp đã ghi ra đĩa. */
 const MAX_INLINE_TEXT = 20_000;

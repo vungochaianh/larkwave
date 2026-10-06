@@ -13,7 +13,7 @@
  * Electron nên `printToPDF` cho kết quả thật; nó cần `electron` nên ở riêng `filePdf.ts`, để
  * module này vẫn dùng được ở bản chạy nền trên VM (chỗ không có Electron).
  */
-import { deflateRawSync } from 'node:zlib';
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
 
 export type FileFormat = 'xlsx' | 'docx' | 'csv' | 'md' | 'txt' | 'html';
 
@@ -22,6 +22,8 @@ export interface SheetData {
   /** Tên sheet trong Excel. Excel cấm : \ / ? * [ ] và giới hạn 31 ký tự. */
   name?: string;
   rows: (string | number | null | undefined)[][];
+  /** Ô gộp, dạng "A1:B1". Dùng cho tiêu đề trải ngang nhiều cột. */
+  merges?: string[];
 }
 
 // ── ZIP ────────────────────────────────────────────────────────────────────────────────
@@ -159,42 +161,80 @@ export function colName(i: number): string {
 // ── .xlsx ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Dựng `.xlsx` một sheet.
+ * Một ô → XML. Ba dạng:
+ *  • CÔNG THỨC: chuỗi mở đầu bằng "=" (vd "=SUM(A1:A3)") → `<f>`, không kèm giá trị đệm (Excel tự
+ *    tính khi mở nhờ `calcPr fullCalcOnLoad`).
+ *  • SỐ: để Excel cộng được. "007"/"0123456789" vẫn giữ dạng CHỮ (ép số là mất số 0 đầu).
+ *  • CHỮ: inlineStr.
+ * `styleAttr` (vd ` s="3"`) dùng khi GHI ĐÈ một ô có sẵn, để giữ nguyên định dạng của mẫu.
+ */
+function cellXml(ref: string, v: string | number | null | undefined, styleAttr = ''): string {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'string' && v.length > 1 && v[0] === '=') {
+    return `<c r="${ref}"${styleAttr}><f>${xmlEscape(v.slice(1))}</f></c>`;
+  }
+  const isNum =
+    typeof v === 'number' ||
+    (/^-?\d+(\.\d+)?$/.test(String(v)) && !/^0\d/.test(String(v)) && Number.isFinite(Number(v)));
+  return isNum
+    ? `<c r="${ref}"${styleAttr}><v>${Number(v)}</v></c>`
+    : `<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(String(v))}</t></is></c>`;
+}
+
+/** `<worksheet>` cho một sheet: dữ liệu + ô gộp (mergeCells PHẢI đứng SAU sheetData theo schema). */
+function sheetXmlFor(sheet: SheetData): string {
+  const rows = sheet.rows ?? [];
+  const body = rows
+    .map((row, r) => {
+      const cells = (row ?? []).map((v, c) => cellXml(`${colName(c)}${r + 1}`, v)).join('');
+      return `<row r="${r + 1}">${cells}</row>`;
+    })
+    .join('');
+  const merges = (sheet.merges ?? []).filter((m) => /^[A-Z]+\d+:[A-Z]+\d+$/i.test(String(m).trim()));
+  const mergeXml = merges.length
+    ? `<mergeCells count="${merges.length}">${merges.map((m) => `<mergeCell ref="${xmlEscape(m.trim().toUpperCase())}"/>`).join('')}</mergeCells>`
+    : '';
+  return (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    `<sheetData>${body}</sheetData>${mergeXml}</worksheet>`
+  );
+}
+
+/**
+ * Dựng `.xlsx` — MỘT hoặc NHIỀU sheet, có công thức và ô gộp.
  *
  * Dùng inline string (`t="inlineStr"`) chứ không dùng bảng sharedStrings: sharedStrings tiết kiệm
  * dung lượng khi có nhiều ô lặp, nhưng thêm một phần XML nữa phải giữ đồng bộ chỉ số — đổi lấy
  * một lớp sai lệch âm thầm (lệch chỉ số thì ô hiện SAI CHỮ chứ không báo lỗi) để tiết kiệm vài
  * chục KB. Báo cáo ở đây tính bằng nghìn dòng, không phải triệu.
+ *
+ * Nhận cả một `SheetData` lẻ (tương thích lời gọi cũ) lẫn mảng nhiều sheet.
  */
-export function buildXlsx(sheet: SheetData): Buffer {
-  const rows = sheet.rows ?? [];
-  const body = rows
-    .map((row, r) => {
-      const cells = (row ?? [])
-        .map((v, c) => {
-          if (v === null || v === undefined || v === '') return '';
-          const ref = `${colName(c)}${r + 1}`;
-          // Số phải vào ô dạng SỐ, không phải chữ — nếu không thì Excel không cộng được, và đó
-          // đúng là việc người ta mở báo cáo ra để làm. Chuỗi "007" hay "0123456789" thì giữ
-          // nguyên dạng chữ: ép thành số là mất số 0 đầu (mã khách, số điện thoại).
-          const isNum =
-            typeof v === 'number' ||
-            (/^-?\d+(\.\d+)?$/.test(String(v)) && !/^0\d/.test(String(v)) && Number.isFinite(Number(v)));
-          return isNum
-            ? `<c r="${ref}"><v>${Number(v)}</v></c>`
-            : `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(String(v))}</t></is></c>`;
-        })
-        .join('');
-      return `<row r="${r + 1}">${cells}</row>`;
-    })
+export function buildXlsx(input: SheetData | SheetData[]): Buffer {
+  const sheets = (Array.isArray(input) ? input : [input]).filter(Boolean);
+  const list = sheets.length ? sheets : [{ rows: [] as (string | number | null | undefined)[][] }];
+
+  // Tên sheet phải DUY NHẤT (Excel từ chối mở nếu trùng) — thêm hậu tố khi đụng.
+  const used = new Set<string>();
+  const names = list.map((s, i) => {
+    let base = safeSheetName(s.name || `Sheet${i + 1}`);
+    let name = base;
+    let k = 2;
+    while (used.has(name.toLowerCase())) name = safeSheetName(`${base} (${k++})`);
+    used.add(name.toLowerCase());
+    return name;
+  });
+
+  const sheetParts = list.map((s, i) => ({ path: `xl/worksheets/sheet${i + 1}.xml`, data: Buffer.from(sheetXmlFor(s), 'utf8') }));
+  const overrides = list
+    .map((_s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+    .join('');
+  const sheetTags = list.map((_s, i) => `<sheet name="${xmlEscape(names[i])}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('');
+  const relTags = list
+    .map((_s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
     .join('');
 
-  const sheetXml =
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    `<sheetData>${body}</sheetData></worksheet>`;
-
-  const name = xmlEscape(safeSheetName(sheet.name));
   return zip([
     {
       path: '[Content_Types].xml',
@@ -204,7 +244,7 @@ export function buildXlsx(sheet: SheetData): Buffer {
           '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
           '<Default Extension="xml" ContentType="application/xml"/>' +
           '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+          overrides +
           '</Types>',
         'utf8',
       ),
@@ -225,7 +265,10 @@ export function buildXlsx(sheet: SheetData): Buffer {
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
           '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
           'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-          `<sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+          `<sheets>${sheetTags}</sheets>` +
+          // fullCalcOnLoad: ô công thức không kèm giá trị đệm → bắt Excel tính lại khi mở.
+          '<calcPr calcId="0" fullCalcOnLoad="1"/>' +
+          '</workbook>',
         'utf8',
       ),
     },
@@ -234,13 +277,176 @@ export function buildXlsx(sheet: SheetData): Buffer {
       data: Buffer.from(
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
           '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+          relTags +
           '</Relationships>',
         'utf8',
       ),
     },
-    { path: 'xl/worksheets/sheet1.xml', data: Buffer.from(sheetXml, 'utf8') },
+    ...sheetParts,
   ]);
+}
+
+// ── Sửa .xlsx CÓ SẴN (điền vào mẫu, giữ nguyên công thức/định dạng/các sheet khác) ────────
+
+/** Giải nén ZIP → mọi phần. Đủ cho việc đọc-sửa-ghi lại một tệp Office. */
+export function unzip(buf: Buffer): ZipItem[] {
+  const out: ZipItem[] = [];
+  // Tìm EOCD để lấy vị trí central directory (quét ngược vì có thể có comment ở cuối).
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i -= 1) {
+    if (buf.readUInt32LE(i) === SIG_EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) return out;
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  for (let n = 0; n < count && p + 46 <= buf.length; n += 1) {
+    if (buf.readUInt32LE(p) !== SIG_CDH) break;
+    const method = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const lho = buf.readUInt32LE(p + 42);
+    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
+    // Đọc local header để biết độ dài name/extra THẬT (có thể khác central), rồi lấy dữ liệu.
+    const lNameLen = buf.readUInt16LE(lho + 26);
+    const lExtraLen = buf.readUInt16LE(lho + 28);
+    const start = lho + 30 + lNameLen + lExtraLen;
+    const slice = buf.subarray(start, start + compSize);
+    try {
+      out.push({ path: name, data: method === 0 ? Buffer.from(slice) : inflateRawSync(slice) });
+    } catch {
+      /* phần đọc không được thì bỏ qua — giữ các phần còn lại */
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+export interface CellEdit {
+  /** Tên sheet. Bỏ trống = sheet đầu tiên. */
+  sheet?: string;
+  /** Ô dạng "B5". */
+  cell: string;
+  /** Giá trị cần điền. Chuỗi "=…" là công thức. null/"" = xoá nội dung ô. */
+  value: string | number | null;
+}
+
+/** Cột "A" → 0, "AB" → 27. */
+function colIndex(letters: string): number {
+  let n = 0;
+  for (const ch of letters.toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/** Áp các sửa đổi lên XML của MỘT sheet, giữ nguyên mọi ô khác (công thức/định dạng/ô gộp). */
+function patchSheetXml(xml: string, edits: CellEdit[]): string {
+  let out = xml;
+  for (const e of edits) {
+    const ref = String(e.cell || '').trim().toUpperCase();
+    const m = /^([A-Z]+)(\d+)$/.exec(ref);
+    if (!m) continue;
+    const col = colIndex(m[1]);
+    const rowNum = Number(m[2]);
+
+    // Ô đã có? Giữ lại style `s="N"` của nó rồi thay cả thẻ.
+    const existing = new RegExp(`<c r="${ref}"(\\s[^>]*?)?(?:/>|>[\\s\\S]*?</c>)`).exec(out);
+    const styleAttr = existing ? (/ s="\d+"/.exec(existing[0])?.[0] ?? '') : '';
+    const newCell = cellXml(ref, e.value, styleAttr) || `<c r="${ref}"${styleAttr}/>`;
+
+    if (existing) {
+      out = out.slice(0, existing.index) + newCell + out.slice(existing.index + existing[0].length);
+      continue;
+    }
+    // Chưa có ô. Chèn vào đúng hàng, đúng thứ tự cột; thiếu hàng thì tạo hàng, đúng thứ tự.
+    const rowRe = new RegExp(`(<row r="${rowNum}"(?:\\s[^>]*)?>)([\\s\\S]*?)(</row>)`);
+    const rowM = rowRe.exec(out);
+    if (rowM) {
+      const inner = rowM[2];
+      // Tìm ô đầu tiên có cột LỚN HƠN để chèn trước; không có thì nối cuối hàng.
+      let insertAt = inner.length;
+      for (const cm of inner.matchAll(/<c r="([A-Z]+)\d+"/g)) {
+        if (colIndex(cm[1]) > col) { insertAt = cm.index ?? inner.length; break; }
+      }
+      const newInner = inner.slice(0, insertAt) + newCell + inner.slice(insertAt);
+      out = out.slice(0, rowM.index) + rowM[1] + newInner + rowM[3] + out.slice(rowM.index + rowM[0].length);
+    } else {
+      const newRow = `<row r="${rowNum}">${newCell}</row>`;
+      // Chèn trước hàng đầu tiên có r LỚN HƠN, giữ sheetData theo thứ tự tăng dần.
+      let placed = false;
+      for (const rm of out.matchAll(/<row r="(\d+)"/g)) {
+        if (Number(rm[1]) > rowNum) {
+          out = out.slice(0, rm.index) + newRow + out.slice(rm.index);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) out = out.replace('</sheetData>', `${newRow}</sheetData>`);
+    }
+  }
+  return out;
+}
+
+/**
+ * ĐIỀN dữ liệu vào một `.xlsx` CÓ SẴN và trả về tệp mới — giữ NGUYÊN form: công thức, định dạng,
+ * các sheet khác, ô gộp đều không đụng tới; chỉ các ô được chỉ định mới đổi giá trị.
+ *
+ * Đây là thứ `buildXlsx` (dựng mới từ số 0) không làm được: điền hoá đơn vào đúng mẫu của khách
+ * mà không phá công thức/định dạng của họ.
+ */
+export function editXlsx(src: Buffer, edits: CellEdit[]): Buffer {
+  const parts = unzip(src);
+  if (!parts.length) throw new Error('Không đọc được tệp .xlsx (tệp hỏng hoặc không phải xlsx).');
+  const byPath = new Map(parts.map((p) => [p.path, p.data]));
+
+  const wb = byPath.get('xl/workbook.xml')?.toString('utf8') ?? '';
+  const rels = byPath.get('xl/_rels/workbook.xml.rels')?.toString('utf8') ?? '';
+  // name → r:id, rồi r:id → target → đường dẫn sheet.
+  const nameToRid = new Map<string, string>();
+  for (const m of wb.matchAll(/<sheet\b[^>]*\bname="([^"]*)"[^>]*\br:id="([^"]+)"/g)) nameToRid.set(unescXml(m[1]), m[2]);
+  // Sheet ĐẦU TIÊN theo thứ tự khai (cho edit không nêu tên).
+  const firstName = [...wb.matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map((m) => unescXml(m[1]))[0] ?? '';
+  const ridToTarget = new Map<string, string>();
+  for (const m of rels.matchAll(/<Relationship\b[^>]*\bId="([^"]+)"[^>]*\bTarget="([^"]+)"/g)) ridToTarget.set(m[1], m[2]);
+
+  const pathForSheet = (name: string): string | null => {
+    const rid = nameToRid.get(name);
+    if (!rid) return null;
+    let t = ridToTarget.get(rid) || '';
+    if (!t) return null;
+    t = t.replace(/^\/+/, '');
+    return t.startsWith('xl/') ? t : `xl/${t}`;
+  };
+
+  // Gom edit theo sheet.
+  const bySheet = new Map<string, CellEdit[]>();
+  for (const e of edits) {
+    const name = e.sheet && nameToRid.has(e.sheet) ? e.sheet : firstName;
+    const arr = bySheet.get(name) ?? [];
+    arr.push(e);
+    bySheet.set(name, arr);
+  }
+
+  for (const [name, list] of bySheet) {
+    const sheetPath = pathForSheet(name);
+    if (!sheetPath) throw new Error(`Không tìm thấy sheet "${name}" trong tệp.`);
+    const xml = byPath.get(sheetPath)?.toString('utf8');
+    if (!xml) throw new Error(`Không đọc được nội dung sheet "${name}".`);
+    byPath.set(sheetPath, Buffer.from(patchSheetXml(xml, list), 'utf8'));
+  }
+
+  // Giữ NGUYÊN thứ tự phần ban đầu (chỉ thay nội dung các sheet đã sửa).
+  return zip(parts.map((p) => ({ path: p.path, data: byPath.get(p.path) ?? p.data })));
+}
+
+/** Giải thoát XML ngược (đủ cho tên sheet). */
+function unescXml(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 // ── .docx ──────────────────────────────────────────────────────────────────────────────

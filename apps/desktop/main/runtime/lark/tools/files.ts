@@ -12,6 +12,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { isInsideDir } from '../filePaths';
+import { getAttachmentDir } from './attachments';
 import { enc, type LarkToolDef, str } from './types';
 import {
   FORMAT_META,
@@ -19,7 +20,9 @@ import {
   buildDocx,
   buildHtml,
   buildXlsx,
+  editXlsx,
   safeFileName,
+  type CellEdit,
   type SheetData,
 } from '../fileBuild';
 
@@ -82,8 +85,13 @@ export const fileTools: LarkToolDef[] = [
       'GỌI TOOL NÀY mỗi khi người dùng nói "xuất ra Excel", "gửi file", "làm báo cáo PDF", "tải về"… — ' +
       'đừng dán bảng dưới dạng chữ trong hội thoại rồi bảo là đã xuất tệp. ' +
       'Dữ liệu dạng BẢNG (xlsx/csv) thì truyền `rows`, hàng ĐẦU TIÊN là tên cột. ' +
+      'Excel NHIỀU SHEET: truyền `sheets` (mỗi phần tử {name, rows, merges}) thay cho `rows`. ' +
+      'CÔNG THỨC: để một ô là chuỗi bắt đầu bằng "=" (vd "=SUM(B2:B10)", "=A2*C2") — Excel tự tính khi mở. ' +
+      'GỘP Ô: truyền `merges` dạng ["A1:D1"] (vd tiêu đề trải ngang). ' +
       'Dữ liệu dạng VĂN BẢN (docx/md/txt) thì truyền `text`. PDF và HTML nhận cả hai: `text` làm phần ' +
       'diễn giải, `rows` thành bảng bên dưới. ' +
+      'ĐIỀN VÀO MẪU có sẵn (file .xlsx người dùng gửi, giữ nguyên form/công thức/định dạng): KHÔNG dùng ' +
+      'tool này — dùng `fill_xlsx`. ' +
       'Tệp tạo xong TỰ HIỆN thành thẻ bấm-để-mở ngay trong hội thoại, và được lưu lại cùng hội thoại — ' +
       'người dùng không phải đi tìm ở đâu cả. ' +
       'TUYỆT ĐỐI KHÔNG tự đẩy tệp lên Lark (Drive / Base / nhóm chat) cho "chắc ăn": làm vậy người dùng ' +
@@ -99,8 +107,27 @@ export const fileTools: LarkToolDef[] = [
         name: str('Tên tệp, KHÔNG kèm đuôi. Cứ đặt tiếng Việt có dấu, vd "Báo cáo thu tiền tháng 9".'),
         rows: {
           type: 'array',
-          description: 'Bảng dữ liệu; mỗi phần tử là một hàng. Hàng đầu tiên là TÊN CỘT.',
+          description: 'Bảng dữ liệu; mỗi phần tử là một hàng. Hàng đầu tiên là TÊN CỘT. Ô bắt đầu bằng "=" là CÔNG THỨC.',
           items: { type: 'array', items: {} },
+        },
+        sheets: {
+          type: 'array',
+          description:
+            'Excel NHIỀU SHEET: mỗi phần tử {name, rows, merges}. Dùng cái này THAY cho `rows` khi cần >1 sheet.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: str('Tên sheet.'),
+              rows: { type: 'array', description: 'Hàng của sheet; hàng đầu là tên cột.', items: { type: 'array', items: {} } },
+              merges: { type: 'array', description: 'Ô gộp, vd ["A1:D1"].', items: { type: 'string' } },
+            },
+          },
+        },
+        merges: {
+          type: 'array',
+          description: 'Ô gộp cho sheet đơn (khi dùng `rows`), vd ["A1:D1"].',
+          items: { type: 'string' },
         },
         text: str('Nội dung văn bản (docx/md/txt), hoặc phần diễn giải đặt trên bảng (pdf/html).'),
         sheet_name: str('Tên sheet trong Excel. Bỏ trống thì lấy theo tên tệp.'),
@@ -118,17 +145,28 @@ export const fileTools: LarkToolDef[] = [
 
       const rows = normRows(input.rows);
       const text = typeof input.text === 'string' ? input.text : '';
-      if (!rows.length && !text.trim()) {
-        throw new Error('Không có nội dung: truyền `rows` (bảng) hoặc `text` (văn bản).');
-      }
       const base = safeFileName(String(input.name || ''), 'ket-qua');
       const meta = FORMAT_META[format];
-      const sheet: SheetData = { name: String(input.sheet_name || base), rows };
+      const normMerges = (m: unknown): string[] | undefined =>
+        Array.isArray(m) ? m.filter((x) => typeof x === 'string') : undefined;
+      // Nhiều sheet: mỗi phần tử {name, rows, merges}. Chuẩn hoá y như sheet đơn.
+      const multi: SheetData[] = Array.isArray(input.sheets)
+        ? (input.sheets as Record<string, unknown>[]).map((s, i) => ({
+            name: String(s?.name || `Sheet${i + 1}`),
+            rows: normRows(s?.rows),
+            merges: normMerges(s?.merges),
+          }))
+        : [];
+      const sheet: SheetData = { name: String(input.sheet_name || base), rows, merges: normMerges(input.merges) };
+      const hasTable = rows.length > 0 || multi.some((s) => s.rows.length > 0);
+      if (!hasTable && !text.trim()) {
+        throw new Error('Không có nội dung: truyền `rows`/`sheets` (bảng) hoặc `text` (văn bản).');
+      }
 
       let bytes: Buffer;
       if (format === 'xlsx') {
-        if (!rows.length) throw new Error('Excel cần `rows`. Nội dung chỉ có chữ thì dùng docx/pdf/txt.');
-        bytes = buildXlsx(sheet);
+        if (!hasTable) throw new Error('Excel cần `rows` hoặc `sheets`. Nội dung chỉ có chữ thì dùng docx/pdf/txt.');
+        bytes = buildXlsx(multi.length ? multi : sheet);
       } else if (format === 'csv') {
         if (!rows.length) throw new Error('CSV cần `rows`.');
         bytes = buildCsv(rows);
@@ -172,6 +210,101 @@ export const fileTools: LarkToolDef[] = [
           'XONG. Tệp đã hiện thành thẻ bấm-để-mở trong hội thoại và được lưu cùng hội thoại' +
           (uploadId ? ' (đã sao lưu lên máy chủ, máy khác mở cũng thấy).' : '.') +
           ' KHÔNG đẩy lên Lark Drive/Base và KHÔNG gửi đi đâu nữa — người dùng đã có tệp rồi.',
+      };
+    },
+  },
+
+  {
+    name: 'fill_xlsx',
+    description:
+      'ĐIỀN dữ liệu vào một file Excel (.xlsx) CÓ SẴN mà người dùng gửi, rồi trả lại file đã điền — ' +
+      'GIỮ NGUYÊN form: công thức, định dạng, các sheet khác, ô gộp đều không đụng; chỉ các ô bạn chỉ ' +
+      'định mới đổi giá trị. Gọi tool này khi người dùng nói "điền vào file này", "nhập số liệu vào mẫu", ' +
+      '"fill đúng theo form tôi gửi"… — ĐỪNG dựng file mới bằng create_file (sẽ mất form của họ). ' +
+      'Trước khi điền: hãy ĐỌC file mẫu (Read) để biết ô nào cần điền gì, rồi liệt kê các ô trong `edits`. ' +
+      '`source_path` = đường dẫn file mẫu người dùng đính kèm (đúng như đã thấy khi đọc). ' +
+      'Mỗi `edits[]` = {cell:"B5", value:…, sheet?:"Sheet1"}. value bắt đầu bằng "=" là công thức. ' +
+      'File điền xong tự hiện thành thẻ bấm-để-mở trong hội thoại.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['source_path', 'edits'],
+      properties: {
+        source_path: str('Đường dẫn file .xlsx mẫu người dùng gửi (lấy từ danh sách tệp đính kèm / lúc bạn Read nó).'),
+        edits: {
+          type: 'array',
+          description: 'Danh sách ô cần điền. Mỗi phần tử {cell, value, sheet?}.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['cell', 'value'],
+            properties: {
+              cell: str('Ô cần điền, dạng "B5".'),
+              value: { description: 'Giá trị điền (số/chữ). Bắt đầu bằng "=" là công thức. null = xoá ô.' },
+              sheet: str('Tên sheet (bỏ trống = sheet đầu tiên).'),
+            },
+          },
+        },
+        name: str('Tên file kết quả (không kèm đuôi). Bỏ trống thì lấy theo tên file gốc + " - đã điền".'),
+      },
+    },
+    // Không gated: chỉ ghi một file MỚI vào thư mục tạm của lượt này (không đụng file gốc của người
+    // dùng, không gửi đi đâu) — cùng mức rủi ro với create_file.
+    gated: false,
+    async exec(input) {
+      if (!OUT_DIR) throw new Error('Chưa có thư mục ghi tệp cho lượt này.');
+      const src = String(input.source_path || '').trim();
+      if (!src) throw new Error('Thiếu `source_path` (đường dẫn file mẫu).');
+      // Chỉ cho đọc file NẰM TRONG thư mục đính kèm của lượt này, hoặc thư mục kết quả (file
+      // create_file vừa tạo). `source_path` tới từ model = dữ liệu không tin được; không chốt thì
+      // nó đọc được bất kỳ .xlsx nào trên máy.
+      const attachDir = getAttachmentDir();
+      if (!isInsideDir(OUT_DIR, src) && !isInsideDir(attachDir, src)) {
+        throw new Error('Chỉ điền được vào file người dùng đính kèm trong lượt này.');
+      }
+      if (!/\.xlsx$/i.test(src)) throw new Error('fill_xlsx chỉ nhận file .xlsx. File khác thì dùng create_file.');
+      const st = await stat(src).catch(() => null);
+      if (!st?.isFile()) throw new Error(`Không tìm thấy file mẫu: ${basename(src)}`);
+
+      const editsIn = Array.isArray(input.edits) ? (input.edits as Record<string, unknown>[]) : [];
+      const edits: CellEdit[] = editsIn
+        .map((e) => ({
+          sheet: e?.sheet ? String(e.sheet) : undefined,
+          cell: String(e?.cell || '').trim(),
+          value:
+            e?.value === null || e?.value === undefined
+              ? null
+              : typeof e.value === 'number'
+                ? e.value
+                : String(e.value),
+        }))
+        .filter((e) => /^[A-Za-z]+\d+$/.test(e.cell));
+      if (!edits.length) throw new Error('`edits` rỗng hoặc không có ô hợp lệ (dạng {cell:"B5", value:…}).');
+
+      const srcBytes = await readFile(src);
+      const outBytes = editXlsx(srcBytes, edits);
+
+      const base = safeFileName(String(input.name || ''), '') || `${safeFileName(basename(src).replace(/\.xlsx$/i, ''), 'ket-qua')} - đã điền`;
+      const meta = FORMAT_META.xlsx;
+      await mkdir(OUT_DIR, { recursive: true });
+      const fileName = `${base}${meta.ext}`;
+      const path = join(OUT_DIR, fileName);
+      await writeFile(path, outBytes);
+      const uploadId = UPLOAD ? await UPLOAD({ name: fileName, bytes: outBytes, mime: meta.mime }).catch(() => null) : null;
+
+      return {
+        ok: true,
+        file_name: fileName,
+        path,
+        ...(uploadId ? { upload_id: uploadId } : {}),
+        mime: meta.mime,
+        bytes: outBytes.length,
+        filled_cells: edits.length,
+        note:
+          'XONG. Đã điền ' + edits.length + ' ô vào file mẫu, GIỮ NGUYÊN form/công thức/định dạng. ' +
+          'File đã hiện thành thẻ bấm-để-mở trong hội thoại' +
+          (uploadId ? ' (đã sao lưu lên máy chủ).' : '.') +
+          ' KHÔNG gửi đi đâu nữa — người dùng đã có file rồi.',
       };
     },
   },

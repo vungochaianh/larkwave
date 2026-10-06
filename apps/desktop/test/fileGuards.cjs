@@ -51,6 +51,19 @@ assert.ok(!/startsWith\(/.test(hbody), 'handler không được tự so chuỗi 
 console.log('✓ cả send_file lẫn handler IPC đều gọi vào hàm chung, không còn bản chép nào');
 
 // ── Phân loại thao tác: cái nào cần hỏi, cái nào không ───────────────────────────────
-assert.ok(/name: 'send_file'[\s\S]{0,3000}gated: true/.test(files), 'send_file phải gated — tệp đi ra ngoài');
-assert.ok(/name: 'create_file'[\s\S]{0,3000}gated: false/.test(files), 'create_file không nên gated — chỉ ghi thư mục tạm');
-console.log('✓ send_file có hỏi xác nhận, create_file thì không (chặn ở đó là chặn mọi lịch chạy)');
+// Xét theo KHỐI của từng tool (tới `name:` kế tiếp), không theo khoảng cách ký tự cố định — mô tả
+// tool dài ra là chuyện bình thường, không được làm bài kiểm vỡ oan.
+const blockOf = (name, next) => {
+  const i = files.indexOf(`name: '${name}'`);
+  const j = next ? files.indexOf(`name: '${next}'`, i + 1) : files.length;
+  return i < 0 ? '' : files.slice(i, j > i ? j : files.length);
+};
+assert.ok(/gated: true/.test(blockOf('send_file', null)), 'send_file phải gated — tệp đi ra ngoài');
+assert.ok(/gated: false/.test(blockOf('create_file', 'fill_xlsx')), 'create_file không nên gated — chỉ ghi thư mục tạm');
+assert.ok(/gated: false/.test(blockOf('fill_xlsx', 'send_file')), 'fill_xlsx không nên gated — chỉ ghi thư mục tạm');
+// fill_xlsx đọc file mẫu theo `source_path` do MODEL đưa → phải chốt phạm vi qua isInsideDir (chỉ
+// đọc trong thư mục đính kèm / thư mục kết quả của lượt này), không tự so chuỗi.
+const fx = blockOf('fill_xlsx', 'send_file');
+assert.ok(/isInsideDir\(/.test(fx), 'fill_xlsx phải chốt source_path qua isInsideDir');
+assert.ok(!/startsWith\(/.test(fx), 'fill_xlsx không được tự so chuỗi');
+console.log('✓ send_file có hỏi xác nhận; create_file/fill_xlsx thì không, và fill_xlsx chốt phạm vi đọc');
