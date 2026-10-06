@@ -1,9 +1,9 @@
 /**
  * @larkwave/core — the platform-agnostic contract between the SHARED UI and a
  * RUNTIME. The UI (packages/ui) only ever talks to a `RuntimeAdapter`; it never
- * knows whether codegen runs on the server (web) or via the local Claude CLI
- * (desktop). Swap the adapter → same UI runs on both. This is what lets the web
- * app and the Nextron desktop app stay in sync from one codebase.
+ * knows whether the AI runs on the server (web, hosted MAIC) or via the local CLI
+ * runners (desktop). Swap the adapter → same UI runs on both. This is what lets the
+ * web app and the Nextron desktop app stay in sync from one codebase.
  */
 
 import type { SkillContractFields } from './skillContract';
@@ -22,28 +22,10 @@ export type RuntimeKind = 'web' | 'desktop';
  */
 export type AppMode = 'plan' | 'build' | 'ask' | 'auto';
 
-/**
- * How much design/planning happens BEFORE code is written — one vocabulary for both
- * runtimes, mirroring the server-side `BuildPreset` (packages/shared):
- *  - 'turbo'    → no design/spec pass at all, straight to writing files
- *  - 'balanced' → the default flow (unchanged behaviour on both runtimes)
- *  - 'thorough' → keep the planning step (server: blueprint approval gate;
- *                 desktop: a design outline demanded before the first file write)
- * The two runtimes honour it with DIFFERENT levers — the web pipeline has real
- * blueprint/spec stages to skip, while the desktop designs and codes in a single
- * CLI turn — so the preset steers that turn instead. Omitted ⇒ 'balanced'.
- *
- * MUST stay identical to `BuildPreset` in packages/shared/src/index.ts. The union is duplicated
- * because this package serves ui+desktop and that one serves api+web, and neither may import the
- * other; if they drift, the composer offers a value the server rejects.
- */
-export type BuildPreset = 'turbo' | 'balanced' | 'thorough';
-
-export type PreviewTarget = 'desktop' | 'mobile' | 'web';
-
 export type BuildStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
-/** A streamed event from a build, rendered by the shared <BuildProgress/>. */
+/** A streamed event from a local CLI runner turn (claudeRunner / runners/*). The Lark engine
+ *  turns these into LarkChatEvents; the name is historical. */
 export type BuildEvent =
   | { type: 'status'; status: BuildStatus }
   | { type: 'stage'; name: string; state: 'running' | 'done' | 'error' }
@@ -53,282 +35,11 @@ export type BuildEvent =
   | { type: 'result'; appId: string; buildId?: string; previewUrl?: string }
   | { type: 'error'; message: string };
 
-/** One turn in an app's iterate conversation (desktop persists this per app). */
-export interface ConvMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  /** ISO timestamp. */
-  at: string;
-}
-
-/** Desktop: one archived chat session (from handoff or manual archive). */
-export interface AppSessionArchive {
-  id: string;
-  /** ISO timestamp of archive. */
-  at: string;
-  turnCount: number;
-  preview: string;
-  messages: ConvMessage[];
-}
-
-/** Desktop: snapshot after each build/iterate attempt. */
-export interface AppCheckpoint {
-  id: string;
-  at: string;
-  prompt: string;
-  runner: string;
-  runnerLabel?: string;
-  model?: string;
-  mode: AppMode;
-  status: 'success' | 'failed' | 'interrupted';
-  summary?: string;
-}
-
-export interface CreateBuildInput {
-  prompt: string;
-  /** Recognizable mode toggle (maps to Claude permission-mode on desktop). */
-  mode: AppMode;
-  /** App kind (web/mobile/extension/auto) — the web's "Loại app". */
-  track?: 'web' | 'mobile' | 'extension' | 'desktop' | 'game' | 'auto';
-  /** Workflow preset ("Quy trình"): how much design/planning runs before code.
-   *  Omitted ⇒ the runtime's existing default flow (see `BuildPreset`). */
-  preset?: BuildPreset;
-  /** Per-build model choice ('opus'|'sonnet' on web; a runner-specific model id on desktop). */
-  model?: string;
-  /** Desktop only: which CLI runner to drive ('claude'|'grok'|'gemini'|'codex').
-   *  Default 'claude'. Ignored on web (server codegen). */
-  runner?: string;
-  /** Brand/accent colour `#rrggbb`. */
-  primaryColor?: string;
-  /** Layout/style hint (e.g. 'landing'|'dashboard'|'auto'). */
-  style?: string;
-  /** Light/dark preference: 'both'|'light'|'dark'. */
-  theme?: string;
-  /** Languages the app should support. */
-  languages?: string[];
-  /** Optional website URL to clone (mirrors the web "Sao chép từ website"). */
-  sourceUrl?: string;
-  /** Concrete feature toggles (dark mode, blog, auth…) — same shape as web. */
-  features?: Record<string, boolean>;
-  /** Uploaded attachment ids (pasted screenshots / files) for context. */
-  attachmentIds?: string[];
-  /** Iterate an existing app instead of creating a new one. */
-  appId?: string;
-  /** Build target; drives which preview the desktop runtime can spin up. */
-  target?: PreviewTarget;
-  /** Desktop only: replace the composed user-message body (advanced prompt tuning). */
-  userPromptOverride?: string;
-  /** Desktop only: replace the system/append-system-prompt block. */
-  systemPromptOverride?: string;
-  /** Desktop only: replace the entire folded prompt file (Grok/Gemini/Codex). */
-  fullPromptOverride?: string;
-
-  /** Desktop only: a read-only Q&A turn ("Trợ giúp") — don't persist it to the
-   *  app's conversation or change the app's status/files. */
-  ephemeral?: boolean;
-
-  /** Project name the user typed; the workspace tab shows `<name>-workspace`. Folded into
-   *  the prompt so codegen names things consistently. (Phase B — single full-stack app.) */
-  projectName?: string;
-  /** Desktop only: PARENT dir the new project's folder is created under (from the composer's
-   *  "Vị trí lưu" picker). Omitted = the global default location. Recorded per-app so every
-   *  later op (preview/iterate/deploy) resolves the same folder. */
-  saveDir?: string;
-  /** Which parts to build: frontend / backend+DB / admin CMS. Folded into the prompt so
-   *  codegen scaffolds exactly those. (Phase B; Phase A splits them into real services.) */
-  components?: { home?: boolean; api?: boolean; cms?: boolean };
-  /** Phase A: scaffold the selected components as SEPARATE service sub-folders (home/api/cms),
-   *  each its own dev server + port, with a `.toolswave/services.json` manifest. */
-  multiService?: boolean;
-  /** "Bộ site" (web): mỗi mặt được chọn thành MỘT site riêng, deploy riêng, nối nhau qua một
-   *  API dùng chung. Dưới 2 mặt thì máy chủ bỏ qua — đó là app đơn như bình thường. */
-  surfaces?: SiteSurface[];
-}
-
-/**
- * Các mặt của một hệ thống, mỗi mặt là một site riêng biệt.
- * Bản sao có chủ đích của `SITE_SURFACES` trong @larkwave/shared — core (ui + desktop) và
- * shared (api + web) không được import lẫn nhau. Sửa một bên phải sửa cả bên kia.
- */
-export const SITE_SURFACES = ['site', 'cms', 'portal', 'api'] as const;
-export type SiteSurface = (typeof SITE_SURFACES)[number];
-
-/** A reference to an uploaded attachment. */
-export interface AttachmentRef {
-  id: string;
-  name: string;
-}
-
-export interface AppSummary {
-  id: string;
-  name: string;
-  status: string;
-  /** Public/live URL (web) or local preview URL (desktop), if any. */
-  url?: string;
-  updatedAt?: string;
-  /** App type — for the "web/mobile/extension" tag on the card. */
-  track?: 'web' | 'mobile' | 'extension' | 'desktop' | 'game';
-}
-
-/**
- * A ready-made prompt template, served by `GET /templates` on the App Builder
- * API (api.toolswave.net). Shared by web + desktop so the "Dùng mẫu" / quick
- * starter experience is identical. `prompt` is prefilled into the composer when
- * the user picks the template.
- */
-export interface PromptTemplate {
-  id: string;
-  title: string;
-  description?: string;
-  category?: string;
-  track?: 'web' | 'mobile' | 'extension' | 'desktop' | 'game';
-  /** Accent colour `#rrggbb` for the card. */
-  accent?: string;
-  /** Prompt text prefilled into the composer when the template is used. */
-  prompt: string;
-}
-
-export interface PreviewHandle {
-  /** URL to load in a webview / BrowserView / iframe (the primary service in a workspace). */
-  url: string;
-  target: PreviewTarget;
-  /** Phase-A multi-service workspace: every running service + its url (empty for single apps). */
-  services?: { name: string; url: string }[];
-  /** 'expo' = a React Native app; the UI shows a QR / mobile view instead of a plain iframe. */
-  kind?: 'web' | 'expo';
-  /** exp://… to open the app in Expo Go on a phone (mobile apps). */
-  expoUrl?: string;
-  /** Stop the underlying dev server / process (desktop) — no-op on web. */
-  stop(): Promise<void>;
-}
-
-/** One dev server running now (across ALL apps) — for the global ports manager. */
-export interface RunningPreview {
-  appId: string;
-  service?: string;
-  url: string;
-  port: number;
-  pid?: number;
-  target: PreviewTarget;
-}
-
-/** One captured view of a running app, saved under `<appDir>/.toolswave/shots/`. */
-export interface AppShot {
-  /** The view's label (from `.toolswave/views.json`), e.g. "Trang chính". */
-  label: string;
-  /** App-relative path of the PNG, e.g. `.toolswave/shots/trang-chinh.png`. */
-  path: string;
-  /** Bare file name of the PNG, e.g. `trang-chinh.png`. */
-  file: string;
-}
-
-/** Result of screenshotting an app's views (never rejects — `ok:false` when nothing was shot). */
-export interface AppShotResult {
-  ok: boolean;
-  shots: AppShot[];
-  /** ISO time of the capture. */
-  at: string;
-}
-
-/** An app's cover screenshot, inlined as a `data:` URL (the renderer origin can't load `file://`). */
-export interface AppScreenshot {
-  dataUrl: string;
-  at: string;
-}
-
-/** A service declared in an app's `.toolswave/services.json` (home/cms/api), without starting it. */
-export interface AppServiceInfo {
-  name: string;
-  kind?: 'vite' | 'node';
-}
-
-/** An API endpoint of a generated app's backend (for the Swagger-like tester). */
-export interface ApiRoute {
-  method: string;
-  path: string;
-  label?: string;
-}
-
-/** Result of an API-tester request (proxied through main to avoid CORS + reach 127.0.0.1). */
-export interface ApiResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: Record<string, string>;
-  body: string;
-  timeMs: number;
-  error?: string;
-}
-
-export interface ApiRequestInput {
-  method: string;
-  path: string;
-  query?: Record<string, string>;
-  headers?: Record<string, string>;
-  body?: string;
-}
-
 export interface AuthState {
   signedIn: boolean;
   email?: string;
   /** For desktop: whether a usable local Claude CLI/SDK was detected. */
   claudeAvailable?: boolean;
-}
-
-export interface DeployResult {
-  url: string;
-}
-
-/** Desktop only: clone a Git repo into a new local app. */
-export interface GitImportInput {
-  /** Clone URL — `https://…/owner/repo(.git)` or `git@host:owner/repo.git`. */
-  url: string;
-  /** Branch to check out (defaults to the repo's default branch). */
-  branch?: string;
-  /** App name to show (defaults to the repo name). */
-  name?: string;
-}
-
-export interface GitImportResult {
-  appId: string;
-  name: string;
-  /** Env vars the cloned project expects (from its `.env.example`) — drives the config form. */
-  envRequired?: string[];
-  /** Detected package manager + dev script, so the UI/preview run the project correctly. */
-  packageManager?: 'pnpm' | 'yarn' | 'bun' | 'npm';
-  devScript?: string | null;
-}
-
-/** One env var a local app expects + its hint/default (for the "Cấu hình .env" form). */
-export interface EnvVarSpec {
-  name: string;
-  comment?: string;
-  defaultValue?: string;
-}
-/** The env config a local app needs: expected vars + whether a `.env` already exists. */
-export interface AppEnvSpec {
-  keys: EnvVarSpec[];
-  hasEnv: boolean;
-}
-
-/** A navigable surface of a full-stack app (public page / CMS / API) for the preview switcher. */
-export interface AppView {
-  path: string;
-  label: string;
-}
-
-/** Desktop only: a started server (Docker) deploy of a local app. */
-export interface ServerDeployStartResult {
-  deployId: string;
-}
-/** Desktop only: polled status of a server (Docker) deploy. */
-export interface ServerDeployStatus {
-  status: 'deploying' | 'live' | 'failed' | string;
-  /** Streaming log (synth + rsync + docker compose + nginx/tunnel). */
-  log: string;
-  /** Public URLs of the running services (when live). */
-  urls: string[];
-  error?: string;
 }
 
 /** Desktop code-push status (renderer OTA + full-version availability). */
@@ -353,38 +64,7 @@ export interface DesktopUpdateInfo {
   notice?: string;
 }
 
-/** A source file of a generated app (relative path + UTF-8 text content). */
-export interface AppFile {
-  path: string;
-  content: string;
-}
-
 // ── Local SQLite browser (desktop "Cơ sở dữ liệu" tab) ──────────────────────────
-export interface AppDbColumn {
-  name: string;
-  type: string;
-}
-export interface AppDbTable {
-  name: string;
-  rows: number;
-  columns: AppDbColumn[];
-}
-/** Tables in a local app's SQLite DB. `available:false` = no DB file yet / engine missing. */
-export interface AppDbOverview {
-  available: boolean;
-  path?: string;
-  tables: AppDbTable[];
-  error?: string;
-}
-/** Rows of a table or the result of a SQL query. `rows` is row-major; `columns` are headers.
- *  For table reads the first column is `__rowid` (used to UPDATE/DELETE a specific row). */
-export interface AppDbResult {
-  columns: string[];
-  rows: unknown[][];
-  total?: number;
-  rowsModified?: number;
-  error?: string;
-}
 
 /** Local Claude Code CLI status (desktop only) — from `claude auth status`. */
 export interface ClaudeStatus {
@@ -394,9 +74,6 @@ export interface ClaudeStatus {
   email?: string;
   plan?: string; // subscriptionType, e.g. "max"
   authMethod?: string; // e.g. "claude.ai"
-  /** Optional local CodeGraph (knowledge-graph MCP) — when installed, the agent explores
-   *  via the graph instead of grep+Reads when iterating, cutting tool calls + tokens. */
-  codegraph?: { installed: boolean; version?: string };
 }
 
 export type ClaudeLoginEvent =
@@ -476,27 +153,8 @@ export interface ClaudeControls {
 // ─────────────────────────────────────────────────────────────────────────────
 // Multi-CLI runners (desktop only) — Claude + Grok + Gemini + Codex behind one
 // registry. The renderer's provider/model picker + "AI runners" connect panel
-// talk to these; the build composer passes the chosen `runner` to createBuild.
+// talk to these; the chat composers pass the chosen `runner` to larkChat.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Status of one desktop CLI runner (provider) — drives the model picker + connect panel. */
-/** Desktop: preview of the exact prompt sent to a CLI runner (Grok/Gemini/Codex/Claude). */
-export interface RunnerPromptPreview {
-  runner: string;
-  runnerLabel: string;
-  model?: string;
-  mode: AppMode;
-  cwd: string;
-  /** Claude uses --append-system-prompt; others fold into one --prompt-file. */
-  delivery: 'append-system-prompt' | 'single-prompt-file';
-  sections: {
-    scopeBackstop: string | null;
-    system: string;
-    user: string;
-  };
-  fullText: string;
-  promptFileName: string;
-}
 
 export interface RunnerStatusInfo {
   id: string;
@@ -634,10 +292,6 @@ export interface AgentControls {
   listTelegramBindings(): Promise<AgentClientStatus>;
   /** Unbind a Telegram chat. */
   deleteTelegramBinding(id: string): Promise<AgentClientStatus>;
-  /** Push this device's local app list to the server so the phone can list + edit them.
-   *  `reason` distinguishes failure causes: 'auth' (not signed-in / not connected),
-   *  'timeout' (network/server stall), 'error' (server 5xx or transport error). */
-  syncApps(): Promise<{ ok: boolean; count: number; reason?: 'auth' | 'timeout' | 'error' }>;
   /** Subscribe to live status pushes (connection up/down, task started/finished). */
   onEvent(cb: (s: AgentClientStatus) => void): () => void;
 }
@@ -1003,9 +657,7 @@ export interface LarkSessionMeta {
 
 /** Who currently holds the shared AI turn-lock, mirrored to every tab. */
 export interface AgentBusyOwner {
-  kind: 'build' | 'lark' | 'relay';
-  /** Workspace/app id (build turns). */
-  appId?: string;
+  kind: 'lark' | 'relay';
   /** Lark conversation id (lark turns). */
   sessionId?: string;
   /** Human label for the blocked-tab banner. */
@@ -1661,8 +1313,8 @@ export interface LarkBotStatus {
 
 /**
  * The single interface every platform implements:
- *  - WebRuntimeAdapter    → HTTP calls to api.toolswave.net (metered, server codegen)
- *  - LocalRuntimeAdapter  → drives the local Claude CLI/SDK + local preview (cheap)
+ *  - WebRuntimeAdapter    → HTTP calls to api.toolswave.net (metered, hosted AI)
+ *  - LocalRuntimeAdapter  → drives the local CLI runners + Lark engine (cheap)
  *  - IpcRuntimeAdapter     → renderer-side proxy that forwards to LocalRuntimeAdapter
  *                            in Electron's main process over IPC
  */
@@ -1673,21 +1325,9 @@ export interface RuntimeAdapter {
   signIn?(email: string, password: string): Promise<AuthState>;
   signOut?(): Promise<void>;
 
-  listApps(): Promise<AppSummary[]>;
 
-  /**
-   * Ready-made prompt templates from the App Builder API (api.toolswave.net),
-   * for the "Dùng mẫu" quick-start. Implemented on every runtime so web and
-   * desktop show the same catalogue. Returns [] when offline/unavailable.
-   */
-  templates?(): Promise<PromptTemplate[]>;
 
-  /** Desktop only: preview the composed runner prompt before sending (no build). */
-  composeRunnerPrompt?(input: CreateBuildInput): Promise<RunnerPromptPreview>;
 
-  /** Start a build and stream progress; UI renders the events identically. */
-  createBuild(input: CreateBuildInput): AsyncIterable<BuildEvent>;
-  cancelBuild?(appId: string): Promise<void>;
   /** Live holder of the shared "one AI turn at a time" lock (null when free). Lets every
    *  tab mirror the lock so it can block its own send while another tab is mid-answer. */
   onAgentBusy?(cb: (owner: AgentBusyOwner | null) => void): () => void;
@@ -1701,21 +1341,10 @@ export interface RuntimeAdapter {
   /** Không truyền khoá = mở khoá khẩn cấp TẤT CẢ; truyền khoá = chỉ dừng đúng lượt đó. */
   agentUnlock?(key?: string): Promise<void>;
 
-  /** The persisted iterate conversation for an app (desktop). */
-  appConversation?(appId: string): Promise<ConvMessage[]>;
 
-  /** Desktop: archived chat sessions (`conversation.<ts>.json`). */
-  appSessions?(appId: string): Promise<AppSessionArchive[]>;
 
-  /** Desktop: build/iterate checkpoints (`.toolswave/checkpoints.json`). */
-  appCheckpoints?(appId: string): Promise<AppCheckpoint[]>;
 
-  /** Summarize the app's conversation, archive it, and seed a fresh session that inherits the
-   *  summary as carryover (desktop "tóm tắt & phiên mới"). Returns the generated summary. */
-  appHandoffSession?(appId: string): Promise<{ summary: string }>;
 
-  /** Rename a local app / conversation (writes meta.name). */
-  renameApp?(appId: string, name: string): Promise<void>;
 
   // ── Skills (Claude-style SKILL.md folders the local CLI uses in BOTH builder + Lark) ──
   /** List the user's imported/created skills. */
@@ -1836,116 +1465,26 @@ export interface RuntimeAdapter {
    */
   supportsSkillCommands?: boolean;
 
-  /** Upload an attachment (pasted screenshot / file) for build context. */
-  uploadAttachment?(file: File): Promise<AttachmentRef>;
   /** Desktop: hard-exit the app (force) — used before a core reinstall so a hidden window
    *  can't keep the process alive and block the drag-replace. */
   quitApp?(): Promise<void>;
 
-  /** Spin up (or fetch) a preview for an app on the given target. */
-  preview(appId: string, target: PreviewTarget): Promise<PreviewHandle>;
-  /** Desktop only: stop a running local preview dev server (frees the process when the user
-   *  leaves the app). No-op/undefined on web (previews are server-side). */
-  stopPreview?(appId: string, service?: string): Promise<void>;
-  /** Desktop only: stop a local preview then start it again (the ports panel's "Khởi động lại").
-   *  `service` restarts just that one workspace service; the api service keeps its previous port
-   *  so the still-running frontends' `VITE_API_URL` stays valid. Undefined on web. */
-  restartPreview?(appId: string, service?: string): Promise<void>;
-  /** Every dev server running now across ALL apps (global ports manager). */
-  listRunningPreviews?(): Promise<RunningPreview[]>;
-  /** Desktop only: screenshot the app's views from its RUNNING local dev server into
-   *  `<appDir>/.toolswave/shots/`. `force` re-shoots even if a fresh capture exists.
-   *  Never rejects. Undefined on web (no local browser engine to capture with). */
-  captureAppScreenshot?(appId: string, opts?: { force?: boolean }): Promise<AppShotResult>;
-  /** Desktop only: the app's cover screenshot as a `data:` URL for the app card, or null when
-   *  the app was never captured. Undefined on web. */
-  appScreenshot?(appId: string): Promise<AppScreenshot | null>;
-  /** Services declared for an app (home/cms/api) without starting them. */
-  appServices?(appId: string): Promise<AppServiceInfo[]>;
-  /** The app backend's API endpoints (for the tester); parsed from functions/api + views. */
-  apiRoutes?(appId: string): Promise<ApiRoute[]>;
-  /** Send a request to the app's running api service (proxied via main → no CORS, reaches loopback). */
-  apiRequest?(appId: string, req: ApiRequestInput): Promise<ApiResponse>;
 
-  /** Publish the app to a public URL (server deploy on web; opt-in on desktop). */
-  deploy?(appId: string): Promise<DeployResult>;
 
-  /** Desktop only: deploy a local FULL-STACK app's backend to the Docker server.
-   *  Synthesizes docker-compose with the local Claude if missing, uploads the
-   *  source, and runs it on the server. Returns a deployId to poll. Undefined on web. */
-  deployServer?(appId: string): Promise<ServerDeployStartResult>;
-  /** Desktop only: poll a server deploy started by deployServer. */
-  deployServerStatus?(deployId: string): Promise<ServerDeployStatus>;
 
-  /** Desktop only: read a local app's source files for the Code view (excludes
-   *  node_modules/dist/.git + large binaries). Undefined on web. */
-  appFiles?(appId: string): Promise<AppFile[]>;
 
-  /** Desktop only: write back an edited source file of a local app (`path` is relative to
-   *  the app root; escapes are rejected). Powers the editable Code view. Undefined on web. */
-  writeAppFile?(appId: string, path: string, content: string): Promise<void>;
-  /** Desktop only: the env vars a local app expects (parsed from `.env.example`) + whether a
-   *  `.env` exists yet. Drives the "Cấu hình .env" form so cloned projects can be configured. */
-  readAppEnvSpec?(appId: string): Promise<AppEnvSpec>;
-  /** Desktop only: the app's surfaces (public/CMS/API routes) from `.toolswave/views.json`,
-   *  for the preview's "Trang/API" switcher. Empty when the app didn't declare any. */
-  appViews?(appId: string): Promise<AppView[]>;
-  /** The full prompt last sent to the runner (from `.toolswave/last-prompt-audit.txt`); '' if none. */
-  appLastPrompt?(appId: string): Promise<string>;
 
-  /** Desktop only: local SQLite browser/editor for a generated full-stack app. `appDb`
-   *  lists tables; `appDbRows` pages a table's rows; `appDbExec` runs SQL (writes persist);
-   *  `appDbCreate` seeds a fresh data.db when the app has none. Undefined on web. */
-  appDb?(appId: string): Promise<AppDbOverview>;
-  appDbRows?(appId: string, table: string, limit: number, offset: number): Promise<AppDbResult>;
-  appDbExec?(appId: string, sql: string, params?: unknown[]): Promise<AppDbResult>;
-  appDbCreate?(appId: string): Promise<AppDbOverview>;
 
-  /** Desktop only: clone a Git repo into a new LOCAL app (so you can edit it with
-   *  Claude + preview + deploy). Uses the machine's local `git` (existing creds/SSH
-   *  handle private repos). Undefined on web. */
-  gitImportLocal?(input: GitImportInput): Promise<GitImportResult>;
 
-  /** Desktop only: import an EXISTING project FOLDER (with code) as a local app to edit +
-   *  run with the agents. Opens a folder picker; returns null if cancelled. Undefined on web. */
-  importLocalFolder?(): Promise<GitImportResult | null>;
 
-  /** Desktop only: import a folder by ABSOLUTE PATH — no native dialog (the renderer picks the
-   *  folder with an `<input webkitdirectory>` and resolves the path). Reliable even when the OS
-   *  folder-sheet is flaky. Returns null if the path is empty/cancelled. */
-  importLocalFolderPath?(path: string): Promise<GitImportResult | null>;
-  /** Desktop only: resolve a File (from an `<input>`) to its absolute filesystem path
-   *  (Electron `webUtils.getPathForFile`). Runs synchronously in the preload. Undefined on web. */
-  pathForFile?(file: File): string | null;
 
-  /** Desktop only: permanently delete a local app's directory. Undefined on web. */
-  deleteApp?(appId: string): Promise<void>;
 
-  /** Desktop only: reveal the app's folder in Finder/Explorer. Undefined on web. */
-  openAppFolder?(appId: string): Promise<void>;
 
-  /** Desktop only: where an app is / will be saved on disk. `appId` omitted → just the default
-   *  root. Used to SHOW the save path + whether it's a custom (override) location. Undefined on web. */
-  appLocation?(appId?: string): Promise<{ dir: string; defaultDir: string; isOverride: boolean }>;
 
-  /** Desktop only: open a native folder picker → the chosen PARENT dir for a new project
-   *  (or null if cancelled). Feed the result into a build as `saveDir`. Undefined on web. */
-  chooseAppLocation?(): Promise<string | null>;
 
-  /** Desktop only: set the GLOBAL default save dir for NEW projects (existing apps aren't moved).
-   *  Pass null to reset to the built-in default. Undefined on web. */
-  setDefaultAppsDir?(dir: string | null): Promise<void>;
 
-  /** Desktop only: OLD flat apps that can be restructured to `{slug}-workspace/{slug}-home`. */
-  listMigratableApps?(): Promise<{ id: string; name: string }[]>;
 
-  /** Desktop only: restructure ONE flat app into the named-workspace layout (backs up first,
-   *  reversible). Idempotent — an already-migrated app returns `{ok:true, skipped:true}`. */
-  migrateApp?(appId: string, newName?: string): Promise<{ ok: boolean; skipped?: boolean; newName?: string; backup?: string; error?: string }>;
 
-  /** Desktop only: export the app as a .zip via a native save dialog. Returns the
-   *  saved path, or null if cancelled. Undefined on web. */
-  downloadAppZip?(appId: string): Promise<string | null>;
 
   /** Local Claude CLI controls — present on desktop, undefined on web. */
   claude?: ClaudeControls;

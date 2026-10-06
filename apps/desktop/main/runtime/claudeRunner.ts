@@ -1,11 +1,9 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppMode, BuildEvent, ClaudeLoginEvent, ClaudeStatus, KeyValidation } from '@larkwave/core';
 import { getStoredToken, removeStoredToken, storeToken, tokenEnvVar } from './claudeTokenStore';
 import { getActiveKey, clearActiveKey } from './claudeKeyStore';
-import { codegraphAvailable, codegraphStatus, ensureIndexed, writeCodegraphMcpConfig, CODEGRAPH_SYSTEM_PROMPT } from './codegraph';
 import { contextUsageFromResult, CONTEXT_WARN_THRESHOLD } from './contextBudget';
 
 /**
@@ -175,10 +173,9 @@ function capture(args: string[]): Promise<{ code: number; out: string; err: stri
   });
 }
 
-/** Read `claude auth status` (+ version) + the optional CodeGraph install state. */
+/** Read `claude auth status` (+ version). */
 export async function claudeStatus(): Promise<ClaudeStatus> {
-  const [base, codegraph] = await Promise.all([claudeStatusBase(), codegraphStatus()]);
-  return { ...base, codegraph };
+  return claudeStatusBase();
 }
 
 async function claudeStatusBase(): Promise<ClaudeStatus> {
@@ -343,34 +340,17 @@ export async function* runClaude(opts: ClaudeRunOptions): AsyncGenerator<BuildEv
     '--verbose',
     '--permission-mode',
     PERMISSION_MODE[opts.mode],
-    // The generated app is throwaway/local — let Claude edit files in its cwd.
+    // Let Claude read/write files in its working dir (skill drafts, scratch files).
     '--add-dir',
     opts.cwd,
   ];
   if (opts.model) args.push('--model', opts.model);
   // Optional insurance so a STILL-ACTIVELY-WORKING big build isn't truncated by a low CLI turn
   // default. ENV-GATED + OFF by default: an unrecognised flag on the pinned `claude` would fail
-  // EVERY spawn, and the real completion fix is createBuild's loop-until-complete (this is only
-  // secondary). Set TW_RUNNER_MAX_TURNS (e.g. "40") after validating the flag on the installed CLI.
+  // EVERY spawn. Set TW_RUNNER_MAX_TURNS (e.g. "40") after validating the flag on the installed CLI.
   if (process.env.TW_RUNNER_MAX_TURNS) args.push('--max-turns', process.env.TW_RUNNER_MAX_TURNS);
 
-  // OPTIONAL CodeGraph (degrades silently when not installed): on an ITERATE run — the app
-  // dir already has code (a package.json) — attach codegraph as an MCP server so the agent
-  // explores via its knowledge graph (one call → relevant source + call-paths + blast-radius)
-  // instead of grep + repeated Reads, cutting tool calls + the user's Claude tokens.
-  let appendSystemPrompt = opts.appendSystemPrompt;
-  let cgDir: string | undefined;
-  if (existsSync(join(opts.cwd, 'package.json')) && (await codegraphAvailable())) {
-    ensureIndexed(opts.cwd);
-    const cfg = await writeCodegraphMcpConfig(opts.cwd);
-    cgDir = cfg.dir;
-    // --strict-mcp-config = only OUR codegraph server (so its tool isn't deferred behind the
-    // CLI's ToolSearch). We KEEP the built-in edit tools (codegen needs Write/Edit) — do NOT
-    // pass `--tools ""` (that's the Lark agent's read-only setup). --allowedTools auto-approves
-    // the codegraph MCP call headlessly (acceptEdits won't auto-approve a non-edit tool).
-    args.push('--mcp-config', cfg.path, '--strict-mcp-config', '--allowedTools', 'mcp__codegraph');
-    appendSystemPrompt = [appendSystemPrompt, CODEGRAPH_SYSTEM_PROMPT].filter(Boolean).join('\n\n');
-  }
+  const appendSystemPrompt = opts.appendSystemPrompt;
   if (appendSystemPrompt) args.push('--append-system-prompt', appendSystemPrompt);
 
   yield { type: 'status', status: 'running' };
@@ -484,7 +464,7 @@ export async function* runClaude(opts: ClaudeRunOptions): AsyncGenerator<BuildEv
     }
   } finally {
     // Runs on normal completion AND on an early abort (.return()): always stop the watchdog,
-    // kill a still-alive child, and clean the temp CodeGraph dir — no orphaned process/dir.
+    // kill a still-alive child — no orphaned process.
     stopWatch();
     if (!done) {
       try {
@@ -493,7 +473,6 @@ export async function* runClaude(opts: ClaudeRunOptions): AsyncGenerator<BuildEv
         /* already gone */
       }
     }
-    if (cgDir) await rm(cgDir, { recursive: true, force: true }).catch(() => {});
   }
   yield { type: 'stage', name: 'Khởi động Claude CLI', state: exitCode === 0 ? 'done' : 'error' };
   yield { type: 'status', status: exitCode === 0 ? 'succeeded' : 'failed' };

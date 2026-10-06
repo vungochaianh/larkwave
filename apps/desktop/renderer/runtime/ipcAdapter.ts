@@ -5,30 +5,14 @@ import type {
   TelegramLinkResponse,
   UpdateTokenNotifyInput,
   ApiKeyList,
-  AppFile,
-  AppDbOverview,
-  AppDbResult,
-  AppSummary,
   AuthState,
-  BuildEvent,
   ClaudeControls,
   ClaudeLoginEvent,
   ClaudeStatus,
   KeyValidation,
   RunnerControls,
   RunnerStatusInfo,
-  ConvMessage,
-  AppCheckpoint,
-  AppSessionArchive,
-  AppEnvSpec,
-  AppView,
-  CreateBuildInput,
-  RunnerPromptPreview,
-  DeployResult,
   DesktopUpdateInfo,
-  GitImportInput,
-  GitImportResult,
-  AttachmentRef,
   LarkAppRef,
   LarkAutomation,
   LarkAutomationInput,
@@ -44,7 +28,6 @@ import type {
   LarkBotStatus,
   LarkChatEvent,
   LarkChatInput,
-  LarkChatMode,
   LarkConnection,
   LarkWebInfo,
   LarkWebRecording,
@@ -56,19 +39,7 @@ import type {
   LarkExtractResult,
   PluginInfo,
   PluginPanelInfo,
-  PreviewHandle,
-  PreviewTarget,
-  RunningPreview,
-  AppScreenshot,
-  AppShotResult,
-  AppServiceInfo,
-  ApiRoute,
-  ApiResponse,
-  ApiRequestInput,
-  PromptTemplate,
   RuntimeAdapter,
-  ServerDeployStartResult,
-  ServerDeployStatus,
   SkillAttachment,
   SkillContractFields,
   LarkPendingPrompts,
@@ -87,13 +58,6 @@ import type {
 /** Shape of the bridge exposed by preload.ts via contextBridge. */
 interface Bridge {
   auth(): Promise<AuthState>;
-  listApps(): Promise<AppSummary[]>;
-  templates(): Promise<PromptTemplate[]>;
-  appConversation(appId: string): Promise<ConvMessage[]>;
-  appSessions(appId: string): Promise<AppSessionArchive[]>;
-  appCheckpoints(appId: string): Promise<AppCheckpoint[]>;
-  appHandoffSession(appId: string): Promise<{ summary: string }>;
-  renameApp(appId: string, name: string): Promise<void>;
   listSkills(): Promise<SkillInfo[]>;
   importSkill(scope?: string[], tags?: string[]): Promise<SkillInfo[]>;
   createSkill(name: string, instructions: string, scope?: string[], tags?: string[], command?: string, contract?: SkillContractFields): Promise<SkillInfo[]>;
@@ -109,45 +73,7 @@ interface Bridge {
   readSkill?(id: string): Promise<{ id: string; name: string; instructions: string; command?: string; contract?: SkillContractFields }>;
   updateSkill?(id: string, patch: { name?: string; instructions?: string; scope?: string[]; tags?: string[]; command?: string; contract?: SkillContractFields }): Promise<SkillInfo[]>;
   deleteSkill(id: string): Promise<SkillInfo[]>;
-  appFiles(appId: string): Promise<AppFile[]>;
-  writeAppFile(appId: string, path: string, content: string): Promise<void>;
-  readAppEnvSpec(appId: string): Promise<AppEnvSpec>;
-  appViews(appId: string): Promise<AppView[]>;
-  appLastPrompt?(appId: string): Promise<string>;
-  appDb(appId: string): Promise<AppDbOverview>;
-  appDbRows(appId: string, table: string, limit: number, offset: number): Promise<AppDbResult>;
-  appDbExec(appId: string, sql: string, params?: unknown[]): Promise<AppDbResult>;
-  appDbCreate(appId: string): Promise<AppDbOverview>;
-  gitImportLocal(input: GitImportInput): Promise<GitImportResult>;
-  importLocalFolder(): Promise<GitImportResult | null>;
-  // Optional: an OLD installed main won't have these preload methods even after a renderer push.
-  importLocalFolderPath?(path: string): Promise<GitImportResult | null>;
-  getPathForFile?(file: File): string | null;
-  uploadAttachment(payload: { name: string; type?: string; bytes: Uint8Array }): Promise<AttachmentRef>;
   quitApp(): Promise<void>;
-  deleteApp(appId: string): Promise<void>;
-  openAppFolder(appId: string): Promise<void>;
-  appLocation(appId?: string): Promise<{ dir: string; defaultDir: string; isOverride: boolean }>;
-  chooseAppLocation(): Promise<string | null>;
-  setDefaultAppsDir(dir: string | null): Promise<void>;
-  listMigratableApps(): Promise<{ id: string; name: string }[]>;
-  migrateApp(appId: string, newName?: string): Promise<{ ok: boolean; skipped?: boolean; newName?: string; backup?: string; error?: string }>;
-  downloadAppZip(appId: string): Promise<string | null>;
-  preview(appId: string, target: string): Promise<{ url: string; target: PreviewTarget; services?: { name: string; url: string }[]; kind?: 'web' | 'expo'; expoUrl?: string }>;
-  stopPreview(appId: string, service?: string): Promise<void>;
-  restartPreview?(appId: string, service?: string): Promise<void>;
-  listRunningPreviews?(): Promise<RunningPreview[]>;
-  captureAppScreenshot?(appId: string, opts?: { force?: boolean }): Promise<AppShotResult>;
-  appScreenshot?(appId: string): Promise<AppScreenshot | null>;
-  appServices?(appId: string): Promise<AppServiceInfo[]>;
-  apiRoutes?(appId: string): Promise<ApiRoute[]>;
-  apiRequest?(appId: string, req: ApiRequestInput): Promise<ApiResponse>;
-  deploy(appId: string, token: string): Promise<DeployResult>;
-  deployServer(appId: string, token: string): Promise<ServerDeployStartResult>;
-  deployServerStatus(deployId: string, token: string): Promise<ServerDeployStatus>;
-  createBuild(streamId: string, input: CreateBuildInput): Promise<{ started: boolean }>;
-  composeRunnerPrompt(input: CreateBuildInput): Promise<RunnerPromptPreview>;
-  onBuildEvent(cb: (streamId: string, ev: BuildEvent | { type: '__end__' }) => void): () => void;
   claudeStatus(): Promise<ClaudeStatus>;
   claudeLogout(): Promise<void>;
   claudeSetToken(token: string): Promise<ClaudeStatus>;
@@ -171,9 +97,7 @@ interface Bridge {
   agentTelegramLink(token?: string): Promise<TelegramLinkResponse>;
   agentTelegramBindings(token?: string): Promise<AgentClientStatus>;
   agentDeleteTelegramBinding(id: string, token?: string): Promise<AgentClientStatus>;
-  agentSyncApps(token?: string): Promise<{ ok: boolean; count: number; reason?: 'auth' | 'timeout' | 'error' }>;
   onAgentEvent(cb: (s: AgentClientStatus) => void): () => void;
-  cancelBuild(appId: string): Promise<void>;
   agentBusyNow(): Promise<AgentBusyOwner | null>;
   agentUnlock(): Promise<void>;
   onAgentBusy(cb: (owner: AgentBusyOwner | null) => void): () => void;
@@ -335,27 +259,6 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   auth(): Promise<AuthState> {
     return this.bridge.auth();
   }
-  listApps(): Promise<AppSummary[]> {
-    return this.bridge.listApps();
-  }
-  templates(): Promise<PromptTemplate[]> {
-    return this.bridge.templates();
-  }
-  appConversation(appId: string): Promise<ConvMessage[]> {
-    return this.bridge.appConversation(appId);
-  }
-  appSessions(appId: string): Promise<AppSessionArchive[]> {
-    return this.bridge.appSessions(appId);
-  }
-  appCheckpoints(appId: string): Promise<AppCheckpoint[]> {
-    return this.bridge.appCheckpoints(appId);
-  }
-  appHandoffSession(appId: string): Promise<{ summary: string }> {
-    return this.bridge.appHandoffSession(appId);
-  }
-  renameApp(appId: string, name: string): Promise<void> {
-    return this.bridge.renameApp(appId, name);
-  }
   listSkills(): Promise<SkillInfo[]> {
     return this.bridge.listSkills();
   }
@@ -423,172 +326,15 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   deleteSkill(id: string): Promise<SkillInfo[]> {
     return this.bridge.deleteSkill(id);
   }
-  appFiles(appId: string): Promise<AppFile[]> {
-    return this.bridge.appFiles(appId);
-  }
-  writeAppFile(appId: string, path: string, content: string): Promise<void> {
-    return this.bridge.writeAppFile(appId, path, content);
-  }
-  readAppEnvSpec(appId: string): Promise<AppEnvSpec> {
-    return this.bridge.readAppEnvSpec(appId);
-  }
-  appViews(appId: string): Promise<AppView[]> {
-    return this.bridge.appViews(appId);
-  }
-  appLastPrompt(appId: string): Promise<string> {
-    return this.bridge.appLastPrompt ? this.bridge.appLastPrompt(appId) : Promise.resolve('');
-  }
-  appDb(appId: string): Promise<AppDbOverview> {
-    return this.bridge.appDb(appId);
-  }
-  appDbRows(appId: string, table: string, limit: number, offset: number): Promise<AppDbResult> {
-    return this.bridge.appDbRows(appId, table, limit, offset);
-  }
-  appDbExec(appId: string, sql: string, params?: unknown[]): Promise<AppDbResult> {
-    return this.bridge.appDbExec(appId, sql, params);
-  }
-  appDbCreate(appId: string): Promise<AppDbOverview> {
-    return this.bridge.appDbCreate(appId);
-  }
-  gitImportLocal(input: GitImportInput): Promise<GitImportResult> {
-    return this.bridge.gitImportLocal(input);
-  }
-  importLocalFolder(): Promise<GitImportResult | null> {
-    return this.bridge.importLocalFolder();
-  }
-  importLocalFolderPath(path: string): Promise<GitImportResult | null> {
-    return this.bridge.importLocalFolderPath ? this.bridge.importLocalFolderPath(path) : Promise.resolve(null);
-  }
-  pathForFile(file: File): string | null {
-    return this.bridge.getPathForFile ? this.bridge.getPathForFile(file) : null;
-  }
-  async uploadAttachment(file: File): Promise<AttachmentRef> {
-    // A File can't cross IPC — send its bytes + name; main writes them to the attachments store.
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    return this.bridge.uploadAttachment({ name: file.name, type: file.type, bytes });
-  }
   quitApp(): Promise<void> {
     return this.bridge.quitApp();
-  }
-  deleteApp(appId: string): Promise<void> {
-    return this.bridge.deleteApp(appId);
-  }
-  openAppFolder(appId: string): Promise<void> {
-    return this.bridge.openAppFolder(appId);
-  }
-  // These three are newer bridge methods. If the installed NATIVE (preload) predates them —
-  // e.g. a code-pushed renderer running on an older/stale bundled preload — window.toolswave
-  // won't have them, and calling `this.bridge.appLocation(...)` would throw synchronously and
-  // crash the whole renderer ("Application error: a client-side exception"). Guard so a missing
-  // method degrades gracefully (the feature is just unavailable) instead of bricking the app.
-  appLocation(appId?: string): Promise<{ dir: string; defaultDir: string; isOverride: boolean }> {
-    if (!this.bridge?.appLocation) return Promise.resolve({ dir: '', defaultDir: '', isOverride: false });
-    return this.bridge.appLocation(appId);
-  }
-  chooseAppLocation(): Promise<string | null> {
-    if (!this.bridge?.chooseAppLocation) return Promise.resolve(null);
-    return this.bridge.chooseAppLocation();
-  }
-  setDefaultAppsDir(dir: string | null): Promise<void> {
-    if (!this.bridge?.setDefaultAppsDir) return Promise.resolve();
-    return this.bridge.setDefaultAppsDir(dir);
-  }
-  listMigratableApps(): Promise<{ id: string; name: string }[]> {
-    if (!this.bridge?.listMigratableApps) return Promise.resolve([]);
-    return this.bridge.listMigratableApps();
-  }
-  migrateApp(appId: string, newName?: string): Promise<{ ok: boolean; skipped?: boolean; newName?: string; backup?: string; error?: string }> {
-    if (!this.bridge?.migrateApp)
-      return Promise.resolve({ ok: false, error: 'Bản lõi này chưa hỗ trợ cập nhật cấu trúc — hãy cài PHẦN LÕI mới nhất.' });
-    return this.bridge.migrateApp(appId, newName);
-  }
-  downloadAppZip(appId: string): Promise<string | null> {
-    return this.bridge.downloadAppZip(appId);
-  }
-  async preview(appId: string, target: PreviewTarget): Promise<PreviewHandle> {
-    const r = await this.bridge.preview(appId, target);
-    return { url: r.url, target: r.target, services: r.services, kind: r.kind, expoUrl: r.expoUrl, stop: () => this.bridge.stopPreview(appId).catch(() => {}) };
-  }
-  stopPreview(appId: string, service?: string): Promise<void> {
-    return this.bridge.stopPreview(appId, service);
-  }
-  // Ports panel + app-card covers ship in the BUNDLED preload, so a code-pushed renderer can run
-  // on a main process that predates them. Degrade (no cover / a clear message) instead of throwing.
-  restartPreview(appId: string, service?: string): Promise<void> {
-    if (!this.bridge.restartPreview) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
-    return this.bridge.restartPreview(appId, service);
-  }
-  listRunningPreviews(): Promise<RunningPreview[]> {
-    return this.bridge.listRunningPreviews ? this.bridge.listRunningPreviews() : Promise.resolve([]);
-  }
-  captureAppScreenshot(appId: string, opts?: { force?: boolean }): Promise<AppShotResult> {
-    if (!this.bridge.captureAppScreenshot) return Promise.resolve({ ok: false, shots: [], at: new Date().toISOString() });
-    return this.bridge.captureAppScreenshot(appId, opts);
-  }
-  appScreenshot(appId: string): Promise<AppScreenshot | null> {
-    if (!this.bridge.appScreenshot) return Promise.resolve(null);
-    return this.bridge.appScreenshot(appId);
-  }
-  appServices(appId: string): Promise<AppServiceInfo[]> {
-    return this.bridge.appServices ? this.bridge.appServices(appId) : Promise.resolve([]);
-  }
-  apiRoutes(appId: string): Promise<ApiRoute[]> {
-    return this.bridge.apiRoutes ? this.bridge.apiRoutes(appId) : Promise.resolve([]);
-  }
-  apiRequest(appId: string, req: ApiRequestInput): Promise<ApiResponse> {
-    if (!this.bridge.apiRequest) return Promise.resolve({ ok: false, status: 0, statusText: '', headers: {}, body: '', timeMs: 0, error: 'Cần bản cài mới (.dmg).' });
-    return this.bridge.apiRequest(appId, req);
-  }
-  deploy(appId: string): Promise<DeployResult> {
-    // The Larkwave JWT lives in the renderer's localStorage (account/api `tw_token`).
-    const token = (typeof localStorage !== 'undefined' && localStorage.getItem('tw_token')) || '';
-    return this.bridge.deploy(appId, token);
   }
   private tw(): string {
     return (typeof localStorage !== 'undefined' && localStorage.getItem('tw_token')) || '';
   }
-  deployServer(appId: string): Promise<ServerDeployStartResult> {
-    return this.bridge.deployServer(appId, this.tw());
-  }
-  deployServerStatus(deployId: string): Promise<ServerDeployStatus> {
-    return this.bridge.deployServerStatus(deployId, this.tw());
-  }
 
-  composeRunnerPrompt(input: CreateBuildInput): Promise<RunnerPromptPreview> {
-    return this.bridge.composeRunnerPrompt(input);
-  }
 
-  async *createBuild(input: CreateBuildInput): AsyncIterable<BuildEvent> {
-    const streamId = `s_${Date.now().toString(36)}_${Math.floor(performance.now())}`;
-    const queue: BuildEvent[] = [];
-    let done = false;
-    let wake: (() => void) | null = null;
 
-    const off = this.bridge.onBuildEvent((sid, ev) => {
-      if (sid !== streamId) return;
-      if ((ev as { type: string }).type === '__end__') done = true;
-      else queue.push(ev as BuildEvent);
-      wake?.();
-      wake = null;
-    });
-
-    try {
-      await this.bridge.createBuild(streamId, input);
-      while (!done || queue.length) {
-        if (!queue.length) {
-          await new Promise<void>((r) => (wake = r));
-          continue;
-        }
-        yield queue.shift()!;
-      }
-    } finally {
-      off();
-    }
-  }
-
-  cancelBuild(appId: string): Promise<void> {
-    return this.bridge.cancelBuild(appId);
-  }
   agentUnlock(): Promise<void> {
     return this.bridge.agentUnlock();
   }
@@ -1007,7 +753,7 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   };
 
   // Remote control ("Điều khiển từ xa"). The main process needs the Larkwave
-  // account JWT to open its SSE stream → forward it (same `tw_token` as deploy).
+  // account JWT to open its SSE stream → forward it (the `tw_token` in localStorage).
   readonly agent: AgentControls = {
     status: () => this.bridge.agentStatus(this.tw()),
     setEnabled: (on: boolean) => this.bridge.agentSetEnabled(on, this.tw()),
@@ -1021,7 +767,6 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
     telegramLink: () => this.bridge.agentTelegramLink(this.tw()),
     listTelegramBindings: () => this.bridge.agentTelegramBindings(this.tw()),
     deleteTelegramBinding: (id: string) => this.bridge.agentDeleteTelegramBinding(id, this.tw()),
-    syncApps: () => this.bridge.agentSyncApps(this.tw()),
     onEvent: (cb: (s: AgentClientStatus) => void) => this.bridge.onAgentEvent(cb),
   };
 

@@ -3,7 +3,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
 import { APIA_BASE } from '@larkwave/core';
-import type { AgentClientStatus, BuildEvent, LarkChatInput } from '@larkwave/core';
+import type { AgentClientStatus, LarkChatEvent, LarkChatInput } from '@larkwave/core';
 import type {
   AgentCommand,
   AgentTokenResponse,
@@ -23,10 +23,11 @@ import { getLarkWebSession } from './lark/larkWebSession';
 /**
  * Remote control ("Điều khiển từ xa") — the DESKTOP side of the phone → server →
  * desktop relay. When enabled, this client holds a long-lived SSE command stream
- * open to the server (`/agent/stream`); each pushed RemoteTask runs through the
- * local CLI runner (createBuild, mode 'auto' = fully autonomous, no approval
- * prompts) and its BuildEvents are POSTed back to `/agent/tasks/:id/events`,
- * which fan out to the user's phone thread.
+ * open to the server (`/agent/stream`); each pushed RemoteTask runs as ONE Trợ lý AI turn
+ * on the local CLI runner (larkChat scope 'general', read-only 'ask' mode — nobody is
+ * there to confirm a write) and its progress is POSTed back to `/agent/tasks/:id/events`,
+ * which fan out to the user's phone thread (and the webhook/Telegram notify target).
+ * The same SSE stream also carries the Lark relay commands (re-login, CMS sync, chat, RPC).
  *
  * OFF by default; needs the app open + the Larkwave account JWT (supplied by the
  * renderer on every status/setEnabled call). The JWT is held in memory only.
@@ -35,26 +36,6 @@ import { getLarkWebSession } from './lark/larkWebSession';
 interface PersistedSettings {
   enabled: boolean;
   deviceName: string;
-}
-
-/** Map a BuildEvent to the RemoteTaskEventItem kind the server stores. */
-function mapKind(type: BuildEvent['type']): RemoteTaskEventItem['kind'] {
-  switch (type) {
-    case 'status':
-      return 'status';
-    case 'stage':
-      return 'stage';
-    case 'progress':
-      return 'progress';
-    case 'result':
-      return 'result';
-    case 'error':
-      return 'error';
-    case 'log':
-    case 'file':
-    default:
-      return 'log';
-  }
 }
 
 export class AgentClient {
@@ -452,7 +433,6 @@ export class AgentClient {
       this.backoff = 1000; // reset on a clean connect
       this.startIdleWatch(controller);
       this.emit();
-      void this.syncAppsNow(); // push this device's local app list so the phone can list them
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -711,7 +691,7 @@ export class AgentClient {
     }
   }
 
-  /** Run one remote task end-to-end, streaming each BuildEvent back to the server. */
+  /** Run one remote task end-to-end as a Trợ lý AI turn, streaming progress back to the server. */
   private async runTask(task: RemoteTask): Promise<void> {
     this.recent = [
       { id: task.id, prompt: task.prompt, status: 'running', createdAt: new Date().toISOString() },
@@ -719,75 +699,51 @@ export class AgentClient {
     ].slice(0, 10);
     this.emit();
 
-    let sentTerminal = false;
     let finalStatus = 'done';
+    let answer = '';
+    let failure = '';
+    await this.postEvent(task.id, { kind: 'status', payload: { type: 'status', status: 'running' } });
     try {
-      const stream = this.runtime.createBuild({
+      if (!this.runtime.larkChat) throw new Error('Bản desktop này chưa có Trợ lý AI.');
+      const stream: AsyncIterable<LarkChatEvent> = this.runtime.larkChat({
         prompt: task.prompt,
-        mode: 'auto', // fully autonomous — no local approval prompts on a remote run
+        // Unattended run: read-only. A write would need a human confirmation nobody can give.
+        mode: 'ask',
+        scope: 'general',
         runner: task.runner,
         model: task.model ?? undefined,
-        // Iterate the targeted app (follow-up from the phone), else create a new one.
-        appId: task.appId ?? undefined,
+        source: 'relay',
       });
       for await (const ev of stream) {
-        const kind = mapKind(ev.type);
-        await this.postEvent(task.id, { kind, payload: ev as unknown as Record<string, unknown> });
-        if (ev.type === 'status' && (ev.status === 'succeeded' || ev.status === 'failed' || ev.status === 'canceled')) {
-          sentTerminal = true;
-          finalStatus = ev.status === 'succeeded' ? 'done' : ev.status === 'failed' ? 'error' : 'canceled';
+        if (ev.type === 'text') {
+          answer += ev.delta;
+        } else if (ev.type === 'tool_call') {
+          await this.postEvent(task.id, {
+            kind: 'log',
+            payload: { type: 'log', level: 'info', message: `Dùng công cụ: ${ev.name}` },
+          });
+          // No one can approve a gated write on an unattended task → deny it so the turn goes on.
+          if (ev.gated) await this.runtime.larkConfirmTool?.(ev.callId, 'deny').catch(() => undefined);
+        } else if (ev.type === 'ask_user') {
+          await this.runtime
+            .larkAnswerAsk?.(ev.callId, 'Không có người trả lời (tác vụ chạy từ xa) — hãy tự chọn phương án hợp lý nhất và nói rõ giả định.')
+            .catch(() => undefined);
+        } else if (ev.type === 'error') {
+          failure = ev.message || failure || 'Lỗi khi chạy.';
         }
-        if (ev.type === 'error') {
-          sentTerminal = true;
-          finalStatus = 'error';
-        }
-      }
-      // If the generator finished without a terminal status, send one so the phone closes the thread.
-      if (!sentTerminal) {
-        await this.postEvent(task.id, { kind: 'status', payload: { type: 'status', status: 'succeeded' } });
-        finalStatus = 'done';
       }
     } catch (e) {
+      failure = (e as Error).message || 'Lỗi khi chạy.';
+    }
+    if (failure && !answer.trim()) {
       finalStatus = 'error';
-      await this.postEvent(task.id, { kind: 'error', payload: { message: (e as Error).message } });
+      await this.postEvent(task.id, { kind: 'error', payload: { message: failure } });
+    } else {
+      await this.postEvent(task.id, { kind: 'result', payload: { type: 'result', result: answer.trim() || 'Hoàn tất.' } });
+      await this.postEvent(task.id, { kind: 'status', payload: { type: 'status', status: 'succeeded' } });
     }
 
     this.recent = this.recent.map((r) => (r.id === task.id ? { ...r, status: finalStatus } : r));
     this.emit();
-    void this.syncAppsNow(); // the app list may have changed (new app created / iterated)
-  }
-
-  /** Push this device's local app list to the server so the phone can list them and send
-   *  follow-up edits (targeting an app by id). Runs on connect + after tasks (fire-and-forget),
-   *  and can be triggered manually from the UI ("Đồng bộ app lên điện thoại"). */
-  async syncAppsNow(
-    token?: string,
-  ): Promise<{ ok: boolean; count: number; reason?: 'auth' | 'timeout' | 'error' }> {
-    this.setToken(token);
-    // Distinguish causes so the UI shows the RIGHT message (not-signed-in vs network vs 5xx).
-    if (!this.token || !this.runtime.listApps) return { ok: false, count: 0, reason: 'auth' };
-    const ac = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      ac.abort();
-    }, 15000); // never hang the renderer's await
-    try {
-      const apps = (await this.runtime.listApps()) ?? [];
-      const res = await fetch(`${APIA_BASE}/agent/apps`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.token}`, 'content-type': 'application/json' },
-        signal: ac.signal,
-        body: JSON.stringify({
-          deviceName: this.settings.deviceName,
-          apps: apps.map((a) => ({ id: a.id, name: a.name, status: a.status, url: a.url, updatedAt: a.updatedAt })),
-        }),
-      });
-      return { ok: res.ok, count: apps.length, reason: res.ok ? undefined : 'error' };
-    } catch {
-      return { ok: false, count: 0, reason: timedOut ? 'timeout' : 'error' };
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

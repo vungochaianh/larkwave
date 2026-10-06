@@ -5,7 +5,7 @@
  * duy nhất, và `tryAcquire` từ chối thẳng lượt thứ hai. Điều đó đúng khi Lark chỉ có một hội
  * thoại đang mở, nhưng chặn hẳn việc hỏi nhiều hội thoại cùng lúc.
  *
- * Mô hình mới: mỗi lượt giữ một khoá RIÊNG (`lark:<hội thoại>`, `build:<app>`…). Từ chối chỉ xảy
+ * Mô hình mới: mỗi lượt giữ một khoá RIÊNG (`lark:<hội thoại>`, `relay:<hội thoại>`…). Từ chối chỉ xảy
  * ra khi (a) ĐÚNG khoá đó đang chạy — chống bấm Gửi hai lần trong cùng một hội thoại, hoặc
  * (b) đã chạm TRẦN số lượt song song. Có trần vì mỗi lượt là một tiến trình CLI thật: mở vô hạn
  * thì máy người dùng chết chứ không phải nhanh hơn.
@@ -19,12 +19,10 @@
  * của lượt cũ, và một lượt treo sẽ không bao giờ bị dọn.
  */
 
-export type LockKind = 'build' | 'lark' | 'relay';
+export type LockKind = 'lark' | 'relay';
 
 export interface LockOwner {
   kind: LockKind;
-  /** Workspace/app this turn belongs to (build + ephemeral). */
-  appId?: string;
   /** Lark conversation id. */
   sessionId?: string;
   /** Human label for the blocked-tab banner. */
@@ -63,13 +61,12 @@ function emit() {
   }
 }
 
-/** Khoá của một lượt. Hội thoại Lark khoá theo hội thoại; build khoá theo app. */
+/** Khoá của một lượt — theo hội thoại. */
 export function lockKeyFor(owner: LockOwner): string {
-  if (owner.kind === 'build') return `build:${owner.appId ?? 'ephemeral'}`;
   return `${owner.kind}:${owner.sessionId ?? 'default'}`;
 }
 
-/** Còn chỗ cho một lượt nữa không (dùng cho hàng đợi sửa lỗi + huy hiệu giao diện). */
+/** Còn chỗ cho một lượt nữa không (dùng cho huy hiệu giao diện). */
 export function hasFreeSlot(): boolean {
   return current.size < MAX_CONCURRENT;
 }

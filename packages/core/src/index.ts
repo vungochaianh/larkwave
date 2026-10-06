@@ -4,7 +4,7 @@ export * from './skillContract';
 export * from './chatTurn';
 
 /**
- * Địa chỉ API của App Builder (NestJS, tiền tố `/v1`).
+ * Địa chỉ API của Larkwave (NestJS, tiền tố `/v1`).
  *
  * Sau khi hai hệ hoán đổi tên miền (22/09/2026) đây là `api.toolswave.net`. Cửa hàng nay nằm ở
  * `apia.toolswave.net` — tức giá trị CŨ của hằng này giờ trỏ sang một hệ thống khác hẳn, không
@@ -33,14 +33,8 @@ export const IPC = {
   auth: 'tw:auth',
   signIn: 'tw:signIn',
   signOut: 'tw:signOut',
-  listApps: 'tw:listApps',
-  templates: 'tw:templates',
   accountFetch: 'tw:accountFetch', // main-process proxy for api.toolswave.net (bypasses renderer CORS)
   accountUpload: 'tw:accountUpload', // main-process proxy for multipart uploads (avatar) — same CORS bypass
-  createBuild: 'tw:createBuild', // invoke → returns a stream id
-  composeRunnerPrompt: 'tw:composeRunnerPrompt', // invoke (input) → RunnerPromptPreview
-  buildEvent: 'tw:buildEvent', // main → renderer push (per stream id)
-  cancelBuild: 'tw:cancelBuild',
   agentBusy: 'tw:agentBusy', // main → renderer push: the shared AI lock owner (or null)
   agentBusyNow: 'tw:agentBusyNow', // invoke: pull the CURRENT lock owner (mount-time mirror)
   // Danh sách ĐẦY ĐỦ các lượt AI đang chạy. Từ khi Lark chạy được nhiều hội thoại song song,
@@ -52,11 +46,6 @@ export const IPC = {
   larkReadFile: 'tw:larkReadFile',
   larkDeleteFile: 'tw:larkDeleteFile',
   agentUnlock: 'tw:agentUnlock', // invoke: force-release the lock (stuck-turn recovery)
-  appConversation: 'tw:appConversation',
-  appSessions: 'tw:appSessions',
-  appCheckpoints: 'tw:appCheckpoints',
-  appHandoffSession: 'tw:appHandoffSession', // summarize the chat → seed a fresh session (handoff)
-  renameApp: 'tw:renameApp', // rename a local app / conversation (writes meta.name)
   listSkills: 'tw:listSkills', // Claude-style skills the local CLI uses
   importSkill: 'tw:importSkill',
   createSkill: 'tw:createSkill',
@@ -66,40 +55,7 @@ export const IPC = {
   readSkill: 'tw:readSkill', // read a skill's editable instruction body
   updateSkill: 'tw:updateSkill', // edit a skill in place (name/instructions/scope/tags)
   deleteSkill: 'tw:deleteSkill',
-  appFiles: 'tw:appFiles', // read a local app's source file tree (Code view)
-  writeAppFile: 'tw:writeAppFile', // write back an edited source file (editable Code view)
-  appDb: 'tw:appDb', // local SQLite: list tables (Database view)
-  appDbRows: 'tw:appDbRows', // local SQLite: page a table's rows
-  appDbExec: 'tw:appDbExec', // local SQLite: run SQL (writes persist)
-  appDbCreate: 'tw:appDbCreate', // local SQLite: create a fresh data.db
-  gitImportLocal: 'tw:gitImportLocal', // clone a Git repo into a new local app
-  importLocalFolder: 'tw:importLocalFolder', // import an existing project folder as a local app
-  importLocalFolderPath: 'tw:importLocalFolderPath', // import a folder by absolute path (renderer picker)
-  uploadAttachment: 'tw:uploadAttachment', // save an uploaded image/file → { id, name } for a build
   quitApp: 'tw:quitApp', // hard-exit the app (force) so a hidden window can't keep it alive on install
-  readAppEnvSpec: 'tw:readAppEnvSpec', // env vars a local app expects (.env.example) for the config form
-  appViews: 'tw:appViews', // app's surfaces (public/CMS/API) for the preview "Trang/API" switcher
-  appLastPrompt: 'tw:appLastPrompt', // the full prompt last sent to the runner (Prompt tab)
-  deleteApp: 'tw:deleteApp', // delete a local app's directory
-  openAppFolder: 'tw:openAppFolder', // reveal the app dir in Finder/Explorer
-  appLocation: 'tw:appLocation', // where an app is / will be saved on disk
-  chooseAppLocation: 'tw:chooseAppLocation', // folder picker → parent dir for a new project
-  setDefaultAppsDir: 'tw:setDefaultAppsDir', // set the global default save dir
-  listMigratableApps: 'tw:listMigratableApps', // old flat apps that can be restructured
-  migrateApp: 'tw:migrateApp', // restructure one flat app → {slug}-workspace/{slug}-home
-  downloadAppZip: 'tw:downloadAppZip', // export the app as a .zip
-  preview: 'tw:preview',
-  stopPreview: 'tw:stopPreview', // stop a local preview dev server (free it when leaving the app)
-  restartPreview: 'tw:restartPreview', // stop + start an app's dev server(s) again (ports panel)
-  listRunningPreviews: 'tw:listRunningPreviews', // all dev servers running now (global ports panel)
-  captureAppScreenshot: 'tw:captureAppScreenshot', // shoot the app's views from its RUNNING dev server
-  appScreenshot: 'tw:appScreenshot', // the app's cover shot as a data: URL (app card thumbnail)
-  appServices: 'tw:appServices', // app's declared services (home/cms/api) without starting them
-  apiRoutes: 'tw:apiRoutes', // app backend API endpoints (Swagger-like tester)
-  apiRequest: 'tw:apiRequest', // proxy an API request to the app's running api service
-  deploy: 'tw:deploy',
-  deployServer: 'tw:deployServer', // desktop: deploy a local app's backend to the Docker server
-  deployServerStatus: 'tw:deployServerStatus', // desktop: poll the server deploy
   claudeStatus: 'tw:claudeStatus',
   claudeLogin: 'tw:claudeLogin', // invoke → stream id
   claudeLoginEvent: 'tw:claudeLoginEvent', // main → renderer push (per stream id)
@@ -128,7 +84,6 @@ export const IPC = {
   agentTelegramLink: 'tw:agentTelegramLink', // invoke → TelegramLinkResponse (one-time code)
   agentTelegramBindings: 'tw:agentTelegramBindings', // invoke → AgentClientStatus (bindings refreshed)
   agentDeleteTelegramBinding: 'tw:agentDeleteTelegramBinding', // invoke (id) → AgentClientStatus
-  agentSyncApps: 'tw:agentSyncApps', // invoke → { ok, count } (push app list to server)
   agentEvent: 'tw:agentEvent', // main → renderer push (live AgentClientStatus)
   openExternal: 'tw:openExternal',
   openLocalFile: 'tw:openLocalFile', // mở tệp agent vừa dựng, CHỈ trong thư mục hội thoại

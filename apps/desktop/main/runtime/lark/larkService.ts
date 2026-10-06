@@ -25,7 +25,6 @@ export interface ExtractRunResult {
   base: string;
 }
 import type {
-  BuildEvent,
   LarkReloginEntry,
   LarkGrantPolicy,
   LarkNoteDoc,
@@ -419,11 +418,9 @@ export class LarkService {
   private readonly baseDir: string;
   /** F3 — a `/run <prompt>` message in a bot chat triggers a real remote build on this
    *  machine. Injected by LocalRuntimeAdapter (which owns createBuild). Undefined = feature off. */
-  private remoteBuild?: (input: { prompt: string; runner?: string; model?: string }) => AsyncIterable<BuildEvent>;
   /** Cached owner open_id (the personally-logged-in Lark user) — the ONLY sender allowed
    *  to trigger an autonomous /run build. Cached so a transient identity-fetch failure
    *  doesn't lock the owner out mid-session. */
-  private ownerOpenIdCache = '';
   /** The signed-in Larkwave account. Local sessions are stored PER-ACCOUNT under it, so
    *  switching accounts on one device never mixes conversations (and never pushes account
    *  A's chats into account B's server backup). null = not signed in → a device-only pool. */
@@ -2961,10 +2958,6 @@ export class LarkService {
     await this.tunnel.stop();
   }
 
-  /** F3 — wire the remote-build runner (LocalRuntimeAdapter.createBuild). */
-  setRemoteBuild(fn: (input: { prompt: string; runner?: string; model?: string }) => AsyncIterable<BuildEvent>): void {
-    this.remoteBuild = fn;
-  }
 
   // ── Phase 1b: hosted (MAIC) general chat — run "Trợ lý AI" on Larkwave's server (no local Claude) ──
 
@@ -3081,105 +3074,13 @@ export class LarkService {
     return this.status();
   }
 
-  /** Best-effort text reply into a Lark chat. */
-  private async replyText(client: LarkClient, chatId: string, text: string): Promise<void> {
-    try {
-      await client.request('POST', '/open-apis/im/v1/messages', {
-        params: { receive_id_type: 'chat_id' },
-        data: { receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }), uuid: randomUUID() },
-      });
-    } catch {
-      /* best-effort reply */
-    }
-  }
-
-  /** `/run <prompt>` (or `/chay`, `/app`) in a bot chat → run a real build on THIS
-   *  machine and reply with the result. Distinct from the read-only ask flow below.
-   *
-   *  SECURITY: `/run` starts a fully-autonomous (bypassPermissions) build under the
-   *  owner's credentials, so it is gated hard: (1) the bot MUST have an Encrypt Key
-   *  configured (otherwise the public webhook authenticates nothing), and (2) the
-   *  sender's open_id MUST be the machine owner's (the personally-logged-in Lark user).
-   *  Group members / forged events are refused. */
-  private async handleRunCommand(client: LarkClient, m: BotMessage, prompt: string): Promise<void> {
-    const chatId = m.chatId;
-    if (!this.remoteBuild) {
-      await this.replyText(client, chatId, 'Tính năng chạy lệnh trên máy chưa sẵn sàng ở bản này.');
-      return;
-    }
-    // Gate 1 — require an Encrypt Key so the webhook can't be spoofed by a plaintext POST.
-    if (!this.store.getBotConfig()?.encryptKey) {
-      await this.replyText(
-        client,
-        chatId,
-        '⚠️ Để dùng /run cần đặt Encrypt Key cho bot (Cài đặt bảo mật) — nếu không, ai biết URL webhook cũng chạy được lệnh trên máy bạn.',
-      );
-      return;
-    }
-    // Gate 2 — only the machine owner (personally-logged-in Lark user) may trigger a build.
-    const me = await this.getMyLarkIdentity().catch(() => ({ openId: '', email: '' }));
-    if (me.openId) this.ownerOpenIdCache = me.openId;
-    const ownerOpenId = me.openId || this.ownerOpenIdCache;
-    if (!ownerOpenId) {
-      await this.replyText(client, chatId, '⚠️ Cần đăng nhập Lark cá nhân (chủ máy) để dùng /run.');
-      return;
-    }
-    if (!m.senderId || m.senderId !== ownerOpenId) {
-      await this.replyText(
-        client,
-        chatId,
-        '⚠️ Chỉ chủ máy mới chạy được /run trên máy này (bảo mật).',
-      );
-      return;
-    }
-    if (!prompt) {
-      await this.replyText(client, chatId, 'Cú pháp: <code>/run &lt;yêu cầu&gt;</code> — ví dụ: /run tạo trang landing bán cà phê.');
-      return;
-    }
-    await this.replyText(client, chatId, '⏳ Đã nhận — máy đang chạy, xong sẽ báo lại ở đây.');
-    const botCfg = this.store.getBotConfig();
-    const runner = botCfg?.runner || this.store.getSettings().defaultRunner || 'claude';
-    const model = botCfg?.model || this.store.getSettings().defaultModel;
-    let appId: string | undefined;
-    let previewUrl: string | undefined;
-    let ok = true;
-    let err = '';
-    try {
-      for await (const ev of this.remoteBuild({ prompt, runner, model })) {
-        if (ev.type === 'result') {
-          appId = ev.appId ?? appId;
-          previewUrl = ev.previewUrl ?? previewUrl;
-        } else if (ev.type === 'status' && ev.status === 'failed') {
-          ok = false;
-        } else if (ev.type === 'error') {
-          ok = false;
-          err = ev.message || err;
-        }
-      }
-    } catch (e) {
-      ok = false;
-      err = (e as Error).message;
-    }
-    const summary = ok
-      ? `✅ Xong!${appId ? `\nApp: ${appId}` : ''}${previewUrl ? `\nXem thử: ${previewUrl}` : ''}`
-      : `❌ Không chạy được: ${err || 'thất bại'}`;
-    await this.replyText(client, chatId, summary);
-  }
-
   /** Answer an incoming Lark message (READ-ONLY) and reply in the same chat. */
   private async handleBotMessage(m: BotMessage): Promise<void> {
     const client = this.ensureClient();
     if (!client) return;
     // In a group the bot is usually @mentioned, which prefixes the text with a mention
-    // placeholder like "@_user_1" (or the literal bot name). Strip leading mentions +
-    // whitespace so "/run" is still recognized when it isn't the very first character.
+    // placeholder like "@_user_1" (or the literal bot name). Strip leading mentions + whitespace.
     const text = m.text.replace(/^(?:\s*@_(?:user_\d+|all))+\s*/i, '').trim() || m.text.trim();
-    // F3 — `/run <prompt>` triggers a real build on this machine (not the read-only ask).
-    const runMatch = text.match(/^\/(run|chay|app)(?:@\w+)?\b\s*/i);
-    if (runMatch) {
-      await this.handleRunCommand(client, m, text.slice(runMatch[0].length).trim());
-      return;
-    }
     const systemPrompt = buildSystemPrompt({
       tenantName: this.tenantName,
       bases: this.store.getBases(),

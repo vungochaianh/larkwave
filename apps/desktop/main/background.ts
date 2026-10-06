@@ -3,12 +3,11 @@ import { existsSync } from 'node:fs';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import serve from 'electron-serve';
 import { APIA_BASE, IPC } from '@larkwave/core';
-import type { CmsSyncErrorReport, CmsSyncJobPatch, CreateBuildInput, GitImportInput, LarkBaseRef, LarkChatInput, LarkGrantPolicy, LarkNoteDoc, LarkSpecDoc, PromptTemplate, SkillContractFields, SpecPromoteInput, UpdateTokenNotifyInput } from '@larkwave/core';
+import type { CmsSyncErrorReport, CmsSyncJobPatch, LarkBaseRef, LarkChatInput, LarkGrantPolicy, LarkNoteDoc, LarkSpecDoc, SkillContractFields, SpecPromoteInput, UpdateTokenNotifyInput } from '@larkwave/core';
 import { LocalRuntimeAdapter } from './runtime/localAdapter';
 import { onLockChange, currentOwner, owners, forceRelease, forceReleaseAll } from './runtime/agentLock';
 import { getRunner, invalidateRunnerStatus, listRunnerStatus } from './runtime/runners/registry';
 import { AgentClient } from './runtime/agentClient';
-import { stopAllPreviews } from './runtime/preview';
 import { startAuthLoopback } from './authLoopback';
 import { openAuthWindow } from './authWindow';
 import { isInsideDir } from './runtime/lark/filePaths';
@@ -17,30 +16,10 @@ import { resolveRenderer, downloadAndOpenInstaller, type UpdateInfo } from './co
 import { AccountCache } from './accountCache';
 import { AccountTokenStore } from './accountTokenStore';
 
-/** App Builder API base (overridable for staging). */
+/** Larkwave API base (overridable for staging). */
 // `APIA_BASE` tự đọc `LARKWAVE_API_BASE` từ 24/09/2026 (xem packages/core/src/index.ts), nên
 // không còn đọc lại ở đây: hai cơ chế song song đúng là cách một hôm nào đó chúng lệch nhau.
 const API_BASE = APIA_BASE;
-
-/**
- * Fetch the shared prompt templates from the App Builder API. Runs in the main
- * (Node) process so it is NOT subject to the renderer's CORS policy. Resilient:
- * returns [] on any error so the UI just falls back to built-in examples.
- */
-async function fetchTemplates(): Promise<PromptTemplate[]> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const r = await fetch(`${API_BASE}/templates`, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!r.ok) return [];
-    const data = await r.json().catch(() => []);
-    const arr = Array.isArray(data) ? data : ((data as { items?: unknown[] })?.items ?? []);
-    return (arr as PromptTemplate[]).filter((t) => t?.prompt);
-  } catch {
-    return [];
-  }
-}
 
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd) serve({ directory: 'app' });
@@ -60,8 +39,6 @@ const agentClient = new AgentClient(runtime, app.getPath('userData'), (s) => {
 
 function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.auth, () => runtime.auth());
-  ipcMain.handle(IPC.listApps, () => runtime.listApps());
-  ipcMain.handle(IPC.templates, () => fetchTemplates());
   // Proxy Larkwave-account API calls through main (Node has no CORS). The renderer
   // Origin-independent account token: localStorage is per-origin, but codePush can load the
   // renderer from either app:// (bundled) or pages.dev (remote) → a token saved on one origin
@@ -128,11 +105,6 @@ function registerIpc(win: BrowserWindow) {
       }
     },
   );
-  ipcMain.handle(IPC.appConversation, (_e, appId: string) => runtime.appConversation(appId));
-  ipcMain.handle(IPC.appSessions, (_e, appId: string) => runtime.appSessions!(appId));
-  ipcMain.handle(IPC.appCheckpoints, (_e, appId: string) => runtime.appCheckpoints!(appId));
-  ipcMain.handle(IPC.appHandoffSession, (_e, appId: string) => runtime.appHandoffSession(appId));
-  ipcMain.handle(IPC.renameApp, (_e, appId: string, name: string) => runtime.renameApp(appId, name));
   ipcMain.handle(IPC.listSkills, () => runtime.listSkills());
   ipcMain.handle(IPC.importSkill, (_e, scope?: string[], tags?: string[]) => runtime.importSkill(scope, tags));
   // `command` is the 5th IPC arg (the preload bridge's shape); the core contract puts it 7th,
@@ -173,33 +145,12 @@ function registerIpc(win: BrowserWindow) {
     runtime.suggestSkillContract(name, instructions, existingKeys),
   );
   ipcMain.handle(IPC.deleteSkill, (_e, id: string) => runtime.deleteSkill(id));
-  ipcMain.handle(IPC.appFiles, (_e, appId: string) => runtime.appFiles(appId));
-  ipcMain.handle(IPC.writeAppFile, (_e, appId: string, path: string, content: string) =>
-    runtime.writeAppFile(appId, path, content),
-  );
-  ipcMain.handle(IPC.appDb, (_e, appId: string) => runtime.appDb(appId));
-  ipcMain.handle(IPC.appDbRows, (_e, appId: string, table: string, limit: number, offset: number) =>
-    runtime.appDbRows(appId, table, limit, offset),
-  );
-  ipcMain.handle(IPC.appDbExec, (_e, appId: string, sql: string, params?: unknown[]) =>
-    runtime.appDbExec(appId, sql, params),
-  );
-  ipcMain.handle(IPC.appDbCreate, (_e, appId: string) => runtime.appDbCreate(appId));
-  ipcMain.handle(IPC.gitImportLocal, (_e, input: GitImportInput) => runtime.gitImportLocal(input));
-  ipcMain.handle(IPC.importLocalFolder, () => runtime.importLocalFolder());
-  ipcMain.handle(IPC.importLocalFolderPath, (_e, p: string) => runtime.importLocalFolderPath(p));
-  ipcMain.handle(IPC.uploadAttachment, (_e, payload: { name: string; type?: string; bytes: Uint8Array }) => runtime.uploadAttachmentBytes(payload));
   ipcMain.handle(IPC.quitApp, () => {
     // HARD exit: window.close() only fires window-all-closed when EVERY window is gone, but a
-    // hidden Lark/OAuth BrowserWindow keeps the app alive. Reap children, destroy all windows,
+    // hidden Lark/OAuth BrowserWindow keeps the app alive. Reap AI turns, destroy all windows,
     // then app.exit(0) (skips before-quit) so the bundle frees for a drag-replace install.
     try {
       forceReleaseAll('quit');
-    } catch {
-      /* ignore */
-    }
-    try {
-      stopAllPreviews();
     } catch {
       /* ignore */
     }
@@ -212,56 +163,6 @@ function registerIpc(win: BrowserWindow) {
     }
     app.exit(0);
   });
-  ipcMain.handle(IPC.readAppEnvSpec, (_e, appId: string) => runtime.readAppEnvSpec(appId));
-  ipcMain.handle(IPC.appViews, (_e, appId: string) => runtime.appViews?.(appId));
-  ipcMain.handle(IPC.appLastPrompt, (_e, appId: string) => runtime.appLastPrompt?.(appId));
-  ipcMain.handle(IPC.deleteApp, (_e, appId: string) => runtime.deleteApp(appId));
-  ipcMain.handle(IPC.openAppFolder, (_e, appId: string) => runtime.openAppFolder(appId));
-  ipcMain.handle(IPC.appLocation, (_e, appId?: string) => runtime.appLocation(appId));
-  ipcMain.handle(IPC.chooseAppLocation, () => runtime.chooseAppLocation());
-  ipcMain.handle(IPC.setDefaultAppsDir, (_e, dir: string | null) => runtime.setDefaultAppsDir(dir));
-  ipcMain.handle(IPC.listMigratableApps, () => runtime.listMigratableApps());
-  ipcMain.handle(IPC.migrateApp, (_e, appId: string, newName?: string) => runtime.migrateApp(appId, newName));
-  ipcMain.handle(IPC.downloadAppZip, (_e, appId: string) => runtime.downloadAppZip(appId));
-  ipcMain.handle(IPC.preview, (_e, appId: string, target: 'desktop' | 'mobile' | 'web') =>
-    runtime.preview(appId, target).then((h) => ({ url: h.url, target: h.target, services: h.services, kind: h.kind, expoUrl: h.expoUrl })),
-  );
-  ipcMain.handle(IPC.stopPreview, (_e, appId: string, service?: string) => runtime.stopPreview?.(appId, service));
-  ipcMain.handle(IPC.restartPreview, (_e, appId: string, service?: string) => runtime.restartPreview?.(appId, service));
-  ipcMain.handle(IPC.listRunningPreviews, () => runtime.listRunningPreviews?.());
-  ipcMain.handle(IPC.captureAppScreenshot, (_e, appId: string, opts?: { force?: boolean }) =>
-    runtime.captureAppScreenshot?.(appId, opts),
-  );
-  ipcMain.handle(IPC.appScreenshot, (_e, appId: string) => runtime.appScreenshot?.(appId));
-  ipcMain.handle(IPC.appServices, (_e, appId: string) => runtime.appServices?.(appId));
-  ipcMain.handle(IPC.apiRoutes, (_e, appId: string) => runtime.apiRoutes?.(appId));
-  ipcMain.handle(IPC.apiRequest, (_e, appId: string, req: import('@larkwave/core').ApiRequestInput) => runtime.apiRequest?.(appId, req));
-  // Publish a desktop-built app: build locally → upload static files → server
-  // deploys to Cloudflare Pages. `token` is the renderer's Larkwave JWT.
-  ipcMain.handle(IPC.deploy, (_e, appId: string, token: string) => runtime.deploy(appId, token));
-  ipcMain.handle(IPC.deployServer, (_e, appId: string, token: string) => runtime.deployServer(appId, token));
-  ipcMain.handle(IPC.deployServerStatus, (_e, deployId: string, token: string) =>
-    runtime.deployServerStatus(deployId, token),
-  );
-
-  ipcMain.handle(IPC.composeRunnerPrompt, (_e, input: CreateBuildInput) => runtime.composeRunnerPrompt!(input));
-
-  // Streaming build: renderer passes a streamId; we push each event back.
-  ipcMain.handle(IPC.createBuild, async (_e, streamId: string, input) => {
-    (async () => {
-      try {
-        for await (const ev of runtime.createBuild(input)) {
-          if (win.isDestroyed()) return;
-          win.webContents.send(IPC.buildEvent, streamId, ev);
-        }
-      } catch (err) {
-        win.webContents.send(IPC.buildEvent, streamId, { type: 'error', message: (err as Error).message });
-      }
-      win.webContents.send(IPC.buildEvent, streamId, { type: '__end__' });
-    })();
-    return { started: true };
-  });
-  ipcMain.handle(IPC.cancelBuild, (_e, appId: string) => runtime.cancelBuild?.(appId));
   // Force-release the shared AI lock — kills whatever is running (stuck-turn recovery).
   ipcMain.handle(IPC.agentBusyNow, () => currentOwner());
   // Danh sách ĐẦY ĐỦ các lượt đang chạy. `agentBusyNow` giữ nguyên (trả một chủ) để bản renderer
@@ -366,7 +267,6 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.agentDeleteTelegramBinding, (_e, id: string, token?: string) =>
     agentClient.deleteTelegramBinding(id, token),
   );
-  ipcMain.handle(IPC.agentSyncApps, (_e, token?: string) => agentClient.syncAppsNow(token));
 
   ipcMain.handle(IPC.openExternal, (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
@@ -740,10 +640,8 @@ if (!gotInstanceLock) {
     }
   })();
 
-  // Reap every running dev server on quit so no node/vite processes are orphaned.
   app.on('before-quit', () => {
     forceReleaseAll('quit'); // SIGTERM every running AI turn so no orphaned CLI outlives the app
-    stopAllPreviews();
   });
   app.on('window-all-closed', () => app.quit());
 }
