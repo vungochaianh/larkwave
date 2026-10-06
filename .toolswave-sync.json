@@ -2,8 +2,8 @@
   "name": "larkwave",
   "source": "/Users/deveris/app",
   "branch": "main",
-  "lastSynced": "a263cc90c336f57b94e7d79b09004e3840c44d2d",
-  "pending": "04d7f974bb285a09523cbee7d8063a6165bfa6da",
+  "lastSynced": "04d7f974bb285a09523cbee7d8063a6165bfa6da",
+  "pending": null,
   "pinVersion": [
     "apps/desktop/package.json"
   ],
