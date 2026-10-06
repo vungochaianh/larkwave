@@ -119,11 +119,19 @@ export function nextStepAfterTurn(s: TurnEndState): TurnNextStep {
  * Bắt ĐẾM LẠI THỰC TẾ trước, vì sau một lần sang phiên mới thì trí nhớ của agent chỉ còn bản tóm
  * tắt — mà chính nó đã một lần báo "đã tạo xong" trong khi còn thiếu 17 bảng. Và bắt kết thúc
  * bằng một dòng tổng kết, vì thiếu đúng dòng đó là thứ khiến người dùng tưởng đã xong.
+ *
+ * KHOÁ PHẠM VI (lỗi "tự nhảy sang việc khác"): lần tự chạy này CHỈ để làm NỐT đúng việc người dùng
+ * vừa yêu cầu — không phải cái cớ để agent nhặt các "việc còn treo" nó tự liệt kê rồi làm luôn. Đã
+ * gặp thật: làm xong file Excel, lượt tự chạy lại nhảy sang bộ hồ sơ khác. Nên nếu việc ĐÃ xong thì
+ * phải DỪNG, tuyệt đối không tự mở việc mới.
  */
 export const AUTO_CONTINUE_PROMPT =
-  'Tiếp tục công việc đang dở. Trước tiên KIỂM LẠI THỰC TẾ đã làm tới đâu bằng công cụ ' +
-  '(đừng tin trí nhớ), làm nốt phần còn thiếu, rồi kết thúc bằng một dòng tổng kết: ' +
-  'đã xong những gì, còn thiếu gì.';
+  'Chỉ làm NỐT đúng việc tôi vừa yêu cầu ở ngay trên, KHÔNG làm gì khác. ' +
+  'Trước tiên KIỂM LẠI THỰC TẾ đã làm tới đâu bằng công cụ (đừng tin trí nhớ). ' +
+  'Nếu việc đó ĐÃ XONG: chỉ trả lời MỘT dòng xác nhận đã xong rồi DỪNG — TUYỆT ĐỐI không tự bắt đầu, ' +
+  'gợi ý, hay chuyển sang bất kỳ việc khác / việc còn treo / bước tiếp theo nào, kể cả khi bạn vừa ' +
+  'liệt kê chúng ở trên. Nếu CHƯA xong: làm nốt phần còn thiếu của ĐÚNG việc đó, rồi kết thúc bằng ' +
+  'một dòng tổng kết (đã xong gì, còn thiếu gì).';
 
 /**
  * Một hội thoại CÓ ĐÁNG ghi xuống đĩa chưa?
