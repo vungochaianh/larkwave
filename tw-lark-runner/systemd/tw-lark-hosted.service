@@ -1,0 +1,20 @@
+[Unit]
+Description=Larkwave Lark hosted runner (chạy lịch tự động hoá hộ NHIỀU người dùng)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tw-lark-hosted
+EnvironmentFile=/opt/tw-lark-hosted/.env
+Environment=MODE=hosted
+ExecStart=/usr/bin/env node dist/runner.js
+Restart=always
+RestartSec=10
+# Gánh nhiều tenant cùng lúc nên trần cao hơn bản một-người (400M). Mỗi tenant là một
+# LarkClient + AutomationEngine, không có trình duyệt.
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target

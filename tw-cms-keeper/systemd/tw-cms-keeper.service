@@ -1,0 +1,25 @@
+[Unit]
+Description=Larkwave CMS Bitable session keeper
+Documentation=https://apihoanam.toolswave.net
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Runs as root because Playwright's Chromium was installed under /root/.cache.
+# HOME MUST point at that user's home or Playwright can't find the browser
+# ("Executable doesn't exist at <HOME>/.cache/ms-playwright/…"). Do NOT set
+# HOME to the app dir.
+User=root
+WorkingDirectory=/opt/tw-cms-keeper
+EnvironmentFile=/opt/tw-cms-keeper/.env
+Environment=HOME=/root
+Environment=HEADLESS=true
+ExecStart=/usr/bin/env node src/index.js run
+Restart=always
+RestartSec=10
+# Headless Chromium can be memory-hungry; give it room but cap runaway.
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+{
+  "name": "tw-agent-host",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Máy chủ Trợ lý AI chia sẻ — chạy 24/7 trên VM, phục vụ người được cấp bằng Claude CLI của admin (an toàn, chỉ hỏi–đáp + tra web).",
+  "bin": { "tw-agent-host": "src/index.js" },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": { "node": ">=18" }
+}

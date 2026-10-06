@@ -1,0 +1,25 @@
+[Unit]
+Description=Toolswave App Builder Web — instance B (blue-green, port 4102)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+# Second Next.js standalone instance for zero-downtime rolling restarts. Same bundle
+# as toolswave-web (instance A on 4100); nginx load-balances 4100+4102 and the deploy
+# restarts them one at a time so the site never goes down.
+WorkingDirectory=/home/app/toolswave/apps/web/.next/standalone/apps/web
+Environment=NODE_ENV=production
+Environment=PORT=4102
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/env node server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toolswave-web2
+
+[Install]
+WantedBy=multi-user.target

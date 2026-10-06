@@ -1,0 +1,49 @@
+# Toolswave App Builder — CI/CD.
+# build + test run on any runner. deploy (manual, main) needs a runner that can
+# reach the server over Tailscale (self-hosted runner on the box is simplest).
+stages: [build, test]
+
+default:
+  image: node:20-bookworm-slim
+  before_script:
+    - corepack enable && corepack prepare pnpm@9.15.9 --activate
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --no-frozen-lockfile
+
+cache:
+  key:
+    files: [pnpm-lock.yaml]
+  paths: [.pnpm-store]
+
+build:
+  stage: build
+  script:
+    - pnpm --filter @larkwave/shared build
+    - pnpm --filter @larkwave/core build
+    - pnpm --filter api exec prisma generate
+    - pnpm --filter api build
+    - pnpm --filter web build
+  artifacts:
+    paths:
+      - packages/shared/dist
+      - apps/api/dist
+      - apps/web/.next
+    expire_in: 1 day
+
+test:
+  stage: test
+  script:
+    - pnpm --filter @larkwave/shared build
+    - pnpm --filter api exec prisma generate
+    - pnpm --filter api test -- --passWithNoTests
+    # Phần DESKTOP không có gì trong stage build (bản cài dựng tay trên máy), nên nếu không
+    # kiểm ở đây thì một lỗi kiểu trong main process chỉ lộ ra lúc dựng .dmg — tức là sau khi
+    # đã đẩy lên nhánh chính.
+    - pnpm --filter @larkwave/core build
+    - pnpm --filter @larkwave/desktop typecheck:desktop
+    # Kiểm của main process (electron được giả lập, không cần màn hình).
+    - bash apps/desktop/test/run.sh
+    # Các cặp file chép tay qua ranh giới package: sửa một bên quên bên kia là lỗi lặng lẽ nhất.
+    - node scripts/check-duplicates.mjs
+
+# (deploy stage removed — phase deploy chưa làm; xem docs/TACH-APP.md)

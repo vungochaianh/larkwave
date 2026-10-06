@@ -1,0 +1,61 @@
+# Toolswave App Builder — full stack (Postgres + API + Web).
+#   cp deploy/.env.production.example .env   # fill secrets
+#   DB_PASSWORD=... docker compose up -d --build
+# Ports bind to localhost only; expose them via the Cloudflare tunnel / reverse proxy.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tw-postgres
+    environment:
+      POSTGRES_USER: toolswave
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-toolswave}
+      POSTGRES_DB: toolswave
+    volumes:
+      - tw-pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toolswave"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: tw-api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://toolswave:${DB_PASSWORD:-toolswave}@postgres:5432/toolswave?schema=public
+      WORKSPACE_DIR: /data/workspace
+      ARTIFACTS_DIR: /data/artifacts
+    volumes:
+      - tw-workspace:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4101:4101"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-https://apia.toolswave.net/v1}
+    container_name: tw-web
+    environment:
+      PORT: 4100
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:4100:4100"
+    restart: unless-stopped
+
+volumes:
+  tw-pgdata:
+  tw-workspace:

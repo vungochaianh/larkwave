@@ -1,0 +1,6 @@
+{
+  "name": "larkwave",
+  "private": true,
+  "description": "Larkwave monorepo (tách từ Toolswave)",
+  "packageManager": "pnpm@9.15.9"
+}

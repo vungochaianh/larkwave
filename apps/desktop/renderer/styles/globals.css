@@ -1,0 +1,164 @@
+html,
+body,
+#__next {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Base surface so there's never a white flash before AppShell paints. The _document
+     inline script sets data-theme on <html> BEFORE first paint, so the dark rule below
+     already applies on load/reload. Keep in sync with PALETTES.layer (theme.ts). */
+  background-color: #f4f5fb;
+}
+
+:root[data-theme='dark'] html,
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] #__next {
+  background-color: #13151c;
+}
+
+/* --tw-* theme variables, defined STATICALLY (not only via ThemeProvider's JS injection) so any
+   surface rendered BEFORE ThemeProvider mounts — e.g. HomeScreen's "Đang tải tài khoản…" loading
+   screen and the login view, which live above AppShell — resolves V.* to the right theme instead
+   of V's light fallback. Mirrors PALETTES + THEME_CSS in packages/ui/src/theme.ts (keep in sync). */
+:root {
+  --tw-layer: #f4f5fb;
+  --tw-surface: #ffffff;
+  --tw-surface-alt: #fafafe;
+  --tw-surface-muted: #f6f5fe;
+  --tw-text: #1e2230;
+  --tw-text-sub: #6b7280;
+  --tw-text-faint: #9aa3b5;
+  --tw-border: #ecedf3;
+  --tw-border-sub: #f1f2f7;
+  --tw-chip-bg: #f1effe;
+  --tw-chip-text: #5b4fc2;
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  --tw-layer: #13151c;
+  --tw-surface: #1b1e27;
+  --tw-surface-alt: #232734;
+  --tw-surface-muted: #272c3b;
+  --tw-text: #e7e9f1;
+  --tw-text-sub: #a7aec0;
+  --tw-text-faint: #79808f;
+  --tw-border: #2b3040;
+  --tw-border-sub: #242836;
+  --tw-chip-bg: rgba(124, 108, 240, 0.2);
+  --tw-chip-text: #b9aef7;
+  color-scheme: dark;
+}
+
+/* Thanh tiến trình cho tài khoản KHÔNG GIỚI HẠN + thanh thành phần.
+   Bản sao của khối cùng tên trong THEME_CSS (packages/ui/src/theme.ts) — desktop KHÔNG nạp
+   THEME_CSS (xem _app.tsx: chỉ có RuntimeProvider + I18nProvider), nên màn hình dùng chung
+   StorageScreen sẽ mất style nếu thiếu khối này. Sửa một bên thì sửa cả hai. */
+.tw-bar-unl {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--tw-border-sub);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 70%, rgba(0, 0, 0, 0.12) 100%);
+  mask-image: linear-gradient(90deg, #000 70%, rgba(0, 0, 0, 0.12) 100%);
+}
+.tw-bar-unl > i {
+  display: block;
+  height: 100%;
+  min-width: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6c5ce7, #8b7bf0 40%, #4fb6ff 72%, #6c5ce7);
+  background-size: 220% 100%;
+  animation: tw-bar-drift 7s linear infinite;
+  will-change: background-position;
+}
+@keyframes tw-bar-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+.tw-bar-unl.tw-bar-onbrand {
+  background: rgba(255, 255, 255, 0.25);
+}
+.tw-bar-unl.tw-bar-onbrand > i {
+  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0.55) 50%, #fff);
+  background-size: 220% 100%;
+}
+.tw-bar-mix {
+  display: flex;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--tw-border-sub);
+}
+.tw-bar-mix > i {
+  display: block;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.tw-bar-xs {
+  height: 4px !important;
+}
+/* Bản sao của khối cùng tên trong THEME_CSS — desktop không nạp THEME_CSS (xem _app.tsx).
+   Sửa một bên thì sửa cả hai. */
+@keyframes tw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tw-rise {
+  animation: tw-rise 0.42s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+.tw-rise-1 { animation-delay: 0.06s; }
+.tw-rise-2 { animation-delay: 0.13s; }
+.tw-rise-3 { animation-delay: 0.2s; }
+@keyframes tw-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.09); opacity: 0.82; }
+}
+.tw-breathe {
+  animation: tw-breathe 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-rise,
+  .tw-breathe {
+    animation: none;
+  }
+}
+.tw-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s ease;
+}
+.tw-collapsible > div {
+  overflow: hidden;
+  min-height: 0;
+}
+.tw-collapsible.tw-open {
+  grid-template-rows: 1fr;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-collapsible {
+    transition: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-bar-unl > i {
+    animation: none;
+  }
+}
+
+/* Tailwind v4 (optional): uncomment after adding @tailwindcss/postcss + a
+   postcss.config + @source scan for ../../packages/ui/src — see README.
+   @import 'tailwindcss';
+   @source '../../packages/ui/src';
+*/

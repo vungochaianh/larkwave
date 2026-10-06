@@ -1,0 +1,25 @@
+[Unit]
+Description=Toolswave App Builder Web (app + aapp.toolswave.net)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+# Next.js standalone output (output: 'standalone' in next.config). Run its
+# bundled server. Do NOT add EnvironmentFile=.env here — it would pull the API's
+# PORT=4101. NEXT_PUBLIC_* are baked in at build time.
+WorkingDirectory=/home/app/toolswave/apps/web/.next/standalone/apps/web
+Environment=NODE_ENV=production
+Environment=PORT=4100
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/env node server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toolswave-web
+
+[Install]
+WantedBy=multi-user.target

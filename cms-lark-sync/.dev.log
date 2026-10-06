@@ -1,0 +1,24 @@
+
+> antd-demo@0.1.0 dev
+> PORT=6102 next dev
+
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:6102
+   - Network:      http://192.168.1.30:6102
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Compiled instrumentation Node.js in 17ms
+ ✓ Compiled instrumentation Edge in 19ms
+ ✓ Ready in 889ms
+ ✓ Compiled instrumentation Node.js in 0ms
+ ✓ Compiled instrumentation Edge in 0ms
+ ✓ Compiled instrumentation Node.js in 1ms
+ ✓ Compiled instrumentation Edge in 0ms
+[Error: ENOENT: no such file or directory, open '/Users/deveris/Hoa_Nam_Workspace/cms-lark-sync/.next/static/development/_buildManifest.js.tmp.41tqhfa0esw'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/deveris/Hoa_Nam_Workspace/cms-lark-sync/.next/static/development/_buildManifest.js.tmp.41tqhfa0esw'
+}
+[?25h

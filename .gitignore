@@ -1,0 +1,37 @@
+node_modules/
+.env
+*.env
+.deploy-secrets
+.secrets/
+jobs/*.json
+config/pipeline.json
+.DS_Store
+dist/
+build-workspace/
+# TypeScript / Next incremental build caches — regenerated on every build, never in VCS.
+*.tsbuildinfo
+.next/
+# Reference clone (Awesome ChatGPT Prompts) — not part of the platform.
+prompts.chat/
+# MAIC gateway — a SEPARATE project (its own git repo). Lives here for convenience only,
+# must never be committed into the app repo (would become a broken embedded gitlink).
+maic-workspace/
+.tmp-test/
+
+# Deploy token đúc cho máy dựng bản Windows — KHÔNG bao giờ commit.
+win-deploy-token.txt
+
+# Gói khoá đã mã hoá để mang máy — KHÔNG commit.
+toolswave-secrets.enc
+*.enc
+
+# Trạng thái của scripts/blog-autopost.mjs: chủ đề đã đăng, để không đăng trùng.
+# Của riêng từng máy treo — không chia sẻ qua git.
+.blog-autopost-used.txt
+
+# Khoá chống chạy chồng của scripts/blog-refresh.mjs — của riêng từng máy.
+.blog-refresh.lock
+
+# Mốc thời gian đã nhắn Telegram cho từng chỗ kẹt (scripts/lib/notify.mjs).
+# Của riêng từng máy — không chia sẻ qua git.
+.notify-state.json

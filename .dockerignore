@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+.git
+.gitignore
+*.env
+.env
+.deploy-secrets
+.secrets
+_reference
+**/.workspace
+**/.artifacts
+**/*.log
+.DS_Store

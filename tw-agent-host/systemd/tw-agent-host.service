@@ -1,0 +1,22 @@
+[Unit]
+Description=Larkwave Agent Host — máy chủ Trợ lý AI chia sẻ (Claude CLI của admin)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tw-agent-host
+EnvironmentFile=/opt/tw-agent-host/.env
+# Chạy dưới user có `claude` đã đăng nhập (HOME phải trỏ tới nơi có ~/.claude của admin).
+User=twagent
+Environment=HOME=/home/twagent
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+# Bảo vệ VM: không cho service ghi ra ngoài thư mục của nó (phòng hờ; Claude đã bị khoá read-only).
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/tw-agent-host /home/twagent
+
+[Install]
+WantedBy=multi-user.target

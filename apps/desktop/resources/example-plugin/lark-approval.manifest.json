@@ -1,0 +1,47 @@
+{
+  "id": "lark-approval",
+  "name": "Lark Approval",
+  "version": "1.0.0",
+  "author": "Larkwave",
+  "description": "Đọc và tạo phiếu phê duyệt (Approval) trên Lark. Ví dụ về plugin chỉ-dữ-liệu: thêm tool cho Claude mà không chạy code tuỳ ý.",
+  "permissions": ["lark:approval"],
+  "tools": [
+    {
+      "name": "get_instance",
+      "description": "Lấy chi tiết một phiếu phê duyệt theo instance_id.",
+      "gated": false,
+      "lark": { "method": "GET", "path": "/open-apis/approval/v4/instances/{instance_id}" },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "instance_id": { "type": "string", "description": "ID phiếu phê duyệt" } },
+        "required": ["instance_id"]
+      }
+    },
+    {
+      "name": "create_instance",
+      "description": "Tạo một phiếu phê duyệt mới. Hành động GHI — sẽ hỏi xác nhận trước khi chạy.",
+      "gated": true,
+      "lark": { "method": "POST", "path": "/open-apis/approval/v4/instances" },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "approval_code": { "type": "string", "description": "Mã quy trình phê duyệt" },
+          "user_id": { "type": "string", "description": "open_id người tạo" },
+          "form": { "type": "string", "description": "Nội dung form (chuỗi JSON theo định nghĩa quy trình)" }
+        },
+        "required": ["approval_code", "form"]
+      }
+    }
+  ],
+  "panels": [
+    {
+      "id": "lookup",
+      "title": "Tra cứu phê duyệt",
+      "tool": "get_instance",
+      "description": "Nhập instance_id để xem chi tiết một phiếu phê duyệt.",
+      "submitLabel": "Tra cứu"
+    }
+  ]
+}

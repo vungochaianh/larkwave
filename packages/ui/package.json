@@ -1,0 +1,32 @@
+{
+  "name": "@larkwave/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"(ui) no lint\""
+  },
+  "peerDependencies": {
+    "@ant-design/icons": ">=5",
+    "antd": ">=5",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "dependencies": {
+    "@larkwave/core": "workspace:*",
+    "mermaid": "^11.4.1",
+    "react-syntax-highlighter": "^15.6.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "typescript": "^5.7.3"
+  }
+}

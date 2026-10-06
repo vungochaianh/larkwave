@@ -1,0 +1,18 @@
+[Unit]
+Description=Larkwave Lark automation runner (chạy lịch tự động hoá 24/7)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tw-lark-runner
+EnvironmentFile=/opt/tw-lark-runner/.env
+ExecStart=/usr/bin/env node dist/runner.js
+Restart=always
+RestartSec=10
+# Không có trình duyệt nên nhẹ hơn hẳn tw-cms-keeper; trần này chỉ để chặn rò rỉ.
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

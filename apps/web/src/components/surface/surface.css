@@ -1,0 +1,412 @@
+/* ═══════════════════════ Bộ bề mặt dùng chung TRONG APP (.tw-app) ═══════════════════════
+   Import bởi SurfaceScope (AppShell / ClaudeShell / AgentsChatShell gắn class `tw-app` lên gốc).
+   Đặt ở file riêng, KHÔNG nhét vào globals.css: globals đang được sửa song song cho admin/auth,
+   và mọi rule dưới đây đều móc vào `.tw-app` nên không có gì cần đứng cạnh phần còn lại.
+
+   NGUYÊN TẮC: đây là mặt LÀM VIỆC. Người dùng dựng app, đọc bảng, sửa dữ liệu — nên:
+     • không WebGL sau lưng, không đèn rọi bám chuột, không lực hút;
+     • chiều sâu đến từ ÁNH SÁNG (vệt sáng 1px mép trên, viền phát sáng khi hover, quầng tím tĩnh)
+       và LỚP (nền → kính thanh bên/đầu trang → thẻ kính → nội dung);
+     • chuyển động duy nhất là thẻ BẤM ĐƯỢC nghiêng tối đa 4° (SurfaceTilt) — tắt khi giảm chuyển
+       động hoặc trên màn cảm ứng.
+   Nhưng phải là CÙNG MỘT SẢN PHẨM với trang tiếp thị: cùng nền đen-tím, cùng chất kính (token
+   `--tw-pub-card-*` dùng chung), cùng tím #6C5CE7, cùng chữ.
+
+   Sáng/tối: app có toggle thật (useThemeMode) nên mọi token khai ba tầng như theme.ts:
+   `:root` (sáng), `[data-theme="dark"]` (html tối HOẶC wrapper ForceDark), `[data-theme="light"]`
+   (subtree bị ForceLight ép sáng). */
+
+/* ---- 1. Token ------------------------------------------------------------------------------ */
+:root {
+  /* Kính của thanh bên + đầu trang: nền bề mặt pha trong suốt, blur phía sau. */
+  --tw-srf-chrome: color-mix(in srgb, var(--tw-surface, #ffffff) 76%, transparent);
+  /* Đường kẻ mảnh (viền thẻ, chia bảng) và bản "sáng lên" khi hover/focus. */
+  --tw-srf-line: rgba(30, 34, 48, 0.08);
+  --tw-srf-line-strong: rgba(108, 92, 231, 0.45);
+  /* Viền thẻ: mặc định = line; đổi sang line-strong khi hover (xem mục 4). Là biến riêng để hover
+     một thẻ không làm mọi đường kẻ BÊN TRONG nó đổi màu theo. */
+  --tw-srf-edge: var(--tw-srf-line);
+  /* Vệt sáng 1px mép trên — thứ làm thẻ đọc như một tấm kính có độ dày. */
+  --tw-srf-hi: rgba(255, 255, 255, 0.85);
+  /* Nền thẻ kính. Sáng: trắng hơi trong để quầng màu của nền lộ qua; tối: gần trong suốt. */
+  --tw-srf-glass: rgba(255, 255, 255, 0.8);
+  /* Bóng thẻ = token trang công khai. CARD_SHADOW (theme.ts) trỏ vào biến này nên MỌI
+     `boxShadow: CARD_SHADOW` inline trong 27 trang tự theo theme và tự đổi khi hover. */
+  --tw-srf-shadow: var(--tw-pub-card-shadow);
+  --tw-srf-shadow-hover: var(--tw-pub-card-shadow-hover);
+  /* Quầng tím (thanh bên) và lớp nhuộm nhẹ (đầu bảng, hàng hover, mục menu hover). */
+  --tw-srf-glow: rgba(108, 92, 231, 0.16);
+  --tw-srf-tint: rgba(108, 92, 231, 0.05);
+  --tw-srf-tint-2: rgba(108, 92, 231, 0.1);
+}
+[data-theme="dark"] {
+  --tw-srf-chrome: color-mix(in srgb, var(--tw-surface, #12101f) 72%, transparent);
+  --tw-srf-line: rgba(255, 255, 255, 0.08);
+  --tw-srf-line-strong: rgba(160, 140, 255, 0.55);
+  --tw-srf-edge: var(--tw-srf-line);
+  --tw-srf-hi: rgba(255, 255, 255, 0.07);
+  --tw-srf-glass: rgba(255, 255, 255, 0.04);
+  --tw-srf-shadow: var(--tw-pub-card-shadow);
+  --tw-srf-shadow-hover: var(--tw-pub-card-shadow-hover);
+  --tw-srf-glow: rgba(108, 92, 231, 0.34);
+  --tw-srf-tint: rgba(124, 108, 240, 0.09);
+  --tw-srf-tint-2: rgba(124, 108, 240, 0.16);
+}
+[data-theme="light"] {
+  --tw-srf-chrome: color-mix(in srgb, var(--tw-surface, #ffffff) 76%, transparent);
+  --tw-srf-line: rgba(30, 34, 48, 0.08);
+  --tw-srf-line-strong: rgba(108, 92, 231, 0.45);
+  --tw-srf-edge: var(--tw-srf-line);
+  --tw-srf-hi: rgba(255, 255, 255, 0.85);
+  --tw-srf-glass: rgba(255, 255, 255, 0.8);
+  --tw-srf-shadow: var(--tw-pub-card-shadow);
+  --tw-srf-shadow-hover: var(--tw-pub-card-shadow-hover);
+  --tw-srf-glow: rgba(108, 92, 231, 0.16);
+  --tw-srf-tint: rgba(108, 92, 231, 0.05);
+  --tw-srf-tint-2: rgba(108, 92, 231, 0.1);
+}
+
+/* ---- 2. Nền tối trong app = ĐEN-TÍM, không phải xám xanh -------------------------------------
+   PALETTES.dark (theme.ts, dùng chung với desktop) là #13151C xám trung tính. Trang tiếp thị tối
+   là #07060E đen-tím. Để app cùng một sản phẩm, khi <html> tối VÀ có mặt một shell `.tw-app`, ghi
+   đè bộ `--tw-*` bằng bảng đen-tím — nhích sáng hơn trang tiếp thị một bậc (#0A0913) vì đây là
+   màn hình nhìn nhiều giờ, đen tuyệt đối làm chữ lóa.
+   Vì sao selector này: `:root[data-theme="dark"]:has(.tw-app)` có specificity (0,3,0), thắng
+   `:root[data-theme="dark"]` (0,2,0) mà ThemeProvider chèn lúc chạy (chèn SAU nên nếu bằng nhau
+   nó thắng) — không phải sửa theme.ts dùng chung với desktop. Popup antd render qua portal (ngoài
+   `.tw-app`) vẫn đọc được vì biến đặt ở <html>. Cùng bộ hex với APP_DARK trong surfaceTheme.ts. */
+:root[data-theme="dark"]:has(.tw-app) {
+  --tw-layer: #0a0913;
+  --tw-surface: #12101f;
+  --tw-surface-alt: #181530;
+  --tw-surface-muted: #1d1a36;
+  --tw-text: #eeedf6;
+  --tw-text-sub: #a8a5c4;
+  --tw-text-faint: #6e6b8c;
+  --tw-border: #262240;
+  --tw-border-sub: #1c1932;
+  --tw-chip-bg: rgba(124, 108, 240, 0.2);
+  --tw-chip-text: #c3b8ff;
+  --tw-code-bg: #0e0c1a;
+  --tw-code-header-bg: #151328;
+  --tw-code-border: #252143;
+  --tw-code-text: #eeedf6;
+  /* ThemeProvider ghi nền <html> bằng inline style (#13151C) — !important trong stylesheet thắng
+     inline; đây là màu lộ ra khi kéo quá đà (overscroll) trên Mac. */
+  background-color: #0a0913 !important;
+}
+:root[data-theme="dark"]:has(.tw-app) ::-webkit-scrollbar-thumb {
+  background: #2b2745;
+}
+
+/* Lớp sáng TĨNH của nền: ba quầng màu rất mờ đặt trên body (nền Layout/Content trong AppShell để
+   trong suốt để lộ nó). Tĩnh có chủ ý — nền trôi lúc đang đọc bảng là làm phiền; lưới caro chậm
+   của `.tw-grid-bg` đã đủ "không phẳng". `background-attachment: fixed` để quầng đứng yên theo
+   khung nhìn khi cuộn (iOS bỏ qua → cuộn theo trang, vẫn ổn). */
+:root:has(.tw-app) body {
+  background:
+    radial-gradient(1100px 620px at 8% -12%, rgba(108, 92, 231, 0.09), transparent 60%),
+    radial-gradient(900px 520px at 100% -6%, rgba(79, 182, 255, 0.07), transparent 58%),
+    radial-gradient(900px 600px at 50% 112%, rgba(166, 107, 255, 0.06), transparent 62%),
+    var(--tw-layer, #f4f5fb);
+  background-attachment: fixed;
+}
+:root[data-theme="dark"]:has(.tw-app) body {
+  background:
+    radial-gradient(1000px 640px at 6% -10%, rgba(108, 92, 231, 0.22), transparent 62%),
+    radial-gradient(800px 520px at 100% -4%, rgba(79, 182, 255, 0.1), transparent 60%),
+    radial-gradient(900px 700px at 50% 112%, rgba(166, 107, 255, 0.12), transparent 62%),
+    #0a0913;
+  background-attachment: fixed;
+}
+
+/* ---- 3. Khung: thanh bên + đầu trang là kính tối có viền phát sáng --------------------------- */
+/* Thanh bên: quầng tím mờ ở góc trên (đèn từ logo hắt xuống) + vệt sáng dọc mép phải mờ dần.
+   Vẽ bằng pseudo để không đụng nền inline của Sider; con nằm trên pseudo nhờ z-index. */
+.tw-app-sider::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(440px 260px at 18% -6%, var(--tw-srf-glow), transparent 70%);
+}
+.tw-app-sider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -1px;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(108, 92, 231, 0.6), rgba(108, 92, 231, 0.14) 38%, transparent 85%);
+}
+.tw-app-sider > .ant-layout-sider-children {
+  position: relative;
+  z-index: 1;
+}
+/* Đầu trang: đường viền dưới là một vệt sáng chạy ngang (tím → hồng-tím → xanh) thay cho kẻ
+   xám; ở tối thêm bóng đổ mềm để tách khỏi nội dung cuộn phía dưới. */
+.tw-app-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(108, 92, 231, 0.55) 16%,
+    rgba(166, 107, 255, 0.4) 50%,
+    rgba(79, 182, 255, 0.38) 84%,
+    transparent 100%
+  );
+}
+[data-theme="dark"] .tw-app-header {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+/* Mục menu đang chọn: một VỆT SÁNG 3px ở mép trái, phát quang — dấu hiệu thấy ngay cả khi thanh
+   bên thu gọn còn biểu tượng, không chỉ đổi màu chữ. `::before` vì antd đã dùng `::after` cho
+   thanh bên phải của inline menu (rộng 0 ở v5 nên vô hình). */
+.tw-app .ant-menu .ant-menu-item-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #a66bff, #6c5ce7);
+  box-shadow:
+    0 0 10px rgba(108, 92, 231, 0.8),
+    0 0 2px rgba(255, 255, 255, 0.45);
+}
+/* Sáng: giữ nền tím nhạt của antd, thêm viền sáng mảnh. */
+.tw-app .ant-menu .ant-menu-item-selected {
+  box-shadow: inset 0 0 0 1px rgba(108, 92, 231, 0.16);
+}
+/* Tối: nền tím đặc → dải tím có ánh (chữ trắng trên nền này ≥ 4.9:1, giữ nguyên sửa lỗi AA cũ). */
+[data-theme="dark"] .tw-app .ant-menu .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgba(108, 92, 231, 0.95), rgba(108, 92, 231, 0.72));
+  box-shadow:
+    0 6px 18px rgba(108, 92, 231, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+/* Ô người dùng / Liên hệ / Đăng nhập ở chân thanh bên: có transition mà chưa có trạng thái hover. */
+.tw-app .tw-userblock:hover {
+  background: var(--tw-srf-tint-2);
+}
+
+/* ---- 4. Thẻ = mặt kính ---------------------------------------------------------------------
+   Áp cho antd Card (42 tệp dùng) qua class — không cần sửa trang. Ba lớp ánh sáng: nền kính,
+   vệt sáng 1px mép trên (pseudo, để không cãi nhau với `boxShadow` inline của trang), và bóng.
+   Bóng đi qua biến `--tw-srf-shadow` (= CARD_SHADOW) nên thẻ có inline boxShadow vẫn đổi theo. */
+.tw-app .ant-card {
+  background: var(--tw-srf-glass);
+  box-shadow: var(--tw-srf-shadow);
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.tw-app .ant-card.ant-card-bordered {
+  border-color: var(--tw-srf-edge);
+}
+.tw-app .ant-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow: inset 0 1px 0 var(--tw-srf-hi);
+}
+.tw-app .ant-card .ant-card-head {
+  border-bottom-color: var(--tw-srf-line);
+}
+.tw-app .ant-card .ant-card-actions {
+  border-top-color: var(--tw-srf-line);
+  background: transparent;
+}
+.tw-app .ant-card .ant-card-actions > li:not(:last-child) {
+  border-inline-end-color: var(--tw-srf-line);
+}
+/* Thẻ BẤM ĐƯỢC (antd hoverable, .tw-lift, .tw-stat-card) khi rê chuột: viền sáng lên + bóng sâu
+   hơn. Đổi qua BIẾN chứ không đặt thuộc tính, vì inline style của trang (`boxShadow: CARD_SHADOW`,
+   `border: 1px solid var(--tw-srf-edge)`) sẽ thắng thuộc tính của class — nhưng inline đang đọc
+   biến, nên đổi biến là inline đổi theo. Transition có sẵn trên phần tử vẫn chạy bình thường. */
+.tw-app .ant-card.ant-card-hoverable:hover,
+.tw-app .tw-lift:hover,
+.tw-app .tw-stat-card:hover {
+  --tw-srf-shadow: var(--tw-srf-shadow-hover);
+  --tw-srf-edge: var(--tw-srf-line-strong);
+  border-color: var(--tw-srf-edge);
+  box-shadow: var(--tw-srf-shadow);
+}
+/* Class dùng cho thẻ KHÔNG phải antd Card (div tự viết) muốn cùng chất kính — thêm vào markup là
+   xong, không cần style inline. */
+.tw-srf-glass {
+  position: relative;
+  background: var(--tw-srf-glass);
+  border: 1px solid var(--tw-srf-edge);
+  border-radius: 16px;
+  box-shadow:
+    var(--tw-srf-shadow),
+    inset 0 1px 0 var(--tw-srf-hi);
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+/* ---- 5. Bảng ----------------------------------------------------------------------------- */
+/* Màu đầu bảng / hàng hover / đường kẻ đi qua token antd (surfaceTheme.ts) — CSS chỉ chỉnh chữ
+   đầu bảng: nhỏ hơn, đậm hơn, để đọc như nhãn cột chứ không như một hàng dữ liệu nữa. */
+.tw-app .ant-table-wrapper .ant-table-thead > tr > th,
+.tw-app .ant-table-wrapper .ant-table-thead > tr > td {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.tw-app .ant-table-wrapper .ant-table {
+  border-radius: 14px;
+}
+.tw-app .ant-table-wrapper .ant-table-container {
+  border-radius: 14px;
+}
+/* Số thẳng cột ở mọi chỗ có số (bảng, KPI, phân trang) — thuộc tính kế thừa, đặt ở gốc là đủ. */
+.tw-app {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 6. Nhãn trạng thái --------------------------------------------------------------------- */
+/* antd Tag (57 tệp) thành viên thuốc: bo tròn qua token (borderRadiusSM), CSS chỉ thêm độ đậm. */
+.tw-app .ant-tag {
+  font-weight: 600;
+  padding-inline: 9px;
+}
+/* Nhãn tự viết (không qua antd): `<span class="tw-srf-pill" data-tone="ok|warn|err|info">`. */
+.tw-srf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  color: var(--tw-chip-text, #5b4fc2);
+  background: var(--tw-chip-bg, #f1effe);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.tw-srf-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+.tw-srf-pill[data-tone="ok"] {
+  color: #16b98d;
+  background: rgba(22, 185, 141, 0.12);
+}
+.tw-srf-pill[data-tone="warn"] {
+  color: #d98b06;
+  background: rgba(245, 158, 11, 0.14);
+}
+.tw-srf-pill[data-tone="err"] {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+.tw-srf-pill[data-tone="info"] {
+  color: #2f9be0;
+  background: rgba(79, 182, 255, 0.14);
+}
+[data-theme="dark"] .tw-srf-pill[data-tone="warn"] {
+  color: #f5b544;
+}
+[data-theme="dark"] .tw-srf-pill[data-tone="info"] {
+  color: #6cc3ff;
+}
+
+/* ---- 7. Nút ------------------------------------------------------------------------------- */
+/* Nút đặc (primary/solid): một lớp bóng sáng mỏng ở nửa trên, như nút có mặt cong. Chỉ ghi
+   `background-image` nên màu nền + màu hover của antd (`background-color`) vẫn nguyên; nút đã
+   có inline `background: gradient` (CTA đầu trang) tự thắng và không bị ảnh hưởng. */
+.tw-app .ant-btn-variant-solid:not(:disabled):not(.ant-btn-background-ghost) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 55%);
+}
+.tw-app .ant-btn-variant-solid:not(:disabled):not(.ant-btn-background-ghost):hover {
+  filter: brightness(1.04);
+}
+
+/* ---- 8. Tiêu đề mục ------------------------------------------------------------------------- */
+/* Tiêu đề trang (Title level 3/4): đậm hơn, sát chữ hơn — cùng giọng với trang công khai và admin. */
+.tw-app h3.ant-typography,
+.tw-app h4.ant-typography {
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+/* Nhãn nhỏ viết hoa trên một khối (eyebrow) cho trang muốn dùng. */
+.tw-srf-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--tw-text-faint, #9aa3b5);
+}
+
+/* ---- 9. Popup antd (portal ngoài .tw-app) ---------------------------------------------------- */
+/* Modal/Drawer/Dropdown render vào body; móc qua `:root:has(.tw-app)` để chúng cùng chất kính:
+   viền mảnh + vệt sáng mép trên. Màu nền của chúng đã đi qua ConfigProvider (surfaceTheme.ts). */
+:root:has(.tw-app) .ant-modal .ant-modal-content,
+:root:has(.tw-app) .ant-drawer .ant-drawer-content,
+:root:has(.tw-app) .ant-dropdown .ant-dropdown-menu,
+:root:has(.tw-app) .ant-popover .ant-popover-inner,
+:root:has(.tw-app) .ant-select-dropdown {
+  border: 1px solid var(--tw-srf-line);
+  box-shadow:
+    var(--tw-srf-shadow-hover),
+    inset 0 1px 0 var(--tw-srf-hi);
+}
+
+/* ---- 10. Nghiêng thẻ bấm được (SurfaceTilt) ------------------------------------------------- */
+/* JS chỉ đặt hai biến góc + class này lên thẻ đang rê chuột; công thức nằm ở đây. Tối đa 4°
+   (SurfaceTilt.maxTilt) — đủ để thẻ "đáp lại" tay, không đủ để chữ méo. Đặt SAU `.tw-lift:hover`
+   (globals) và cao hơn về specificity để thắng translateY của nó lúc đang nghiêng. */
+.tw-app .tw-srf-tilt.tw-srf-tilt {
+  transform: perspective(900px) rotateX(var(--tw-srf-rx, 0deg)) rotateY(var(--tw-srf-ry, 0deg)) translateY(-2px);
+  transition-duration: 0.12s;
+  transition-timing-function: linear;
+  will-change: transform;
+}
+
+/* ---- 11. Giảm chuyển động: tắt HẾT, giữ nguyên bố cục ---------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .tw-app .ant-card,
+  .tw-app .tw-lift,
+  .tw-app .tw-stat-card,
+  .tw-app .tw-srf-tilt.tw-srf-tilt,
+  .tw-srf-glass {
+    transition: none;
+    transform: none !important;
+  }
+  .tw-app .ant-btn-variant-solid:not(:disabled):hover {
+    filter: none;
+  }
+}
+
+/* ---- 12. Điện thoại (~380px) ----------------------------------------------------------------- */
+/* Nội dung không được đẩy trang cuộn ngang: `clip` (không phải hidden) để KHÔNG tạo scroll
+   container mới — đầu trang sticky vẫn bám. */
+.tw-app-content {
+  overflow-x: clip;
+  min-width: 0;
+}

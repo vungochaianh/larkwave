@@ -1,0 +1,20 @@
+[Unit]
+Description=Toolswave generated-app reverse proxy (*.a.toolswave.net -> *.pages.dev)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+Environment=PORT=8095
+Environment=APP_BASE_DOMAIN=toolswave.net
+ExecStart=/usr/bin/env node /home/app/toolswave/deploy/app-proxy/server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toolswave-app-proxy
+
+[Install]
+WantedBy=multi-user.target

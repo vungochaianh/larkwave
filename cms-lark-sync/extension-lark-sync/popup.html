@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    :root {
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --bg: #0f1117;
+      --bg2: #1a1d2e;
+      --bg3: #252838;
+      --border: #2d3148;
+      --text: #e4e4e7;
+      --text2: #9ca3af;
+      --text3: #6b7280;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 440px; max-height: 560px; overflow-y: auto;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px; background: var(--bg); color: var(--text);
+    }
+
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .header h1 { font-size: 14px; font-weight: 600; }
+    .header h1 span { color: var(--accent); }
+    .header-actions { display: flex; gap: 6px; }
+
+    .settings-bar {
+      padding: 8px 14px; background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .settings-bar label { color: var(--text2); font-size: 11px; white-space: nowrap; }
+    .settings-bar input {
+      flex: 1; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 11px; outline: none;
+    }
+    .settings-bar input:focus { border-color: var(--accent); }
+
+    .toolbar {
+      padding: 6px 14px; background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .stat { font-size: 11px; color: var(--text2); }
+    .stat b { color: var(--accent); }
+
+    .current-page {
+      padding: 10px 14px; background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+    .current-page .label { color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .current-page .info { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      display: inline-flex; align-items: center; padding: 2px 6px;
+      border-radius: 3px; font-size: 10px; font-family: monospace;
+      background: var(--bg3); color: var(--text2);
+    }
+    .tag.accent { background: rgba(99,102,241,0.15); color: var(--accent); }
+    .tag.green { background: rgba(34,197,94,0.15); color: var(--success); }
+
+    .section { padding: 10px 14px; }
+
+    /* Connector capture — prominent */
+    .connector-capture {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 10px; margin-bottom: 8px;
+      border-left: 3px solid var(--accent);
+    }
+    .connector-capture:hover { border-color: var(--accent); }
+
+    /* Other capture — compact */
+    .other-capture {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 10px; margin-bottom: 4px;
+    }
+    .other-capture .capture-header {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .other-capture .capture-path { color: var(--text2); font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .other-capture .capture-actions { margin-top: 4px; }
+
+    .capture-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+    }
+    .capture-type {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+    }
+    .capture-time { color: var(--text3); font-size: 10px; white-space: nowrap; }
+    .capture-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+    .field { }
+    .field.full-width { grid-column: 1 / -1; }
+    .field-label { color: var(--text3); font-size: 10px; }
+    .field-value {
+      font-size: 11px; color: var(--text);
+      word-break: break-all; max-height: 32px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .field-value.mono { font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 10px; }
+    .capture-actions { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+
+    /* Show more bar */
+    .show-more-bar {
+      text-align: center; padding: 8px 0; margin-top: 4px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--bg3); color: var(--text);
+      font-size: 11px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent-hover); }
+    .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+    .btn.small { padding: 2px 6px; font-size: 10px; }
+
+    .empty { text-align: center; padding: 24px; color: var(--text3); }
+    .empty-icon { font-size: 28px; margin-bottom: 8px; }
+
+    .toast {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: var(--success); color: #fff; padding: 6px 14px;
+      border-radius: 6px; font-size: 11px; z-index: 100;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { background: var(--danger); }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1><span>Lark</span> Sync Helper</h1>
+    <div class="header-actions">
+      <button class="btn small" id="btnOpenCms">CMS</button>
+      <button class="btn small danger" id="btnClear">Clear</button>
+    </div>
+  </div>
+
+  <div class="settings-bar">
+    <label>API:</label>
+    <input type="text" id="apiBase" placeholder="https://apihoanam.toolswave.net/api">
+    <button class="btn small" id="btnSaveApi">Save</button>
+  </div>
+
+  <div id="currentPageSection" class="current-page" style="display:none">
+    <div class="label">Current Lark Page</div>
+    <div class="info" id="currentPageInfo"></div>
+  </div>
+
+  <div class="toolbar">
+    <span class="stat">Total: <b id="captureCount">0</b> &nbsp;|&nbsp; Connector Sync: <b id="connectorCount">0</b></span>
+  </div>
+
+  <div class="section">
+    <div id="captureList"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

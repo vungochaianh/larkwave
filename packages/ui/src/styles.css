@@ -1,0 +1,10 @@
+/* Shared Tailwind entry for @larkwave/ui. Consuming apps import this and add
+   the package to their Tailwind v4 `@source` / content scan so utility classes
+   used inside shared components are generated. */
+@import 'tailwindcss';
+
+/* Brand tokens shared by web + desktop. */
+:root {
+  --tw-brand: #6c5cef;
+  --tw-brand-600: #5b4fc2;
+}

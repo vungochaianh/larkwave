@@ -1,0 +1,7 @@
+node_modules/
+.profile/
+.env
+*.log
+# Generated on first run — gates /qr and /status. Anyone holding it can open the live Lark
+# login QR, so it is a credential: never commit it, and it differs per machine.
+.http-token

@@ -1,0 +1,18 @@
+{
+  "name": "tw-cms-keeper",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless Lark web-session keeper for Larkwave CMS Bitable sync. Runs 24/7 on a Linux VM (or Windows) so connector jobs never go stale when the desktop app is closed.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js run",
+    "login": "node src/index.js login",
+    "once": "node src/index.js once",
+    "jobs": "node src/index.js jobs",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

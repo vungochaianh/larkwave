@@ -1,0 +1,68 @@
+appId: net.toolswave.larkwave
+productName: Larkwave
+copyright: Copyright © Larkwave
+# Custom scheme for the desktop OAuth deep link (larkwave://auth?token=…).
+protocols:
+  - name: Larkwave
+    schemes:
+      - larkwave
+# No native node modules → skip @electron/rebuild (it ENOENTs on pnpm's layout).
+npmRebuild: false
+# No Apple Developer cert → ad-hoc sign the packed mac app so arm64 doesn't reject it as
+# "damaged". See afterPack.cjs. (Windows/Linux: hook is a no-op.)
+afterPack: ./afterPack.cjs
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - from: .
+    filter:
+      - package.json
+      - app
+mac:
+  # KHÔNG để electron-builder tự đi tìm chứng chỉ. `identity: null` = không ký ở tầng builder,
+  # nên chữ ký ad-hoc do afterPack.cjs đặt được GIỮ NGUYÊN.
+  #
+  # Vì sao phải ghim: trước đây cách ký phụ thuộc vào biến môi trường `CSC_IDENTITY_AUTO_DISCOVERY`
+  # mà người gõ lệnh phải nhớ đặt. Quên một lần là builder nhặt chứng chỉ "Apple Development" có
+  # sẵn trong keychain và ký đè lên chữ ký ad-hoc — ra một bản cài ký bằng chứng chỉ PHÁT TRIỂN,
+  # loại không được phép dùng để phân phối. Chuyện này đã xảy ra thật ở bản 1.0.310.
+  #
+  # Một thứ quyết định app chạy được trên máy người khác hay không thì không được nằm ở môi trường
+  # của người gõ lệnh. Muốn ký thật để phân phối, xem `docs/ky-va-notarize-macos.md`.
+  identity: null
+  # Chưa có Developer ID ⇒ chưa notarize được. Khai rõ `false` thay vì để builder tự đoán, và
+  # `scripts/check-dist-mac.mjs` sẽ chặn ở bước phát hành chứ không để lọt ra ngoài im lặng.
+  notarize: false
+  # UNIVERSAL (arm64 + x64 trong 1 .dmg): chạy được cả Mac Apple Silicon LẪN Mac Intel. Trình duyệt
+  # không phân biệt được arch của Mac (UA đều báo "Intel"), nên 1 link universal là cách đúng để
+  # /download luôn có bản cài. App không có native module → gộp arch sạch (chỉ lipo binary Electron).
+  target:
+    - target: dmg
+      arch:
+        - universal
+  icon: resources/icon.png
+  category: public.app-category.developer-tools
+win:
+  # BUILD THIS ON THE WINDOWS MACHINE ONLY. nsis needs Wine when the host is macOS, and that
+  # is dead-ended on Apple Silicon — so `dist:win` on a Mac now FAILS on the nsis target
+  # instead of quietly producing a zip. That is deliberate: the Windows release machine builds
+  # natively, and a silent zip-only fallback is how the .exe promise got lost before.
+  # zip stays as the portable option; push-installers.mjs picks the .exe first (its pick() order).
+  # x64 = the arch most Windows PCs use (a Mac host defaults to arm64 otherwise).
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+  icon: resources/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  artifactName: Larkwave-${version}-win.${ext}
+linux:
+  target: AppImage
+  icon: resources/icon.png

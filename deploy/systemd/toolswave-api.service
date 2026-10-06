@@ -1,0 +1,22 @@
+[Unit]
+Description=Toolswave App Builder API (apia.toolswave.net)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+WorkingDirectory=/home/app/toolswave/apps/api
+EnvironmentFile=/home/app/toolswave/.env
+# PATH so the build-runner can spawn npm for generated apps
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/app/.local/share/pnpm
+ExecStart=/usr/bin/env node dist/main.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toolswave-api
+
+[Install]
+WantedBy=multi-user.target

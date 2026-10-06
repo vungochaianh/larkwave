@@ -1,0 +1,13 @@
+node_modules
+# nextron main-process build output
+app
+# electron-builder packaged installers
+dist
+# code-push staging dir (scripts/push-renderer.mjs)
+.pages-out
+# Next.js renderer build
+renderer/.next
+renderer/out
+renderer/next-env.d.ts
+*.log
+.test-build/

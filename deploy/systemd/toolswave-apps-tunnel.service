@@ -1,0 +1,16 @@
+[Unit]
+Description=Toolswave apps tunnel (*.a.toolswave.net) — isolated from the shared tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared-apps/config.yml tunnel run
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toolswave-apps-tunnel
+
+[Install]
+WantedBy=multi-user.target

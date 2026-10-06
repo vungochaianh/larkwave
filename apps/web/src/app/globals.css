@@ -1,0 +1,1205 @@
+/*
+ * Tailwind v4 WITHOUT preflight so it does not clobber Ant Design's base styles.
+ * We import only the theme (CSS variables / tokens) and utilities layers.
+ * `@import "tailwindcss";` would also pull in preflight — do NOT use it.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/*
+ * Web tokens are now ALIASES of the shared @larkwave/ui theme (same as the desktop). The
+ * ThemeProvider injects `--tw-layer / --tw-surface / --tw-text / --tw-text-sub / --tw-border`
+ * (light AND dark via [data-theme]) at runtime; aliasing here means every `var(--tw-bg)` /
+ * `var(--tw-text)` in the web flips with the theme too. (Hardcoded hex colours in components
+ * are being migrated to these tokens page by page.)
+ */
+:root {
+  --tw-brand: #6c5ce7;
+  --tw-bg: var(--tw-layer, #f4f5fb);
+  --tw-bg-elevated: var(--tw-surface, #ffffff);
+  --tw-text-secondary: var(--tw-text-sub, #6b7280);
+  /* Light first-paint fallbacks; the shared ThemeProvider's stylesheet (injected at runtime)
+     overrides --tw-text/--tw-border with theme-aware values for both light AND dark. */
+  --tw-text: #1e2230;
+  --tw-border: #ecedf3;
+  /* Line colour for the animated graph-paper grid behind the app content (subtle). */
+  --tw-grid-line: rgba(108, 92, 231, 0.055);
+}
+:root[data-theme="dark"] {
+  --tw-grid-line: rgba(255, 255, 255, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tw-grid-line: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Animated "khung caro" (graph-paper) grid the app content sits on — a subtle diagonal drift.
+   Drawn on an ISOLATED ::before layer (its own paint layer via will-change) so the animation
+   never repaints the page content; sits above the Content's solid background, below everything. */
+.tw-grid-bg {
+  position: relative;
+  isolation: isolate;
+}
+.tw-grid-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--tw-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tw-grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  animation: tw-grid-drift 28s linear infinite;
+  will-change: background-position;
+}
+@keyframes tw-grid-drift {
+  from {
+    background-position:
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      46px 46px,
+      46px 46px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-grid-bg::before {
+    animation: none;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  /* Never let a stray wide child scroll the WHOLE page sideways on a phone.
+     `clip` (not `hidden`) does not create a scroll container, so the AppShell's
+     position:sticky header + any sticky sub-nav keep working normally. */
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  background:
+    radial-gradient(1100px 620px at 8% -12%, rgba(108, 92, 231, 0.06), transparent 60%),
+    radial-gradient(900px 520px at 100% -6%, rgba(79, 182, 255, 0.05), transparent 58%),
+    var(--tw-bg);
+  color: var(--tw-text);
+  -webkit-font-smoothing: antialiased;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+/* Custom scrollbar to fit the light theme */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(30, 34, 48, 0.14);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(30, 34, 48, 0.24);
+}
+
+/* Live log console — stays a dark terminal block (reads great on light). */
+.tw-log-console {
+  background: #0d1117;
+  border: 1px solid #1b2230;
+  border-radius: 12px;
+  /* Readable light text on the dark console (raw log lines have no per-level span). */
+  color: #d7dde7;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  padding: 14px 16px;
+  min-height: 240px;
+  max-height: 60vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tw-log-line {
+  display: flex;
+  gap: 10px;
+}
+.tw-log-ts {
+  color: rgba(255, 255, 255, 0.32);
+  flex-shrink: 0;
+}
+.tw-log-level-info {
+  color: rgba(255, 255, 255, 0.82);
+}
+.tw-log-level-debug {
+  color: rgba(255, 255, 255, 0.45);
+}
+.tw-log-level-warn {
+  color: #f5c451;
+}
+.tw-log-level-error {
+  color: #ff8d85;
+}
+
+/* Vivid friendly gradient text used for small accents. */
+.tw-gradient-text {
+  background: linear-gradient(120deg, #6c5ce7 0%, #a66bff 45%, #ff7ab6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Small rounded gradient logo mark. */
+.tw-logo-mark {
+  background: linear-gradient(135deg, #6c5ce7 0%, #a66bff 45%, #ff7ab6 75%, #4fb6ff 100%);
+  color: #fff;
+}
+
+/* Clean white card on light bg with a soft shadow. */
+.tw-card {
+  background: #ffffff;
+  border: 1px solid #ecedf3;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(17, 24, 39, 0.06),
+    0 8px 24px rgba(17, 24, 39, 0.04);
+}
+
+/* Faint pastel gradient top strip used to accent "create" surfaces. */
+.tw-gradient-strip {
+  background: linear-gradient(
+    90deg,
+    rgba(108, 92, 231, 0.16),
+    rgba(166, 107, 255, 0.14),
+    rgba(255, 122, 182, 0.12),
+    rgba(79, 182, 255, 0.12)
+  );
+}
+
+/* Dark IDE file-tree panel (CodeEditor / CodeBrowser). */
+.tw-code-tree .ant-tree {
+  color: rgba(255, 255, 255, 0.82);
+  background: transparent;
+}
+.tw-code-tree .ant-tree .ant-tree-node-content-wrapper {
+  color: rgba(255, 255, 255, 0.82);
+}
+.tw-code-tree .ant-tree .ant-tree-node-content-wrapper:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.tw-code-tree .ant-tree .ant-tree-node-selected,
+.tw-code-tree .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: rgba(108, 92, 231, 0.28) !important;
+}
+.tw-code-tree .ant-tree-switcher {
+  color: rgba(255, 255, 255, 0.5);
+}
+.tw-code-tree .ant-tree .ant-tree-iconEle {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Hoverable card: gentle lift + stronger shadow on hover. */
+.tw-lift {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+.tw-lift:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 6px rgba(17, 24, 39, 0.07),
+    0 18px 40px rgba(17, 24, 39, 0.10);
+}
+
+/* Faux browser chrome bar dots (template thumbnails / preview frame). */
+.tw-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+.tw-dots > i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Workspace left sub-nav item. */
+.tw-subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.tw-subnav-item:hover {
+  background: rgba(108, 92, 231, 0.06);
+  color: #1e2230;
+}
+.tw-subnav-item.is-active {
+  background: rgba(108, 92, 231, 0.1);
+  color: #6c5ce7;
+  font-weight: 600;
+}
+.tw-subnav-item .tw-subnav-ico {
+  font-size: 15px;
+  display: inline-flex;
+}
+
+/* App console workspace: flush left sub-nav + full-width content area.
+   The grid fills the available width (no centred max-width cap) so Preview
+   and Code use the entire remaining space next to a compact vertical menu. */
+.tw-workspace-grid {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  width: 100%;
+}
+
+/* Workspace: stack the left sub-nav above content on narrow screens. */
+@media (max-width: 768px) {
+  .tw-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .tw-workspace-grid > :first-child {
+    position: static !important;
+  }
+  .tw-workspace-grid nav {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+  .tw-workspace-grid .tw-subnav-item {
+    width: auto !important;
+  }
+}
+
+/* ─── Base44/Lovable editor: LEFT conversation + RIGHT canvas ──────────────── */
+/* Two columns filling the viewport height below the sticky header. The chat
+   column has its own scroll; the canvas fills the rest. */
+.tw-editor-grid {
+  display: grid;
+  /* Canvas (Preview/Dashboard) is ALWAYS full-width; the chat is a floating,
+     chatbot-style panel that overlays the bottom-right corner on demand. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  width: 100%;
+  /* Header (60) + content top padding (18) + bottom padding (56) ≈ 134px. */
+  height: calc(100vh - 150px);
+  min-height: 540px;
+}
+/* Chat closed → the floating panel is hidden entirely. */
+.tw-editor-grid[data-chat="closed"] .tw-chat-col {
+  display: none;
+}
+/* Backdrop is mobile-only (see media query); hidden on desktop. */
+.tw-chat-backdrop {
+  display: none;
+}
+
+/* Conversation turns fade/slide in for a livelier chat (reduced-motion safe). */
+@keyframes tw-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tw-msg {
+  animation: tw-msg-in 0.28s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-msg {
+    animation: none;
+  }
+}
+
+/* The conversation panel: a floating, chatbot-style card anchored bottom-right
+   (overlays the full-width canvas). Header tabs + scroll + pinned composer. */
+.tw-chat-col {
+  position: fixed;
+  right: 20px;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  z-index: 945;
+  width: 412px;
+  max-width: calc(100vw - 32px);
+  height: min(74vh, 660px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #ffffff;
+  border: 1px solid #ecedf3;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(17, 24, 39, 0.08),
+    0 18px 50px rgba(17, 24, 39, 0.22);
+  overflow: hidden;
+}
+/* Expanded ("maximize") state — a large panel for longer conversations. */
+.tw-chat-col[data-expanded="true"] {
+  width: min(900px, calc(100vw - 40px));
+  height: min(90vh, 940px);
+  bottom: 24px;
+}
+/* Floating panel header — title + mode tabs + close. */
+.tw-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f2f7;
+  background: #fbfbfe;
+}
+/* Floating "open chat" button (chatbot FAB) shown when the panel is closed.
+   The WRAPPER carries the fixed position (not the circle) so a hint pill can sit
+   beside it: on its own the bare circle never says what it opens, so someone who
+   closes the panel once has no visible way back to "sửa app". */
+.tw-chat-fab-wrap {
+  position: fixed;
+  right: 20px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 944;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tw-chat-fab {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #6c5ce7, #8b7bf0);
+  box-shadow: 0 10px 26px rgba(108, 92, 231, 0.45);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+.tw-chat-fab:hover {
+  filter: brightness(1.05);
+}
+/* Ping ring — a few pulses right after the panel is closed, then it stops on its
+   own (iteration count, not `infinite`): enough to catch the eye, not a permanent
+   blinking light in the corner. Sits BEHIND the circle so the icon stays crisp. */
+.tw-chat-fab::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(108, 92, 231, 0.55);
+  z-index: -1;
+  opacity: 0;
+}
+.tw-chat-fab-wrap.tw-hint .tw-chat-fab::after {
+  animation: twFabPing 1.7s ease-out 3;
+}
+@keyframes twFabPing {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+/* The hint pill. Shown for a few seconds after closing, then folded back to the
+   bare circle — but still reachable on hover, so it is a reminder rather than a
+   thing you get one chance to read. */
+.tw-chat-fab-hint {
+  padding: 8px 13px;
+  border: 1px solid var(--tw-border, #ecedf3);
+  border-radius: 999px;
+  background: var(--tw-surface, #ffffff);
+  color: var(--tw-text, #1e2230);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.16);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(10px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+  pointer-events: none;
+}
+.tw-chat-fab-wrap.tw-hint .tw-chat-fab-hint,
+.tw-chat-fab-wrap:hover .tw-chat-fab-hint,
+.tw-chat-fab-hint:focus-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-chat-fab-wrap.tw-hint .tw-chat-fab::after {
+    animation: none;
+  }
+  .tw-chat-fab-hint {
+    transition: none;
+  }
+}
+.tw-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+.tw-chat-composer {
+  border-top: 1px solid #f1f2f7;
+  padding: 14px 14px 16px;
+  background: #fbfbfe;
+}
+
+/* The canvas column: tab bar on top, framed preview / code below. */
+.tw-canvas-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #ffffff;
+  border: 1px solid #ecedf3;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(17, 24, 39, 0.06),
+    0 8px 24px rgba(17, 24, 39, 0.04);
+  overflow: hidden;
+}
+/* The canvas body holds either the preview (padded) or the dashboard (full). */
+.tw-canvas-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tw-canvas-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f2f7;
+  background: #fbfbfe;
+}
+/* Preview keeps the framed/padded look. */
+.tw-canvas-pad {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* ─── Dashboard: left nav + content (Base44-style) ─────────────────────────── */
+.tw-dash {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.tw-dash-nav {
+  width: 212px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 10px 8px;
+  border-right: 1px solid #f1f2f7;
+  background: #fbfbfe;
+}
+.tw-dash-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 11px;
+  margin-bottom: 2px;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #4a5163;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.3;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.tw-dash-navitem:hover {
+  background: #f2f3f8;
+  color: #1e2230;
+}
+.tw-dash-navitem[data-active="true"] {
+  background: rgba(108, 92, 231, 0.1);
+  color: #5b4fc2;
+  font-weight: 600;
+}
+.tw-dash-navicon {
+  display: inline-flex;
+  font-size: 15px;
+  opacity: 0.9;
+}
+.tw-dash-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Editors/browsers own their full-height layout (no padding wrapper). */
+.tw-dash-full {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+/* Card sections scroll inside a padded column with a section header. */
+.tw-dash-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+.tw-dash-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+.tw-dash-head-icon {
+  display: inline-flex;
+  font-size: 18px;
+  color: #6c5ce7;
+}
+
+/* Narrow: the canvas takes the full width; the chat becomes a slide-in overlay
+   (toggled by the chat button in the canvas top bar) instead of stealing height. */
+@media (max-width: 1000px) {
+  .tw-editor-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+  /* Chat = fixed slide-in panel from the left; stays mounted, just off-screen. */
+  .tw-chat-col {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: auto;
+    bottom: 0;
+    width: min(92vw, 392px);
+    height: 100vh;
+    max-width: none;
+    z-index: 1001;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    display: flex;
+  }
+  /* On mobile the chat is a full-height drawer, so the FAB sits a little lower. */
+  .tw-chat-fab-wrap {
+    bottom: 76px;
+  }
+  .tw-editor-grid[data-chat="open"] .tw-chat-col {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgba(17, 24, 39, 0.28);
+  }
+  /* Keep it mounted (not display:none) so the conversation state survives toggling. */
+  .tw-editor-grid[data-chat="closed"] .tw-chat-col {
+    display: flex;
+  }
+  .tw-chat-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(17, 24, 39, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .tw-editor-grid[data-chat="open"] .tw-chat-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .tw-canvas-col {
+    min-height: calc(100vh - 130px);
+  }
+}
+
+/* ─── Profile / contribution graph (GitHub-style heatmap) ─────────────────── */
+.tw-contrib {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+}
+.tw-contrib-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #ebedf3;
+  outline: 1px solid rgba(17, 24, 39, 0.04);
+  outline-offset: -1px;
+  transition: transform 0.1s ease;
+}
+.tw-contrib-cell:hover {
+  transform: scale(1.22);
+}
+.tw-contrib-cell.lvl-0 {
+  background: #ebedf3;
+}
+.tw-contrib-cell.lvl-1 {
+  background: #d6cffb;
+}
+.tw-contrib-cell.lvl-2 {
+  background: #b3a4f5;
+}
+.tw-contrib-cell.lvl-3 {
+  background: #8b73ef;
+}
+.tw-contrib-cell.lvl-4 {
+  background: #6c5ce7;
+}
+.tw-contrib-cell.is-empty {
+  background: transparent;
+  outline: none;
+}
+/* Months row aligned above the week columns. */
+.tw-contrib-months {
+  display: grid;
+  grid-auto-flow: column;
+  font-size: 11px;
+  color: #9aa3b5;
+  height: 16px;
+}
+/* Weekday labels column to the left of the grid. */
+.tw-contrib-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  font-size: 10.5px;
+  color: #9aa3b5;
+  padding-right: 6px;
+}
+.tw-contrib-weekday {
+  height: 12px;
+  line-height: 12px;
+  text-align: right;
+}
+.tw-contrib-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+/* Subtle pastel backdrop for auth screens. */
+.tw-auth-bg {
+  background:
+    radial-gradient(700px 460px at 18% 8%, rgba(108, 92, 231, 0.12), transparent 60%),
+    radial-gradient(640px 420px at 88% 92%, rgba(255, 122, 182, 0.10), transparent 60%),
+    radial-gradient(620px 420px at 78% 6%, rgba(79, 182, 255, 0.10), transparent 60%),
+    #f4f5fb;
+}
+
+/* Running pipeline stage — a gentle live pulse to signal activity. */
+@keyframes twStagePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(108, 92, 231, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.12);
+  }
+}
+.tw-stage-active {
+  animation: twStagePulse 1.6s ease-in-out infinite;
+}
+
+/* Sidebar pinned-app rows — hover affordance. */
+.tw-pinned-row:hover {
+  background: rgba(108, 92, 231, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-stage-active {
+    animation: none;
+  }
+}
+
+/* ───────────────────────── Landing page animations ─────────────────────────
+   Used by /welcome. Scroll-reveal is toggled by the Reveal client island
+   (adds .tw-in when the element enters the viewport). All motion is disabled
+   under prefers-reduced-motion. */
+
+/* Scroll reveal: fade + rise into place. */
+.tw-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.tw-reveal.tw-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Animated aurora blobs behind the hero. */
+.tw-aurora {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 680px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.tw-aurora::before,
+.tw-aurora::after {
+  content: "";
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  max-width: 640px;
+  max-height: 640px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.55;
+}
+.tw-aurora::before {
+  left: 8%;
+  top: -8%;
+  background: radial-gradient(circle, rgba(108, 92, 231, 0.55), transparent 70%);
+  animation: twDrift1 16s ease-in-out infinite alternate;
+}
+.tw-aurora::after {
+  right: 6%;
+  top: 4%;
+  background: radial-gradient(circle, rgba(79, 182, 255, 0.45), transparent 70%);
+  animation: twDrift2 18s ease-in-out infinite alternate;
+}
+@keyframes twDrift1 {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(8%, 10%) scale(1.15); }
+}
+@keyframes twDrift2 {
+  from { transform: translate(0, 0) scale(1.1); }
+  to { transform: translate(-10%, 8%) scale(0.95); }
+}
+
+/* Gentle float (hero product mockup). */
+.tw-float {
+  animation: twFloat 7s ease-in-out infinite;
+}
+@keyframes twFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+/* Animated gradient text. */
+.tw-gradient-anim {
+  background-size: 220% auto;
+  animation: twGradientMove 6s linear infinite;
+}
+@keyframes twGradientMove {
+  to { background-position: 220% center; }
+}
+
+/* Soft pulsing glow (hero badge). */
+.tw-pulse {
+  animation: twPulse 2.8s ease-in-out infinite;
+}
+@keyframes twPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.0); }
+  50% { box-shadow: 0 0 0 8px rgba(108, 92, 231, 0.08); }
+}
+
+/* CTA shine sweep on hover. */
+.tw-shine {
+  position: relative;
+  overflow: hidden;
+}
+.tw-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  transform: skewX(-18deg);
+  transition: left 0.6s ease;
+}
+.tw-shine:hover::after {
+  left: 140%;
+}
+
+/* Subtle 3D tilt-lift for cards/mockup on hover. */
+.tw-tilt {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.tw-tilt:hover {
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-reveal { opacity: 1; transform: none; transition: none; }
+  .tw-aurora::before, .tw-aurora::after,
+  .tw-float, .tw-gradient-anim, .tw-pulse { animation: none; }
+  .tw-shine::after { display: none; }
+}
+
+/* ───────────────────── Bề mặt 3D cho trang công khai (/download, /explore) ─────────────────────
+   Token dùng chung cho các thẻ TiltCard và quầng màu parallax. Ba tầng selector đúng như theme.ts
+   và FxStyles: `:root` (sáng), `[data-theme="dark"]` (khớp cả <html> dark lẫn wrapper ForceDark —
+   KHÔNG dùng `:root[data-theme="dark"]`, selector đó không khớp wrapper con), và `[data-theme="light"]`
+   cho subtree bị ForceLight ép sáng. Ở tối, thẻ là KÍNH: nền gần trong suốt, viền trắng mờ, vệt
+   sáng 1px mép trên, bóng đen sâu — chiều sâu đến từ ánh sáng, không từ độ chênh màu nền. */
+:root {
+  --tw-pub-orb-a: 0.55;
+  --tw-pub-edge: rgba(255, 255, 255, 0.7);
+  --tw-pub-card-bg: var(--tw-surface, #ffffff);
+  --tw-pub-card-border: var(--tw-border, #ecedf3);
+  --tw-pub-card-shadow: 0 1px 3px rgba(17, 24, 39, 0.05), 0 16px 40px rgba(108, 92, 231, 0.09);
+  --tw-pub-card-shadow-hover: 0 4px 10px rgba(17, 24, 39, 0.06), 0 28px 60px rgba(108, 92, 231, 0.16);
+}
+[data-theme="dark"] {
+  --tw-pub-orb-a: 0.42;
+  --tw-pub-edge: rgba(255, 255, 255, 0.14);
+  /* 3.5% trắng là gần như vô hình trên nền gần đen — thẻ CHÌM vào trang thay vì nổi lên khỏi nó.
+     Người dùng chê đúng chỗ này ("các card tối quá").
+     Vỏ tối không có nghĩa là MỌI thứ đều tối: mặt chứa nội dung phải sáng đủ để mắt biết đâu là
+     tấm thẻ, đâu là nền. Nâng lên 8% nền + 16% viền, và thêm một chút sắc tím thay vì trắng trơn
+     để nó vẫn thuộc về bảng màu chứ không thành một mảng xám. */
+  --tw-pub-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(146, 132, 255, 0.045));
+  --tw-pub-card-border: rgba(255, 255, 255, 0.16);
+  --tw-pub-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 24px 60px rgba(0, 0, 0, 0.55);
+  --tw-pub-card-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 70px rgba(108, 92, 231, 0.28);
+}
+[data-theme="light"] {
+  --tw-pub-orb-a: 0.55;
+  --tw-pub-edge: rgba(255, 255, 255, 0.7);
+  --tw-pub-card-bg: var(--tw-surface, #ffffff);
+  --tw-pub-card-border: var(--tw-border, #ecedf3);
+  --tw-pub-card-shadow: 0 1px 3px rgba(17, 24, 39, 0.05), 0 16px 40px rgba(108, 92, 231, 0.09);
+  --tw-pub-card-shadow-hover: 0 4px 10px rgba(17, 24, 39, 0.06), 0 28px 60px rgba(108, 92, 231, 0.16);
+}
+/* Thẻ: bề mặt theme + viền + vệt sáng mép trên (inset) để đọc như một tấm kính có độ dày.
+   Không dùng backdrop-filter: nó ép trình duyệt làm phẳng preserve-3d của TiltCard. */
+.tw-pub-card {
+  background: var(--tw-pub-card-bg);
+  border: 1px solid var(--tw-pub-card-border);
+  box-shadow: var(--tw-pub-card-shadow), inset 0 1px 0 var(--tw-pub-edge);
+  transition: box-shadow 0.45s ease, border-color 0.45s ease;
+}
+.tw-pub-card:hover {
+  box-shadow: var(--tw-pub-card-shadow-hover), inset 0 1px 0 var(--tw-pub-edge);
+}
+/* Thẻ đang nghiêng/phóng nổi lên trên hàng xóm thay vì bị thẻ kế bên đè mép. */
+.tw-pub-card.tw-fx-live {
+  z-index: 2;
+}
+/* Quầng màu mờ dùng làm lớp parallax; vị trí/màu đặt inline ở từng trang. */
+.tw-pub-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: var(--tw-pub-orb-a);
+  pointer-events: none;
+}
+.tw-pub-orb-soft {
+  opacity: calc(var(--tw-pub-orb-a) * 0.55);
+}
+
+/* ───────────────────────── Mặt quản trị (/admin, AdminShell) ─────────────────────────
+   Mọi rule dưới đây móc vào `.tw-admin` (Layout của AdminShell) hoặc `.tw-admin-pop` (popup antd
+   render qua portal, AdminShell gắn class này qua ConfigProvider) nên KHÔNG chạm tới app chính.
+
+   Nguyên tắc: đây là mặt LÀM VIỆC — đọc số, duyệt thanh toán, xem lỗi. Ưu tiên đọc rõ và quét
+   nhanh; chiều sâu đến từ LỚP và ÁNH SÁNG (nền / thẻ / bảng phân tầng, viền sáng mảnh), không
+   từ chuyển động. Không WebGL, không nghiêng thẻ, không hút chuột.
+
+   Token theo theme khai ba tầng như phần "Bề mặt 3D" phía trên: `.tw-admin` (sáng),
+   `[data-theme="dark"] .tw-admin`, và `[data-theme="light"] .tw-admin` cho subtree bị ép sáng. */
+.tw-admin {
+  /* Số thẳng cột ở MỌI chỗ có số: font-variant-numeric là thuộc tính kế thừa, đặt ở gốc là đủ
+     cho bảng, KPI, thống kê, phân trang… (antd 5 không còn bật tabular-nums mặc định như v4). */
+  font-variant-numeric: tabular-nums;
+  --tw-adm-glow: rgba(108, 92, 231, 0.07);
+  --tw-adm-ring: rgba(108, 92, 231, 0.18);
+  --tw-adm-th-bg: color-mix(in srgb, var(--tw-surface-muted, #f6f5fe) 55%, var(--tw-surface, #ffffff));
+  --tw-adm-row-hover: rgba(108, 92, 231, 0.05);
+  --tw-adm-ok: #16b98d;
+  --tw-adm-warn: #f59e0b;
+  --tw-adm-err: #ef4444;
+}
+[data-theme="dark"] .tw-admin {
+  --tw-adm-glow: rgba(108, 92, 231, 0.2);
+  --tw-adm-ring: rgba(150, 130, 255, 0.45);
+  /* Đầu bảng TỐI hơn thân bảng một bậc: ở nền tối, tầng thấp hơn = tối hơn. */
+  --tw-adm-th-bg: color-mix(in srgb, var(--tw-layer, #13151c) 70%, var(--tw-surface, #1b1e27));
+  --tw-adm-row-hover: rgba(124, 108, 240, 0.1);
+}
+[data-theme="light"] .tw-admin {
+  --tw-adm-glow: rgba(108, 92, 231, 0.07);
+  --tw-adm-ring: rgba(108, 92, 231, 0.18);
+  --tw-adm-th-bg: color-mix(in srgb, var(--tw-surface-muted, #f6f5fe) 55%, var(--tw-surface, #ffffff));
+  --tw-adm-row-hover: rgba(108, 92, 231, 0.05);
+}
+.tw-admin-pop {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thanh bên: quầng sáng tím mờ ở góc trên (đèn rọi từ logo xuống) + vệt sáng 1px mép phải.
+   Vẽ bằng pseudo để không đụng nền inline của Sider; con nằm trên pseudo nhờ z-index. */
+.tw-admin-sider {
+  position: relative;
+}
+.tw-admin-sider::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(420px 260px at 18% -6%, var(--tw-adm-glow), transparent 70%);
+}
+.tw-admin-sider > .ant-layout-sider-children {
+  position: relative;
+  z-index: 1;
+}
+/* Mục đang chọn: viền sáng mảnh + bóng tím nhẹ — là "đèn" của mục, không phải chuyển động. */
+.tw-admin .ant-menu-inline .ant-menu-item-selected {
+  box-shadow: inset 0 0 0 1px var(--tw-adm-ring), 0 6px 18px rgba(108, 92, 231, 0.16);
+}
+.tw-admin .ant-menu-inline .ant-menu-item-group-title {
+  padding-block: 14px 4px;
+}
+
+/* Nhãn ADMIN ở đầu trang + ô người dùng: cùng bộ tím nhạt như PlanBadge. */
+.tw-admin-pill {
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #6c5ce7;
+  background: rgba(108, 92, 231, 0.1);
+  border: 1px solid rgba(108, 92, 231, 0.2);
+  flex: 0 0 auto;
+}
+[data-theme="dark"] .tw-admin-pill {
+  color: #c3b8ff;
+  background: rgba(124, 108, 240, 0.18);
+  border-color: rgba(150, 130, 255, 0.32);
+}
+.tw-admin-user {
+  transition: background 0.15s ease;
+}
+.tw-admin-user:hover {
+  background: rgba(108, 92, 231, 0.08);
+}
+
+/* Nội dung không được đẩy trang cuộn ngang ở ~380px (một Select width 180 + tiêu đề dài là đủ
+   tràn). `clip` thay vì `hidden` để KHÔNG tạo scroll container mới — sticky header vẫn bám. */
+.tw-admin-content {
+  overflow-x: clip;
+  min-width: 0;
+}
+
+/* Tiêu đề trang: to hơn một chút, sát chữ hơn — cùng giọng với tiêu đề khu vực của app. */
+.tw-admin h3.ant-typography {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+/* ---- Thẻ = mặt kính (tầng 2) ---------------------------------------------------------------
+   Dùng lại đúng token `--tw-pub-card-*` của trang công khai để thẻ admin và thẻ website là cùng
+   một vật liệu: nền sáng = trắng + bóng tím mờ; nền tối = gần trong suốt + vệt sáng mép trên +
+   bóng đen sâu. Không backdrop-filter (tốn GPU trên bảng dài, và không cần vì không có gì di
+   chuyển phía sau thẻ ngoài lưới caro). */
+.tw-admin .ant-card {
+  background: var(--tw-pub-card-bg);
+  border: 1px solid var(--tw-pub-card-border);
+  box-shadow: var(--tw-pub-card-shadow), inset 0 1px 0 var(--tw-pub-edge);
+}
+.tw-admin .ant-card > .ant-card-head {
+  border-bottom-color: var(--tw-pub-card-border);
+  font-weight: 700;
+  min-height: 48px;
+}
+
+/* ---- Bảng = tầng 3 ---------------------------------------------------------------------
+   Bảng đứng một mình (không trong Card) tự có khung kính; bảng nằm trong Card thì bỏ khung để
+   không thành hai viền lồng nhau. Thân bảng trong suốt để thẻ bên dưới lộ qua (phân tầng thật,
+   không phải hai màu đặc na ná nhau), đầu bảng tô một bậc khác để mắt bắt được hàng tiêu đề. */
+.tw-admin .ant-table-wrapper {
+  background: var(--tw-pub-card-bg);
+  border: 1px solid var(--tw-pub-card-border);
+  border-radius: 14px;
+  box-shadow: var(--tw-pub-card-shadow), inset 0 1px 0 var(--tw-pub-edge);
+  overflow: hidden;
+}
+.tw-admin .ant-card .ant-table-wrapper {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.tw-admin .ant-table-wrapper .ant-table,
+.tw-admin .ant-table-wrapper .ant-table-container,
+.tw-admin .ant-table-wrapper .ant-table-tbody > tr > td {
+  background: transparent;
+}
+.tw-admin .ant-table-wrapper .ant-table-thead > tr > th,
+.tw-admin .ant-table-wrapper .ant-table-thead > tr > td {
+  background: var(--tw-adm-th-bg);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--tw-text-sub, #6b7280);
+}
+.tw-admin .ant-table-wrapper .ant-table-thead > tr > th::before {
+  /* Vạch chia cột mặc định của antd rối mắt trên nền đã có màu — bỏ. */
+  display: none;
+}
+.tw-admin .ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: var(--tw-adm-row-hover);
+}
+/* Cột cố định (fixed) không được trong suốt, nếu không chữ hàng bên dưới lộ qua khi cuộn ngang. */
+.tw-admin .ant-table-wrapper .ant-table-cell-fix-left,
+.tw-admin .ant-table-wrapper .ant-table-cell-fix-right {
+  background: var(--tw-surface, #ffffff);
+}
+/* Phân trang nằm TRONG khung kính nên cần mép trong; antd mặc định margin 16px 0. */
+.tw-admin .ant-table-wrapper .ant-table-pagination.ant-pagination {
+  margin: 12px 14px;
+}
+/* Bảng rộng hơn màn hình (điện thoại) thì cuộn trong khung, không kéo cả trang. */
+.tw-admin .ant-table-wrapper .ant-table-content {
+  overflow-x: auto;
+}
+/* KPI / Statistic: con số là thứ nhìn đầu tiên. */
+.tw-admin .ant-statistic-content {
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* ---- Trạng thái mã hoá bằng HÌNH ---------------------------------------------------------
+   Thẻ trạng thái (antd Tag màu preset) được thêm một chấm trước chữ. Chỉ chấm thôi chưa đủ —
+   chấm mã hoá thêm MỨC ĐỘ để khi liếc, cái cần chú ý tự nổi lên:
+     mức 0  trung tính (default)              → chấm rỗng
+     mức 1  ổn / thông tin (success, blue…)   → chấm đặc; "processing" (đang chạy) thở chậm
+     mức 2  cần để ý (warning, gold, orange)  → chấm đặc + quầng sáng
+     mức 3  nặng (error, red, volcano)        → chấm đặc + quầng + VẠCH 3px mép trái thẻ
+   Màu chấm = currentColor của thẻ nên luôn khớp màu chữ ở cả hai theme, không cần bảng màu riêng.
+   Chỉ áp trong vùng nội dung + popup (không đụng huy hiệu ở header), và bỏ qua thẻ đã có icon
+   riêng (:has) — icon đó đã là hình rồi, chấm nữa là thừa. Thẻ màu tuỳ ý (hex, chữ trắng) không
+   thuộc nhóm này. */
+:is(.tw-admin .tw-admin-content, .tw-admin-pop)
+  .ant-tag:is(
+    .ant-tag-default, .ant-tag-success, .ant-tag-processing, .ant-tag-warning, .ant-tag-error,
+    .ant-tag-green, .ant-tag-blue, .ant-tag-purple, .ant-tag-gold, .ant-tag-orange,
+    .ant-tag-red, .ant-tag-volcano
+  ):not(:has(> .anticon:first-child))::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-inline-end: 6px;
+  vertical-align: 1px;
+}
+/* mức 0: chấm rỗng */
+:is(.tw-admin .tw-admin-content, .tw-admin-pop) .ant-tag.ant-tag-default::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  opacity: 0.7;
+}
+/* mức 1: đang chạy thì thở — nhịp chậm (1.8s), biên độ nhỏ, để nói "còn sống" chứ không giật. */
+:is(.tw-admin .tw-admin-content, .tw-admin-pop) .ant-tag.ant-tag-processing::before {
+  animation: tw-adm-breathe 1.8s ease-in-out infinite;
+}
+@keyframes tw-adm-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 35%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent); }
+}
+/* mức 2: quầng sáng */
+:is(.tw-admin .tw-admin-content, .tw-admin-pop)
+  .ant-tag:is(.ant-tag-warning, .ant-tag-gold, .ant-tag-orange)::before {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+}
+/* mức 3: quầng + vạch mép trái */
+:is(.tw-admin .tw-admin-content, .tw-admin-pop)
+  .ant-tag:is(.ant-tag-error, .ant-tag-red, .ant-tag-volcano) {
+  border-inline-start: 3px solid currentColor;
+  padding-inline-start: 6px;
+}
+:is(.tw-admin .tw-admin-content, .tw-admin-pop)
+  .ant-tag:is(.ant-tag-error, .ant-tag-red, .ant-tag-volcano)::before {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 28%, transparent);
+}
+
+/* Vạch mức độ ở CẤP HÀNG: hàng nào chứa thẻ trạng thái lỗi (error) / cần duyệt (warning) thì
+   mép trái hàng có vạch 3px cùng màu — quét cột đầu tiên là thấy hàng nào đang cần tay người.
+   Chỉ dùng hai preset TRẠNG THÁI của antd (error/warning — StatusTags + thanh toán chờ duyệt),
+   không dùng màu đặt tên (red/gold…) vì trang Báo lỗi dùng "red" cho trạng thái "Từ chối" — đó
+   là hàng đã xong, kéo mắt vào là sai. Vẽ bằng inset box-shadow, không đổi kích thước ô. */
+.tw-admin .ant-table-wrapper .ant-table-tbody > tr:has(.ant-tag-error) > td:first-child {
+  box-shadow: inset 3px 0 0 var(--tw-adm-err);
+}
+.tw-admin .ant-table-wrapper .ant-table-tbody > tr:has(.ant-tag-warning) > td:first-child {
+  box-shadow: inset 3px 0 0 var(--tw-adm-warn);
+}
+/* Hàng vừa lỗi vừa cảnh báo: lỗi thắng (đứng sau để đè). */
+.tw-admin .ant-table-wrapper .ant-table-tbody > tr:has(.ant-tag-error):has(.ant-tag-warning) > td:first-child {
+  box-shadow: inset 3px 0 0 var(--tw-adm-err);
+}
+
+/* Giảm chuyển động: tắt nhịp thở của chấm và mọi transition riêng của mặt quản trị; giữ
+   nguyên hình (chấm/quầng/vạch vẫn còn — chúng là thông tin, không phải trang trí). */
+@media (prefers-reduced-motion: reduce) {
+  :is(.tw-admin .tw-admin-content, .tw-admin-pop) .ant-tag.ant-tag-processing::before {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent);
+  }
+  .tw-admin-user {
+    transition: none;
+  }
+}
