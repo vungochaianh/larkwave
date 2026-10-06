@@ -1,10 +1,51 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { IPC } from '@larkwave/core';
 import { primeVersionSnapshot } from './runtime/versionHint';
-import { createWriteStream, existsSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { join } from 'node:path';
+
+const pexec = promisify(execFile);
+
+/**
+ * TỰ CÀI bản .dmg vừa tải, thay vì mount rồi để người dùng kéo thả.
+ *
+ * Vì sao: app CHƯA KÝ, nên macOS (nhất là Apple Silicon) hay báo lỗi Finder -36 ("some data … can't
+ * be read or written") đúng lúc kéo .app từ dmg vào Applications. `ditto` copy không dính lỗi đó.
+ * Nên: mount (hdiutil) → `ditto` .app đè vào đúng chỗ app đang chạy (hoặc /Applications) → xoá cờ
+ * quarantine → tháo mount. Thất bại ở bất kỳ bước nào thì trả false để người gọi LÙI VỀ cách cũ
+ * (mở dmg cho kéo tay) — không bao giờ để người dùng kẹt.
+ *
+ * Lưu ý: bản vá này chỉ có tác dụng từ bản .dmg KẾ TIẾP trở đi (bản đang cài vẫn dùng luồng cũ).
+ */
+async function installDmgMac(dmg: string): Promise<boolean> {
+  if (process.platform !== 'darwin') return false;
+  const mnt = join(app.getPath('temp'), `tw-dmg-${Date.now()}`);
+  let mounted = false;
+  try {
+    await pexec('hdiutil', ['attach', dmg, '-nobrowse', '-noautoopen', '-mountpoint', mnt], { timeout: 120_000 });
+    mounted = true;
+    const appName = readdirSync(mnt).find((n) => n.endsWith('.app'));
+    if (!appName) return false;
+    const srcApp = join(mnt, appName);
+    // Cài ĐÈ lên chính chỗ app đang chạy nếu đó là một .app (thường là /Applications/Larkwave.app);
+    // nếu không xác định được thì về /Applications. Ghi đè bundle đang chạy là an toàn trên macOS:
+    // tiến trình giữ inode cũ, bundle mới nằm sẵn cho lần mở sau.
+    const exe = app.getPath('exe');
+    const m = /^(.*\.app)\/Contents\/MacOS\//.exec(exe);
+    const destApp = m ? m[1] : join('/Applications', appName);
+    await pexec('ditto', [srcApp, destApp], { timeout: 180_000 });
+    await pexec('xattr', ['-cr', destApp], { timeout: 30_000 }).catch(() => undefined);
+    return true;
+  } catch {
+    return false; // perms / mount / copy hỏng → lùi về mở dmg cho kéo tay
+  } finally {
+    if (mounted) await pexec('hdiutil', ['detach', mnt, '-force'], { timeout: 60_000 }).catch(() => undefined);
+  }
+}
 
 /**
  * Renderer "code push" (OTA). The installed (possibly unsigned) app can pick up new
@@ -153,7 +194,35 @@ function netMessage(e: unknown): string {
  *     Cái cần canh là mạng CHẾT, không phải mạng chậm — nên ở đây canh thời gian giữa hai lần
  *     nhận dữ liệu, còn tải bao lâu thì kệ.
  */
-export async function downloadAndOpenInstaller(): Promise<{ ok: boolean; path?: string; error?: string }> {
+/**
+ * Kết thúc cài: macOS thì TỰ CÀI bằng ditto rồi khởi động lại; hỏng (hoặc nền tảng khác) thì mở tệp
+ * cho người dùng cài tay (luồng cũ). `installed` cho giao diện biết để hiện thông báo đúng.
+ */
+async function finishInstall(file: string): Promise<{ ok: boolean; path?: string; installed?: boolean }> {
+  if (process.platform === 'darwin') {
+    const installed = await installDmgMac(file);
+    if (installed) {
+      try {
+        app.relaunch();
+      } catch {
+        /* vẫn thoát để người dùng tự mở lại bản mới */
+      }
+      setTimeout(() => {
+        try {
+          app.exit(0);
+        } catch {
+          /* ignore */
+        }
+      }, 1200);
+      return { ok: true, path: file, installed: true };
+    }
+  }
+  const openErr = await shell.openPath(file);
+  if (openErr) shell.showItemInFolder(file);
+  return { ok: true, path: file, installed: false };
+}
+
+export async function downloadAndOpenInstaller(): Promise<{ ok: boolean; path?: string; error?: string; installed?: boolean }> {
   const m = await fetchManifest();
   const url = process.platform === 'darwin' ? m?.downloads?.mac : m?.downloads?.win;
   if (!url || !/^https:\/\//i.test(url)) {
@@ -184,9 +253,7 @@ export async function downloadAndOpenInstaller(): Promise<{ ok: boolean; path?: 
       // 416 = đã tải đủ rồi mà lần trước chưa kịp đổi tên. Không phải lỗi.
       if (res.status === 416 && have > 0) {
         renameSync(part, file);
-        const openErr0 = await shell.openPath(file);
-        if (openErr0) shell.showItemInFolder(file);
-        return { ok: true, path: file };
+        return finishInstall(file);
       }
       return { ok: false, error: `Tải lỗi (HTTP ${res.status}).` };
     }
@@ -240,9 +307,7 @@ export async function downloadAndOpenInstaller(): Promise<{ ok: boolean; path?: 
 
     report(true); // chốt 100% trước khi đổi màn, để thanh không dừng lại ở 98%
     renameSync(part, file); // chỉ đổi tên khi đã ghi XONG — tệp .dmg dở dang trông y hệt tệp thật
-    const openErr = await shell.openPath(file); // '' on success
-    if (openErr) shell.showItemInFolder(file); // fallback: at least reveal the downloaded file
-    return { ok: true, path: file };
+    return finishInstall(file); // macOS: tự cài (ditto) tránh -36 rồi relaunch; hỏng thì mở cho kéo tay
   } catch (e) {
     // GIỮ tệp .part để lần bấm sau tải tiếp. Xoá nó ở đây là vứt bỏ đúng thứ vừa tải được.
     const msg =
