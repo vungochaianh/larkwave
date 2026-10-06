@@ -95,3 +95,31 @@ Sản phẩm làm việc với Lark/Feishu bằng AI + Trợ lý AI, cùng màu 
    cloudflared (nhớ restart, không SIGHUP).
 7. **tw-lark-runner / tw-cms-keeper**: trỏ `.env` về API Larkwave, service riêng trên VM, khoá runner mới.
 8. CI: thêm lại stage deploy khi hạ tầng sẵn sàng (`.gitlab-ci.yml`).
+
+## Đồng bộ thay đổi từ Toolswave gốc
+
+Toolswave (`/Users/deveris/app`) vẫn được phát triển tiếp. Repo này kéo thay đổi về bằng:
+
+```bash
+node scripts/sync-from-toolswave.mjs --dry   # xem trước: file nào vào, file nào bỏ qua, chỗ nào xung đột
+node scripts/sync-from-toolswave.mjs         # đồng bộ từng commit, mỗi commit gốc = 1 commit ở đây
+```
+
+- Mốc đã đồng bộ, đường dẫn repo gốc và danh sách loại trừ nằm trong `.toolswave-sync.json`.
+- Script chỉ ĐỌC repo gốc qua `git show` / `diff-tree`. Nó không bao giờ đổi cây làm việc hay nhánh bên đó, nên phiên khác đang làm trên Toolswave vẫn an toàn.
+- Mỗi file được gộp 3 chiều: base là gốc trước commit, theirs là gốc sau commit (cả hai đều đã đi qua đúng phép đổi tên lúc tách), ours là file ở đây.
+- File của app kia, hoặc file đã bị cắt hay đổi chỗ ở đây, sẽ bị **bỏ qua và liệt kê ra**.
+- Danh sách "bỏ qua … (không có ở repo này)" cần được đọc. Nếu đó là thay đổi phần chung mà ở đây đã chuyển chỗ (ví dụ bộ máy chat trong appwave nằm ở `runtime/chat/`), phải port tay.
+- Dòng `⚠ … khớp /…/` nghĩa là dòng được thêm vào có dấu hiệu thuộc về app kia. Phải kiểm tra trước khi giữ.
+- Số phiên bản desktop đi đường riêng: `apps/desktop/package.json` được ghim theo bản ở đây.
+
+**Khi gặp xung đột**, script dừng lại và để dấu `<<<<<<< repo này / ======= / >>>>>>> Toolswave` trong file:
+
+1. Gỡ xung đột.
+2. Chạy `git add -A && git commit -F .git/TW_SYNC_MSG`.
+3. Chạy `node scripts/sync-from-toolswave.mjs --continue`.
+4. Chạy lại script không kèm cờ để đi tiếp.
+
+**Commit gốc không thuộc repo này** nhưng vẫn chạm vào file chung: `git checkout --` các file đó, commit, rồi chạy `--continue`.
+
+**Sau mỗi đợt đồng bộ:** chạy lại typecheck và test (lệnh ở phần kiểm tra phía trên).
