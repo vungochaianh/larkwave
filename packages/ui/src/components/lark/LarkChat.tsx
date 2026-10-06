@@ -24,6 +24,7 @@ import { useSlashCommands, skillsToCommandItems, type SlashCommandItem } from '.
 import { ToolCallGroup, type ToolCallState } from './ToolCallCard';
 import { ConfirmToolModal, type PendingConfirm } from './ConfirmToolModal';
 import { AskUserModal, type PendingAsk } from './AskUserModal';
+import { findAnswer, isToolAllowed, rememberAnswer, rememberTool, type RememberScope } from './agentPrefs';
 import { takeLarkPrompt } from './larkHandoff';
 import { useI18n } from '../../i18n';
 
@@ -266,6 +267,11 @@ export function LarkChat({
   const [items, setItems] = useState<ChatItem[]>([]);
   const [pendings, setPendings] = useState<PendingConfirm[]>([]);
   const [asks, setAsks] = useState<PendingAsk[]>([]);
+  // Skill đang chạy của lượt hiện tại (nếu người dùng mở lượt bằng một /lệnh) — để "nhớ lựa chọn
+  // cho skill này". State cho prop modal; ref cho dùng trong vòng lặp apply (async). Chỉ đổi ở lượt
+  // NGƯỜI DÙNG gõ, không đổi ở lượt tự-chạy-tiếp (giữ scope skill xuyên suốt tác vụ).
+  const [activeSkill, setActiveSkill] = useState<{ id: string; name: string } | null>(null);
+  const activeSkillRef = useRef<{ id: string; name: string } | null>(null);
   const [sessionId, setSessionId] = useState('');
   const [sessions, setSessions] = useState<LarkSessionMeta[]>([]);
   // Collapsed answers — a per-machine view preference (see larkFold.ts for why it is
@@ -798,7 +804,15 @@ export function LarkChat({
         ...prev,
         { kind: 'tool', id: ev.callId, call: { callId: ev.callId, name: ev.name, input: ev.input, gated: ev.gated, status: 'pending' } },
       ]);
-      if (ev.gated) setPendings((p) => [...p, { callId: ev.callId, name: ev.name, input: ev.input }]);
+      if (ev.gated) {
+        // "Nhớ lựa chọn": công cụ ghi này đã được tự duyệt cho hội thoại/skill hiện tại → cho chạy
+        // luôn, KHÔNG hiện hộp xác nhận. (Thẻ công cụ vẫn hiện bình thường ở trên.)
+        if (isToolAllowed(sessionId, activeSkillRef.current?.id, ev.name)) {
+          runtime.larkConfirmTool?.(ev.callId, 'allow');
+        } else {
+          setPendings((p) => [...p, { callId: ev.callId, name: ev.name, input: ev.input }]);
+        }
+      }
     } else if (ev.type === 'tool_result') {
       updateTool(ev.callId, (c) => ({ ...c, status: ev.ok ? 'ok' : 'error', summary: ev.summary, error: ev.error, suspectAppBug: ev.suspectAppBug, tier: ev.tier }));
       // The tool already ran (e.g. auto-approved server-side) — drop any lingering confirm.
@@ -821,7 +835,14 @@ export function LarkChat({
       updateTool(ev.callId, (c) => ({ ...c, status: 'denied' }));
       setPendings((p) => p.filter((x) => x.callId !== ev.callId));
     } else if (ev.type === 'ask_user') {
-      setAsks((a) => [...a, { callId: ev.callId, question: ev.question, choices: ev.choices }]);
+      // "Nhớ lựa chọn": nếu đã có câu trả lời ghi nhớ cho ĐÚNG câu hỏi này (hội thoại/skill hiện
+      // tại) → tự trả lời, không hiện hộp hỏi lại.
+      const remembered = findAnswer(sessionId, activeSkillRef.current?.id, ev.question);
+      if (remembered != null) {
+        runtime.larkAnswerAsk?.(ev.callId, remembered);
+      } else {
+        setAsks((a) => [...a, { callId: ev.callId, question: ev.question, choices: ev.choices }]);
+      }
     } else if (ev.type === 'usage') {
       setCtx({ percentUsed: ev.percentUsed, contextTokens: ev.contextTokens, windowTokens: ev.windowTokens });
       // Ghi tên model THẬT lên bong bóng trả lời, thay cho bí danh. Người dùng chọn "opus", còn
@@ -841,7 +862,11 @@ export function LarkChat({
   };
 
   /** Deliver the user's answer for a pending `ask_user` → resumes the paused agent. */
-  const answer = (callId: string, ans: string) => {
+  const answer = (callId: string, ans: string, remember?: RememberScope | null) => {
+    if (remember) {
+      const q = asks.find((a) => a.callId === callId)?.question;
+      if (q) rememberAnswer(remember, { convId: sessionId, skillId: activeSkillRef.current?.id }, q, ans);
+    }
     runtime.larkAnswerAsk?.(callId, ans);
     setAsks((a) => a.filter((x) => x.callId !== callId));
   };
@@ -903,6 +928,14 @@ export function LarkChat({
    */
   const autoLeftRef = useRef(0);
 
+  /** Nếu câu lệnh mở đầu bằng "/lệnh" khớp một SKILL người dùng có → trả {id,name} skill đó. */
+  const skillFromText = (text: string): { id: string; name: string } | null => {
+    const m = /^\/([^\s]+)/.exec((text || '').trim());
+    if (!m) return null;
+    const cmd = slashCmds.find((c) => c.command === m[1] && (c.kind === 'skill' || !c.kind));
+    return cmd ? { id: cmd.id, name: cmd.name } : null;
+  };
+
   const send = async (text?: string, label?: string, auto = false) => {
     if (blocked) return; // desktop offline — nothing to send to
     const prompt = (text ?? input).trim();
@@ -919,6 +952,13 @@ export function LarkChat({
     setInput('');
     setAttachments([]);
     if (!auto) autoLeftRef.current = AUTO_CONTINUE_MAX; // yêu cầu MỚI của người dùng → nạp lại lượt tự nối
+    if (!auto) {
+      // Lượt NGƯỜI DÙNG gõ: nếu mở bằng một /lệnh (skill), ghi lại skill đang chạy để các xác nhận/
+      // câu hỏi trong lượt có thể "nhớ cho skill này". Lượt tự-chạy-tiếp KHÔNG đổi (giữ scope skill).
+      const sk = skillFromText(prompt);
+      setActiveSkill(sk);
+      activeSkillRef.current = sk;
+    }
     setBusy(true);
     setItems((prev) => [
       ...prev,
@@ -1098,7 +1138,11 @@ export function LarkChat({
     }, 8000);
   };
 
-  const decide = (callId: string, decision: 'allow' | 'deny') => {
+  const decide = (callId: string, decision: 'allow' | 'deny', remember?: RememberScope | null) => {
+    if (decision === 'allow' && remember) {
+      const name = pendings.find((p) => p.callId === callId)?.name;
+      if (name) rememberTool(remember, { convId: sessionId, skillId: activeSkillRef.current?.id }, name);
+    }
     runtime.larkConfirmTool?.(callId, decision);
     setPendings((p) => p.filter((x) => x.callId !== callId));
   };
@@ -2512,8 +2556,8 @@ export function LarkChat({
         </Drawer>
       )}
 
-      <ConfirmToolModal pending={pendings[0] ?? null} onDecide={decide} />
-      <AskUserModal pending={asks[0] ?? null} onAnswer={answer} />
+      <ConfirmToolModal pending={pendings[0] ?? null} skillName={activeSkill?.name ?? null} onDecide={decide} />
+      <AskUserModal pending={asks[0] ?? null} skillName={activeSkill?.name ?? null} onAnswer={answer} />
 
       {/* New conversation → pick which Base(s) it applies to. */}
       <Modal

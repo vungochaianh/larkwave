@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Modal, Typography, Input, Button } from 'antd';
+import { Modal, Typography, Input, Button, Checkbox, Radio } from 'antd';
 import { QuestionCircleFilled } from '@ant-design/icons';
 import { useI18n } from '../../i18n';
+import type { RememberScope } from './agentPrefs';
 
 const { Paragraph } = Typography;
 
@@ -21,18 +22,28 @@ export interface PendingAsk {
  */
 export function AskUserModal({
   pending,
+  skillName,
   onAnswer,
 }: {
   pending: PendingAsk | null;
-  onAnswer: (callId: string, answer: string) => void;
+  /** Tên skill đang chạy (nếu lượt do một /lệnh mở ra) — bật lựa chọn nhớ theo skill. */
+  skillName?: string | null;
+  onAnswer: (callId: string, answer: string, remember?: RememberScope | null) => void;
 }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [scope, setScope] = useState<RememberScope>('conversation');
 
-  // Reset the input each time a new question appears.
+  // Reset the input + remember flag each time a new question appears.
   useEffect(() => {
     setText('');
+    setRemember(false);
+    setScope('conversation');
   }, [pending?.callId]);
+
+  // Câu trả lời THẬT (chọn / gõ) thì kèm lựa chọn nhớ; "Bỏ qua" thì không nhớ.
+  const rememberScope = () => (remember ? scope : null);
 
   return (
     <Modal
@@ -98,7 +109,7 @@ export function AskUserModal({
                 {pending.choices.map((c, i) => (
                   <Button
                     key={i}
-                    onClick={() => onAnswer(pending.callId, c)}
+                    onClick={() => onAnswer(pending.callId, c, rememberScope())}
                     style={{
                       whiteSpace: 'normal',
                       height: 'auto',
@@ -130,15 +141,29 @@ export function AskUserModal({
             onPressEnter={(e) => {
               if (!e.shiftKey && text.trim()) {
                 e.preventDefault();
-                onAnswer(pending.callId, text.trim());
+                onAnswer(pending.callId, text.trim(), rememberScope());
               }
             }}
           />
+          {/* Nhớ câu trả lời này → lần sau gặp câu hỏi y hệt thì tự trả lời, không hiện hộp này nữa. */}
+          <div style={{ marginTop: 10 }}>
+            <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)}>
+              {t('chat.rememberAnswer', 'Nhớ lựa chọn này, lần sau tự trả lời câu hỏi tương tự')}
+            </Checkbox>
+            {remember && (
+              <div style={{ marginTop: 6, marginLeft: 24 }}>
+                <Radio.Group value={scope} onChange={(e) => setScope(e.target.value)} size="small">
+                  <Radio value="conversation">{t('chat.rememberConv', 'Trong hội thoại này')}</Radio>
+                  {skillName && <Radio value="skill">{t('chat.rememberSkill', 'Cho skill') + ` “${skillName}”`}</Radio>}
+                </Radio.Group>
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
             <Button type="text" onClick={() => onAnswer(pending.callId, '[người dùng bỏ qua]')}>
               {t('chat.skip', 'Bỏ qua')}
             </Button>
-            <Button type="primary" disabled={!text.trim()} onClick={() => onAnswer(pending.callId, text.trim())}>
+            <Button type="primary" disabled={!text.trim()} onClick={() => onAnswer(pending.callId, text.trim(), rememberScope())}>
               {t('chat.sendToClaude', 'Gửi cho Claude')}
             </Button>
           </div>
