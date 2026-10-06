@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.0.349',
+    date: '2026-10-06',
+    items: [
+      'EXCEL MẠNH HƠN: trợ lý giờ tạo được file Excel NHIỀU SHEET, có CÔNG THỨC (vd =SUM(...)) và GỘP Ô — không còn chỉ một bảng phẳng.',
+      'ĐIỀN VÀO MẪU CÓ SẴN: gửi một file .xlsx mẫu rồi bảo "điền số liệu vào đúng form này" — trợ lý điền thẳng vào các ô, GIỮ NGUYÊN công thức/định dạng/các sheet khác (tool fill_xlsx). Không phải tự nhập vào Lark Sheets nữa.',
+      'SỬA LỖI CÀI ĐẶT -36: app chưa ký nên macOS hay báo lỗi -36 khi kéo app vào Applications. Nay bản cài tự copy bằng ditto + xoá cờ quarantine rồi tự khởi động lại — từ bản này trở đi hết dính -36 khi cập nhật.',
+      'Bản này cũng gồm (đã tự cập nhật ngầm trước đó): lượt tự chạy tiếp không còn tự nhảy sang việc khác; và tuỳ chọn "nhớ lựa chọn — lần sau khỏi hỏi" cho xác nhận ghi / câu hỏi của trợ lý, theo từng hội thoại hoặc skill.',
+    ],
+  },
+  {
     version: '1.0.348',
     date: '2026-10-01',
     items: [
