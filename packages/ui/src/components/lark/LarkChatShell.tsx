@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Drawer, Empty, Input, Tooltip } from 'antd';
 import { DeleteOutlined, EditOutlined, HistoryOutlined, PlusOutlined } from '@ant-design/icons';
-import type { AppSummary, RuntimeAdapter } from '@larkwave/core';
-import { BRAND, BRAND_GRADIENT, V } from '../../theme';
-import { WorkspaceTabStrip } from '../WorkspaceTabStrip';
+import type { RuntimeAdapter } from '@larkwave/core';
+import { BRAND_GRADIENT, V } from '../../theme';
+import { WorkspaceTabStrip, type TabItem } from '../WorkspaceTabStrip';
 import { LarkChat } from './LarkChat';
 
 /**
@@ -30,7 +30,6 @@ function greeting(now = new Date()): { text: string; icon: string } {
 export function LarkChatShell({
   runtime,
   basesRev = 0,
-  onBuildApp,
   onOpenSkills,
   blocked,
   userName,
@@ -39,7 +38,6 @@ export function LarkChatShell({
   /** Tên người dùng để chào. Bỏ trống thì chỉ chào theo buổi, không bịa tên. */
   userName?: string;
   basesRev?: number;
-  onBuildApp?: (prompt: string) => void;
   onOpenSkills?: () => void;
   blocked?: string | null;
 }) {
@@ -208,11 +206,10 @@ export function LarkChatShell({
     return [...g.entries()].sort((a, b) => (a[0] === '_none' ? 1 : b[0] === '_none' ? -1 : 0));
   }, [filtered]);
 
-  const tabs: AppSummary[] = openIds.map((id) => ({
+  const tabs: TabItem[] = openIds.map((id) => ({
     id,
     name: titles[id] || 'Cuộc trò chuyện',
-    // WorkspaceTabStrip đọc `status` để vẽ dấu đang chạy; 'building' là trạng thái nó hiểu.
-    status: running.has(id) ? 'building' : 'idle',
+    status: running.has(id) ? 'running' : 'idle',
   }));
 
   return (
@@ -392,7 +389,6 @@ export function LarkChatShell({
             <LarkChat
               runtime={runtime}
               basesRev={basesRev}
-              onBuildApp={onBuildApp}
               onOpenSkills={onOpenSkills}
               blocked={blocked}
               pinnedSessionId={id}

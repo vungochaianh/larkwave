@@ -1,34 +1,11 @@
 'use client';
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type CSSProperties,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { Alert, App as AntApp, Button, Card, Input, Modal, Segmented, Select, Switch, Tag, Tooltip, Typography } from 'antd';
 import { SkillContractEditor, isEmptyContract } from './SkillContractEditor';
 import { NodeIndexOutlined } from '@ant-design/icons';
 import { setLarkPrompt } from './lark/larkHandoff';
 import type { SkillContractFields } from '@larkwave/core';
-import {
-  ExperimentOutlined,
-  BulbOutlined,
-  DeleteOutlined,
-  FolderOpenOutlined,
-  PlusOutlined,
-  QuestionCircleOutlined,
-  CheckCircleFilled,
-  TagsOutlined,
-  ArrowRightOutlined,
-  ReloadOutlined,
-  CloudDownloadOutlined,
-  FileOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons';
+import { ExperimentOutlined, BulbOutlined, DeleteOutlined, FolderOpenOutlined, PlusOutlined, QuestionCircleOutlined, CheckCircleFilled, TagsOutlined, ArrowRightOutlined, ReloadOutlined, CloudDownloadOutlined, FileOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { SkillInfo, SkillAttachment } from '@larkwave/core';
 import { SKILL_COMMAND_MAX, isReservedSkillCommand, slugifySkillCommand, uniqueSkillCommand } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
@@ -64,8 +41,8 @@ const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 const CMD_CHIP: CSSProperties = { ...CHIP, fontFamily: MONO };
 
 /** Starter labels for the "loại" picker — free-form, so these are just one-tap suggestions.
- *  Covers the two big buckets the user asked for (làm app vs Lark) + common extras. */
-const TAG_SUGGESTIONS = ['Làm app', 'Lark', 'Bảo mật', 'UI/UX', 'Commit', 'Dữ liệu'];
+ *  Covers the common buckets (Lark, data, reports…) + extras. */
+const TAG_SUGGESTIONS = ['Lark', 'Bitable', 'Báo cáo', 'Dữ liệu', 'Email', 'Bảo mật'];
 
 
 /** Enabled/disabled badge: OK-tinted pill when on, muted V.textFaint chip when off. */
@@ -91,11 +68,9 @@ function EnabledPill({ on }: { on: boolean }) {
 
 export function SkillsScreen({
   onNav,
-  onCreate,
   mode = 'plain',
 }: {
   onNav?: (v: View) => void;
-  onCreate?: () => void;
   /**
    * 'plain' = kỹ năng rời (AI tự áp khi yêu cầu khớp mô tả).
    * 'cross' = kỹ năng có hợp đồng, chạy theo bộ và kiểm chéo nhau.
@@ -518,7 +493,6 @@ export function SkillsScreen({
 
   // Header interlink cluster — deep-links to sibling pillars (each guarded).
   const interlinks: { label: string; show: boolean; onClick: () => void }[] = [
-    { label: t('skills.link.apps', 'Làm app'), show: !!(onCreate || onNav), onClick: () => (onCreate ? onCreate() : onNav?.('apps')) },
     { label: t('skills.link.lark', 'Lark × Agents'), show: !!onNav, onClick: () => onNav?.('lark') },
     { label: t('skills.link.settings', 'Cài đặt · Trình AI (CLI)'), show: !!onNav, onClick: () => onNav?.('settings') },
     { label: t('skills.link.overview', 'Tổng quan'), show: !!onNav, onClick: () => onNav?.('home') },
@@ -699,7 +673,7 @@ export function SkillsScreen({
           ) : (
             <>
               {t('skills.desc.p1', '“Kỹ năng” dạy AI cách làm một việc theo quy trình/quy tắc của bạn — ')}<b>{t('skills.desc.p2', 'bật lên là AI TỰ áp dụng khi yêu cầu KHỚP MÔ TẢ skill')}</b>{' '}
-              {t('skills.desc.p3', '(không cần gõ tên/lệnh), trong lúc dựng app và chạy từ xa.')}{' '}
+              {t('skills.desc.p3', '(không cần gõ tên/lệnh), trong Lark × Agents, Trợ lý AI và khi chạy từ xa.')}{' '}
               <b>{t('skills.desc.p4', 'Muốn kỹ năng nối vào nhau thành dây chuyền thì tạo ở mục “Kỹ năng chéo”.')}</b>{' '}
               {onNav ? (
                 <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => onNav('skills-cross')}>
@@ -1037,7 +1011,7 @@ export function SkillsScreen({
               placeholder={t('skills.field.applyPlaceholder', 'Chọn model áp dụng')}
             />
             <Text type="secondary" style={{ fontSize: 12.5, display: 'block', margin: '14px 0 6px' }}>
-              {t('skills.field.tagsLabel', 'Nhãn (tự đặt — để lọc & nhóm; vd “Làm app”, “Lark”):')}
+              {t('skills.field.tagsLabel', 'Nhãn (tự đặt — để lọc & nhóm; vd “Lark”, “Báo cáo”):')}
             </Text>
             <Select
               mode="tags"
@@ -1174,7 +1148,7 @@ export function SkillsScreen({
           <>
             <Text type="secondary" style={{ fontSize: 12.5, display: 'block' }}>
               <b>{t('skills.simple.howTitle', 'Cách hoạt động:')}</b> <b>{t('skills.simple.firstLine', 'DÒNG ĐẦU')}</b>{t('skills.simple.how1', ' của hướng dẫn = câu ')}<b>{t('skills.simple.trigger', 'KÍCH HOẠT')}</b>{t('skills.simple.how2', ' (trở thành “mô tả” của skill). AI ')}<b>{t('skills.simple.autoApply', 'tự đọc + áp dụng')}</b>{t('skills.simple.how3', ' khi việc bạn giao ')}<b>{t('skills.simple.matchFirst', 'khớp dòng đầu')}</b>{t('skills.simple.how4', ' này — ')}<b>{t('skills.simple.noName', 'bạn KHÔNG gõ tên skill')}</b>{t('skills.simple.how5', '. Thử ở màn ')}{' '}
-              <b>{t('skills.link.apps', 'Làm app')}</b>{t('skills.simple.how6', ' (chọn model có Claude); trong ')}<b>{t('skills.simple.larkNoSkill', 'Lark hiện chưa chạy skill')}</b>{t('skills.simple.how7', '.')}
+              <b>{t('skills.link.lark', 'Lark × Agents')}</b>{t('skills.simple.how6', ' hoặc Trợ lý AI.')}
             </Text>
             <Input
               placeholder={t('skills.simple.namePlaceholder', 'Tên skill (vd: Viết commit chuẩn)')}
@@ -1190,7 +1164,7 @@ export function SkillsScreen({
               autoSize={{ minRows: 6, maxRows: 14 }}
             />
             <Text type="secondary" style={{ fontSize: 12.5, display: 'block', margin: '12px 0 6px' }}>
-              {t('skills.simple.tagsLabel', 'Loại / nhãn (tự đặt — để lọc & nhóm; vd “Làm app”, “Lark”):')}
+              {t('skills.simple.tagsLabel', 'Loại / nhãn (tự đặt — để lọc & nhóm; vd “Lark”, “Báo cáo”):')}
             </Text>
             <Select
               mode="tags"
@@ -1346,7 +1320,7 @@ export function SkillsScreen({
       >
         <div style={{ maxHeight: '62vh', overflow: 'auto', paddingRight: 4 }}>
           <GuideSection title={t('skills.guide.s1.title', 'Kỹ năng là gì?')}>
-            {t('skills.guide.s1.a', 'Một ')}<b>{t('skills.guide.s1.skillWord', '“kỹ năng”')}</b>{t('skills.guide.s1.b', ' là hướng dẫn ngắn (một thư mục chứa file ')}<Text code>SKILL.md</Text>{t('skills.guide.s1.c', ') dạy AI cách làm một việc theo ')}<b>{t('skills.guide.s1.yourRules', 'quy trình/quy tắc của bạn')}</b>{t('skills.guide.s1.d', '. Khi bật, AI ')}<b>{t('skills.guide.s1.autoApply', 'tự đọc + áp dụng khi việc bạn giao KHỚP MÔ TẢ của skill')}</b>{t('skills.guide.s1.e', ' — trong lúc dựng app và chạy từ xa (điện thoại). Với ')}<b>Claude</b>{t('skills.guide.s1.f', ' đây ')}<b>{t('skills.guide.s1.native', 'đúng là cơ chế skills native')}</b>{t('skills.guide.s1.g', ' (chép vào ')}{' '}
+            {t('skills.guide.s1.a', 'Một ')}<b>{t('skills.guide.s1.skillWord', '“kỹ năng”')}</b>{t('skills.guide.s1.b', ' là hướng dẫn ngắn (một thư mục chứa file ')}<Text code>SKILL.md</Text>{t('skills.guide.s1.c', ') dạy AI cách làm một việc theo ')}<b>{t('skills.guide.s1.yourRules', 'quy trình/quy tắc của bạn')}</b>{t('skills.guide.s1.d', '. Khi bật, AI ')}<b>{t('skills.guide.s1.autoApply', 'tự đọc + áp dụng khi việc bạn giao KHỚP MÔ TẢ của skill')}</b>{t('skills.guide.s1.e', ' — trong Lark × Agents, Trợ lý AI và khi chạy từ xa (điện thoại). Với ')}<b>Claude</b>{t('skills.guide.s1.f', ' đây ')}<b>{t('skills.guide.s1.native', 'đúng là cơ chế skills native')}</b>{t('skills.guide.s1.g', ' (chép vào ')}{' '}
             <Text code>~/.claude/skills</Text>{t('skills.guide.s1.h', ', có “progressive disclosure”: AI đọc tên+mô tả trước, chỉ nạp đầy đủ khi cần).')}
           </GuideSection>
           <GuideSection title={t('skills.guide.s2.title', 'Thêm kỹ năng — 2 cách')}>
@@ -1356,7 +1330,7 @@ export function SkillsScreen({
             </ul>
           </GuideSection>
           <GuideSection title={t('skills.guide.s3.title', 'Nhãn (loại) — sắp xếp theo cách của bạn')}>
-            {t('skills.guide.s3.a', 'Khi tạo/nhập, bạn tự ')}<b>{t('skills.guide.s3.setTag', 'đặt nhãn')}</b>{t('skills.guide.s3.b', ' cho skill (vd ')}<i>{t('skills.guide.s3.ex1', '“Làm app”')}</i>, <i>{t('skills.guide.s3.ex2', '“Lark”')}</i>, <i>{t('skills.guide.s3.ex3', '“Bảo mật”')}</i>{t('skills.guide.s3.c', ') — ')}<b>{t('skills.guide.s3.freeType', 'tự do gõ')}</b>{t('skills.guide.s3.d', ', không giới hạn danh sách. Nhãn chỉ để ')}<b>{t('skills.guide.s3.filterGroup', 'lọc & nhóm')}</b>{t('skills.guide.s3.e', ' cho dễ tìm; ')}<b>{t('skills.guide.s3.no', 'không')}</b>{t('skills.guide.s3.f', ' ảnh hưởng skill chạy ở đâu (cái đó do “áp dụng model” quyết định). Dùng hàng nhãn phía trên để lọc nhanh.')}
+            {t('skills.guide.s3.a', 'Khi tạo/nhập, bạn tự ')}<b>{t('skills.guide.s3.setTag', 'đặt nhãn')}</b>{t('skills.guide.s3.b', ' cho skill (vd ')}<i>{t('skills.guide.s3.ex1', '“Báo cáo”')}</i>, <i>{t('skills.guide.s3.ex2', '“Lark”')}</i>, <i>{t('skills.guide.s3.ex3', '“Bảo mật”')}</i>{t('skills.guide.s3.c', ') — ')}<b>{t('skills.guide.s3.freeType', 'tự do gõ')}</b>{t('skills.guide.s3.d', ', không giới hạn danh sách. Nhãn chỉ để ')}<b>{t('skills.guide.s3.filterGroup', 'lọc & nhóm')}</b>{t('skills.guide.s3.e', ' cho dễ tìm; ')}<b>{t('skills.guide.s3.no', 'không')}</b>{t('skills.guide.s3.f', ' ảnh hưởng skill chạy ở đâu (cái đó do “áp dụng model” quyết định). Dùng hàng nhãn phía trên để lọc nhanh.')}
           </GuideSection>
           <GuideSection title={t('skills.guide.s4.title', 'Áp dụng cho model nào')}>
             {t('skills.guide.s4.a', 'Mỗi skill chọn được áp cho ')}<b>Claude / Grok / Gemini / Codex</b>{t('skills.guide.s4.b', ' — hoặc ')}<b>{t('skills.guide.s4.shared', '“tất cả model” (dùng chung)')}</b>{t('skills.guide.s4.c', '. Claude, Grok, Gemini cùng chuẩn (tự nạp từ ')}<Text code>~/.&lt;cli&gt;/skills</Text>{t('skills.guide.s4.d', '); Codex nhận qua khối ')}<Text code>AGENTS.md</Text>{t('skills.guide.s4.e', ' do Larkwave quản lý. ')}<b>{t('skills.guide.s4.clickCard', 'Bấm vào thẻ skill')}</b>{t('skills.guide.s4.f', ' để mở cửa sổ chỉnh — đổi model áp dụng & nhãn ở đó.')}
@@ -1368,12 +1342,9 @@ export function SkillsScreen({
             <b>{t('skills.guide.s6.noRun', 'Không có nút “chạy”, KHÔNG gõ tên skill.')}</b>{t('skills.guide.s6.just', ' Chỉ cần:')}
             <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
               <li>{t('skills.guide.s6.li1a', 'Bật skill + chọn ')}<b>{t('skills.guide.s6.li1b', 'model có Claude')}</b>.</li>
-              <li>{t('skills.guide.s6.li2a', 'Vào ')}<b>{t('skills.guide.s6.li2b', 'màn Làm app')}</b>{t('skills.guide.s6.li2c', ' (dựng/sửa) và gõ yêu cầu ')}<b>{t('skills.guide.s6.li2d', 'khớp mô tả skill')}</b>{t('skills.guide.s6.li2e', ' → AI tự gọi skill.')}</li>
+              <li>{t('skills.guide.s6.li2a', 'Vào ')}<b>{t('skills.guide.s6.li2b', 'Lark × Agents hoặc Trợ lý AI')}</b>{t('skills.guide.s6.li2c', ' và gõ yêu cầu ')}<b>{t('skills.guide.s6.li2d', 'khớp mô tả skill')}</b>{t('skills.guide.s6.li2e', ' → AI tự gọi skill.')}</li>
               <li>{t('skills.guide.s6.li3a', 'Vd skill “chào các agent” → gõ ')}<i>{t('skills.guide.s6.li3b', '“chào các agent giúp tôi”')}</i>{t('skills.guide.s6.li3c', ' (đừng gõ chữ “test” hay tên skill).')}</li>
             </ul>
-            <div style={{ marginTop: 6, color: WARN }}>
-              {t('skills.guide.s6.warnA', 'Lưu ý: ')}<b>{t('skills.guide.s6.warnB', 'trong Lark hiện CHƯA kích hoạt skill')}</b>{t('skills.guide.s6.warnC', ' (chat Lark chỉ bật công cụ Lark, tool skill bị tắt) — hãy thử ở ')}<b>{t('skills.guide.s6.li2b', 'màn Làm app')}</b>{t('skills.guide.s6.warnD', '.')}
-            </div>
           </GuideSection>
           <GuideSection title={t('skills.guide.s7.title', 'Viết hướng dẫn tốt')}>
             <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
@@ -1384,12 +1355,12 @@ export function SkillsScreen({
               </li>
               <li>{t('skills.guide.s7.li2a', 'Nói rõ ')}<b>{t('skills.guide.s7.when', 'KHI NÀO')}</b>{t('skills.guide.s7.li2b', ' dùng và ')}<b>{t('skills.guide.s7.what', 'LÀM GÌ')}</b>{t('skills.guide.s7.li2c', ' (càng cụ thể càng chuẩn).')}</li>
               <li>{t('skills.guide.s7.li3', 'Ngắn gọn, dạng gạch đầu dòng hoặc quy trình từng bước.')}</li>
-              <li>{t('skills.guide.s7.li4a', 'Ví dụ: ')}<i>{t('skills.guide.s7.li4b', '“Mọi web app: dùng React + TypeScript + Tailwind + Ant Design, responsive, có dark mode.”')}</i></li>
-              <li>{t('skills.guide.s7.li5a', 'Ví dụ: ')}<i>{t('skills.guide.s7.li5b', '“Trước khi xuất bản: rà lỗi bảo mật (XSS, lộ key), kiểm tra .env.example đủ biến.”')}</i></li>
+              <li>{t('skills.guide.s7.li4a', 'Ví dụ: ')}<i>{t('skills.guide.s7.li4b', '“Mọi báo cáo tuần: lấy số liệu từ Bitable Bán hàng, so với tuần trước, trình bày bảng + 3 nhận xét.”')}</i></li>
+              <li>{t('skills.guide.s7.li5a', 'Ví dụ: ')}<i>{t('skills.guide.s7.li5b', '“Trước khi ghi vào Base: liệt kê thay đổi dự kiến và hỏi xác nhận.”')}</i></li>
             </ul>
           </GuideSection>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, color: OK, fontSize: 12.5 }}>
-            <CheckCircleFilled /> {t('skills.guide.tip', 'Mẹo: bật vài skill “dùng chung” là mọi app bạn tạo sẽ tự theo chuẩn của bạn.')}
+            <CheckCircleFilled /> {t('skills.guide.tip', 'Mẹo: bật vài skill “dùng chung” là mọi câu trả lời của AI sẽ tự theo chuẩn của bạn.')}
           </div>
         </div>
       </Modal>

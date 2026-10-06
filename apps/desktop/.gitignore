@@ -11,3 +11,6 @@ renderer/out
 renderer/next-env.d.ts
 *.log
 .test-build/
+# stale root-level webpack outputs (real main bundle lives in app/)
+/background.js
+/preload.js

@@ -48,7 +48,6 @@ export function LarkGuideModal({ open, onClose }: { open: boolean; onClose: () =
       items: [
         t('chat.guideSec4Item1', '⚡ Hỏi nhanh: các nút bấm-một-cái; bấm ℹ️ để xem mỗi nút làm gì; "＋ Thêm" để tự tạo câu hỏi hay dùng.'),
         t('chat.guideSec4Item2', '📝 Tóm tắt hội thoại: tóm tắt nhanh những gì đã trao đổi.'),
-        t('chat.guideSec4Item3', '🚀 Dựng app từ phân tích: lấy cấu trúc + dữ liệu Base để dựng một app full-stack.'),
         t('chat.guideSec4Item4', '🔗 Chia sẻ hội thoại ra một link web công khai.'),
         t('chat.guideSec4Item5', 'Chọn AI: Claude / Grok / Gemini / Codex — chạy qua CLI trên máy hoặc "API trực tiếp" (dán API key, không cần cài CLI).'),
       ],

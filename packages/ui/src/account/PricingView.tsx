@@ -130,15 +130,9 @@ export function PricingView({ onNav }: { onNav?: (v: View) => void } = {}) {
                   <Tag style={{ background: PLAN_ACCENT[sub.plan] ?? BRAND, color: '#fff', border: 'none' }}>{sub.plan.toUpperCase()}</Tag>
                 </div>
                 <div style={{ marginTop: 6 }}>
-                  {onNav ? (
-                    <Link onClick={() => onNav('apps')} style={{ fontSize: 12.5 }}>
-                      {sub.liveApps}/{sub.maxLiveApps < 0 ? '∞' : sub.maxLiveApps} app đang chạy <ArrowRightOutlined style={{ fontSize: 10 }} />
-                    </Link>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 12.5 }}>
-                      {sub.liveApps}/{sub.maxLiveApps < 0 ? '∞' : sub.maxLiveApps} app đang chạy
-                    </Text>
-                  )}
+                  <Text type="secondary" style={{ fontSize: 12.5 }}>
+                    {sub.resetAt ? `Hạn mức làm mới ${new Date(sub.resetAt).toLocaleDateString('vi-VN')}` : 'Hạn mức dùng AI theo tháng'}
+                  </Text>
                 </div>
               </div>
               <div style={{ minWidth: 220, flex: 1 }}>
@@ -225,8 +219,9 @@ function PlanCard({ plan, current, currentRank, onChoose }: { plan: PlanCatalogE
         )}
       </div>
       <Space direction="vertical" size={4} style={{ width: '100%' }}>
-        <Text style={{ fontSize: 12.5 }}><CheckOutlined style={{ color: OK, marginInlineEnd: 6 }} />{plan.maxLiveApps < 0 ? 'Không giới hạn' : plan.maxLiveApps} app chạy cùng lúc</Text>
-        {plan.fullStack && <Text style={{ fontSize: 12.5 }}><CheckOutlined style={{ color: OK, marginInlineEnd: 6 }} />Chạy full-stack trên server</Text>}
+        {(plan.features ?? []).slice(0, 4).map((f) => (
+          <Text key={f} style={{ fontSize: 12.5 }}><CheckOutlined style={{ color: OK, marginInlineEnd: 6 }} />{f}</Text>
+        ))}
         {plan.monthlyTokens ? <Text style={{ fontSize: 12.5 }}><CheckOutlined style={{ color: OK, marginInlineEnd: 6 }} />{fmtTokens(plan.monthlyTokens)}</Text> : null}
       </Space>
       <div style={{ marginTop: 'auto', paddingTop: 4 }}>

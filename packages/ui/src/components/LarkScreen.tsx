@@ -25,9 +25,8 @@ const { Title, Text } = Typography;
  * a "desktop only" notice.
  */
 export function LarkScreen({
-  onBuildApp,
   onOpenSkills,
-}: { onBuildApp?: (prompt: string) => void; onOpenSkills?: () => void } = {}) {
+}: { onOpenSkills?: () => void } = {}) {
   const runtime = useRuntime();
   const { user } = useAccountAuth();
   const supported = !!runtime.larkChat;
@@ -204,7 +203,6 @@ export function LarkScreen({
                 userName={(user?.name || '').trim().split(/\s+/).pop() || undefined}
                 runtime={runtime}
                 basesRev={basesRev}
-                onBuildApp={onBuildApp}
                 onOpenSkills={onOpenSkills}
               />
             ) : (

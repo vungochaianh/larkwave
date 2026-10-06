@@ -1,17 +1,13 @@
 'use client';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Modal, Tag, Input, Badge, Drawer, Typography } from 'antd';
-import { DashboardOutlined, AppstoreOutlined, CompassOutlined, ApiOutlined, BulbOutlined, NodeIndexOutlined, BugOutlined, UserOutlined, SettingOutlined, ThunderboltOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, PushpinOutlined, PushpinFilled, CommentOutlined, NotificationOutlined, VideoCameraOutlined, FileImageOutlined, ReadOutlined, GlobalOutlined, MobileOutlined, DesktopOutlined, PlayCircleOutlined, ChromeOutlined, TeamOutlined, TrophyOutlined, CrownOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import type { AppSummary, ClaudeStatus, RunnerStatusInfo } from '@larkwave/core';
+import { useEffect, useState, type ReactNode } from 'react';
+import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Tag, Badge } from 'antd';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, BugOutlined, UserOutlined, SettingOutlined, ThunderboltOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, CrownOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
 import { ThemeProvider, useThemeMode } from '../ThemeProvider';
 import { useI18n, type Locale } from '../i18n';
 import { useRuntime } from '../RuntimeProvider';
-import { loadCats, onCatsChange, isPinned, togglePin, type CatStore } from '../convCategories';
-import { onAppsChange, mergeOptimistic } from '../appEvents';
-import { useRunningPreviews } from '../useRunningPreviews';
 import { MessengerWidget } from '../account/MessengerWidget';
-import { RunningPreviews } from './RunningPreviews';
 import { UpdateBanner } from './UpdateBanner';
 import { VersionFooter } from './VersionFooter';
 import { AgentGuideModal } from './AgentGuideModal';
@@ -23,25 +19,10 @@ import { UserAvatar } from '../account/UserAvatar';
 const { Sider, Header, Content } = Layout;
 
 // "Tổng quan" is a STANDALONE top-level item (first) — it aggregates data from EVERYTHING
-// (apps + Lark + CMS), so it doesn't belong inside the Vibe Coding group.
+// (Lark + Trợ lý AI + CMS).
 const OVERVIEW_ITEM = { key: 'tw-composer', label: 'Tổng quan', icon: <DashboardOutlined /> };
-// "Làm app" cluster — one entry per app TYPE (each presets the builder's Loại app + filters the
-// library). "Tất cả app" is the unfiltered library. Khám phá/Integrations moved out (standalone).
-const APP_NAV = [
-  { key: 'tw-apps', label: 'Tất cả app', icon: <AppstoreOutlined /> },
-  { key: 'tw-app-web', label: 'Website', icon: <GlobalOutlined /> },
-  { key: 'tw-app-mobile', label: 'App mobile', icon: <MobileOutlined /> },
-  { key: 'tw-app-desktop', label: 'App desktop', icon: <DesktopOutlined /> },
-  { key: 'tw-app-game', label: 'Game', icon: <PlayCircleOutlined /> },
-  { key: 'tw-app-extension', label: 'Tiện ích', icon: <ChromeOutlined /> },
-];
-// Standalone community/integration items (were inside the old Vibe group).
-const EXTRA_NAV = [
-  { key: 'tw-explore', label: 'Khám phá', icon: <CompassOutlined /> },
-  { key: 'tw-friends', label: 'Bạn bè', icon: <TeamOutlined /> },
-  { key: 'tw-leaderboard', label: 'Xếp hạng', icon: <TrophyOutlined /> },
-  { key: 'tw-integrations', label: 'Integrations', icon: <ApiOutlined /> },
-];
+// Standalone community item.
+const EXTRA_NAV = [{ key: 'tw-friends', label: 'Bạn bè', icon: <TeamOutlined /> }];
 // Top-level items outside any group.
 const TOP_NAV = [
   { key: 'tw-reports', label: 'Báo lỗi', icon: <BugOutlined /> },
@@ -193,139 +174,6 @@ function AgentsBlock({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-/**
- * GPT-style conversation organizer in the sidebar: conversations (= local apps) grouped into
- * CATEGORIES (folders) you create; double-click to rename a conversation; drag a conversation into
- * a folder. Click opens it (onOpenApp). Categories are a per-machine localStorage layer shared with
- * the "App của tôi" grid.
- */
-function SidebarRecent({
-  collapsed,
-  refreshKey,
-  onOpenApp,
-  onSeeAll,
-}: {
-  collapsed: boolean;
-  refreshKey?: number;
-  onOpenApp?: (app: AppSummary) => void;
-  onSeeAll?: () => void;
-}) {
-  const runtime = useRuntime();
-  const [apps, setApps] = useState<AppSummary[]>([]);
-  const [store, setStore] = useState<CatStore>(loadCats);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editVal, setEditVal] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      runtime.listApps().then((a) => alive && setApps(mergeOptimistic(a))).catch(() => alive && setApps([]));
-    void load();
-    const off = onAppsChange(load); // live cross-tab sync of the conversation list
-    return () => {
-      alive = false;
-      off();
-    };
-  }, [runtime, refreshKey]);
-  useEffect(() => onCatsChange(() => setStore(loadCats())), []);
-
-  if (collapsed) return null;
-
-  const saveRename = async (a: AppSummary) => {
-    const name = editVal.trim().slice(0, 80);
-    setEditId(null);
-    if (!name || name === a.name || !runtime.renameApp) return;
-    try {
-      await runtime.renameApp(a.id, name);
-      setApps((p) => p.map((x) => (x.id === a.id ? { ...x, name } : x)));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  // Sidebar shows a compact list: PINNED first, then most-recent. Capped at 5 (pinned always
-  // shown even beyond the cap). Full organization (folders/drag) lives in the "App của tôi" grid.
-  const byRecent = (x: AppSummary, y: AppSummary) =>
-    (Date.parse(y.updatedAt || '') || 0) - (Date.parse(x.updatedAt || '') || 0);
-  const pinnedApps = apps.filter((a) => isPinned(store, a.id)).sort(byRecent);
-  const restApps = apps.filter((a) => !isPinned(store, a.id)).sort(byRecent);
-  const LIMIT = 5;
-  const visible = [...pinnedApps, ...restApps].slice(0, Math.max(LIMIT, pinnedApps.length));
-  const hiddenCount = apps.length - visible.length;
-
-  const convRow = (a: AppSummary) => {
-    const pinned = isPinned(store, a.id);
-    return (
-      <div
-        key={a.id}
-        onClick={() => editId !== a.id && onOpenApp?.(a)}
-        onDoubleClick={() => {
-          if (runtime.renameApp) {
-            setEditId(a.id);
-            setEditVal(a.name || '');
-          }
-        }}
-        title={runtime.renameApp ? `${a.name} — double-click để đổi tên` : a.name}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, cursor: 'pointer', color: V.textSub }}
-      >
-        <span style={{ width: 18, height: 18, minWidth: 18, borderRadius: 6, background: 'rgba(108,92,231,0.12)', color: BRAND, fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-          {(a.name || 'A').charAt(0).toUpperCase()}
-        </span>
-        {editId === a.id ? (
-          <Input
-            size="small"
-            autoFocus
-            value={editVal}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => setEditVal(e.target.value)}
-            onPressEnter={() => void saveRename(a)}
-            onBlur={() => void saveRename(a)}
-            style={{ height: 22, fontSize: 12, padding: '0 6px' }}
-          />
-        ) : (
-          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {a.name}
-          </span>
-        )}
-        <button
-          type="button"
-          title={pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}
-          onClick={(e) => {
-            e.stopPropagation();
-            togglePin(a.id);
-            setStore(loadCats());
-          }}
-          style={{ border: 'none', background: 'none', cursor: 'pointer', color: pinned ? BRAND : V.textFaint, padding: 0, fontSize: 12, lineHeight: 1, opacity: pinned ? 1 : 0.55 }}
-        >
-          {pinned ? <PushpinFilled /> : <PushpinOutlined />}
-        </button>
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ padding: '10px 10px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 6px 6px' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', color: V.textFaint, flex: 1 }}>
-          Hội thoại
-        </span>
-      </div>
-      {!apps.length && (
-        <div style={{ fontSize: 11.5, color: V.textFaint, padding: '2px 8px' }}>Chưa có hội thoại nào.</div>
-      )}
-      {visible.map(convRow)}
-      {hiddenCount > 0 && (
-        <div
-          onClick={() => onSeeAll?.()}
-          style={{ padding: '6px 8px 2px', fontSize: 12, color: BRAND, cursor: 'pointer', fontWeight: 600 }}
-        >
-          Xem tất cả ({apps.length}) →
-        </div>
-      )}
-    </div>
-  );
-}
-
 const NAV_TITLE: Record<string, string> = {
   'tw-composer': 'Tổng quan',
   'tw-agents': 'Trợ lý AI',
@@ -336,11 +184,7 @@ const NAV_TITLE: Record<string, string> = {
   'tw-cms-sync': 'Đồng bộ Bitable (CMS)',
   'tw-skills': 'Kỹ năng (Skills)',
   'tw-skills-cross': 'Kỹ năng chéo (kiểm chéo liên tục)',
-  'tw-apps': 'App của tôi',
-  'tw-explore': 'Khám phá',
   'tw-friends': 'Bạn bè',
-  'tw-leaderboard': 'Xếp hạng',
-  'tw-integrations': 'Integrations',
   'tw-reports': 'Báo lỗi',
   'tw-pricing': 'Gói & Thanh toán',
   'tw-storage': 'Dung lượng',
@@ -350,13 +194,9 @@ const NAV_TITLE: Record<string, string> = {
 
 /** Nav item key → i18n message key (translate the SIDEBAR menu labels at render; the raw
  *  Vietnamese label is passed as the fallback so it never renders blank before the dictionary
- *  is merged). Module-scope consts (OVERVIEW_ITEM/VIBE_NAV/TOP_NAV) + inline string labels. */
+ *  is merged). Module-scope consts (OVERVIEW_ITEM/TOP_NAV) + inline string labels. */
 const NAV_I18N: Record<string, string> = {
   'tw-composer': 'app.nav.overview',
-  'grp-app': 'nav.makeApp',
-  'tw-apps': 'app.nav.myApps',
-  'tw-explore': 'app.nav.explore',
-  'tw-integrations': 'app.nav.integrations',
   'tw-agents': 'app.nav.assistant',
   'grp-lark': 'app.nav.lark',
   'tw-lark': 'app.nav.larkAgents',
@@ -380,9 +220,6 @@ const NAV_TITLE_I18N: Record<string, string> = {
   'tw-cms-sync': 'app.title.cmsSync',
   'tw-skills': 'app.title.skills',
   'tw-skills-cross': 'app.title.skillsCross',
-  'tw-apps': 'app.nav.myApps',
-  'tw-explore': 'app.nav.explore',
-  'tw-integrations': 'app.nav.integrations',
   'tw-reports': 'app.nav.reports',
   'tw-profile': 'app.nav.profile',
   'tw-settings': 'app.nav.settings',
@@ -440,31 +277,19 @@ export function AppShell(props: Parameters<typeof AppShellInner>[0]) {
 function AppShellInner({
   children,
   sectionTitle = 'Tổng quan',
-  refreshKey,
   onSelect,
   cmsAllowed = false,
   activeKey,
-  activeAppId,
-  onOpenApp,
-  tabBar,
   headerExtra,
 }: {
   children: ReactNode;
   sectionTitle?: string;
-  refreshKey?: number;
   onSelect?: (key: string) => void;
   /** Show the "Đồng bộ Bitable (CMS)" entry — admins + an email allowlist (jobs are backend-global). */
   cmsAllowed?: boolean;
   /** Controlled sidebar selection (desktop) — lets the parent navigate
    *  programmatically (e.g. clicking a KPI tile) and keep the rail in sync. */
   activeKey?: string;
-  /** The project the user is currently looking at (desktop tabs). Only used to mark "hiện tại"
-   *  in the running-ports panel and to split its count into "of this project" vs the global total. */
-  activeAppId?: string | null;
-  /** Open a conversation (app) from the sidebar organizer — desktop wires this to its tabs. */
-  onOpenApp?: (app: AppSummary) => void;
-  /** Open-project tab strip, rendered sticky under the header on every view. */
-  tabBar?: ReactNode;
   /** Extra controls rendered in the header toolbar (right side) — e.g. the "Báo lỗi" button. */
   headerExtra?: ReactNode;
 }) {
@@ -495,33 +320,6 @@ function AppShellInner({
   const isDesktop = runtime.kind === 'desktop';
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgUnread, setMsgUnread] = useState(0);
-  // Local dev servers running right now (shared 4s poll — the drawer reuses this one timer).
-  const { rows: runningRows } = useRunningPreviews();
-  const [portsOpen, setPortsOpen] = useState(false);
-  const [portsApps, setPortsApps] = useState<AppSummary[]>([]);
-  const showPorts = isDesktop && !!runtime.listRunningPreviews;
-
-  // Names for the ports panel — listApps() is a readdir + N meta.json reads, so only while open.
-  useEffect(() => {
-    if (!portsOpen) return;
-    let alive = true;
-    runtime.listApps().then((a) => alive && setPortsApps(a)).catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [portsOpen, runtime, refreshKey]);
-
-  // Stable identity: the panel treats a passed map as "the host owns the names" and skips its own fetch.
-  const portsNames = useMemo(() => Object.fromEntries(portsApps.map((a) => [a.id, a.name])), [portsApps]);
-  /** The panel hands back an appId; the tab API wants the AppSummary, so resolve it here. */
-  const openAppById = (id: string) => {
-    const app = portsApps.find((a) => a.id === id);
-    if (!app) return;
-    setPortsOpen(false);
-    onOpenApp?.(app);
-  };
-  const mineCount = activeAppId ? runningRows.filter((r) => r.appId === activeAppId).length : 0;
-
   const go = (key: string) => {
     setInternalSelected(key);
     if (key === 'pricing' && !onSelect) {
@@ -537,7 +335,7 @@ function AppShellInner({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11, height: 60, padding: collapsed ? 0 : '0 18px', justifyContent: collapsed ? 'center' : 'flex-start', borderBottom: `1px solid ${V.borderSub}` }}>
         <LogoMark />
-        {!collapsed && <span style={{ fontWeight: 800, letterSpacing: 1, fontSize: 16, color: V.text }}>TOOLSWAVE</span>}
+        {!collapsed && <span style={{ fontWeight: 800, letterSpacing: 1, fontSize: 16, color: V.text }}>LARKWAVE</span>}
       </div>
       <div style={{ flex: 1, overflowY: 'auto', paddingTop: 10 }}>
         <Menu
@@ -545,12 +343,9 @@ function AppShellInner({
           selectedKeys={[selected]}
           style={{ borderInlineEnd: 'none', background: 'transparent' }}
           onClick={({ key }) => go(key)}
-          defaultOpenKeys={['grp-app', 'grp-lark']}
+          defaultOpenKeys={['grp-lark']}
           items={(() => {
             type NavNode = { key: string; label: ReactNode; icon: ReactNode; children?: NavNode[] };
-            // "Vibe Coding" GROUP: apps + explore + integrations (Tổng quan is top-level; Skills is
-            // its own standalone item — categorized by free-form tags, shared by app-building + Lark).
-            const vibeGroup: NavNode = { key: 'grp-app', label: 'Làm app', icon: <ThunderboltOutlined />, children: [...APP_NAV] };
             // "Lark" GROUP: chat, living spec, CMS sync.
             const larkChildren: NavNode[] = [];
             if (runtime.larkChat) {
@@ -564,7 +359,7 @@ function AppShellInner({
             // The CMS sync jobs live on a shared backend with no per-user scoping. Visible to admins
             // + a specific email allowlist — they all see the SAME global jobs.
             if (cmsAllowed && runtime.cmsSyncListJobs) larkChildren.push({ key: 'tw-cms-sync', label: 'Đồng bộ Bitable', icon: <CloudServerOutlined /> });
-            const list: NavNode[] = [OVERVIEW_ITEM, vibeGroup];
+            const list: NavNode[] = [OVERVIEW_ITEM];
             // General "Agents chat" — a capable assistant (desktop CLI). Standalone, top-level.
             //
             // ẨN Ở BẢN DESKTOP (yêu cầu của người dùng): ở đó mọi việc đã đi qua nhóm Lark, nên một
@@ -613,7 +408,6 @@ function AppShellInner({
             }));
           })()}
         />
-        <SidebarRecent collapsed={collapsed} refreshKey={refreshKey} onOpenApp={onOpenApp} onSeeAll={() => go('tw-apps')} />
       </div>
       {isDesktop && <UserBlock collapsed={collapsed} />}
       <AgentsBlock collapsed={collapsed} />
@@ -669,34 +463,18 @@ function AppShellInner({
                   </Badge>
                 </Tooltip>
               )}
-              {showPorts && (
-                <Tooltip
-                  title={
-                    mineCount > 0
-                      ? `Cổng đang chạy — ${runningRows.length} dev server (${mineCount} của dự án này)`
-                      : 'Cổng đang chạy'
-                  }
-                >
-                  <Badge count={runningRows.length} size="small" offset={[-2, 4]}>
-                    <Button type="text" aria-label="Cổng đang chạy" icon={<ApiOutlined />} onClick={() => setPortsOpen(true)} />
-                  </Badge>
-                </Tooltip>
-              )}
               <AgentActivity />
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => go('tw-apps')}
-                style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600, boxShadow: '0 6px 16px rgba(108,92,231,0.35)' }}
-              >
-                Tạo app
-              </Button>
+              {onSelect && runtime.larkChat && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => go(isDesktop ? 'tw-lark' : 'tw-agents')}
+                  style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600, boxShadow: '0 6px 16px rgba(108,92,231,0.35)' }}
+                >
+                  {t('app.newChat', 'Trò chuyện mới')}
+                </Button>
+              )}
             </Header>
-            {/* Open-project tab strip — sticky just under the header, visible on EVERY view
-                so switching to Settings/Hồ sơ never hides your tabs. Empty on web. */}
-            {tabBar && (
-              <div style={{ position: 'sticky', top: 60, zIndex: 19 }}>{tabBar}</div>
-            )}
             <Content className="tw-grid-bg" style={{ background: V.layer }}>
               {/* Left-aligned, fills the frame (just padding) — no centered max-width
                   cap that leaves big empty gutters on wide screens. Animated caro grid matches the web. */}
@@ -706,28 +484,6 @@ function AppShellInner({
                 {children}
               </div>
               {isDesktop && <MessengerWidget listOpen={msgOpen} onCloseList={() => setMsgOpen(false)} onUnread={setMsgUnread} />}
-              {/* Ports panel as a DRAWER, not a modal: stopping/restarting can take seconds and the
-                  header must stay usable meanwhile. */}
-              {showPorts && (
-                <Drawer
-                  title="Cổng đang chạy"
-                  placement="right"
-                  width={560}
-                  open={portsOpen}
-                  onClose={() => setPortsOpen(false)}
-                  destroyOnClose
-                >
-                  <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-                    Dev server đang chạy trên máy này. Khác với “đang live” ở Hồ sơ — đó là số app đã
-                    xuất bản lên cloud.
-                  </Typography.Text>
-                  <RunningPreviews
-                    currentAppId={activeAppId ?? undefined}
-                    appNames={portsNames}
-                    onOpenApp={onOpenApp ? openAppById : undefined}
-                  />
-                </Drawer>
-              )}
             </Content>
           </Layout>
         </Layout>

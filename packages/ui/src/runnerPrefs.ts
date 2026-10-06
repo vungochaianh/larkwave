@@ -1,7 +1,5 @@
-import type { CreateBuildInput } from '@larkwave/core';
-
-/** Desktop: read the persisted CLI runner + model from localStorage (Composer writes these). */
-export function desktopRunnerPrefs(): Pick<CreateBuildInput, 'runner' | 'model'> {
+/** Desktop: read the persisted CLI runner + model from localStorage (the runner picker writes these). */
+export function desktopRunnerPrefs(): { runner?: string; model?: string } {
   if (typeof window === 'undefined') return {};
   const runner = localStorage.getItem('tw_runner') || 'claude';
   const model = localStorage.getItem('tw_runner_model') || undefined;

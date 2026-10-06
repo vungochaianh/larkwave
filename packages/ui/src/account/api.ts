@@ -1,7 +1,7 @@
 'use client';
 /**
  * Larkwave App Builder API client for the DESKTOP account features (Explore,
- * Friends, Leaderboard, Reports, Profile, Billing…). Mirrors apps/web/src/lib/api
+ * Friends, Reports, Profile, Billing…). Mirrors apps/web/src/lib/api
  * but standalone so the desktop can talk to the same server (api.toolswave.net)
  * with the user's Larkwave-account JWT. Types are kept local + minimal so this
  * package needn't depend on @larkwave/shared.
@@ -29,22 +29,21 @@ export interface User {
   role?: 'user' | 'admin' | string;
   discoverable?: boolean;
   createdAt?: string;
-  xp?: number;
-  level?: number;
 }
 
 export interface MeOverview {
-  totalApps: number;
-  liveApps: number;
-  totalBuilds: number;
-  succeededBuilds: number;
-  failedBuilds: number;
-  totalDeployments: number;
-  totalVisits: number;
+  /** Metered hosted-AI runs (help assistant, Trợ lý AI, hosted Lark turns). */
+  aiRuns: number;
+  /** Tasks run on the user's desktop from the phone/web/webhook/Telegram. */
+  remoteTasks: number;
+  artifacts: number;
+  skills: number;
+  scheduledTasks: number;
+  reports: number;
   joinedAt: string;
 }
 
-/** One cell of the contribution graph: a calendar day and its build count. */
+/** One cell of the contribution graph: a calendar day and its AI-activity count. */
 export interface ActivityDay {
   /** `YYYY-MM-DD` (UTC). */
   date: string;
@@ -78,54 +77,11 @@ export interface AuthConfig {
   gitlab: boolean;
   github: boolean;
 }
-export type GitProvider = 'gitlab' | 'github';
-/** One repository from a connected Git provider (mirrors the server's GitRepo). */
-export interface GitRepo {
-  id: string | number;
-  fullName: string;
-  name: string;
-  defaultBranch: string;
-  private: boolean;
-  webUrl: string;
-  updatedAt: string;
-}
-/** `GET /me/git/:provider/repos` — `{connected:false}` if the provider isn't linked. */
-export type GitReposResponse =
-  | { connected: false }
-  | { connected: true; repos: GitRepo[]; hasMore: boolean };
-export interface LeaderboardUser {
-  id: string;
-  email: string;
-  name?: string | null;
-  avatarUrl?: string | null;
-}
-export interface LeaderboardEntry {
-  rank: number;
-  user: LeaderboardUser;
-  xp: number;
-  level: number;
-  isMe: boolean;
-}
-export interface LeaderboardResponse {
-  entries: LeaderboardEntry[];
-  me: LeaderboardEntry | null;
-}
 export interface Paginated<T> {
   items: T[];
   total: number;
   page: number;
   pageSize: number;
-}
-
-export interface PublicApp {
-  slug: string;
-  name: string;
-  author: string;
-  description?: string | null;
-  track: string;
-  url?: string | null;
-  visits: number;
-  updatedAt: string;
 }
 
 export type FeedbackStatus = 'open' | 'resolved' | 'duplicate' | 'rejected';
@@ -194,16 +150,14 @@ export interface PlanCatalogEntry {
   priceVnd: number;
   discountedVnd?: number | null;
   monthlyTokens?: number;
-  maxLiveApps: number;
-  fullStack?: boolean;
+  storageMb?: number;
+  features?: string[];
 }
 export interface MeSubscription {
   plan: PlanId;
   planLabel: string;
   percentUsed: number;
   resetAt: string | null;
-  liveApps: number;
-  maxLiveApps: number;
   unlimited: boolean;
   freePlanEnabled: boolean;
   catalog: PlanCatalogEntry[];
@@ -232,41 +186,6 @@ export interface CreatePaymentResponse {
   /** VietQR image URL to render. */
   qrUrl: string;
   bank: { name: string; holder: string; account: string };
-}
-
-export type AppStatus = 'draft' | 'building' | 'live' | 'failed' | 'archived' | 'suspended';
-export interface App {
-  id: string;
-  name: string;
-  slug: string;
-  track: string;
-  description?: string;
-  status: AppStatus;
-  currentUrl?: string | null;
-  backendKind?: string;
-  gitProvider?: string | null;
-  gitRepo?: string | null;
-  pinned?: boolean;
-  published?: boolean;
-  visits?: number;
-  role?: string;
-  shared?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  buildsCount?: number;
-  deploymentsCount?: number;
-}
-export interface Build {
-  id: string;
-  status: string;
-  prompt?: string | null;
-  createdAt: string;
-}
-export interface Deployment {
-  id: string;
-  status: string;
-  url?: string | null;
-  createdAt: string;
 }
 
 /* ───────────────────────── token helpers ───────────────────────── */
@@ -609,7 +528,7 @@ export interface LoginDevice {
 
 
 /** Nhóm dữ liệu trên trang quản lý dung lượng. */
-export type StorageCategory = 'apps' | 'uploads' | 'video' | 'image' | 'chat';
+export type StorageCategory = 'uploads' | 'chat';
 
 export interface StorageBucket {
   category: StorageCategory;
@@ -792,19 +711,7 @@ export const accountApi = {
   /** Liveness probe for the offline banner (never cached). Throws when apia is down. */
   health: () => apiFetch<{ status?: string }>('/health', { token: null }),
 
-  // git — list the user's repos from a linked provider (for native import)
-  gitRepos: (provider: GitProvider, q?: string, page?: number) =>
-    apiFetch<GitReposResponse>(`/me/git/${provider}/repos`, {
-      query: { ...(q ? { q } : {}), ...(page && page > 1 ? { page } : {}) },
-    }),
 
-  // leaderboard
-  leaderboard: (limit?: number) =>
-    apiFetch<LeaderboardResponse>('/leaderboard', { query: limit ? { limit } : undefined }),
-
-  // explore (public showcase)
-  publicApps: (query?: { page?: number; pageSize?: number; track?: string; q?: string }) =>
-    apiFetch<Paginated<PublicApp>>('/public/apps', { query, token: null }),
 
   // reports / feedback (tester rewards)
   myFeedback: () => apiFetch<MyFeedbackResponse>('/feedback/mine'),
@@ -812,7 +719,7 @@ export const accountApi = {
   submitFeedback: (body: SubmitFeedbackRequest) =>
     apiFetch<Feedback>('/feedback', { method: 'POST', body }),
   /** Upload one evidence file (image/pdf/text) → returns its ref for attachmentIds. */
-  uploadFile: (file: File, purpose?: 'chat' | 'feedback' | 'marketing' | 'build') =>
+  uploadFile: (file: File, purpose?: 'chat' | 'feedback') =>
     apiUpload<UploadRef>(purpose ? `/uploads?purpose=${purpose}` : '/uploads', 'file', file),
   /** GET /uploads/:id — the FULL stored content (owner-only). For an office doc this is the text
    *  the server extracted at upload time, i.e. exactly what the assistant will read. */
@@ -891,17 +798,6 @@ export const accountApi = {
   /** Downgrade/switch plan without payment (server prorates). */
   setPlan: (plan: PlanId) => apiFetch<MeSubscription>('/me/plan', { method: 'POST', body: { plan } }),
 
-  // apps (server) + console
-  appsList: (query?: { page?: number; pageSize?: number; q?: string; pinned?: boolean }) =>
-    apiFetch<Paginated<App>>('/apps', { query }),
-  getApp: (id: string) => apiFetch<App>(`/apps/${id}`),
-  appBuilds: (id: string, query?: { page?: number; pageSize?: number }) =>
-    apiFetch<Paginated<Build>>(`/apps/${id}/builds`, { query }),
-  appDeployments: (id: string, query?: { page?: number; pageSize?: number }) =>
-    apiFetch<Paginated<Deployment>>(`/apps/${id}/deployments`, { query }),
-  updateApp: (id: string, body: { name?: string; status?: string; pinned?: boolean; published?: boolean }) =>
-    apiFetch<App>(`/apps/${id}`, { method: 'PATCH', body }),
-  deleteApp: (id: string) => apiFetch<{ ok: true }>(`/apps/${id}`, { method: 'DELETE' }),
 
   // notifications (for the header bell)
   notificationsUnread: () => apiFetch<{ unread: number }>('/notifications/unread-count'),

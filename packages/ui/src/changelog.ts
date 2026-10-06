@@ -16,7 +16,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.348',
     date: '2026-10-01',
     items: [
-      'SỬA MẤT DỮ LIỆU: gắn nhiều Base vào một hội thoại CHƯA nhắn gì thì bị mất sạch. App có một luật "hội thoại rỗng thì chưa đáng lưu" (để bấm + không đẻ ra hội thoại trống), nhưng luật đó chỉ đếm tin nhắn — nên việc bạn chọn tay 5 Base bị vứt đi cùng.',
       'Tệ hơn: nó mất NGAY ở lần lưu kế tiếp, không cần khởi động lại. Nhắn tin đầu tiên là app lưu theo danh sách Base CŨ, và các Base vừa gắn biến mất ngay tại đó.',
       'Nay gắn Base được coi là thao tác có chủ ý và được ghi lại ngay. Bấm "+" rồi bỏ đó thì vẫn không đẻ ra hội thoại rỗng như cũ.',
     ],
@@ -25,7 +24,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.347',
     date: '2026-10-01',
     items: [
-      'SỬA: băng cảnh báo ngữ cảnh vẫn ghi câu CŨ ("Tạo phiên mới — agent tự tóm tắt…") dù app đã tự nén từ 1.0.344. Lỗi nằm ở chỗ bảng dịch thắng chuỗi mặc định, nên hai bản sửa trước đó là mã chết — băng cảnh báo nói sai về chính app, bảo bạn tự bấm trong khi nó đã tự làm.',
       'NÉN CHỦ ĐỘNG: trước đây app chỉ nén khi một lượt dừng giữa chừng, nên hội thoại cứ ngồi ở 100% — mỗi lượt vẫn chạy nhưng agent mất dần phần đầu, và cảnh báo nằm đó mãi. Nay xong việc mà ngữ cảnh gần đầy là nén ngay, không đợi tới lúc hỏng.',
       'Nén xong KHÔNG tự chạy thêm lượt nào: bạn chưa yêu cầu gì thì app chỉ dọn chỗ rồi thôi.',
     ],
@@ -128,7 +126,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.335',
     date: '2026-09-24',
     items: [
-      'Màn đăng nhập nay NÓI RA khi bản cài đã cũ, thay vì lặng lẽ giấu mất các nút Google/GitHub/GitLab. Trước đó màn hình chỉ đơn giản thiếu cụm nút đó — trông y như tính năng bị cắt bỏ, chứ không phải đang hỏng.',
       'Cảnh báo chỉ hiện đúng trường hợp phần lõi chặn địa chỉ máy chủ mới, KHÔNG hiện khi mất mạng — hai thứ này trả về cùng một mã lỗi, mà bảo một người đang mất mạng đi tải bộ cài 214 MB thì vô nghĩa.',
     ],
   },
@@ -209,7 +206,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Kỹ năng chuyển vào nhóm Lark và TÁCH LÀM HAI: "Kỹ năng" (quy tắc rời, AI tự áp khi yêu cầu khớp mô tả) và "Kỹ năng chéo" (nối nhau bằng khoá, chạy theo thứ tự suy ra từ dữ liệu và kiểm chéo sau mỗi bước).',
       'Hai luồng này logic khác hẳn nhau nên gộp chung một danh sách thì mọi câu hướng dẫn đều phải nói "nếu loại A thì…, nếu loại B thì…". Tách ra là mỗi mục nói đúng một chuyện.',
       'Thẻ "Bộ kỹ năng" chỉ còn ở mục Kỹ năng chéo — ở mục kia nó luôn rỗng và chỉ làm bạn tưởng mình đang thiếu gì đó.',
-      'TẢI NHANH HƠN: bản cài chuyển sang tải từ máy chủ Larkwave thay vì GitLab. Đo thật: 19 KB/s → 10.9 MB/s, tức 214 MiB từ hơn 3 tiếng xuống còn khoảng 20 giây.',
     ],
   },
   {
@@ -397,7 +393,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-12',
     items: [
       'Thêm “Để Larkwave chạy lịch hộ”: bật lên thì lịch tự động hoá chạy kể cả khi bạn tắt app. Nút nằm ngay trên danh sách Tự động hoá.',
-      'Việc này gửi App Secret Lark của bạn lên máy chủ Larkwave — có cảnh báo rõ ngay tại chỗ bật. Không muốn vậy thì tự chạy trên VM của mình (tw-lark-runner), khoá không rời máy bạn.',
       'Tắt là xoá khoá khỏi máy chủ, không phải chỉ ẩn đi.',
       'Sửa lỗi tài khoản chưa từng đồng bộ Lark thì bộ chạy lịch nền chết ngay khi khởi động.',
     ],
@@ -434,7 +429,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-11',
     items: [
       'Lark × Agents có thêm nguồn chạy thứ ba: “Gói Larkwave” — chạy bằng số token bạn đã mua trên website, KHÔNG cần cài CLI và KHÔNG cần dán khoá API riêng.',
-      'Công cụ Lark vẫn chạy trên máy bạn bằng chính kết nối của bạn, nên App Secret và token cá nhân không rời khỏi máy.',
       'Chỗ chọn cách chạy đổi từ công tắc bật/tắt thành ba lựa chọn rõ ràng: CLI trên máy · API riêng · Gói Larkwave.',
     ],
   },
@@ -534,18 +528,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.291',
-    date: '2026-09-09',
-    items: [
-      'Ô tạo app: bảng tuỳ chọn không còn tự bung ra khi bạn vừa bấm vào ô mô tả. Nay có nút “Tuỳ chọn” riêng, và bảng trượt mở êm thay vì nhảy.',
-      '“Tên dự án” và nút tạo app nay nằm ngay bên ngoài, luôn nhìn thấy — trước đó phải mở cả bảng tuỳ chọn mới điền và bấm được.',
-    ],
-  },
-  {
     version: '1.0.290',
     date: '2026-09-08',
     items: [
-      'Trang "Dung lượng lưu trữ": tài khoản không giới hạn nay có thanh THÀNH PHẦN — nhìn một cái là biết dung lượng đang nằm ở nhóm nào (app, tệp tải lên, video, ảnh, hội thoại), kèm chú giải màu.',
       'Chỗ nào không có hạn mức thì thanh không còn biến mất để lại khoảng trống trông như hỏng: thanh vẫn vẽ, nhưng mép phải nhoè dần để không ai đọc nhầm thành "đã dùng hết".',
     ],
   },
@@ -619,7 +604,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-03',
     items: [
       'Skills có “lệnh gọi nhanh”: đặt lệnh cho skill (vd /sieu-ba) khi tạo hoặc sửa, rồi gõ “/” trong khung chat để chọn — có cả ở Trợ lý AI lẫn Lark, trên web và trên máy.',
-      'Lệnh chỉ tính khi ở ĐẦU DÒNG, nên đường dẫn kiểu “cd /build” hay “https://…/bao-cao” trong tin nhắn vẫn giữ nguyên; muốn gọi nhiều skill thì mỗi lệnh một dòng.',
       'Gọi skill bằng lệnh là chỉ định RÕ RÀNG: skill được áp dụng cho lượt đó kể cả khi đang tắt, và với mọi model (Claude/Grok/Gemini/Codex, CLI hay API trực tiếp).',
       'Sửa: skill chỉ gắn cho Grok / Gemini / Codex trước đây KHÔNG bao giờ được nạp (bộ lọc bị cố định vào Claude) — nay nạp đúng theo model đang chạy.',
       'Sửa: nhấn Enter khi đang chọn từ gợi ý bộ gõ tiếng Việt không còn vô tình gửi tin nhắn.',
@@ -654,7 +638,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'TẠO ẢNH trong Trợ lý AI: gõ “tạo hình/ảnh…” → ra ẢNH AI thật (OpenAI). Mỗi khối HTML/SVG có nút “Tạo ảnh PNG” (render thành ảnh thật) + “Tải file mã”; khối code có nút “Tải”.',
       'XUẤT PDF cho Lark × Agents — lưu lại hội thoại/báo cáo thành file PDF.',
-      'ĐỒNG BỘ giao diện với web: thêm nav Bạn bè / Xếp hạng / Gói & Thanh toán, ô “tạo nhanh” + chip Marketing ngay trên Tổng quan, thanh cuộn gọn ở chế độ sáng.',
       'MỚI — Lịch tự chạy Lark Agent: Tự động hoá → hành động “Chạy AI agent” → chọn lịch để job (vd đối chiếu “PBTTCN”) tự chạy read-only + gửi báo cáo vào nhóm Lark / lưu hội thoại / thông báo. (Cần cài lại bản .dmg 1.0.276 để phần chạy nền hoạt động.)',
     ],
   },
@@ -680,20 +663,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.272',
-    date: '2026-08-28',
-    items: [
-      'MỚI — Artifacts (web): lưu lại các sản phẩm (HTML chạy được / SVG / mã nguồn / tài liệu) thành thư viện; xem lại, sửa, và CHIA SẺ bằng link công khai (toolswave.net/a/…). Vào mục “Artifacts” bên menu trái. (Hoàn tất roadmap kéo tính năng Claude: Tác vụ định kỳ + Dự án + Artifacts.)',
-    ],
-  },
-  {
-    version: '1.0.271',
-    date: '2026-08-28',
-    items: [
-      'MỚI — Dự án (web): đặt CHỈ DẪN RIÊNG cho từng dự án; Trợ lý AI tự áp dụng chỉ dẫn đó cho mọi hội thoại trong dự án (giống Projects của Claude). Tạo dự án trong Trợ lý AI, thêm chỉ dẫn ở mục “Dự án” bên menu trái.',
-    ],
-  },
-  {
     version: '1.0.270',
     date: '2026-08-28',
     items: [
@@ -705,7 +674,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-27',
     items: [
       'Skills (web) — màn “Tạo skill” theo đúng kiểu Claude: Tên + Mô tả (KHI NÀO dùng) + Hướng dẫn (LÀM GÌ) + ĐÍNH KÈM FILE ngay trong lúc tạo (mỗi file có mô tả riêng). Nút “Tải file lên” rời đã gộp vào đây.',
-      'Skills — “Tạo bằng AI (Claude)”: gõ ý tưởng 1 dòng, trợ lý AI (MAIC) tự soạn nháp tên + mô tả + hướng dẫn để bạn chỉnh lại.',
       'Skill đang BẬT được đưa thẳng vào Trợ lý AI (mô tả + hướng dẫn + nội dung file đính kèm) — hỏi đúng ngữ cảnh là AI áp dụng.',
     ],
   },
@@ -715,13 +683,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Skills: khi CHƯA có kỹ năng, màn hình gọn & đẹp hơn — icon + chữ TO và căn GIỮA, bỏ các nút/hàng lọc trùng ở phía trên (hết cảnh “lắm nút dư”).',
       'Website: nền các trang thêm hiệu ứng lưới “caro” động chạy nhẹ nhàng (tự tắt nếu máy bật giảm chuyển động).',
-    ],
-  },
-  {
-    version: '1.0.267',
-    date: '2026-08-27',
-    items: [
-      'Skills: thêm nút “Tải file lên” — chọn 1 file .md/.txt để tạo skill ngay từ nội dung file (tên lấy từ frontmatter hoặc tên file). Có trên CẢ website và app desktop; desktop vẫn giữ “Nhập từ thư mục”.',
     ],
   },
   {
@@ -738,8 +699,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.265',
     date: '2026-08-27',
     items: [
-      'ỔN ĐỊNH KHI CẬP NHẬT: khi hệ thống đang deploy (máy chủ khởi động lại ~30–60s), giao diện KHÔNG còn bị ẩn/mất rồi hiện lại nữa. Nút đăng nhập Google/GitLab/GitHub (web + app), bảng giá & nút nâng cấp, thẻ giới thiệu nhận credit, danh sách app đã ghim/gần đây/được chia sẻ, chỉ số dùng gói… đều GIỮ nguyên hiển thị và tự phục hồi khi máy chủ trả lời lại — thay vì biến mất giữa lúc cập nhật.',
-      'QUAN TRỌNG: đang đăng nhập mà gặp lúc deploy sẽ KHÔNG bị đá ra trang đăng nhập nữa (phân biệt "hết phiên" với "máy chủ tạm nghỉ") — phiên hợp lệ được giữ và tự vào lại.',
       'Trợ lý AI mở NHANH hơn: không còn màn hình chờ đứng hình khi máy chủ bận — khung chat hiện ngay, tự nâng cấp lên chế độ hosted khi sẵn sàng.',
       'Sửa lỗi hiển thị tràn của ô "Nhắn cho trợ lý…" trên điện thoại.',
     ],
@@ -749,13 +708,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-27',
     items: [
       'TỐI ƯU RESPONSIVE toàn website: header trên điện thoại gọn hơn (gộp nút Ngôn ngữ/Sáng-Tối vào menu "⋯", tiêu đề tự cắt gọn); khung chat Trợ lý AI gọn gàng trên mobile (bớt lề, gợi ý 1 cột, Thư viện/Chia sẻ mở full màn hình); lưới thẻ + bảng tự co theo màn hình và cuộn ngang trong khung riêng nên KHÔNG tràn ngang trang.',
-    ],
-  },
-  {
-    version: '1.0.263',
-    date: '2026-08-26',
-    items: [
-      'ĐA NGÔN NGỮ (Việt / Anh): app tự nhận ngôn ngữ theo trình duyệt/hệ thống, có nút đổi VI↔EN ở thanh trên cùng (ghi nhớ lựa chọn). Đã dịch ~1.500+ chuỗi ở các màn chính: đăng nhập, trang chủ, tạo app, Trợ lý AI, cài đặt, hồ sơ, bạn bè…',
     ],
   },
   {
@@ -897,13 +849,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.245',
-    date: '2026-08-19',
-    items: [
-      'SỬA banner "Mất kết nối máy chủ" bớt phiền: chỉ hiện khi mất mạng THẬT (kéo dài ~60s) — lúc deploy/khởi động lại máy chủ (vài chục giây) sẽ KHÔNG bật nữa; và giờ có nút tắt (×) để đóng. (Gộp kèm bản 1.0.244: Lark × Agents đầy đủ trên web + nút Đồng bộ.)',
-    ],
-  },
-  {
     version: '1.0.244',
     date: '2026-08-19',
     items: [
@@ -933,13 +878,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'SỬA Skill không chạy trong chat Lark / Trợ lý AI: nay app CHÈN nội dung ĐẦY ĐỦ của các skill đang bật vào ngữ cảnh chat — gõ "chạy <tên skill>" là trợ lý làm theo đúng quy trình. (Claude CLI ở chế độ nền chỉ thấy TÊN skill chứ không thấy nội dung, nên trước đây trợ lý hỏi lại "là gì".) Nhớ bật chế độ "Thực thi" nếu skill cần ghi dữ liệu.',
       'Skill theo BASE: gắn NHÃN trùng ĐÚNG tên một Base → skill đó chỉ áp dụng khi Base đó đang mở trong hội thoại; nhãn khác (vd "Lark") thì áp dụng mọi nơi.',
-    ],
-  },
-  {
-    version: '1.0.240',
-    date: '2026-08-18',
-    items: [
-      'SỬA lỗi "credit balance is too low" khi app KHÔNG dùng API key (chỉ đăng nhập Claude CLI) mà chat vẫn báo lỗi dù Terminal chạy tốt: app đã bỏ qua biến môi trường ANTHROPIC_API_KEY rác (thường bị đặt toàn cục qua `launchctl setenv`, app mở từ Finder thừa hưởng còn Terminal thì không) → nay dùng ĐÚNG đăng nhập Claude CLI của bạn.',
     ],
   },
   {
@@ -1068,7 +1006,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.224',
     date: '2026-08-16',
     items: [
-      'Đồng bộ Bitable (CMS) — nói rõ cơ chế VM: "Máy VM là TUỲ CHỌN, hiện chưa cài" + giải thích chính App đang giữ phiên (VM chỉ cần khi muốn chạy 24/7 lúc tắt App; nút "Đăng nhập" KHÔNG tạo ra VM).',
       'Khi có job lỗi session: panel nêu rõ cách sửa — bấm "Làm mới session" (bơm phiên mới, tự bật lại job hết phiên); nút này thành nút CHÍNH khi đang có lỗi. Nếu làm mới vẫn lỗi → là lỗi cần sửa tay (mất quyền Base / bảng-cột đã đổi), không phải do phiên.',
     ],
   },
@@ -1083,12 +1020,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.222',
     date: '2026-08-16',
     items: [
-      'ĐỒNG BỘ GIAO DIỆN toàn bộ các trang (Cài đặt, Hồ sơ, Khám phá, Gói, Tích hợp, Kỹ năng) theo cùng "ngôn ngữ" với Tổng quan: cùng bộ thẻ, tiêu đề mục, màu nhấn — không còn mỗi trang một kiểu. Các trang giờ LIÊN KẾT với nhau (nút mở nhanh sang Lark, CMS, Tạo app, Tổng quan…).',
       'SỬA "Cài đặt": nút "Làm mới" khoá API trước đây tải lại CẢ cửa sổ (làm mất tab app + tiến trình dựng đang chạy) — nay chỉ làm mới đúng ô khoá.',
       'SỬA "Hồ sơ": lời mời kết bạn giờ CHẤP NHẬN/TỪ CHỐI được ngay trong trang (trước không có chỗ nào nhận lời mời); gộp các ô số liệu về một kiểu; thêm hoạt động & thành tích.',
       'SỬA "Gói": các thẻ gói cao bằng nhau, nút ghi đúng "Nâng cấp/Chuyển xuống/Gói hiện tại" (trước luôn ghi "Nâng cấp" kể cả khi hạ gói); hiện rõ ngân sách token mỗi gói.',
-      'SỬA "Tích hợp": hướng dẫn đúng TÊN BIẾN cho từng dịch vụ (Stripe→STRIPE_SECRET_KEY…) thay vì tên sai; thêm 2 tích hợp có sẵn Lark × Agents + Đồng bộ CMS; đổi tên trang thành "Tích hợp".',
-      'SỬA "Khám phá": nút xoá tìm kiếm không còn để lại kết quả cũ; thêm nút "Tạo app mới"; ô trống hiển thị rõ ràng hơn.',
       '"Kỹ năng": thẻ đều nhau + bấm để sửa trong hộp thoại; màu sắc theo đúng bộ nhấn (an toàn cho chế độ tối).',
     ],
   },
@@ -1097,23 +1031,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-15',
     items: [
       'Trang "Báo lỗi của tôi" giờ CÓ nút "Báo lỗi mới" (trước đây chỉ báo lỗi được qua nút nổi ở góc) — bấm là gửi ngay, danh sách tự tải lại; bảng trống cũng có nút "Gửi báo lỗi đầu tiên".',
-      'Sau khi Xuất bản / chạy trên server, thẻ app ở mọi nơi (Tổng quan, App của tôi) tự cập nhật URL + trạng thái "đang chạy" — không phải tải lại thủ công.',
     ],
   },
   {
     version: '1.0.220',
     date: '2026-08-15',
     items: [
-      'Chỉ báo "AI đang chạy" ở header giờ hiện CẢ HÀNG ĐỢI: phiên đang chạy + danh sách app đang CHỜ tới lượt (badge số lượng, tên + thứ tự). Hàng đợi sửa app giờ TOÀN CỤC — không mất khi chuyển trang.',
       'Giữ cách chạy TUẦN TỰ (AI một phiên/lần) — an toàn hơn cho giới hạn API + tài nguyên máy; nếu muốn chạy song song thật (bounded) thì cần bản .dmg riêng.',
-    ],
-  },
-  {
-    version: '1.0.219',
-    date: '2026-08-15',
-    items: [
-      'SỬA "Cần xử lý" khi bấm Sửa nhanh NHIỀU app: trước đây bấm app thứ 2 không ăn (AI chạy 1 phiên/lần). Nay các app được XẾP HÀNG và tự chạy lần lượt — mỗi card hiện rõ Chờ → Đang sửa → Đã sửa/Lỗi, không còn im lặng thất bại.',
-      'CHỈ BÁO "AI ĐANG CHẠY" ở thanh trên cùng (cạnh nút Tạo app): hiện phiên nào đang chạy (Dựng/sửa app · Lark × Agents · Điều khiển từ xa) + thời gian + chi tiết (app/hội thoại) + nút "Dừng phiên". Giúp thấy rõ tiến trình + tại sao yêu cầu khác phải chờ.',
     ],
   },
   {
@@ -1125,28 +1049,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.217',
-    date: '2026-08-15',
-    items: [
-      'Tổng quan LẤP ĐẦY khoảng trống: các lưới "App gần đây" và "Mẫu gợi ý" giờ xếp ĐỦ HÀNG theo bề rộng màn hình (không còn 1 card lẻ chỏng chơ + mảng trống lớn), hiển thị tối đa 2 hàng khớp full-width.',
-    ],
-  },
-  {
-    version: '1.0.216',
-    date: '2026-08-15',
-    items: [
-      'SỬA HẲN "Nhập từ thư mục": bỏ hộp thoại hệ thống hay bị lỗi/không hiện, thay bằng bộ chọn thư mục TIN CẬY ngay trong app (chọn thư mục → lấy đúng đường dẫn → nhập tại chỗ, không copy). ⚠️ Đây là phần LÕI ứng dụng nên phải CÀI LẠI bản .dmg 1.0.216 mới có hiệu lực — các bản cập nhật tự động trước đó chỉ là giao diện, không chạm được vào phần này (đó là lý do trước đây bạn sửa mãi không được).',
-      '"Cần xử lý" có SỬA NHANH tại chỗ: mỗi app đang lỗi hiện thành card riêng + nút "Sửa nhanh" — AI chẩn đoán & sửa NGAY trên trang Tổng quan (không redirect, không tự nhảy vào hội thoại 1 app); xong thì trạng thái tự cập nhật, vẫn mở được app để xem chi tiết.',
-    ],
-  },
-  {
     version: '1.0.215',
     date: '2026-08-15',
     items: [
       'Trang Tổng quan giờ dùng FULL chiều ngang (không còn co hẹp giữa trang).',
       'SỬA "Cần xử lý": mục app đang lỗi giờ bấm "Xem" là BUNG RA CÁC CARD APP lỗi (không còn tự nhảy vào hội thoại của 1 app) — mỗi card mở đúng app đó để bạn xem lỗi và nhờ AI sửa nhanh.',
-      'KHÁM PHÁ gọn lại: chỉ còn "App cộng đồng", và các card app giờ GIỐNG HỆT card ở Tổng quan (ảnh bìa + nhãn + lượt xem). Bỏ 2 tab "Người dùng" và "Xếp hạng".',
-      'Chuyển "Xếp hạng" + "Người dùng" VÀO Tổng quan: bảng xếp hạng (bạn được tô đậm) + gợi ý kết bạn/duyệt lời mời ngay tại trang chủ — các trang liên kết với nhau thay vì rời rạc.',
     ],
   },
   {
@@ -1155,61 +1062,24 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'TỔNG QUAN THÀNH TRUNG TÂM TỔNG HỢP THẬT SỰ (không còn rời rạc): hero gradient có dải chỉ số + ĐỒNG HỒ NGÂN SÁCH TOKEN (gói · % đã dùng · làm mới) — trước đây phải vào tận Hồ sơ & Gói mới thấy.',
       'Băng "CẦN XỬ LÝ" gom mọi việc cần làm từ khắp app vào một chỗ: app đang lỗi, job CMS lỗi, máy VM ngoại tuyến, Lark rớt kết nối, thưởng báo lỗi chờ chi, lời mời kết bạn — bấm là nhảy thẳng tới nơi xử lý.',
-      'App "Tiếp tục làm việc" xếp LƯỚI CÂN ĐỐI, các card bằng nhau (bỏ card dài phá layout).',
-      'Dải "THƯỞNG & CỘNG ĐỒNG" kéo dữ liệu từ Hồ sơ/Báo lỗi/Xếp hạng về Tổng quan: XP · cấp · hạng, số báo lỗi hợp lệ + thưởng, lời mời, giới thiệu — mỗi ô bấm mở đúng trang.',
-      'Ô "Hoạt động" dùng DỮ LIỆU THẬT của tài khoản (chuỗi ngày đóng góp + tổng build + lượt xem) thay cho biểu đồ tự suy đoán trước đây (đã sai số).',
       'Nút làm mới trên hero + mọi thẻ đều liên kết chéo sang màn tương ứng — app giờ liền mạch, kết nối với nhau.',
-    ],
-  },
-  {
-    version: '1.0.213',
-    date: '2026-08-15',
-    items: [
-      'SỬA MÀU CHẾ ĐỘ TỐI (dark mode) trên nhiều trang: thay các màu cứng (nền/chữ/viền không đổi theo theme) bằng token theme — hết cảnh chữ/icon bị chìm hoặc panel chói trắng ở chế độ tối trên các màn Tích hợp, Lark × Agents, Đồng bộ CMS, Thanh toán, Gói, Bạn bè, App workspace, Đặc tả. (Bước nền cho đợt làm mới giao diện đồng bộ toàn hệ thống đang tiến hành.)',
-    ],
-  },
-  {
-    version: '1.0.212',
-    date: '2026-08-15',
-    items: [
-      'TRANG TỔNG QUAN THIẾT KẾ LẠI HOÀN TOÀN: hero chào theo thời điểm trong ngày + tóm tắt nhanh (số app/sẵn sàng/preview) có nút làm mới; "Bắt đầu nhanh" lối tắt tới mọi phần; "Tiếp tục làm việc" hiện app gần đây KÈM ẢNH BÌA (chụp màn hình) — bấm để mở ngay; "Sức khỏe hệ thống" (vòng tiến độ + checklist AI/Lark/VM keeper, bấm từng mục để thiết lập); thẻ thống kê Lark & Đồng bộ CMS; biểu đồ "Nhịp làm việc 7 ngày". Mỗi thẻ đều liên kết nhảy thẳng tới màn tương ứng.',
-      'APP CỦA TÔI GỌN & RÕ HƠN: "Mẫu bắt đầu nhanh" chuyển VÀO luồng tạo app — bấm nút "Mẫu" ngay ô mô tả để mở bộ chọn mẫu (không còn là mục rời cuối trang). Trang giờ đọc mạch lạc: thanh công cụ → tạo app → App của tôi.',
-      'SỬA LỖI chọn mẫu: trước đây bấm mẫu điền mô tả vào màn "Tổng quan" (nơi không hiện ô nhập) nên tưởng như không ăn — nay luôn đưa về đúng ô mô tả ở "App của tôi".',
-    ],
-  },
-  {
-    version: '1.0.211',
-    date: '2026-08-15',
-    items: [
-      'ĐỒNG BỘ ICON THEO ANT DESIGN: chuẩn hoá toàn bộ icon giao diện về bộ Ant Design để KHỚP với các component antd dùng khắp app — nhất quán một phong cách trên mọi màn (menu, thanh trên cùng, Tổng quan, tạo app, danh sách app, Kỹ năng, báo lỗi). Vẫn giữ nguyên các cải tiến 1.0.210 bên dưới (Tổng quan tách riêng, Kỹ năng có nhãn tự do, bỏ emoji, sửa dark mode).',
     ],
   },
   {
     version: '1.0.210',
     date: '2026-08-15',
     items: [
-      'GIAO DIỆN CHUYÊN NGHIỆP HƠN + BỎ EMOJI: làm mới toàn bộ icon giao diện (menu, thanh trên cùng, Tổng quan, tạo app, danh sách app, Kỹ năng…) và bỏ sạch emoji trang trí — gọn, hiện đại, nhất quán.',
-      'TỔNG QUAN TÁCH RIÊNG, LÀ MENU ĐẦU TIÊN: "Tổng quan" không còn nằm trong nhóm Vibe Coding nữa (vì nó tổng hợp dữ liệu của TẤT CẢ: app + Lark + CMS) — nay đứng riêng ở trên cùng.',
-      'KỸ NĂNG (SKILLS) TÁCH RA MENU RIÊNG + GẮN NHÃN TỰ DO: Kỹ năng giờ là một mục độc lập (dùng chung cho cả làm app lẫn Lark). Khi tạo/nhập skill có thể tự ĐẶT NHÃN (vd "Làm app", "Lark", "Bảo mật"…) — gõ tự do, gợi ý sẵn — rồi LỌC theo nhãn cho dễ tìm. Mỗi thẻ sửa nhãn ngay tại chỗ.',
       'SỬA "NHẬP TỪ THƯ MỤC" (chẩn đoán tận gốc): thêm nhật ký chi tiết (liệt kê mọi cửa sổ + cửa sổ nào được chọn để gắn hộp chọn) và surface lỗi thật ngay lập tức thay vì để nút quay hoài. Hộp chọn bám đúng cửa sổ chính + đưa app lên trước (giống "Đổi vị trí lưu" vốn chạy tốt). (Cần cài bản .dmg này để có hiệu lực.)',
-      'Sửa vài chỗ màu cứng ở lưới "App của tôi" cho đúng dark mode.',
     ],
   },
   {
     version: '1.0.209',
     date: '2026-08-15',
     items: [
-      'GIAO DIỆN GỌN LẠI THEO NHÓM: menu bên trái gộp thành nhóm "Vibe Coding" (Tổng quan · App của tôi · Khám phá · Integrations · Kỹ năng) và nhóm "Lark". "Trang chủ" giờ là TỔNG QUAN — bảng thống kê nhanh về app Vibe-coding + Lark + đồng bộ CMS; phần tạo app, danh sách app và Mẫu gộp hết vào "App của tôi".',
       'SỬA MÀN TRẮNG DARK MODE ở "Phiên bản & thay đổi": bảng thông tin trước đây dùng màu sáng cứng nên tối màn — nay dùng token theo theme, hiển thị đúng ở cả sáng/tối.',
-      'Bỏ trang Quản trị khỏi app desktop (đã có trang CMS) → app nhẹ hơn, build/deploy nhanh hơn.',
       'Nút "Báo lỗi" chuyển lên thanh trên cùng (cạnh nút sáng/tối) thay cho nút nổi góc phải.',
-      'Sidebar Hội thoại gọn: chỉ hiện 5 mục (ghim trước, rồi mới nhất), có nút GHIM từng hội thoại + "Xem tất cả"; quản lý danh mục/thư mục chuyển vào lưới "App của tôi".',
       'Hồ sơ & Gói gộp thành MỘT trang: thêm mục "Bạn bè của tôi", gộp gói thanh toán, lịch sử thanh toán mở bằng popup.',
-      'Khám phá gộp 3 tab: App cộng đồng · Người dùng (kết bạn/khám phá) · Xếp hạng.',
       'Trang Cài đặt bố cục lưới toàn chiều rộng (2 cột xen kẽ) cho gọn, chuyên nghiệp.',
-      'Kỹ năng (Skills) giờ có ở CẢ nhóm Vibe Coding lẫn nhóm Lark (không dùng chung một chỗ).',
-      'SỬA "Nhập từ thư mục" không mở được hộp chọn: trước đây hộp chọn bám nhầm cửa sổ ẩn (dev) hoặc nổi sau cửa sổ khác — nay bám đúng cửa sổ chính.',
-      'Integrations: các thẻ dịch vụ cao bằng nhau, nút "Hướng dẫn" thẳng hàng; thêm CHÍNH SÁCH TÍCH HỢP AN TOÀN — khoá được mã hoá trên server, agent chỉ tham chiếu theo tên biến, giải mã khi deploy (khoá không lộ cho AI/không hiện lại).',
     ],
   },
   {
@@ -1222,34 +1092,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.207',
-    date: '2026-08-12',
-    items: [
-      'SỬA "Nhập từ thư mục" không mở được (Trang chủ + App của tôi): hộp chọn thư mục trước đây bị gắn vào một cửa sổ nền/ẩn nên KHÔNG hiện ra — nút cứ quay "Đang mở thư mục…" rồi báo quá giờ. Nay đưa app + cửa sổ chính lên trước rồi mở hộp chọn dạng app-modal (nổi trên cùng, không dính cửa sổ nào) → luôn hiện.',
-      'Bản Windows được cập nhật lên mới nhất (trước đây kẹt ở 1.0.141) — người dùng Windows tải lại để có đủ các bản vá: dựng app đáng tin (vòng hoàn thiện + kiểm biên dịch + chạy thử), CMS chạy từ web, sửa màn đen đăng nhập Lark, và bản vá này.',
-    ],
-  },
-  {
-    version: '1.0.206',
-    date: '2026-08-12',
-    items: [
-      'CHẠY THỬ APP TRƯỚC KHI BÁO XONG (chặn "compile OK nhưng chạy trắng màn"): sau khi build sạch, Larkwave giờ TỰ MỞ app trong cửa sổ ẩn ~2.6s để KIỂM TRA CHẠY THẬT — bắt lỗi TRẮNG MÀN (React không render vào #root) hoặc lỗi runtime nghiêm trọng (null/undefined khi .map, hook sai, crash). Nếu lỗi → đưa THÔNG BÁO LỖI CHÍNH XÁC cho AI sửa đúng chỗ (thêm guard/optional chaining…) rồi kiểm lại (tối đa 2 lần). An toàn/thận trọng: chỉ áp dụng app frontend-thuần (app có backend bỏ qua để tránh báo nhầm do thiếu /api), và mọi trục trặc hạ tầng thì bỏ qua (không chặn). Cùng với kiểm biên dịch (1.0.205) và vòng tự-hoàn-thiện (1.0.204), giờ app phải THỰC SỰ render được mới tính là xong.',
-    ],
-  },
-  {
-    version: '1.0.205',
-    date: '2026-08-11',
-    items: [
-      'BẮT LỖI BIÊN DỊCH khi dựng app (chống "đủ file nhưng vẫn lỗi"): trước đây build chỉ kiểm tra ĐỦ FILE + import — một app có đủ file, import trỏ đúng, VẪN có thể KHÔNG chạy vì lỗi biên dịch (vd class Tailwind không tồn tại như "border-white/12", lỗi kiểu TS). Nay sau khi dựng xong, Larkwave TỰ CHẠY THỬ BUILD (vite build); nếu lỗi thì đưa THÔNG BÁO LỖI CHÍNH XÁC cho AI sửa đúng chỗ rồi chạy lại (tối đa 2 lần). Chỉ báo "Lỗi" khi thật sự không biên dịch được. (Best-effort: nếu chưa cài được thư viện/timeout thì bỏ qua, không chặn — preview vẫn bắt lỗi.)',
-    ],
-  },
-  {
     version: '1.0.204',
     date: '2026-08-11',
     items: [
-      'DỰNG APP ĐÁNG TIN HƠN (hết cảnh "làm lâu mà vẫn thiếu src/App"): trước đây AI chạy MỘT lượt, xong lớp logic/thư viện là dừng dù CHƯA viết giao diện → build chỉ vá 1 lần rồi bỏ cuộc + hiện màn tạm "thiếu src/App". Nay build KIỂM TRA trên đĩa và TỰ CHẠY TIẾP tối đa 3 lượt "hoàn thiện app" nhắm đúng phần còn thiếu (viết src/App + trang/component, đọc code đã có để dùng lại, vá import mồ côi) cho tới khi app RENDER được màn hình thật. Chỉ báo lỗi khi thật sự bó tay sau các lượt (không còn nhận nhầm App "giả"/placeholder là xong).',
       'THEO DÕI TIẾN TRÌNH RÕ THỜI GIAN THỰC: thanh dựng giờ hiện ĐANG LÀM GÌ (⏳ "Ghi src/App.tsx", "Chạy npm…", "Đọc lib/…") + đếm "N tệp · M thao tác", thay vì chỉ "🔧 Write" chung chung nhìn như treo. (Phần hiển thị này về ngay qua cập nhật; các bước tự-hoàn-thiện cần bản .dmg 1.0.204.)',
-      'Siết yêu cầu với AI: định nghĩa "XONG" = app render ra MÀN HÌNH THẬT (chuỗi index.html → src/main → src/App dùng lib/pages/components), ưu tiên VIẾT file, KHÔNG dừng ở lớp lib.',
     ],
   },
   {
@@ -1264,29 +1110,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-11',
     items: [
       'Đồng bộ Bitable (CMS): thêm CHẠY TEST HÀNG LOẠT — nút "Chạy test tất cả" (chạy mọi job đang hiển thị theo bộ lọc/tìm kiếm), và nút "Chạy test" cho các job ĐÃ CHỌN (tick nhiều dòng). Chạy LẦN LƯỢT từng job (không song song, vì đồng bộ connector dùng chung một cửa sổ Lark), có thanh tiến độ "Đang chạy X/N: tên job", và tổng kết "N OK, M lỗi" kèm chi tiết phản hồi Lark từng job ở khung bên dưới. Bảng lớn báo "đang đồng bộ" (bận) không tính là lỗi.',
-    ],
-  },
-  {
-    version: '1.0.201',
-    date: '2026-08-11',
-    items: [
-      'App đang lỗi giờ CHỦ ĐỘNG báo + tự sửa: khi mở một app có nhãn "Lỗi", hiện banner "App đang được đánh dấu LỖI" với nút "Chẩn đoán & sửa" — bấm là AI tự kiểm tra app chạy được local chưa (đủ package.json/dependencies/file khởi động, không còn import mồ côi) rồi sửa; nếu app đã ổn thì xác nhận. Chạy xong sạch sẽ tự bỏ nhãn "Lỗi" trên card. (Trước đây mở app lỗi thì không có gì gợi ý, AI cũng không tự chạy.)',
-    ],
-  },
-  {
-    version: '1.0.200',
-    date: '2026-08-11',
-    items: [
-      'SỬA: sau khi Claude chạy xong một lượt sửa app, PREVIEW/views giờ TỰ CẬP NHẬT ngay — trước đây phải thoát app rồi vào lại mới thấy thay đổi (luồng "iterate" thiếu bước tải lại preview mà luồng dựng lần đầu đã có).',
-      'SỬA: tab app không còn quay vòng "đang tải" mãi khi thực ra không có tác vụ nào chạy — icon quay giờ CHỈ hiện khi đang dựng hoặc đang có lượt AI chạy cho tab đó; preview đang chạy (dev server) hiển thị bằng chấm xanh đứng yên (không phải icon quay).',
-    ],
-  },
-  {
-    version: '1.0.199',
-    date: '2026-08-11',
-    items: [
-      'Tạo skill: thêm HƯỚNG DẪN + CÁCH HOẠT ĐỘNG ngay trong hộp thoại tạo mới — nêu rõ DÒNG ĐẦU của hướng dẫn = câu kích hoạt (AI tự áp dụng khi việc khớp dòng đầu, KHÔNG cần gõ tên skill; thử ở màn Làm app). Thêm 3 VÍ DỤ bấm-để-điền-sẵn (Chào các agent / Chuẩn web app / Commit chuẩn) + ô nhập gợi ý cấu trúc "dòng 1 = KHI NÀO, dòng sau = LÀM GÌ".',
-      'Sửa layout card app (Trang chủ + App của tôi): các card trên cùng một hàng giờ CAO BẰNG NHAU (viền canh thẳng) thay vì so le/lệch khi nội dung dài ngắn khác nhau.',
     ],
   },
   {
@@ -1324,24 +1147,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.194',
     date: '2026-08-11',
     items: [
-      'Kỹ năng (Skills) — hướng dẫn dùng RÕ RÀNG: skill KHÔNG có nút "chạy" và bạn KHÔNG gõ tên skill. AI tự gọi khi yêu cầu của bạn KHỚP MÔ TẢ skill — chỉ cần bật skill (chọn model có Claude) rồi vào màn Làm app gõ việc bình thường khớp mô tả (vd skill "chào các agent" → gõ "chào các agent giúp tôi"). Đây đúng là cơ chế skills native của Claude (progressive disclosure). Đã sửa lời quảng cáo cũ gây hiểu nhầm: trong Lark HIỆN CHƯA kích hoạt skill (chat Lark chỉ bật công cụ Lark) — hãy thử ở màn Làm app. Thêm mẹo: DÒNG ĐẦU của hướng dẫn = câu KÍCH HOẠT (thành "mô tả"), viết mờ nhạt thì skill không bao giờ chạy.',
-      'Vài chỗ tinh chỉnh nhỏ: tab app hiện chấm "đang chạy" theo dev server thật; bảng "Cổng đang chạy" hiện đúng "Expo (QR)" cho app di động không có cổng http; nút sao chép hiện tooltip tiếng Việt; hồ sơ không bị trắng khi API hoạt động chưa cập nhật.',
       'Sửa: "Đăng nhập lại Lark web" (Đồng bộ Bitable/CMS) trước đây hiện MÀN TỐI ĐEN — cửa sổ đăng nhập bật lên trước khi trang Lark kịp vẽ khung đầu tiên (nhất là chế độ tối trên macOS) nên thành khung đen. Nay cửa sổ nền TRẮNG và chỉ hiện sau khi đã vẽ xong (kèm hẹn giờ dự phòng để trang chậm vẫn hiện ra) — không còn màn đen.',
-      'Sửa (mobile Expo): nếu Expo thoát lỗi trước khi sẵn sàng, trước đây "tiến trình chết" bị lưu lại khiến mọi lần Xem trước/Thử lại sau đó trả về khung rỗng; nay báo đúng lỗi kèm nhật ký và chạy lại được ngay. (Cần bản .dmg 1.0.194.)',
-    ],
-  },
-  {
-    version: '1.0.193',
-    date: '2026-08-11',
-    items: [
-      'CHỐNG TRẮNG TRANG khi làm app: nếu bản dựng thiếu file khởi động giao diện (index.html trỏ /src/main.tsx nhưng main.tsx/App.tsx/index.css chưa có) — trước đây Vite vẫn chạy, module 404 âm thầm → TRẮNG TRANG mà build vẫn báo "Hoàn tất". Nay có "render guard": (1) sau khi dựng, tự nhờ AI tạo nốt màn hình chính; (2) TỰ SỬA KHI MỞ APP (preview tự dựng file khởi động nếu thiếu) → không còn trắng trang; (3) nếu app vẫn chưa có màn chính thật thì tạo màn tạm + đánh dấu LỖI + hiện nút "Nhờ AI sửa" thay vì giả vờ "xong".',
     ],
   },
   {
     version: '1.0.192',
     date: '2026-08-11',
     items: [
-      'Xuất bản app: hộp thoại "Đã xuất bản" giờ CÓ NÚT ĐÓNG (dấu X + nút "Đóng") — trước chỉ có "Mở trang" nên phải tải lại app mới thoát được. QR cũng phóng to (196px) + thêm nút Sao chép link.',
       'Sửa lỗi kẹt khóa AI: sau khi tải lại app mà một lượt AI cũ vẫn đang chạy cho CHÍNH app đó, trước đây không hiện gì và không gửi/không sửa được. Nay hiện banner + nút "Mở khoá nếu treo" ngay ở khung chat để thoát ngay (một lượt CLI vẫn chạy tuần tự — nhưng bạn luôn có nút thoát khi bị treo).',
     ],
   },
@@ -1350,38 +1162,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-11',
     items: [
       'Quản trị → Người dùng: KÍCH HOẠT GÓI trực tiếp cho một người dùng — chọn gói (Miễn phí / Khởi đầu / Chuyên nghiệp / Doanh nghiệp), số tháng của chu kỳ hạn mức và tuỳ chọn đặt hạn mức đã dùng về 0. Thêm cột "Gói" để thấy ngay ai đang ở gói nào; mỗi lần cấp đều được ghi nhật ký quản trị.',
-      'Card app (Trang chủ + App của tôi) giờ hiện ẢNH THẬT của app thay vì icon chung: khi bạn xem trước, app tự chụp các trang của chính nó từ dev server đang chạy rồi dùng làm ảnh bìa. App chưa từng chụp vẫn hiện logo như cũ.',
-      'Nút "CỔNG ĐANG CHẠY" (kèm số đếm) ngay cạnh nút Tạo app, mở được ở MỌI màn hình — trước đây bảng này chỉ vào được từ bên trong một app đang mở. Liệt kê mọi dev server đang chạy của TẤT CẢ app kèm TÊN dự án, cho Dừng / Khởi động lại từng dịch vụ hoặc Mở hội thoại của app đó. Khởi động lại nay GIỮ NGUYÊN cổng của dịch vụ api, nên các frontend đang chạy không bị mất kết nối tới backend.',
-      'Hồ sơ trong app đã đầy đủ như trên web: HUY HIỆU thành tựu, chuỗi ngày hoạt động (streak) và BIỂU ĐỒ ĐÓNG GÓP 12 tháng — trước đây phải bấm sang web mới xem được.',
-      'Sửa: app di động (Expo) khởi động lỗi trước đây bị KẸT — mọi lần "Xem trước"/"Thử lại" sau đó đều trả về khung trắng cho tới khi khởi động lại app; nay báo đúng lỗi kèm nhật ký và chạy lại được ngay.',
-      'Sửa: các lần sửa app tiếp theo không còn ghi đè LOẠI APP (app Mobile/Extension bị đổi nhầm thành Website) và không còn xoá link đã xuất bản của app.',
-      '(Gồm cả các cải tiến 1.0.190: tag loại app web/mobile/extension + preview app di động Expo qua QR/web.)',
-    ],
-  },
-  {
-    version: '1.0.190',
-    date: '2026-08-11',
-    items: [
-      'App của tôi: mỗi card giờ có TAG loại app — Website / Mobile / Extension — để nhận diện ngay (suy luận cả cho app cũ; app mới lưu sẵn loại).',
-      'Preview app DI ĐỘNG (React Native / Expo) — trước đây khung web không hiển thị được (Metro không phải trang web). Nay: app Expo có hỗ trợ web thì chạy expo-web hiện NGAY trong khung (điện thoại); nếu không, hiện MÃ QR + hướng dẫn mở bằng Expo Go trên điện thoại (cùng WiFi, hoặc --tunnel). App mobile tạo mới từ nay kèm sẵn react-native-web để xem trước trong app được.',
     ],
   },
   {
     version: '1.0.189',
     date: '2026-08-10',
     items: [
-      'Sửa app — 4 nâng cấp lớn. (1) QUẢN LÝ CỔNG TOÀN CỤC: nút "Cổng đang chạy" mở bảng liệt kê MỌI dev server đang chạy của TẤT CẢ app (home/cms/api + cổng + app), Dừng từng cái hoặc "Dừng hết" theo app — để tắt các site chạy ngầm chiếm cổng.',
-      '(2) Bỏ rail "Các trang / API"; điều hướng chuyển lên thanh công cụ: ô địa chỉ GÕ ĐƯỢC (nhập path/URL + Enter để đi) + ô chọn trang nhanh. Preview rộng hết khung.',
       '(3) THÊM tab "API" (kiểu Swagger): liệt kê endpoint của backend, chọn method + path + body, Gửi và xem response (status/thời gian/JSON). Gọi qua tiến trình chính nên không vướng CORS, tới đúng cổng api.',
-      '(4) "Thêm ô" giờ HỎI mở site nào: app nhiều dịch vụ (home/cms/api…) chọn ghim ô preview vào đúng site (mỗi ô một cổng), hoặc "Tự động (theo route)".',
       'Sửa gốc: chuỗi services (home/cms/api + URL) trước đây bị RỚT ở tầng IPC nên panel Cổng/định tuyến theo service chưa chạy — nay truyền xuyên suốt.',
-    ],
-  },
-  {
-    version: '1.0.188',
-    date: '2026-08-10',
-    items: [
-      'Sửa app — khung Xem trước cục bộ (desktop) giờ FULL HEIGHT: trước bị chặn maxHeight 720px + canh giữa nên preview không cao hết khung; nay iframe kéo giãn hết chiều cao vùng xem. Chế độ Mobile vẫn giữ khung điện thoại 390×700.',
     ],
   },
   {
@@ -1390,7 +1178,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Sửa app (Xem trước cục bộ) — nâng cấp lớn: (1) THÊM THANH ĐỊA CHỈ hiển thị đúng URL trang đang xem + nút copy. (2) "Các trang / API" nay CHẠY ĐÚNG: mỗi route mở đúng service của nó — trước đây mọi route nối vào cổng của "home" nên /api/* và /admin (chạy cổng khác) bị 404. (3) THÊM nút "Cổng" liệt kê cổng từng dịch vụ (home/cms/api) — copy + mở ngoài; backend đã trả sẵn nhưng UI trước đây vứt đi.',
       'Tab "Prompt" giờ hiện PROMPT ĐÃ GỬI gần nhất (đọc .toolswave/last-prompt-audit.txt) thay vì chỉ ô trống khó hiểu — gõ yêu cầu mới ở chat thì xem prompt của lần tới.',
-      'Tab "CSDL" hết trống với app full-stack: DB dùng WAL (dữ liệu nằm ở data.db-wal, file chính gần như rỗng) nên sql.js đọc ra 0 bảng — nay GỘP các frame WAL đã commit trước khi đọc → hiện đúng bảng/dữ liệu. Chặn SỬA dữ liệu khi app đang chạy (WAL còn mở) để tránh hỏng DB.',
     ],
   },
   {
@@ -1418,13 +1205,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.183',
-    date: '2026-08-10',
-    items: [
-      '`lark_app_inspect` thêm tham số `tab`: các tab trong một Lark App ("Trang Tổng Hợp / Dữ Liệu Vận Đơn / …") là điều hướng phụ trong trang — `pageId` trên URL KHÔNG deep-link tới tab nên mở lên luôn rơi vào tab đầu. Giờ truyền `tab="<tên tab>"` (vd "Dữ Liệu Vận Đơn") thì tool sẽ mở → chờ → tự CLICK đúng tab đó → chờ tab tải → mới soi lỗi loading/chức năng. Trả thêm `tabClicked` (đã vào đúng tab chưa) + `tabNote` nếu không thấy tên tab.',
-    ],
-  },
-  {
     version: '1.0.182',
     date: '2026-08-10',
     items: [
@@ -1437,7 +1217,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-10',
     items: [
       'MỚI (thử nghiệm) — Trợ lý TỰ LÁI giao diện Lark để tạo Automation: thay vì bạn thao tác tay, trợ lý tự ĐỌC giao diện Lark sống (lark_ui_snapshot) rồi tự BẤM/ĐIỀN/CHỌN (lark_ui_act/lark_ui_wait) để dựng automation NGAY TRONG panel "Tự động hoá" của Lark → chính Lark sinh schema hợp lệ, không còn 800004006. Cần đã "Kết nối Lark web".',
-      'AN TOÀN (bắt buộc): trợ lý CHỈ dựng BẢN NHÁP — TUYỆT ĐỐI không tự bấm Bật/Kích hoạt/Xuất bản/Xoá (bị chặn = cần xác nhận); dựng xong nó DỪNG và để BẠN tự mở Lark bật. Kèm giới hạn số thao tác mỗi phiên + chỉ chạy trên trang Lark.',
       'Bản "học → tạo lại" (record→replay, 1.0.180) vẫn giữ làm phương án dự phòng cho các ca kéo-thả/giá trị hằng/iframe khác origin.',
     ],
   },
@@ -1475,13 +1254,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.176',
-    date: '2026-08-09',
-    items: [
-      'Sửa MÀN ĐEN sau khi "Đăng nhập bằng tài khoản Lark (toàn quyền)": khi cửa sổ đăng nhập (con) đóng lại, cửa sổ chính bị đen do một lỗi vặt của macOS — giờ tự đưa cửa sổ chính lên trước + ép vẽ lại. Áp dụng cho cả đăng nhập tài khoản Larkwave (Google/GitLab/GitHub). Kèm lưới an toàn: nếu giao diện chính bị crash (đen) sẽ TỰ tải lại thay vì đứng im.',
-    ],
-  },
-  {
     version: '1.0.175',
     date: '2026-08-09',
     items: [
@@ -1496,51 +1268,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.173',
-    date: '2026-08-09',
-    items: [
-      'Nhập từ thư mục — hết "loading mãi": giờ MỞ TẠI CHỖ, KHÔNG copy gì cả (đúng như bạn nói — chỉ là mở thư mục). Chọn folder xong là dùng ngay tức thì; AI sửa/chạy TRỰC TIẾP trong thư mục đó (như mở folder ở VS Code). Xoá app ở đây KHÔNG xoá thư mục gốc của bạn (chỉ gỡ khỏi danh sách). Dự án nhập tại-chỗ cũng không bị đưa vào "Cập nhật cấu trúc" để tránh đụng thư mục gốc.',
-    ],
-  },
-  {
-    version: '1.0.172',
-    date: '2026-08-09',
-    items: [
-      'Workspace nhiều dịch vụ giờ theo kiểu MONOREPO (như ảnh bạn gửi): tự tạo sẵn `packages/ui` (component React dùng chung — “@ui”) và `packages/shared` (kiểu dữ liệu + tiện ích dùng chung — “@shared”). Các frontend (home/cms) import code dùng chung qua alias @ui/@shared (đã hướng dẫn AI cấu hình vite.config + fs.allow), không copy-dán trùng lặp. Dịch vụ api chạy độc lập. Chỉ áp dụng khi bật “Tách thành dịch vụ riêng” — app 1 giao diện vẫn giữ {tên}-home.',
-    ],
-  },
-  {
-    version: '1.0.171',
-    date: '2026-08-09',
-    items: [
-      'Tab "Mã nguồn" giờ như VS Code: CÂY THƯ MỤC đóng/mở từng folder (thay vì danh sách phẳng), có nút "Mở hết / Thu gọn". Bấm file để xem/sửa; sửa trực tiếp rồi Cmd+S (hoặc nút "Lưu") là LƯU + tự chạy lại preview ngay.',
-      'Sửa: trước đây lưu code trong khung workspace nhiều-ô KHÔNG tự chạy lại preview (thiếu nối) — nay lưu là preview cập nhật liền.',
-    ],
-  },
-  {
-    version: '1.0.170',
-    date: '2026-08-09',
-    items: [
-      'Nhập từ thư mục — làm lại phần copy để hết treo: dùng cách duyệt thủ công (KHÔNG chui vào node_modules/.git/dist…, bỏ symlink dễ gây treo, bỏ tệp > 20MB) nhanh hơn hẳn cách cũ, có mốc thời gian 120s và GHI LOG ra Console (View → Toggle Developer Tools) — nếu còn treo sẽ thấy đúng đang kẹt ở bước nào (mở hộp thoại / copy). LƯU Ý: đây là sửa ở PHẦN LÕI nên phải CÀI .dmg mới mới có tác dụng.',
-      'Cập nhật cấu trúc thư mục giờ HỎI tên ngắn cho dự án (≤30 ký tự, dấu cách → “-”) — mỗi app một ô nhập, xem trước “{tên}-workspace / {tên}-home”. Áp dụng cả nút từng-app (menu ⋯) lẫn nút hàng loạt ở trang chủ.',
-    ],
-  },
-  {
-    version: '1.0.169',
-    date: '2026-08-09',
-    items: [
-      'Nút "Cập nhật cấu trúc thư mục" cho dự án CŨ (Đợt 2b): trong workspace bấm ⋯ → "Cập nhật cấu trúc thư mục" để đổi 1 app; ở trang chủ có nút "Cập nhật cấu trúc (N)" + modal tiến độ để đổi HÀNG LOẠT. Dự án cũ (lưu phẳng) được sắp xếp lại thành "{tên}-workspace/{tên}-home" — MỖI app được SAO LƯU (.zip) trước khi đổi nên khôi phục được. node_modules/dist tự bỏ (cài lại khi chạy). App đã ở cấu trúc mới thì tự bỏ qua.',
-      'Sửa lỗi liệt kê TRÙNG: app đặt tên "{tên}-workspace" ở thư mục mặc định trước đây có thể hiện 2 lần trong danh sách — nay lọc đúng.',
-    ],
-  },
-  {
-    version: '1.0.168',
-    date: '2026-08-09',
-    items: [
-      'Sửa crash "Application error: a client-side exception" khi reload app: khi giao diện mới (được cập nhật ngầm) chạy trên PHẦN LÕI cũ chưa có một số hàm cầu nối (vd vị trí lưu dự án), lời gọi đó ném lỗi ngay lúc tải → trắng màn. Giờ renderer tự bỏ qua an toàn hàm cầu nối còn thiếu (tính năng đó tạm không có thay vì làm sập cả app). Kèm "lưới an toàn": nếu một thành phần lỗi, app hiện thông báo + nút "Tải lại" thay vì màn lỗi đỏ. → Cài PHẦN LÕI mới nhất để có đủ tính năng.',
-    ],
-  },
-  {
     version: '1.0.167',
     date: '2026-08-09',
     items: [
@@ -1548,48 +1275,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.166',
-    date: '2026-08-09',
-    items: [
-      'Cấu trúc thư mục theo TÊN dự án (app mới): thay vì "app-mslcazpa" khó hiểu, dự án mới lưu là "{tên}-workspace" với thư mục con theo tên — app 1 phần giao diện → "{tên}-workspace/{tên}-home"; nhiều dịch vụ → "{tên}-home / {tên}-api / {tên}-cms" mỗi cái chạy cổng riêng. Preview/Xuất bản/CSDL đều nhận cấu trúc mới. Dự án CŨ giữ nguyên (chưa đụng) — phần chuyển dự án cũ sang cấu trúc mới (có sao lưu) sẽ ra ở bản kế tiếp.',
-    ],
-  },
-  {
-    version: '1.0.165',
-    date: '2026-08-09',
-    items: [
-      'Vị trí lưu dự án (mới): form "Tạo app" giờ HIỆN nơi dự án sẽ lưu và cho CHỌN thư mục khác cho riêng dự án đó ("Vị trí lưu dự án" → "Đổi…"). Ở Cài đặt có thêm "Vị trí lưu dự án" để đổi thư mục MẶC ĐỊNH cho mọi dự án mới. Dự án cũ KHÔNG bị dời; danh sách app tự nhận cả dự án lưu ở thư mục tuỳ chọn.',
-      'Sửa "Nhập từ thư mục" bấm vào loading mãi: hộp thoại chọn thư mục trước đây có thể gắn nhầm vào cửa sổ ẩn (phiên Lark / chụp web) nên sheet vô hình. Giờ luôn gắn vào cửa sổ chính đang hiển thị + đưa lên trước, nên hộp thoại chắc chắn bật ra.',
-    ],
-  },
-  {
     version: '1.0.164',
     date: '2026-08-09',
     items: [
-      'Hết "báo lỗi luôn sau khi dựng xong": khi AI lỡ import một file mà chưa tạo (vd App.tsx import ./pages/Contact nhưng thiếu Contact.tsx → Vite hiện overlay đỏ "Failed to resolve import"), giờ sau mỗi lần dựng app TỰ quét các import tương đối, phát hiện file còn thiếu và CHẠY THÊM 1 lượt để tạo nốt — app chạy được ngay. Nếu vẫn thiếu thì đánh dấu "lỗi" thật (kèm nút "Nhờ AI sửa") thay vì báo "Hoàn tất" giả.',
       'Sửa cảnh báo "đã dùng ~100% ngữ cảnh" báo sai trên app đơn giản: trước đây lấy nhầm tổng token CỘNG DỒN của cả lượt chạy (đếm lại cache mỗi bước) nên phình quá cửa sổ → kẹp ~100%. Giờ đo theo lượt cuối của model (ngữ cảnh thực), nên % khớp thực tế — app nhỏ sẽ hiện vài % chứ không dọa 100%.',
       'Chi phí khi dùng Claude CLI: bỏ hiển thị "Hoàn tất ($2.24)" gây hiểu lầm bị trừ tiền. Giờ ghi rõ đây chỉ là ước tính nếu tính theo giá API — dùng Claude CLI (gói thuê bao) KHÔNG bị tính tiền.',
-    ],
-  },
-  {
-    version: '1.0.163',
-    date: '2026-08-09',
-    items: [
-      'Hết cảnh preview báo lỗi giả khi app đang dựng LẦN ĐẦU: trước đây vừa tạo app xong, khung xem trước lập tức nhảy "App chưa được tạo đầy đủ (thiếu package.json)…" dù AI vẫn đang sinh file bình thường. Giờ trong lúc build còn chạy, khung xem trước hiện trạng thái "Đang dựng app…" (chờ AI tạo file) và tự chạy preview NGAY khi dựng xong; chỉ báo lỗi khi build đã kết thúc mà thật sự thiếu file. Bản build sửa lỗi/đang thao tác vẫn giữ preview cũ, không chớp trắng.',
-    ],
-  },
-  {
-    version: '1.0.162',
-    date: '2026-08-09',
-    items: [
-      'Form "Tạo app" giờ THỰC SỰ full-width: bỏ hẳn giới hạn 1040px + căn giữa (trước đây vẫn nằm giữa, hai bên trống) — form trải hết bề rộng nội dung như phần còn lại của trang. Bên trong xếp lưới 2 cột: "Loại app · Model" và "Màu · Mẫu" mỗi hàng 2 mục; các mục rộng (Tên dự án, Thành phần, Số trang, Công nghệ…) trải full-width.',
-    ],
-  },
-  {
-    version: '1.0.161',
-    date: '2026-08-09',
-    items: [
-      'Bố cục lại form "Tạo app" ở trang chủ: thay vì một cột hẹp căn giữa (trống 2 bên), các mục giờ xếp thành LƯỚI NHIỀU CỘT — mỗi hàng chứa vài mục gọn (Loại app · Model · Màu · Mẫu…) dùng hết bề rộng; các mục rộng (Tên dự án, Thành phần, Số trang, Công nghệ, Sao chép URL) trải full-width. Form rộng tới 1040px, tự co về 1 cột khi cửa sổ hẹp.',
     ],
   },
   {
@@ -1603,15 +1293,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.159',
     date: '2026-08-09',
     items: [
-      'Sửa "Nhập từ thư mục" bị treo / loading mãi: giờ chỉ copy MÃ NGUỒN — bỏ qua thư mục nặng (node_modules, .git, dist, venv, Pods, target…) và tệp lớn > 20MB (ảnh/video/dataset) → dự án thật nhập trong vài giây thay vì đứng chờ; ổ mạng không phản hồi thì báo lỗi sau 120s.',
       'Form "Tạo app" gọn hơn: giới hạn bề rộng + căn giữa (hết cảnh trải full màn trống trơn), khoảng cách sít lại.',
-    ],
-  },
-  {
-    version: '1.0.158',
-    date: '2026-08-09',
-    items: [
-      '"Tạo app": "Tên dự án" giờ là trường BẮT BUỘC và nằm ở ĐẦU phần tuỳ chọn (có dấu *) — để đặt tên workspace/thư mục cho chuẩn. Chưa nhập tên sẽ không tạo được.',
     ],
   },
   {
@@ -1619,7 +1301,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-09',
     items: [
       'Ô "Tạo app" giờ ĐÍNH KÈM ẢNH / FILE được: nút "Đính kèm ảnh / file" (cạnh nút Tạo app) + DÁN ảnh trực tiếp vào ô mô tả → AI sẽ MỞ/ĐỌC ảnh-tài liệu để hiểu đúng thiết kế/yêu cầu (trước đây bản desktop chưa có, chỉ web mới có).',
-      'Bản này ĐỔI PHẦN LÕI → cần CÀI LẠI. Cài bản này là có LUÔN: Phase A (workspace đa dịch vụ) + đính kèm ảnh + mọi cập nhật trước (dark-mode, nút Dừng, Mẫu mới, tự thoát khi cài…).',
     ],
   },
   {
@@ -1630,41 +1311,16 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.155',
-    date: '2026-08-09',
-    items: [
-      'Workspace NHIỀU DỊCH VỤ (Phase A): ở "Tạo app" chọn ≥2 thành phần rồi bật "Tách thành dịch vụ riêng" → AI dựng home / api / cms thành các thư mục riêng, MỖI cái chạy trên MỘT CỔNG riêng (không xung đột), frontend tự gọi API qua URL được tiêm sẵn. App cũ (1 app 1 cổng) vẫn chạy y như trước.',
-      'Bản này ĐỔI PHẦN LÕI → cần CÀI LẠI. Cài xong là có LUÔN mọi thứ gần đây: fix "Nhập từ thư mục" treo, splash đen, toàn bộ dark-mode, nút "Dừng" khi tạo app, trang "Mẫu" mới (grid + preview + game/extension), CMS không cần AI, Messenger…',
-    ],
-  },
-  {
     version: '1.0.154',
     date: '2026-08-09',
     items: [
-      'Trang "Mẫu" làm lại: hiển thị dạng LƯỚI THẺ có ảnh preview bố cục (dashboard/bảng/form/cửa hàng/game/extension…), lọc theo danh mục, bấm thẻ để XEM TRƯỚC lớn rồi mới "Dùng mẫu".',
       'Thêm mẫu mới: Trò chơi (2048, lật thẻ trí nhớ, rắn săn mồi) và Tiện ích mở rộng (theo dõi giá, ghi chú nhanh).',
-    ],
-  },
-  {
-    version: '1.0.153',
-    date: '2026-08-09',
-    items: [
-      '"Tạo app" ở trang chủ: thêm ô "Tên dự án" — tab mở ra sẽ mang tên "<tên>-workspace". Và "Thành phần" giờ là nút BẤM CHỌN THẬT (Giao diện người dùng / Cơ sở dữ liệu & API / Trang quản trị): chọn phần nào thì AI dựng đúng phần đó (trước đây chỉ là chip trang trí). Bước tiếp theo sẽ tách thành dịch vụ riêng, cổng riêng.',
-    ],
-  },
-  {
-    version: '1.0.152',
-    date: '2026-08-09',
-    items: [
-      'Dark mode trang "Khám phá": thẻ app, ô tìm kiếm, viền — hết nền trắng chói trên nền tối.',
-      'Trang "Integrations": logo dịch vụ khi không tải được từ mạng (hay gặp) giờ tự hiện biểu tượng emoji thay vì để ô trắng.',
     ],
   },
   {
     version: '1.0.151',
     date: '2026-08-08',
     items: [
-      'Thêm nút "Dừng" khi đang tạo / sửa app: bấm để NGỪNG ngay lượt đang chạy (dừng CLI), sửa lại prompt rồi gửi lại — không phải đợi chạy xong. Giúp tăng độ chính xác và dừng sớm khi thấy sai.',
       'Báo lỗi / góp ý giờ tự đính kèm TÊN TRANG (hoặc app) đang mở → biết chính xác trang nào lỗi.',
       'Dark mode: sidebar trang "Quản trị", trang "Gói & Thanh toán", "Hồ sơ", và phần "API key của nhóm" (Cài đặt) — hết nền trắng / chữ tối khó đọc.',
     ],
@@ -1697,22 +1353,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-08-08',
     items: [
       'Hết nháy trắng khi mở / tải lại app ở chế độ tối: theme được áp NGAY từ khung hình đầu tiên (một đoạn mã chạy trước khi React dựng) — không còn "màn splash trắng".',
-      'Sửa "Nhập từ thư mục" bị treo vô hạn: hộp chọn thư mục giờ mở đúng trước cửa sổ (không nấp sau nữa) và việc copy có giới hạn thời gian + an toàn với symlink — hết cảnh bấm rồi quay mãi.',
-      'Bản này ĐỔI PHẦN LÕI → cần CÀI LẠI app để có bản sửa "Nhập từ thư mục" (phần giao diện dark-mode vẫn tự cập nhật ngầm).',
-    ],
-  },
-  {
-    version: '1.0.146',
-    date: '2026-08-08',
-    items: [
-      'Dark mode (tiếp): "Xem trước cục bộ" và các tab "Mã nguồn / CSDL / Prompt" trước đây còn nền/viền sáng chói — giờ đổi theo theme. Trang app trong khung xem trước vẫn giữ nền thật của app (không ép tối).',
-    ],
-  },
-  {
-    version: '1.0.145',
-    date: '2026-08-08',
-    items: [
-      'Sửa giao diện tối (dark mode) ở khung làm app: panel hội thoại/lịch sử "Lượt", bong bóng trả lời của AI, danh sách phiên & thanh soạn tin, khung xem trước và log build trước đây bị nền trắng + chữ tối khó đọc — giờ đổi màu theo theme, đọc rõ ở cả sáng lẫn tối.',
     ],
   },
   {
@@ -1727,8 +1367,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.143',
     date: '2026-08-07',
     items: [
-      '"Đồng bộ lên điện thoại" giờ MỞ MODAL tiến trình: thanh tiến trình + liệt kê ĐÚNG các app trên máy đang được đẩy, mỗi app tick ✔ khi xong; các thông báo (đã đồng bộ N app / chưa có app / cần bật Điều khiển từ xa / mạng lỗi / quá thời gian) hiện ngay trong modal thay vì toast thoáng qua. Khi xong: hiện mã QR + link app.toolswave.net/remote/agent, kèm nút "Đồng bộ lại".',
-      '"Nhập từ thư mục": hiện "Đang nhập…" trong lúc copy + tự dừng sau 3 phút nếu thư mục quá lớn / ổ mạng treo (trước đây bấm là quay mãi không phản hồi).',
       '"Tải & mở bộ cài": mở cửa sổ "Đang tải…" có thanh tiến trình động (bộ cài ~100MB) + tự dừng sau 5 phút nếu mạng chết, thay vì chỉ có spinner nhỏ; tải xong tự chuyển sang hướng dẫn cài.',
       'Nút "Làm mới" liên kết Telegram giờ có trạng thái đang tải.',
     ],
@@ -1745,8 +1383,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.141',
     date: '2026-08-07',
     items: [
-      'Thêm nút "Đồng bộ lên điện thoại" (ở Trang chủ và "App của tôi") — bấm là đẩy ngay danh sách app lên server để điện thoại thấy + chọn app gửi tiếp, không phải chờ tự đồng bộ.',
-      '"App của tôi": bổ sung nút "Điều khiển từ điện thoại" (mã QR mở /remote/agent) và "Nhập từ thư mục" — giống Trang chủ.',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -1754,7 +1390,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.140',
     date: '2026-08-07',
     items: [
-      'Máy của tôi (điện thoại): giờ thấy DANH SÁCH APP đang có trên máy. Máy tự đẩy danh sách app lên server; trên điện thoại chọn một app ở ô "App trên máy" rồi gửi yêu cầu — máy sẽ SỬA đúng app đó (gửi tiếp), thay vì luôn tạo app mới.',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -1778,7 +1413,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.137',
     date: '2026-08-07',
     items: [
-      'Trang chủ: thêm nút "Nhập từ thư mục" — chọn một thư mục dự án CÓ SẴN CODE trên máy, app copy vào workspace (bỏ node_modules/.git cho nhanh), tự nhận package manager + lệnh dev, rồi mở workspace để sửa/chạy bằng AI (như "Nhập từ Git" nhưng cho thư mục local).',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -1854,7 +1488,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.128',
     date: '2026-08-06',
     items: [
-      'Sửa: lệnh "/run" trong nhóm Lark không nhận khi bạn @nhắc bot (Lark chèn @tên vào trước) — giờ tự bỏ phần @nhắc ở đầu nên "/run <yêu cầu>" luôn được nhận. Lưu ý: tính năng /run nằm ở phần lõi (bản 1.0.124+) nên máy phải CÀI LẠI mới có.',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -1862,7 +1495,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.127',
     date: '2026-08-06',
     items: [
-      'Điều khiển từ xa: nhóm Lark "/run" giờ TỰ TẠO một lần khi Bot Lark đang bật (không cần bấm), rồi được nhớ lại — mở panel lần sau chỉ hiện nhóm cũ kèm nút "Mở / tham gia" và "Tạo nhóm khác", không tạo trùng.',
       'Bản này CẬP NHẬT NGAY (không cần cài lại).',
     ],
   },
@@ -1870,7 +1502,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.126',
     date: '2026-08-06',
     items: [
-      'Điều khiển từ xa → mục "Điều khiển bằng chat": thêm nút "Tạo nhóm Lark với Bot (/run)" — một chạm tạo nhóm Lark có sẵn bot + mở link tham gia (giống bên Đồng bộ Bitable CMS), vào nhóm nhắn /run là máy chạy.',
       'Bản này CẬP NHẬT NGAY (không cần cài lại).',
     ],
   },
@@ -1878,7 +1509,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.125',
     date: '2026-08-06',
     items: [
-      'Điều khiển từ xa: thêm nút "Hướng dẫn" (góc phải) mở modal hướng dẫn ngay trong app — cách dùng Webhook API (curl), Telegram, Lark /run, nút Test, Báo KQ và các điểm bảo mật. Không cần mở trang ngoài.',
       'Bản này CẬP NHẬT NGAY (không cần cài lại).',
     ],
   },
@@ -1888,7 +1518,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Điều khiển từ xa — Token webhook: thêm nút "Test" mỗi token (kiểm token còn dùng được + máy có đang online không, KHÔNG chạy gì) và "Báo KQ" để khi tác vụ chạy xong tự gửi kết quả ra Telegram hoặc nhóm Lark.',
       'Điều khiển bằng CHAT: nối một chat Telegram với máy — nhắn nội dung vào chat là máy chạy rồi trả kết quả về (bấm "Nối Telegram" để lấy mã, gửi /start <mã> cho bot). Cần quản trị đặt bot token trên máy chủ.',
-      'Bot Lark: nhắn "/run <yêu cầu>" trong nhóm có bot là máy chạy luôn (tạo/sửa app) và trả kết quả về nhóm — trước đây bot chỉ trả lời câu hỏi. Bảo mật: /run chỉ chạy khi bot đã đặt Encrypt Key và người gửi CHÍNH là chủ máy (đăng nhập Lark cá nhân) — thành viên khác trong nhóm không kích hoạt được.',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -1904,7 +1533,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.122',
     date: '2026-08-06',
     items: [
-      'Điều khiển từ xa: Token webhook giờ tạo được NHIỀU token có TÊN (mỗi cái cho một dự án/dịch vụ) thay vì chỉ 1. Có danh sách token (tên, thời điểm tạo, dùng gần nhất) + nút xoá; token mới hiện một lần để sao chép. Mọi token đều đẩy lệnh về máy đang online.',
       'Bản này cần CÀI LẠI app (đổi phần lõi).',
     ],
   },
@@ -2005,7 +1633,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.109',
     date: '2026-08-05',
     items: [
-      'Lark: BÁO NGAY khi phiên Lark web hết hạn — có thông báo hệ thống + banner trong app kèm nút "Đăng nhập lại Lark" (trước đây phiên chết âm thầm mà vẫn hiện "Đã kết nối"). App tự dò phiên mỗi 10 phút.',
       'Lark: thêm tool "tạo hội thoại nhóm" + gửi tin ĐỊNH DẠNG (rich text/card) — nhờ agent tạo nhóm rồi đẩy nội dung vào đó ngay trong hội thoại.',
       'Tự động hoá: thêm loại kích hoạt "Theo lịch giờ" — đăng 1 nội dung cố định vào nhóm mỗi ngày vào giờ chọn (hoặc lặp mỗi N giây), không cần bảng Base.',
       'Bot Lark: bật "Tự tạo URL công khai (cloudflared)" để app tự sinh URL webhook công khai (cần cài cloudflared), khỏi chạy ngrok/cloudflared bằng tay.',
@@ -2108,7 +1735,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.96',
     date: '2026-07-30',
     items: [
-      'Lark × Agents — thẻ gọi công cụ nay GỌN + ẨN app_token: chỉ hiện tên công cụ, bấm để mở xem tham số; các giá trị nhạy cảm (app_token, secret…) được che (••••••) để quay video/chụp màn hình không lộ.',
       'Bảng trong câu trả lời nay hiển thị đúng dạng BẢNG (kể cả khi có tiêu đề ngay phía trên bảng, trước đây bị dính thành chữ thô).',
       'Thêm nút “Lỗi” có badge đếm (cạnh Ghi chú / Chia sẻ): bấm mở bảng liệt kê các công cụ chạy lỗi. Mỗi lỗi có nút “Xem trong hội thoại” và nút đổi trạng thái “đã xử lý ↔ chưa xử lý” — badge chỉ đếm lỗi CHƯA xử lý; lỗi lặp lại (lần chạy mới) tự hiện lại là chưa xử lý.',
       'Đặc tả hệ thống — tab Workflow nay NHÓM THEO BASE (gập/mở từng base) giống tab Thực thể & quan hệ.',
@@ -2156,13 +1782,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.89',
-    date: '2026-07-26',
-    items: [
-      'Đổi tài khoản nay LÀM MỚI CẢ CẤU HÌNH Lark: kết nối (App ID/Secret), Base, đăng nhập Lark, bot, cài đặt — mỗi tài khoản một bộ RIÊNG, không còn dùng chung của tài khoản trước. Trên máy chia sẻ, người khác đăng nhập sẽ không thấy kết nối Lark của bạn. Kết nối cũ của máy được giữ nguyên cho tài khoản đầu tiên đăng nhập (không phải kết nối lại).',
-    ],
-  },
-  {
     version: '1.0.88',
     date: '2026-07-26',
     items: [
@@ -2177,19 +1796,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.86',
-    date: '2026-07-24',
-    items: [
-      'Chuyển qua lại giữa các tab nay GIỮ NGUYÊN vị trí cuộn của từng tab (khung chat, mã nguồn, preview) — không còn bị nhảy về đầu. Preview cũng không tải lại.',
-    ],
-  },
-  {
     version: '1.0.85',
     date: '2026-07-24',
     items: [
       'Hoàn thiện khoá gửi dùng chung: tab mở GIỮA lúc một lượt đang chạy nay hiện đúng trạng thái bị khoá ngay (trước đây phải đợi lượt kết thúc mới biết).',
       'Thêm nút "Dừng" lượt AI đang chạy (trong khung chat Lark) và "Mở khoá nếu treo" trên thanh nhắc — để tự thoát khi một lượt bị treo, không phải chờ.',
-      'Khung dự án (App của tôi) cũng khoá nút Gửi + hiện nhắc khi tab khác đang chờ AI, giống ô soạn ở Trang chủ và Lark.',
     ],
   },
   {
@@ -2201,27 +1812,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.82',
-    date: '2026-07-24',
-    items: [
-      '🗂 THANH TAB KIỂU TRÌNH DUYỆT: mở nhiều dự án cùng lúc, hiển thị trên MỌI trang (kể cả khi vào Cài đặt, Hồ sơ…). Kéo để sắp lại thứ tự, chuột giữa để đóng, chuột phải ra menu (đổi tên / ghim / đóng tab / đóng tab khác / đóng tất cả / mở lại tab vừa đóng). Phím tắt: Cmd/Ctrl+1..9 chọn tab, Cmd/Ctrl+T mở tab mới, Cmd/Ctrl+Shift+T mở lại tab, Ctrl+Tab xoay vòng.',
-      'ĐỒNG BỘ REALTIME giữa các tab: tạo dự án ở tab này thì tab khác (và thanh bên) hiện ngay lập tức, không cần tải lại. Chuyển tab GIỮ NGUYÊN mọi thứ đang chạy — không refresh.',
-    ],
-  },
-  {
     version: '1.0.81',
     date: '2026-07-23',
     items: [
-      '🛠 SỬA LỖI MẤT VIỆC ĐANG CHẠY: trước đây chỉ cần vào Hồ sơ hoặc Gói & Thanh toán là TOÀN BỘ tab dự án đang mở bị huỷ — dev server bị tắt, build đang chạy bị bỏ dở. Nay các tab luôn được giữ sống, chuyển mục chỉ là ẩn/hiện.',
       'Tương tự, mỗi lần app làm mới phiên đăng nhập cũng không còn phá các tab đang mở nữa.',
-      'Bấm vào chip tab khi đang ở mục khác sẽ tự quay về khung dự án (trước đây bấm không thấy gì xảy ra).',
-    ],
-  },
-  {
-    version: '1.0.80',
-    date: '2026-07-23',
-    items: [
-      'Đăng nhập Google/GitHub/GitLab có ĐƯỜNG THOÁT khi trình duyệt không tự nhảy về: hộp "Đang đăng nhập…" nay hiện link đăng nhập kèm nút SAO CHÉP (dán sang trình duyệt bất kỳ), và ô DÁN TOKEN thủ công để vào thẳng app. Cả hai cũng hiện khi đăng nhập lỗi/hết giờ — đúng lúc bạn cần chúng nhất.',
     ],
   },
   {
@@ -2236,10 +1830,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.78',
     date: '2026-07-23',
     items: [
-      '🤝 CHIA SẺ KẾT NỐI LARK (giai đoạn 1): tạo/mời/cấp phạm vi Base/đặt hạn dùng/tạm dừng/THU HỒI từng người + nhật ký truy cập — bạn bè KHÔNG nhận App Secret. Mời bằng một dòng trong Larkwave (không mã, không link), bạn của bạn chỉ bấm "Kết nối". LƯU Ý: phần bạn bè CHẠY ĐƯỢC CÂU HỎI qua máy bạn tạm thời CHƯA BẬT — bản rà soát nội bộ phát hiện phạm vi Base mới chỉ là gợi ý trong prompt chứ chưa chặn thật ở tầng công cụ, nên tôi khoá lại thay vì cho chạy rộng hơn những gì đã hứa.',
-      'Thu hồi được TỪNG NGƯỜI bằng một nút, không phải đổi App Secret (đổi secret sẽ ngắt kết nối của tất cả mọi người, kể cả bạn). Có phạm vi theo Base, hạn dùng, giới hạn số lượt/giờ, tạm dừng, và nhật ký truy cập từng người.',
       'Ghi chú & Việc cần làm cho từng hội thoại + tóm tắt câu trả lời bằng AI (chạy bằng CLI hoặc API trực tiếp tuỳ nút chuyển bạn đang bật, và lưu lại nên mở lại không tốn thêm token).',
-      'Sửa bảo mật: kho lưu App Secret/token trước đây vẫn chấp nhận file dạng văn bản thường ngay cả khi máy có keychain — nay tự mã hoá lại và siết quyền file.',
     ],
   },
   {
@@ -2353,13 +1944,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Đọc workflow — GIỜ LẤY ĐỦ TẤT CẢ + kèm TÊN: dùng Open API chính thức (/workflows + /block_workflows) để liệt kê mọi workflow (cả automation lẫn dạng sơ đồ) kèm tên & trạng thái, rồi lấy logic chi tiết qua phiên Lark. Không cần mở tay từng cái nữa.',
       'Nếu chưa Kết nối Lark web: vẫn hiện được TÊN + trạng thái tất cả workflow (chỉ thiếu phần logic chi tiết).',
-    ],
-  },
-  {
-    version: '1.0.62',
-    date: '2026-07-08',
-    items: [
-      'Thêm chip "🐞 Endpoint (gỡ lỗi)" trong Lark × Agents: liệt kê nguyên văn các endpoint nội bộ app đã "bắt" được — để tìm nốt endpoint cây-node của base (giúp lấy đủ tên + tất cả workflow sơ đồ).',
     ],
   },
   {
@@ -2500,13 +2084,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.43',
-    date: '2026-07-03',
-    items: [
-      'Thêm nút "Hướng dẫn" ngay cạnh "Cài đặt" trong Lark × Agents — mở bảng HDSD liệt kê rõ các việc trợ lý làm được (dữ liệu Base, phân quyền, tin nhắn/tài liệu, tự động hoá, dựng app, hỏi nhanh, tóm tắt…) kèm mẹo dùng.',
-    ],
-  },
-  {
     version: '1.0.42',
     date: '2026-07-03',
     items: [
@@ -2520,7 +2097,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-07-03',
     items: [
       'Lark × Agents: thêm nút "📝 Tóm tắt hội thoại" ở thanh Kỹ năng — tóm tắt nhanh những gì đã trao đổi trong cuộc trò chuyện.',
-      'Hội thoại làm app (Tạo app): thêm "Tóm tắt hội thoại" trong menu ⋯ — AI tóm tắt các yêu cầu/thay đổi đã bàn (chỉ đọc, không sửa code), hiện ở tab Trợ giúp.',
       'Thanh Kỹ năng của Lark có thêm chip "🔐 Phân quyền" để xem nhanh vai trò + quyền của base đang chọn.',
     ],
   },
@@ -2539,7 +2115,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-07-03',
     items: [
       'API trực tiếp (không cần CLI): chạy AI bằng API key của nhà cung cấp — Claude, GPT, Grok, Gemini — thay vì phải cài CLI trên máy. Bật công tắc "API trực tiếp" + dán key ở Cài đặt → Trình AI / CLI.',
-      'Áp dụng cho CẢ HAI nơi: Lark × Agents VÀ Tạo app. Cấu hình 1 lần, dùng chung. Trên màn Tạo app đã có công tắc + nhãn "· API ✓" cho nhà nào đã có key.',
       'Vì phần này thay đổi lõi (main process) nên cần TẢI + CÀI LẠI bản 1.0.39 (bản cũ không tự có tính năng qua code-push).',
       'Lưu ý: đường dẫn GPT/Grok/Gemini mới hoàn thiện theo tài liệu chính thức, cần bạn test bằng key thật; Claude đã kiểm theo chuẩn API.',
     ],
@@ -2574,7 +2149,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-07-02',
     items: [
       'Hiệu năng: sửa lỗi Trang chủ & Lark × Agents load quá lâu / treo — cache trạng thái agents (Claude/Grok/Gemini/Codex), gộp lần dò, không còn spawn shell lặp lại. Vào nhanh, thao tác được ngay.',
-      'Lark × Agents: lưu lịch sử NHIỀU app đã kết nối — đặt tên, chuyển nhanh giữa các app mà không cần nhập lại App Secret.',
       'Lark × Agents: tự động kiểm tra & báo khi kết nối/token hết hạn (nút "Kết nối lại"), không còn im lặng đến khi chat lỗi.',
       'Lark × Agents: thêm MÔ TẢ cho từng Base — AI hiểu dữ liệu từng Base mà không cần nhắc lại.',
       'Lark × Agents: CHIA SẺ hội thoại — tạo link công khai xem trên web (app.toolswave.net/lark/s/…), copy/mở/bỏ chia sẻ.',
@@ -2587,7 +2161,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Cải tiến sidebar: giữ user Larkwave chính, hiển thị danh sách tất cả agents (Claude/Grok/Gemini/Codex) bên dưới để người dùng biết agents đang có. Thêm gợi ý cài đặt & kỹ năng agents.',
       'Settings: tách riêng phần "API Keys (Quản lý API)" rõ ràng, lưu ý khác với token CLI cá nhân. Nhúng ClaudeKeyManager trực tiếp.',
-      'Skills: thêm nút "Tạo skill" trong Composer để train/tạo kỹ năng trực tiếp từ mô tả trong hội thoại.',
       'Loading & splash: thay thế full-screen Spin bằng AppShell + overlay, splash có logo, show UI sớm thay vì chỉ loading trắng. Desktop window show ngay.',
       'Performance: tối ưu load trang chủ và cài đặt agents (giảm chặn UI, load shell sớm hơn, overlay thay vì thay thế).',
       'Website/download: cập nhật text nhất quán với "AI" thay hardcode Claude.',
@@ -2599,7 +2172,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Sidebar: hiển thị user Larkwave + danh sách agents (Claude/Grok/...) bên dưới để xem agents đang có. Gợi ý cài đặt & kỹ năng.',
       'Cài đặt: phần "API Keys (Quản lý API)" riêng, rõ khác với token CLI cá nhân.',
-      'Kỹ năng: tạo/train skill trực tiếp từ mô tả trong hội thoại (nút Tạo skill ở composer).',
       'Splash/loading: thay Spin full bằng shell app + overlay + splash có logo, show app sớm thay vì chỉ loading.',
       'Perf: giảm chặn UI home & cài đặt agents, load sớm hơn.',
       'Sửa nhầm lẫn agents: sidebar desktop hiển thị tài khoản Larkwave (Google login) chính; khối Claude local để phụ (không còn nhầm khi login Google).',
@@ -2621,17 +2193,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.31',
     date: '2026-06-29',
     items: [
-      'Preview cục bộ: thanh CÁC TRANG/API luôn hiển thị (kể cả khi preview lỗi), toolbar gọn hơn, đọc views.json từ app.',
-      'Workspace Agent dock: chọn CLI + model ngay trong workspace; chế độ Lên kế hoạch/Tự sửa/… dạng dropdown không bị ẩn.',
       'Lịch sử tách tab: Lượt (accordion) · Phiên cũ (archive) · Checkpoint (mỗi lần gửi) — không còn nhồi hết vào một ô chat.',
-    ],
-  },
-  {
-    version: '1.0.30',
-    date: '2026-06-29',
-    items: [
-      'Workspace → ô Prompt: xem prompt đầy đủ gửi tới Grok/Claude/Gemini/Codex theo thời gian thực khi bạn gõ yêu cầu; có thể sửa system/user/prompt đầy đủ trước khi gửi.',
-      'Mỗi lần build lưu audit tại `.toolswave/last-prompt-audit.txt` — tài liệu `docs/desktop-runner-prompt.md` mô tả cấu trúc (ví dụ "tiệm bánh mì").',
     ],
   },
   {
@@ -2645,9 +2207,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.28',
     date: '2026-06-29',
     items: [
-      'Sửa Grok CLI: dùng đúng `--prompt-file` + `--cwd` + `--always-approve` (không còn lỗi "unexpected argument --prompt"); model mặc định khớp `grok models` (Composer 2.5 Fast / Grok Build).',
       'Cài đặt → Trình AI / CLI hiện rõ trạng thái từng gói (đã cài / sẵn sàng / thiếu key) kèm đường dẫn binary thật trên máy; khung soạn cũng báo khi thiếu cài/key.',
-      'Lỗi preview & sửa app không còn nhắc nhầm "Claude" khi bạn chọn Grok/Gemini/Codex; iterate trong workspace giữ đúng CLI đã chọn.',
     ],
   },
   {
@@ -2655,7 +2215,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-06-29',
     items: [
       'CHỈNH SỬA app đáng tin hơn: khi bạn yêu cầu sửa/thêm tính năng, AI chỉ đụng đúng phần cần — KHÔNG còn vô tình xoá hay viết lại những trang/tính năng không liên quan, và TỰ KIỂM TRA (thư viện đã khai báo đủ, không để code dở/“…”, đổi tên thì cập nhật mọi nơi gọi) TRƯỚC khi báo hoàn tất.',
-      'An toàn hơn với các trình AI ngoài Claude (Grok · Gemini · Codex): chỉ được tạo/sửa file BÊN TRONG thư mục app, không đụng tới phần còn lại của máy.',
     ],
   },
   {
@@ -2670,7 +2229,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-06-27',
     items: [
       'KỸ NĂNG (Skills) chia theo từng model: mỗi skill chọn áp dụng cho Claude / Grok / Gemini / Codex (mặc định dùng chung) hoặc chỉ vài model. Trang Skills có tab lọc theo model + chip hiển thị phạm vi + sửa nhanh. Skill tự đồng bộ vào đúng từng CLI (Codex dùng AGENTS.md).',
-      'Làm mới giao diện trang “Kỹ năng” và “App của tôi”: thẻ gọn-đẹp hơn (icon, trạng thái rõ ràng, hover nâng bóng), kéo-thả danh mục + ô trống mượt/đẹp hơn.',
     ],
   },
   {
@@ -2682,18 +2240,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.23',
-    date: '2026-06-26',
-    items: [
-      'Đại tu giao diện workspace (pass 2): gộp về MỘT KHUNG gọn gàng — lưới tối đa 4 ô (Trang/Mã nguồn/CSDL) LẤP ĐẦY màn hình thay vì các thẻ rời. Bỏ các tab thừa: Mã nguồn/CSDL giờ là loại ô, "Trợ giúp" gộp vào khung chat (nút Trò chuyện | Hỏi).',
-      'Chat dính bên phải: KÉO mép để đổi rộng (320–600, nhớ kích thước), nút mở rộng nhanh, thu thành thanh dọc. Link "Đã xuất bản" thành thẻ gọn trên thanh tiêu đề.',
-    ],
-  },
-  {
     version: '1.0.22',
     date: '2026-06-26',
     items: [
-      'Chat trong workspace giờ là CỘT DÍNH bên phải (KHÔNG còn nổi đè lên nội dung): các ô preview/mã nguồn/CSDL co lại nhường chỗ; có nút mở rộng/thu hẹp + thu thành thanh dọc. Không bao giờ che ô làm việc nữa.',
       'Nhắn tin bạn bè NGAY TRONG APP: nút hộp thư (✉) ở thanh trên + cửa sổ chat nổi; vào "Bạn bè" → "Nhắn tin" để chat (không còn mở web). Tin nhắn cập nhật tự động.',
     ],
   },
@@ -2701,15 +2250,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.21',
     date: '2026-06-26',
     items: [
-      'Workspace mới: ô CHAT thu thành nút NỔI nhỏ ở góc phải (tự mở khi vào app, bấm để thu gọn / mở rộng). Phần chính là LƯỚI tối đa 4 Ô — mỗi ô tự chọn xem: 1 Trang (route), Mã nguồn, hoặc CSDL. Mở nhiều trang/màn cùng lúc và thao tác song song.',
       '(Sắp tới: ô Terminal log + shell thật, và nhắn tin bạn bè ngay trong app.)',
-    ],
-  },
-  {
-    version: '1.0.20',
-    date: '2026-06-26',
-    items: [
-      'Quản lý hội thoại kiểu ChatGPT ngay ở THANH BÊN TRÁI (mục "Hội thoại"): tạo DANH MỤC (thư mục) bằng nút thư-mục, double-click để ĐỔI TÊN hội thoại, KÉO hội thoại vào danh mục, bấm để mở. Đồng bộ với trang "App của tôi".',
     ],
   },
   {
@@ -2724,20 +2265,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.18',
     date: '2026-06-26',
     items: [
-      'Nhiều hội thoại CÙNG LÚC: mỗi app mở thành một TAB, build + preview chạy nền khi bạn chuyển qua lại. Sắp xếp hội thoại vào DANH MỤC (thư mục), kéo-thả để chuyển, và đổi tên hội thoại (✎ trên thẻ hoặc double-click tab).',
-      '“Tóm tắt & phiên mới”: tóm tắt hội thoại đang dài rồi mở phiên mới kế thừa tóm tắt (giữ nguyên app + mã nguồn) — trong menu ⋯ của app.',
-      'Kỹ năng (Skills): nhập / tạo / bật-tắt skill kiểu Claude (thư mục SKILL.md). Skill bật sẽ được Claude tự dùng khi dựng app và trong Lark.',
       'Sửa lỗi đăng nhập Lark (quét QR) bị lỗi + modal không đóng được; nay đăng nhập chạy đúng.',
-      'Sửa “Xuất bản” bị lỗi “Failed to resolve import” (thiếu thư viện) — nay tự cài bù như preview; bớt server preview rò rỉ / hiện nhầm app cũ; báo lỗi build rõ hơn (không còn báo “xong” khi thật ra lỗi).',
     ],
   },
   {
     version: '1.0.17',
     date: '2026-06-26',
     items: [
-      'Sửa lỗi xem trước "Failed to resolve import" (vd antd): Larkwave tự cài bù thư viện còn thiếu trước khi chạy preview — kể cả khi bước nâng cấp vừa thêm thư viện mới.',
-      'App full-stack: Trang chính · CMS · API hiện thành thanh "views" NGAY CẠNH khung xem trước, tự bung sẵn — đổi sang CMS chỉ 1 cú bấm, không phải mở link từng trang.',
-      'Bố cục workspace gọn hơn: khung xem trước rộng & đẹp hơn, ô trò chuyện thu gọn.',
       'Hiện rõ ngăn xếp công nghệ mặc định (React · TypeScript · Ant Design · Tailwind · framer-motion · Node + SQLite) khi để "Tự động".',
     ],
   },
@@ -2750,36 +2284,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.15',
-    date: '2026-06-25',
-    items: [
-      'Preview: thêm nút "Trang/API" — xem mọi mặt của app full-stack ngay trong khung xem trước: Trang chính, Quản trị (CMS), API, hoặc gõ đường dẫn bất kỳ (vd /cms, /api/products). Có nút bật/tắt thanh này cho gọn.',
-    ],
-  },
-  {
-    version: '1.0.14',
-    date: '2026-06-25',
-    items: [
-      'Bấm "Tạo app" giờ VÀO THẲNG tab workspace của app đó (khung trò chuyện + preview), và quá trình dựng (chụp trang gốc, tạo file…) chạy NGAY trong tab — không còn dựng lộn xộn ở trang chủ rồi mới hiện app.',
-    ],
-  },
-  {
-    version: '1.0.13',
-    date: '2026-06-25',
-    items: [
-      '"Sao chép từ website" giờ CRAWL THẬT: app tự mở + CHỤP MÀN HÌNH trang gốc để Claude nhìn thấy thiết kế thật, và lấy đúng ẢNH / MÀU / FONT / tiêu đề của trang → clone TRUNG THỰC, dùng ảnh thật của trang, không còn tự bịa giao diện xấu nữa. (Trang riêng tư/không tải được thì tự chuyển sang dựng theo mô tả.)',
-    ],
-  },
-  {
-    version: '1.0.12',
-    date: '2026-06-25',
-    items: [
-      'Sửa lỗi PREVIEW hiện nhầm app: trước đây tạo app mới nhưng khung xem trước lại hiện app cũ (do iframe dùng lại cổng cũ) — nay mỗi app luôn có khung xem trước riêng, đúng app vừa tạo.',
-      'Số liệu trang chủ giờ tính theo app TRÊN MÁY của bạn (Tổng app / Sẵn sàng / Sửa trong 7 ngày) — khớp với "App của tôi", không còn lệch với số liệu tài khoản web.',
-      '"App của tôi" gọn đẹp hơn: bỏ tiêu đề trùng, thẻ app hiển thị trạng thái + thời gian sửa, nút "Tạo app" + "Nhập từ Git".',
-    ],
-  },
-  {
     version: '1.0.11',
     date: '2026-06-25',
     items: [
@@ -2787,27 +2291,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '1.0.10',
-    date: '2026-06-25',
-    items: [
-      'Đăng nhập tài khoản như website: mở app là hiện màn đăng nhập (Google/GitLab/GitHub) trước — đăng nhập xong mới vào phần dựng app. Trước đây app vào thẳng builder nên không thấy chỗ đăng nhập.',
-    ],
-  },
-  {
-    version: '1.0.9',
-    date: '2026-06-25',
-    items: [
-      '"App của tôi": bấm vào app giờ mở thẳng khung làm việc TRONG app (Trò chuyện / Mã nguồn / Cơ sở dữ liệu) — không còn mở console trên web nữa.',
-      'Nhập từ Git → chạy local mọi loại dự án: tự nhận trình quản lý gói (pnpm/yarn/bun/npm) và lệnh dev đúng (Vite/Next/Remix/CRA…), không chỉ npm+Vite.',
-      'Cấu hình .env ngay trong app: dự án clone về cần biến môi trường (.env.example) sẽ có nút "Cấu hình .env" — điền giá trị, lưu thành file .env để chạy local.',
-      'Giới hạn ngữ cảnh: khi hội thoại sắp đầy, hiện cảnh báo và nút "Tạo phiên mới (giữ tóm tắt)" — Claude tự tóm tắt việc đang làm rồi mở phiên mới nên KHÔNG quên (Lark × Claude). Khung dựng app cũng cảnh báo khi gần giới hạn.',
-    ],
-  },
-  {
     version: '1.0.8',
     date: '2026-06-24',
     items: [
-      'Đăng nhập Google/GitLab/GitHub: mở bằng TRÌNH DUYỆT THẬT của bạn (đang đăng nhập Google sẵn → KHÔNG phải nhập lại tài khoản), xong tự quay về app. Bỏ cách mở cửa sổ riêng trong app (phải đăng nhập lại, bất tiện).',
       'Banner cập nhật: nút "Tải bản cài mới" mở thẳng trang tải bản cài (.dmg/.exe) — trước đây bấm chỉ tải lại giao diện nên không cập nhật được phần lõi. Đã ẩn thì không nhắc lại mỗi lần mở.',
     ],
   },
@@ -2815,18 +2301,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.7',
     date: '2026-06-24',
     items: [
-      'Sửa CODE ngay trên app: tab "Mã nguồn" giờ sửa được + nút Lưu (Cmd/Ctrl+S) → lưu vào file app + tự tải lại preview.',
-      'CƠ SỞ DỮ LIỆU (mới): tab "Cơ sở dữ liệu" — xem/sửa bảng SQLite của app (sửa ô tại chỗ, thêm/xoá dòng, chạy SQL, tạo data.db). Khi bạn yêu cầu app cần lưu dữ liệu, Claude tự dựng app full-stack có SQLite (chạy local, sửa rồi mới deploy).',
       'Sửa lỗi: đăng xuất Claude giờ HIỆN lại màn kết nối (trước bị kẹt vì token/API key chưa xoá); màn kết nối hiển thị toàn màn hình.',
-      'Đăng nhập Google/GitLab/GitHub: mở cửa sổ ngay trong app + TỰ quay về app sau khi xong (không phải tự chuyển lại). Đăng nhập Claude cũng tự nhận trạng thái sau khi xác thực trên trình duyệt.',
-      'Trang chủ: "App gần đây" → "App của tôi", sắp xếp theo lần sửa mới nhất (kể cả app thiếu mốc thời gian).',
     ],
   },
   {
     version: '1.0.6',
     date: '2026-06-24',
     items: [
-      'CodeGraph (tuỳ chọn) — sửa app nhanh hơn, đỡ tốn token: nếu bạn cài CodeGraph (chạy cục bộ), Claude hiểu cấu trúc code qua "bản đồ" thay vì đọc/grep lần lượt nhiều file. Tự bật khi sửa app đã có + đã cài; thiếu thì vẫn chạy như cũ. Màn hình kết nối Claude có hướng dẫn cài 1 dòng.',
       'Lark: đăng nhập QR giờ xin thêm quyền Lịch (Calendar) — Claude xem/tạo sự kiện được như Base/Docs/Sheets (nhớ bật scope Calendar trong Lark Console).',
     ],
   },
@@ -2857,7 +2338,6 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Lark × Claude: đăng nhập bằng tài khoản Lark (quét QR) — Claude thao tác toàn quyền như bạn (mọi Base, Docs, Sheets, Wiki, Drive, tin nhắn).',
       'Lark: "Tự động nạp Base của bạn" — không cần thêm từng Base thủ công.',
-      'Dựng app từ phân tích Lark: 1 nút → brief app full-stack (schema + dữ liệu mẫu + phân tích) đẩy thẳng vào Composer.',
       'Báo lỗi / góp ý ngay trong app (đính kèm ảnh, tính điểm thưởng) như trên web.',
       'Kết nối Claude: dán token (API key sk-ant-api… hoặc token đăng nhập sk-ant-oat…) thay cho đăng nhập trình duyệt.',
       'Sửa: tự phục hồi khi phiên Claude trên Lark không nối lại được (hết "Phiên Claude kết thúc với lỗi").',
@@ -2879,20 +2359,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.1',
     date: '2026-06-23',
     items: [
-      'Nhập từ Git: clone repo GitHub/GitLab về thành app local để sửa bằng Claude.',
-      'Trò chuyện app: thêm tab "Trợ giúp" (hỏi đáp, không sửa file) + mã QR khi xuất bản.',
-      '"Chạy trên Server (Docker)": deploy backend full-stack lên server, không chỉ trang tĩnh.',
       'Lark × Claude: hội thoại áp dụng NHIỀU Base, thanh "Kỹ năng" nhanh, "Tự động duyệt" thao tác ghi, lịch sử trò chuyện theo Base, chat full màn hình.',
       'Lark: thêm tool nhập/sửa hàng loạt + tạo view Kanban; render bảng markdown đẹp; gom cấu hình vào nút "Cài đặt".',
-      'Code-push: app đã cài tự cập nhật giao diện ở lần mở kế, không cần cài lại.',
-      'Đăng nhập Google/GitLab/GitHub qua trình duyệt thật (không phải nhập lại tài khoản).',
     ],
   },
   {
     version: '1.0.0',
     date: '2026-06-22',
     items: [
-      'Bản đầu tiên: tạo app bằng Claude chạy local, xem trước, xuất bản lên Cloudflare Pages.',
       'Lark × Claude: hỏi đáp & chỉnh sửa dữ liệu Lark (Base, tin nhắn, tài liệu, danh bạ).',
     ],
   },

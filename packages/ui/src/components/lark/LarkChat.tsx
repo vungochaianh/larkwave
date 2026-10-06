@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, App, Badge, Button, Checkbox, Drawer, Dropdown, Grid, Input, Modal, Popover, Segmented, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
 import { renderUserText } from '../chat/renderUserText';
-import { LoadingOutlined, SendOutlined, RobotOutlined, PlusOutlined, DeleteOutlined, DatabaseOutlined, PaperClipOutlined, CloseOutlined, FileTextOutlined, RocketOutlined, ShareAltOutlined, LinkOutlined, GlobalOutlined, StopOutlined, InfoCircleOutlined, SearchOutlined, ReloadOutlined, CopyOutlined, EditOutlined, ShrinkOutlined, ArrowsAltOutlined, WarningOutlined, CheckCircleFilled, MenuOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { LoadingOutlined, SendOutlined, RobotOutlined, PlusOutlined, DeleteOutlined, DatabaseOutlined, PaperClipOutlined, CloseOutlined, FileTextOutlined, ShareAltOutlined, LinkOutlined, GlobalOutlined, StopOutlined, InfoCircleOutlined, SearchOutlined, ReloadOutlined, CopyOutlined, EditOutlined, ShrinkOutlined, ArrowsAltOutlined, WarningOutlined, CheckCircleFilled, MenuOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { exportTranscriptPdf } from '../../exportPdf';
-import type { LarkBaseRef, LarkBaseSnapshot, LarkChatEvent, LarkChatMode, LarkNoteDoc, LarkSessionMeta, RuntimeAdapter } from '@larkwave/core';
+import type { LarkBaseRef, LarkChatEvent, LarkChatMode, LarkNoteDoc, LarkSessionMeta, RuntimeAdapter } from '@larkwave/core';
 import { AUTO_CONTINUE_MAX, AUTO_CONTINUE_PROMPT, nextStepAfterTurn, saysUnfinished } from '@larkwave/core';
 import { messageDigest } from '../../messageDigest';
 import { useAgentBusy } from '../../useAgentBusy';
@@ -179,49 +179,10 @@ function TypingDots() {
 const SUMMARY_PROMPT =
   'Tóm tắt lại cuộc hội thoại của chúng ta cho tới hiện tại: những câu hỏi/yêu cầu chính tôi đã nêu và kết quả/kết luận tương ứng. Trình bày gạch đầu dòng, ngắn gọn, tiếng Việt. Chỉ tóm tắt — KHÔNG gọi tool, KHÔNG thay đổi dữ liệu.';
 
-/**
- * Synthesize a full-stack app brief from the conversation's Base snapshot(s) + the
- * analysis (assistant messages) — the handoff payload that pre-fills the builder.
- */
-function buildAppBrief(snapshots: LarkBaseSnapshot[], analysis: string): string {
-  const L: string[] = [];
-  L.push(
-    'Hãy DỰNG một ỨNG DỤNG FULL-STACK (frontend + backend + CMS/CSDL) dựa trên dữ liệu Lark Base và bài phân tích bên dưới.',
-    'Tự chọn loại app phù hợp nhất theo phân tích (dashboard, quản lý/CRUD, CRM, báo cáo…). Giao diện đẹp, hiện đại, responsive, tiếng Việt.',
-    '',
-  );
-  for (const s of snapshots) {
-    L.push(`## Nguồn dữ liệu — Lark Base "${s.baseName}"`);
-    if (!s.tables.length) L.push('_(không đọc được cấu trúc bảng — hãy hỏi lại người dùng)_');
-    for (const t of s.tables) {
-      L.push(`### Bảng: ${t.tableName}`);
-      if (t.fields.length) {
-        L.push('Cột:');
-        for (const f of t.fields) L.push(`- ${f.name} — ${f.type}`);
-      }
-      if (t.sample.length) {
-        L.push('Dữ liệu mẫu:', '```json', JSON.stringify(t.sample, null, 2), '```');
-      }
-      L.push('');
-    }
-  }
-  if (analysis) {
-    L.push('## Bài phân tích & yêu cầu (từ hội thoại Claude × Lark)', analysis, '');
-  }
-  L.push(
-    '## Yêu cầu',
-    '- App full-stack chạy được: mô hình dữ liệu (bảng/cột) bám sát Base ở trên, có CRUD + bộ lọc + biểu đồ phù hợp.',
-    '- Seed sẵn dữ liệu mẫu ở trên vào CSDL/CMS để app chạy được ngay.',
-    '- Áp dụng các đề xuất trong bài phân tích nếu có.',
-  );
-  return L.join('\n');
-}
-
 /** The chat surface: Ask/Build toggle, streamed assistant text, tool cards, confirm modal. */
 export function LarkChat({
   runtime,
   basesRev = 0,
-  onBuildApp,
   blocked,
   onOpenSkills,
   pinnedSessionId,
@@ -240,7 +201,6 @@ export function LarkChat({
   /** Open the Skills screen — the "/" menu's "Tạo lệnh mới" row. Absent = the row is hidden. */
   onOpenSkills?: () => void;
   /** Hand the synthesized app brief to the builder (fills the Composer + navigates). */
-  onBuildApp?: (prompt: string) => void;
   /** When set (web, desktop offline): disable the composer + show this notice — nothing to send to. */
   blocked?: string | null;
 }) {
@@ -550,7 +510,6 @@ export function LarkChat({
   const [picker, setPicker] = useState<{ open: boolean; sel: string[] }>({ open: false, sel: [] });
   const [pickerQuery, setPickerQuery] = useState('');
   const [attachments, setAttachments] = useState<{ name: string; dataBase64: string; isImage: boolean; mime: string }[]>([]);
-  const [buildingApp, setBuildingApp] = useState(false);
   // Context-window fill for this conversation (from Claude's per-turn usage). Drives the
   // "nearing the limit → start a fresh chat" banner.
   const [ctx, setCtx] = useState<{ percentUsed: number; contextTokens: number; windowTokens: number } | null>(null);
@@ -812,47 +771,6 @@ export function LarkChat({
       </Button>
     </Space.Compact>
   );
-
-  /**
-   * "Dựng app từ phân tích" — pull a bounded snapshot (schema + sample rows) of each
-   * applied Base, combine it with the conversation's analysis (assistant messages),
-   * synthesize a full-stack builder brief, and hand it to the Composer for review.
-   */
-  const handoffToBuilder = async () => {
-    if (!onBuildApp || buildingApp) return;
-    const analysis = items
-      .filter((it): it is Extract<ChatItem, { kind: 'msg' }> => it.kind === 'msg' && it.role === 'assistant')
-      .map((it) => it.text)
-      .join('\n\n')
-      .trim()
-      .slice(0, 6000);
-    if (!convBases.length && !analysis) {
-      message.warning(tr('chat.attachBaseFirst', 'Hãy gắn Base hoặc trò chuyện/phân tích trước khi dựng app.'));
-      return;
-    }
-    setBuildingApp(true);
-    const hide = message.loading(tr('chat.fetchingBase', 'Đang lấy cấu trúc Base + dữ liệu mẫu…'), 0);
-    try {
-      const snapshots: LarkBaseSnapshot[] = [];
-      for (const b of convBases) {
-        if (!runtime.larkBaseSnapshot) break;
-        try {
-          snapshots.push(await runtime.larkBaseSnapshot(b.appToken));
-        } catch {
-          /* skip a Base we can't read; the brief still carries the rest + analysis */
-        }
-      }
-      const prompt = buildAppBrief(snapshots, analysis);
-      hide();
-      onBuildApp(prompt);
-      message.success(tr('chat.briefCreated', 'Đã tạo brief — chuyển sang phần Dựng app, bạn xem lại rồi bấm Tạo app.'));
-    } catch (e) {
-      hide();
-      message.error((e as Error)?.message || tr('chat.briefFailed', 'Không tạo được brief.'));
-    } finally {
-      setBuildingApp(false);
-    }
-  };
 
   const updateTool = (callId: string, fn: (c: ToolCallState) => ToolCallState) =>
     setItems((prev) =>
@@ -1871,23 +1789,6 @@ export function LarkChat({
                 </Button>
               </Tooltip>
             </Popover>
-          )}
-          {onBuildApp && (
-            <>
-              <div style={{ flex: 1 }} />
-              <Tooltip title={tr('chat.buildAppTip', 'Lấy cấu trúc Base + dữ liệu mẫu + bài phân tích trong hội thoại để dựng app full-stack')}>
-                <Button
-                  size="small"
-                  type="primary"
-                  ghost
-                  icon={<RocketOutlined />}
-                  loading={buildingApp}
-                  onClick={handoffToBuilder}
-                >
-                  {tr('chat.buildAppFromAnalysis', 'Dựng app từ phân tích')}
-                </Button>
-              </Tooltip>
-            </>
           )}
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '2px 2px 6px' }}>

@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
-import { App as AntApp, Button, Input, Empty, Tag } from 'antd';
-import { TrophyOutlined, TeamOutlined, UserAddOutlined, MessageOutlined, CheckOutlined } from '@ant-design/icons';
+import { App as AntApp, Button, Input, Empty } from 'antd';
+import { TeamOutlined, UserAddOutlined, MessageOutlined, CheckOutlined } from '@ant-design/icons';
 import { V, BRAND, CARD_SHADOW } from '../theme';
 import { UserAvatar } from '../account/UserAvatar';
-import { accountApi, type LeaderboardEntry, type DiscoverUser, type FriendRequest } from '../account/api';
+import { accountApi, type DiscoverUser, type FriendRequest } from '../account/api';
 import { openMessenger } from '../account/messenger';
 
 const NUM = { fontVariantNumeric: 'tabular-nums' as const, fontWeight: 800, letterSpacing: -0.3, color: V.text };
@@ -23,49 +23,6 @@ function PanelHead({ icon, color, title, sub, right }: { icon: ReactNode; color:
         {sub && <div style={{ fontSize: 12, color: V.textFaint }}>{sub}</div>}
       </div>
       {right}
-    </div>
-  );
-}
-
-/** Top-8 leaderboard, "me" highlighted — the "Xếp hạng" view, aggregated onto the hub. */
-export function HubLeaderboard() {
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
-  const [me, setMe] = useState<LeaderboardEntry | null>(null);
-  useEffect(() => {
-    let alive = true;
-    accountApi.leaderboard(8).then((r) => { if (alive) { setEntries(r.entries); setMe(r.me); } }).catch(() => alive && setEntries([]));
-    return () => { alive = false; };
-  }, []);
-  const meInTop = !!me && !!entries?.some((e) => e.isMe);
-  const rankColor = (r: number) => (r === 1 ? '#F59E0B' : r === 2 ? '#9AA3B5' : r === 3 ? '#CD7F32' : V.textFaint);
-
-  const row = (e: LeaderboardEntry) => (
-    <div key={e.user.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 10, background: e.isMe ? 'rgba(108,92,231,0.10)' : 'transparent' }}>
-      <span style={{ width: 24, textAlign: 'center', fontWeight: 800, fontSize: 13, color: rankColor(e.rank), fontVariantNumeric: 'tabular-nums' }}>{e.rank}</span>
-      <UserAvatar name={e.user.name} avatarUrl={e.user.avatarUrl} size={30} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nameOf(e.user)}{e.isMe ? ' (bạn)' : ''}</div>
-        <div style={{ fontSize: 11.5, color: V.textFaint }}>Cấp {e.level}</div>
-      </div>
-      <div style={{ textAlign: 'right' }}><span style={{ ...NUM, fontSize: 15 }}>{e.xp.toLocaleString('vi-VN')}</span><span style={{ fontSize: 11, color: V.textFaint, marginLeft: 3 }}>XP</span></div>
-    </div>
-  );
-
-  return (
-    <div style={{ background: V.surface, border: `1px solid ${V.border}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <PanelHead icon={<TrophyOutlined />} color="#F59E0B" title="Bảng xếp hạng" sub="Kiếm XP: tạo app, build, deploy, thu hút lượt xem" />
-      <div style={{ flex: 1 }}>
-        {entries === null ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2, 3].map((i) => <div key={i} style={{ height: 44, borderRadius: 10, background: V.surfaceMuted }} />)}</div>
-        ) : entries.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có bảng xếp hạng" />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {entries.map(row)}
-            {!meInTop && me && (<><div style={{ borderTop: `1px dashed ${V.borderSub}`, margin: '4px 0' }} />{row(me)}</>)}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

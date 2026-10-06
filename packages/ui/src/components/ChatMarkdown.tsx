@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { CopyOutlined, CheckOutlined, CodeOutlined, EyeOutlined, ExpandOutlined, DownloadOutlined, FileImageOutlined, LoadingOutlined } from '@ant-design/icons';
+import { CopyOutlined, CheckOutlined, CodeOutlined, EyeOutlined, ExpandOutlined, DownloadOutlined } from '@ant-design/icons';
 import { App, Modal } from 'antd';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -8,7 +8,6 @@ import { BRAND, CODE_BG_LIGHT, OK, V } from '../theme';
 import { useThemeMode } from '../ThemeProvider';
 import { ensureContrast, toRgb } from '../contrast';
 import { useI18n } from '../i18n';
-import { apiFetch } from '../account/api';
 
 /** Trigger a browser download of in-memory text (client-side, same-origin blob — always works). */
 function downloadText(content: string, filename: string, mime: string): void {
@@ -147,7 +146,6 @@ function ArtifactBlock({ code, kind }: { code: string; kind: 'html' | 'svg' }) {
   const { message } = App.useApp();
   const [tab, setTab] = useState<'preview' | 'code'>('preview');
   const [expanded, setExpanded] = useState(false);
-  const [pngLoading, setPngLoading] = useState(false);
   const [copied, copy] = useCopy(code);
   const [codeTheme, codeRef] = useCodeTheme();
   const label = kind === 'svg' ? 'SVG' : 'HTML';
@@ -187,20 +185,6 @@ function ArtifactBlock({ code, kind }: { code: string; kind: 'html' | 'svg' }) {
   // Download the artifact SOURCE (client, instant) — the .html/.svg file itself.
   const downloadSource = () =>
     downloadText(kind === 'svg' ? code : srcDoc, `artifact-${Date.now()}.${kind === 'svg' ? 'svg' : 'html'}`, kind === 'svg' ? 'image/svg+xml' : 'text/html;charset=utf-8');
-  // Render to a REAL PNG on the server (Playwright — same pipeline as Make Picture), then open it.
-  const downloadPng = async () => {
-    if (pngLoading) return;
-    setPngLoading(true);
-    try {
-      const { url } = await apiFetch<{ url: string }>('/assistant/render', { method: 'POST', body: { html: srcDoc } });
-      window.open(url, '_blank', 'noopener');
-      message.success(t('md.pngReady', 'Đã tạo ảnh PNG — mở tab mới để lưu về máy.'));
-    } catch (e) {
-      message.error((e as Error)?.message || t('md.pngFailed', 'Không tạo được ảnh, bạn thử lại nhé.'));
-    } finally {
-      setPngLoading(false);
-    }
-  };
   return (
     <div ref={codeRef} style={{ margin: '14px 0', borderRadius: 12, overflow: 'hidden', border: `1px solid ${V.border}`, background: V.surface }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', background: V.surfaceAlt, borderBottom: `1px solid ${V.borderSub}` }}>
@@ -210,7 +194,6 @@ function ArtifactBlock({ code, kind }: { code: string; kind: 'html' | 'svg' }) {
           {seg('code', <CodeOutlined />, t('md.code', 'Mã'))}
         </div>
         <div style={{ display: 'inline-flex', gap: 2 }}>
-          {toolBtn(downloadPng, t('md.savePng', 'Tạo ảnh PNG'), pngLoading ? <LoadingOutlined style={{ color: BRAND }} /> : <FileImageOutlined />)}
           {toolBtn(downloadSource, t('md.downloadSource', 'Tải file mã'), <DownloadOutlined />)}
           {toolBtn(copy, t('md.copy', 'Sao chép'), copied ? <CheckOutlined style={{ color: OK }} /> : <CopyOutlined />)}
           {toolBtn(() => setExpanded(true), t('md.expand', 'Mở rộng'), <ExpandOutlined />)}

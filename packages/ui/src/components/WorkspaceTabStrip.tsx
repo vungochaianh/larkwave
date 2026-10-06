@@ -2,13 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Dropdown, Input, Tooltip } from 'antd';
 import { HomeOutlined, PlusOutlined, CloseOutlined, SyncOutlined, PushpinFilled } from '@ant-design/icons';
-import type { AppSummary } from '@larkwave/core';
 import { BRAND, V } from '../theme';
 
+/** One open tab: a conversation id + title, and whether its AI turn is running now. */
+export interface TabItem {
+  id: string;
+  name: string;
+  status?: 'running' | 'idle';
+}
+
 /**
- * Chrome-like tab strip for open project workspaces. It only renders + emits — every tab
- * stays MOUNTED in HomeShell behind visibility, so nothing here can remount a workspace or
- * lose its build stream / preview / scroll. Reorder, middle-click close, context menu,
+ * Chrome-like tab strip for open conversations (Lark × Agents). It only renders + emits —
+ * every tab stays MOUNTED behind visibility, so nothing here can remount a conversation or
+ * lose its stream / scroll. Reorder, middle-click close, context menu,
  * pin, and the running / waiting indicators; keyboard shortcuts live in HomeShell.
  */
 export function WorkspaceTabStrip({
@@ -29,10 +35,10 @@ export function WorkspaceTabStrip({
   onReopen,
   canReopen,
 }: {
-  apps: AppSummary[];
+  apps: TabItem[];
   activeId: string | null;
   pinned: Set<string>;
-  /** Tabs whose conversation/build is running right now. */
+  /** Tabs whose conversation is running right now. */
   runningIds: Set<string>;
   /** The tab that currently holds the shared AI lock, if any (may differ from active). */
   lockOwnerId?: string | null;
@@ -204,10 +210,10 @@ export function WorkspaceTabStrip({
                   }}
                 >
                   {isPinned && <PushpinFilled style={{ fontSize: 11, color: BRAND }} />}
-                  {/* Spin ONLY when this tab is actually WORKING — a build in progress, or it holds the
+                  {/* Spin ONLY when this tab is actually WORKING — a turn in progress, or it holds the
                       shared AI lock (an active Claude turn). A running dev server (preview live) is a
                       steady state, not "loading", so it gets a calm green dot — NOT a perpetual spinner. */}
-                  {a.status === 'building' || lockOwnerId === a.id ? (
+                  {a.status === 'running' || lockOwnerId === a.id ? (
                     <SyncOutlined spin style={{ fontSize: 11, color: BRAND }} />
                   ) : waiting ? (
                     <span style={{ fontSize: 10 }} title="Đang chờ phản hồi ở tab khác">

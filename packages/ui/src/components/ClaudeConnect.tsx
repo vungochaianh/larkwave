@@ -114,7 +114,7 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
             <CloudOutlined />
           </div>
           <Title level={4} style={{ margin: 0 }}>{t('ui.claude.connectTitle', 'Kết nối Claude (CLI) trên máy bạn')}</Title>
-          <Text type="secondary">{t('ui.claude.connectDesc', 'Desktop dùng Claude CLI của bạn (hoặc runner khác trong Cài đặt) để dựng app — không tốn phí token của Larkwave.')}</Text>
+          <Text type="secondary">{t('ui.claude.connectDesc', 'Desktop dùng Claude CLI của bạn (hoặc runner khác trong Cài đặt) để chạy Lark × Agents — không tốn phí token của Larkwave.')}</Text>
         </div>
 
         <Steps
@@ -195,33 +195,6 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
           />
         )}
 
-        {/* CodeGraph (optional): local knowledge-graph MCP that speeds up EDITING existing
-            apps (fewer tool calls + tokens). Like the Claude CLI, the user installs it; this
-            only surfaces a hint — codegen works with or without it. */}
-        {st && st.loggedIn && st.codegraph && (
-          st.codegraph.installed ? (
-            <Text type="secondary" style={{ display: 'block', marginTop: 10, fontSize: 12.5 }}>
-              <CheckCircleFilled style={{ color: '#52c41a' }} /> CodeGraph
-              {st.codegraph.version ? ` v${st.codegraph.version}` : ''} {t('ui.claude.codegraphInstalled', '— Claude hiểu code nhanh hơn khi sửa app, đỡ tốn token.')}
-            </Text>
-          ) : (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginTop: 10 }}
-              message={t('ui.claude.speedupTitle', 'Tăng tốc sửa app (tuỳ chọn)')}
-              description={
-                <Space direction="vertical" size={3}>
-                  <Text style={{ fontSize: 12.5 }}>
-                    {t('ui.claude.speedupDesc', 'Cài CodeGraph để Claude hiểu code nhanh hơn khi sửa app đã có — đỡ tốn token (chạy cục bộ):')}
-                  </Text>
-                  <Text code copyable>npm i -g @colbymchenry/codegraph</Text>
-                  <a onClick={refresh} style={{ fontSize: 12 }}>{t('ui.claude.installedRecheck', 'Đã cài? Kiểm tra lại')}</a>
-                </Space>
-              }
-            />
-          )
-        )}
       </Card>
 
       <Collapse

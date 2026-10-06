@@ -1,31 +1,7 @@
 'use client';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Card, Progress, Tag, Tooltip, Typography } from 'antd';
-import {
-  AppstoreOutlined,
-  BugOutlined,
-  BuildOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloudDownloadOutlined,
-  CloudUploadOutlined,
-  CrownOutlined,
-  ExperimentOutlined,
-  EyeOutlined,
-  FireFilled,
-  FireOutlined,
-  GlobalOutlined,
-  HeartFilled,
-  LockOutlined,
-  RocketOutlined,
-  SafetyCertificateOutlined,
-  ShareAltOutlined,
-  StarFilled,
-  TeamOutlined,
-  ThunderboltOutlined,
-  ToolOutlined,
-  TrophyOutlined,
-} from '@ant-design/icons';
+import { AppstoreOutlined, BugOutlined, BuildOutlined, CheckCircleOutlined, ClockCircleOutlined, CloudUploadOutlined, CrownOutlined, ExperimentOutlined, EyeOutlined, FireFilled, FireOutlined, GlobalOutlined, HeartFilled, LockOutlined, RocketOutlined, SafetyCertificateOutlined, ShareAltOutlined, StarFilled, TeamOutlined, ThunderboltOutlined, ToolOutlined, TrophyOutlined } from '@ant-design/icons';
 import { BRAND, CARD_SHADOW, V } from '../theme';
 import { TESTER_RANKS } from './gamification';
 import { accountApi, type MeActivity, type MeOverview } from './api';
@@ -185,11 +161,13 @@ export function AchievementBadge({
 /* ── Catalog ─────────────────────────────────────────────────────────────── */
 
 export interface AchievementInput {
-  totalApps: number;
-  liveApps: number;
-  totalBuilds: number;
-  succeededBuilds: number;
-  totalDeployments: number;
+  /** Hosted AI runs (Trợ lý AI, hosted Lark turns, help assistant). */
+  aiRuns: number;
+  /** AI tasks run on the user's desktop from phone/web/webhook/Telegram. */
+  remoteTasks: number;
+  skills: number;
+  artifacts: number;
+  scheduledTasks: number;
   longestStreak: number;
   plan: string;
   joinedAt: string | null;
@@ -240,81 +218,81 @@ const TESTER_ACHIEVEMENTS: AchievementDef[] = TESTER_RANKS.map((r) => ({
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
-    id: 'first-app',
-    name: 'App đầu tay',
-    desc: 'Tạo app đầu tiên của bạn.',
+    id: 'first-ai',
+    name: 'Lượt AI đầu tay',
+    desc: 'Chạy lượt Trợ lý AI đầu tiên.',
     tier: 'common',
     icon: <ThunderboltOutlined />,
-    earned: (s) => s.totalApps >= 1,
-    progress: (s) => ({ cur: s.totalApps, target: 1 }),
+    earned: (s) => s.aiRuns + s.remoteTasks >= 1,
+    progress: (s) => ({ cur: s.aiRuns + s.remoteTasks, target: 1 }),
   },
   {
-    id: 'tinkerer',
-    name: 'Thợ mày mò',
-    desc: 'Tạo 10 app.',
-    tier: 'rare',
-    icon: <AppstoreOutlined />,
-    earned: (s) => s.totalApps >= 10,
-    progress: (s) => ({ cur: s.totalApps, target: 10 }),
-  },
-  {
-    id: 'architect',
-    name: 'Kiến trúc sư',
-    desc: 'Tạo 50 app.',
-    tier: 'epic',
-    icon: <BuildOutlined />,
-    earned: (s) => s.totalApps >= 50,
-    progress: (s) => ({ cur: s.totalApps, target: 50 }),
-  },
-  {
-    id: 'first-deploy',
-    name: 'Lên sóng',
-    desc: 'Deploy app đầu tiên ra liên kết công khai.',
-    tier: 'rare',
-    icon: <GlobalOutlined />,
-    earned: (s) => s.totalDeployments >= 1 || s.liveApps >= 1,
-    progress: (s) => ({ cur: Math.max(s.totalDeployments, s.liveApps), target: 1 }),
-  },
-  {
-    id: 'shipmaster',
-    name: 'Bậc thầy xuất bản',
-    desc: 'Thực hiện 10 lần deploy.',
-    tier: 'epic',
-    icon: <CloudUploadOutlined />,
-    earned: (s) => s.totalDeployments >= 10,
-    progress: (s) => ({ cur: s.totalDeployments, target: 10 }),
-  },
-  {
-    id: 'grinder',
+    id: 'ai-100',
     name: 'Cày cuốc',
-    desc: 'Chạy 50 lượt build.',
+    desc: 'Chạy 100 lượt AI.',
     tier: 'rare',
     icon: <ToolOutlined />,
-    earned: (s) => s.totalBuilds >= 50,
-    progress: (s) => ({ cur: s.totalBuilds, target: 50 }),
+    earned: (s) => s.aiRuns + s.remoteTasks >= 100,
+    progress: (s) => ({ cur: s.aiRuns + s.remoteTasks, target: 100 }),
   },
   {
-    id: 'centurion',
+    id: 'ai-500',
     name: 'Bách chiến',
-    desc: 'Chạy 100 lượt build.',
+    desc: 'Chạy 500 lượt AI.',
     tier: 'epic',
     icon: <RocketOutlined />,
-    earned: (s) => s.totalBuilds >= 100,
-    progress: (s) => ({ cur: s.totalBuilds, target: 100 }),
+    earned: (s) => s.aiRuns + s.remoteTasks >= 500,
+    progress: (s) => ({ cur: s.aiRuns + s.remoteTasks, target: 500 }),
   },
   {
-    id: 'flawless',
-    name: 'Tay nghề cứng',
-    desc: 'Có 20 lượt build thành công.',
+    id: 'first-skill',
+    name: 'Kỹ năng đầu tay',
+    desc: 'Tạo kỹ năng (Skill) đầu tiên.',
+    tier: 'common',
+    icon: <AppstoreOutlined />,
+    earned: (s) => s.skills >= 1,
+    progress: (s) => ({ cur: s.skills, target: 1 }),
+  },
+  {
+    id: 'skill-10',
+    name: 'Kiến trúc sư',
+    desc: 'Có 10 kỹ năng.',
+    tier: 'epic',
+    icon: <BuildOutlined />,
+    earned: (s) => s.skills >= 10,
+    progress: (s) => ({ cur: s.skills, target: 10 }),
+  },
+  {
+    id: 'first-artifact',
+    name: 'Lên sóng',
+    desc: 'Tạo Artifact đầu tiên.',
+    tier: 'rare',
+    icon: <GlobalOutlined />,
+    earned: (s) => s.artifacts >= 1,
+    progress: (s) => ({ cur: s.artifacts, target: 1 }),
+  },
+  {
+    id: 'remote',
+    name: 'Điều khiển từ xa',
+    desc: 'Chạy một tác vụ trên máy desktop từ điện thoại/web.',
+    tier: 'rare',
+    icon: <CloudUploadOutlined />,
+    earned: (s) => s.remoteTasks >= 1,
+    progress: (s) => ({ cur: s.remoteTasks, target: 1 }),
+  },
+  {
+    id: 'scheduler',
+    name: 'Tự động hoá',
+    desc: 'Đặt tác vụ AI định kỳ đầu tiên.',
     tier: 'rare',
     icon: <CheckCircleOutlined />,
-    earned: (s) => s.succeededBuilds >= 20,
-    progress: (s) => ({ cur: s.succeededBuilds, target: 20 }),
+    earned: (s) => s.scheduledTasks >= 1,
+    progress: (s) => ({ cur: s.scheduledTasks, target: 1 }),
   },
   {
     id: 'streak-7',
     name: 'Chuỗi lửa',
-    desc: 'Dựng app 7 ngày liên tiếp.',
+    desc: 'Dùng AI 7 ngày liên tiếp.',
     tier: 'rare',
     icon: <FireOutlined />,
     earned: (s) => s.longestStreak >= 7,
@@ -323,7 +301,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'streak-30',
     name: 'Không ngừng nghỉ',
-    desc: 'Dựng app 30 ngày liên tiếp.',
+    desc: 'Dùng AI 30 ngày liên tiếp.',
     tier: 'legendary',
     icon: <FireFilled />,
     earned: (s) => s.longestStreak >= 30,
@@ -372,27 +350,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   },
   // ── Upcoming (đợt sau) — shown locked so the collection feels complete ──
   {
-    id: 'importer',
-    name: 'Nhập khẩu',
-    desc: 'Nhập một repo từ Git (GitLab/GitHub).',
-    tier: 'common',
-    icon: <CloudDownloadOutlined />,
-    upcoming: true,
-  },
-  {
     id: 'publisher',
     name: 'Người chia sẻ',
-    desc: 'Đăng một app lên trang công khai.',
+    desc: 'Chia sẻ trợ lý Lark/AI cho một người bạn.',
     tier: 'rare',
     icon: <ShareAltOutlined />,
-    upcoming: true,
-  },
-  {
-    id: 'star-app',
-    name: 'Ngôi sao',
-    desc: 'Một app đạt 100 lượt truy cập.',
-    tier: 'epic',
-    icon: <EyeOutlined />,
     upcoming: true,
   },
   ...TESTER_ACHIEVEMENTS,
@@ -439,11 +401,11 @@ export function AchievementsCard({
   }, []);
 
   const input: AchievementInput = {
-    totalApps: overview?.totalApps ?? 0,
-    liveApps: overview?.liveApps ?? 0,
-    totalBuilds: overview?.totalBuilds ?? 0,
-    succeededBuilds: overview?.succeededBuilds ?? 0,
-    totalDeployments: overview?.totalDeployments ?? 0,
+    aiRuns: overview?.aiRuns ?? 0,
+    remoteTasks: overview?.remoteTasks ?? 0,
+    skills: overview?.skills ?? 0,
+    artifacts: overview?.artifacts ?? 0,
+    scheduledTasks: overview?.scheduledTasks ?? 0,
     longestStreak: activity?.longestStreak ?? 0,
     plan: plan ?? 'free',
     joinedAt,

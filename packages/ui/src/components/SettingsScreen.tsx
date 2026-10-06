@@ -1,39 +1,9 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import {
-  Card,
-  Typography,
-  Space,
-  Tag,
-  Button,
-  Input,
-  Switch,
-  Alert,
-  List,
-  Modal,
-  Popconfirm,
-  Spin,
-  Tooltip,
-  message,
-  Grid,
-} from 'antd';
-import {
-  ApiOutlined,
-  CheckCircleFilled,
-  ReloadOutlined,
-  CloudServerOutlined,
-  CopyOutlined,
-  MobileOutlined,
-  ReadOutlined,
-  FolderOpenOutlined,
-} from '@ant-design/icons';
-import type {
-  AgentClientStatus,
-  AgentWebhookTokenInfo,
-  RunnerStatusInfo,
-  TelegramLinkResponse,
-} from '@larkwave/core';
+import { Card, Typography, Space, Tag, Button, Input, Switch, Alert, List, Modal, Popconfirm, Spin, Tooltip, message, Grid } from 'antd';
+import { ApiOutlined, CheckCircleFilled, ReloadOutlined, CloudServerOutlined, CopyOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
+import type { AgentClientStatus, AgentWebhookTokenInfo, RunnerStatusInfo, TelegramLinkResponse } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { ClaudeConnect } from './ClaudeConnect';
 import { ClaudeKeyManager } from './ClaudeKeyManager';
@@ -222,26 +192,6 @@ function RunnersPanel() {
   );
 }
 
-/** "Điều khiển từ xa" — the desktop agent client toggle + webhook token + recent tasks. */
-/** Remembered "/run" Lark group (so we don't recreate one every time the panel opens). */
-const LARK_RUN_GROUP_KEY = 'tw_run_lark_group';
-type RunLarkGroup = { name: string; joinLink?: string; chatId?: string };
-function readRunLarkGroup(): RunLarkGroup | null {
-  try {
-    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(LARK_RUN_GROUP_KEY) : null;
-    return raw ? (JSON.parse(raw) as RunLarkGroup) : null;
-  } catch {
-    return null;
-  }
-}
-function writeRunLarkGroup(g: RunLarkGroup): void {
-  try {
-    window.localStorage.setItem(LARK_RUN_GROUP_KEY, JSON.stringify(g));
-  } catch {
-    /* ignore */
-  }
-}
-
 /** In-app usage guide for "Điều khiển từ xa" — opened from the panel's "Hướng dẫn" button. */
 function RemoteGuide({ open, onClose, onNav }: { open: boolean; onClose: () => void; onNav?: (v: View) => void }) {
   const { t } = useI18n();
@@ -267,8 +217,8 @@ function RemoteGuide({ open, onClose, onNav }: { open: boolean; onClose: () => v
     <Modal open={open} onCancel={onClose} footer={null} width={screens.md ? 640 : '94vw'} title={t('ui.guide.title', 'Hướng dẫn — Điều khiển từ xa')}>
       <div style={{ maxHeight: '68vh', overflowY: 'auto', paddingRight: 6, fontSize: 13.5, lineHeight: 1.65 }}>
         <Paragraph type="secondary" style={{ fontSize: 13 }}>
-          Máy này đóng vai “thợ chạy”: bạn gửi yêu cầu từ bên ngoài, máy chạy AI cục bộ (tạo/sửa app) rồi trả kết quả về.
-          Có <b>3 kênh gọi vào</b> (Webhook API, Telegram, Lark) — kết quả luôn hiện ở tab <b>“Máy của tôi”</b> trên web,
+          Máy này đóng vai “thợ chạy”: bạn gửi yêu cầu từ bên ngoài, máy chạy Trợ lý AI cục bộ (chỉ đọc — không tự ghi dữ liệu) rồi trả câu trả lời về.
+          Có <b>2 kênh gọi vào</b> (Webhook API, Telegram) — kết quả luôn hiện ở tab <b>“Máy của tôi”</b> trên web,
           và có thể gửi thêm ra Telegram/Lark.
         </Paragraph>
 
@@ -280,7 +230,7 @@ function RemoteGuide({ open, onClose, onNav }: { open: boolean; onClose: () => v
         <div style={codeBox}>{`curl -X POST https://api.toolswave.net/v1/agent/webhook \\
   -H "Authorization: Apikey twa_xxxxxxxx" \\
   -H "content-type: application/json" \\
-  -d '{"prompt":"Tạo trang landing bán cà phê"}'`}</div>
+  -d '{"prompt":"Tóm tắt tin tức AI hôm nay trong 5 gạch đầu dòng"}'`}</div>
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
           Header dùng chữ <Text code>Apikey</Text> (không phải Bearer). Máy offline thì lệnh được xếp hàng, chạy khi kết nối lại.
         </Text>
@@ -294,11 +244,10 @@ function RemoteGuide({ open, onClose, onNav }: { open: boolean; onClose: () => v
           chat/nhóm → xong, nhắn thẳng nội dung là máy chạy.
         </Text>
 
-        <H>{t('ui.guide.h4', '4) Kênh Lark — /run trong nhóm')}</H>
+        <H>{t('ui.guide.h4', '4) Trong Lark — nhắn Bot')}</H>
         <Text style={{ fontSize: 13 }}>
-          Bật bot ở tab <b>“Bot trong Lark”</b> (bắt buộc đặt <b>Encrypt Key</b>). Khi bot đang bật, một nhóm{' '}
-          <Text code>/run</Text> được <b>tự tạo</b> ở mục “Điều khiển bằng chat” (chỉ một lần) — tham gia nhóm rồi nhắn{' '}
-          <Text code>/run &lt;yêu cầu&gt;</Text>. Máy chạy + trả kết quả về nhóm.
+          Bot trong Lark trả lời câu hỏi (chỉ đọc) ngay trong chat/nhóm Lark — bật ở tab <b>“Bot trong Lark”</b> (nên đặt{' '}
+          <b>Encrypt Key</b>).
         </Text>
         {onNav && (
           <Button
@@ -310,18 +259,6 @@ function RemoteGuide({ open, onClose, onNav }: { open: boolean; onClose: () => v
             {t('ui.remote.openLarkBotTab', 'Mở tab Bot trong Lark →')}
           </Button>
         )}
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginTop: 8 }}
-          message={t('ui.guide.securityRun', 'Bảo mật /run')}
-          description={
-            <span style={{ fontSize: 12.5 }}>
-              <Text code>/run</Text> khởi động build TỰ ĐỘNG trên máy bạn nên chỉ chạy khi bot đã đặt Encrypt Key <b>và</b>{' '}
-              người gửi chính là <b>chủ máy</b> (tài khoản Lark cá nhân đã đăng nhập). Thành viên khác bị từ chối.
-            </span>
-          }
-        />
 
         <H>{t('ui.guide.h5', '5) Nút “Test” & “Báo KQ” (mỗi token)')}</H>
         <Text style={{ fontSize: 13 }}>
@@ -363,10 +300,6 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
   const [tgLink, setTgLink] = useState<TelegramLinkResponse | null>(null);
   const [tgBusy, setTgBusy] = useState(false);
   const [tgRefreshing, setTgRefreshing] = useState(false);
-  // F3 — one-click "create a Lark group with the bot" (reuses larkBotCreateChat).
-  const [larkChat, setLarkChat] = useState<{ name: string; joinLink?: string } | null>(null);
-  const [larkBusy, setLarkBusy] = useState(false);
-
   useEffect(() => {
     if (!runtime.agent) return;
     runtime.agent
@@ -498,53 +431,6 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
       message.error((e as Error).message);
     }
   };
-  // F3 — create a Lark group with the bot (like the CMS page) for /run + REMEMBER it, so
-  // it appears automatically next time instead of making a new group each open. `auto` =
-  // silent first-time creation (no toast / no forced Lark open).
-  const createLarkGroup = useCallback(
-    async (auto = false) => {
-      if (!runtime.larkBotCreateChat) {
-        if (!auto) message.warning(tr('ui.remote.enableLarkBotFirst', 'Bật Bot Lark ở tab "Bot trong Lark" trước đã.'));
-        return;
-      }
-      setLarkBusy(true);
-      try {
-        const c = await runtime.larkBotCreateChat('Điều khiển máy (Larkwave · /run)');
-        const g: RunLarkGroup = { name: c.name, joinLink: c.joinLink, chatId: c.chatId };
-        setLarkChat(g);
-        writeRunLarkGroup(g);
-        if (c.joinLink && !auto) runtime.openExternal?.(c.joinLink);
-        if (!auto) message.success(tr('ui.remote.larkGroupCreated', 'Đã tạo nhóm Lark (bot đã ở trong) — tham gia rồi nhắn /run.'));
-      } catch (e) {
-        if (!auto) message.error((e as Error)?.message || tr('ui.remote.larkGroupFailed', 'Tạo nhóm thất bại (kiểm tra Bot Lark đã bật + quyền im:chat).'));
-      } finally {
-        setLarkBusy(false);
-      }
-    },
-    [runtime],
-  );
-
-  // Restore the remembered /run group; if none and the Lark bot is LIVE, auto-create one
-  // ONCE (mirrors the CMS "tự tạo nhóm" flow — no button click needed).
-  const larkAutoRef = useRef(false);
-  useEffect(() => {
-    const saved = readRunLarkGroup();
-    if (saved) {
-      setLarkChat(saved);
-      return;
-    }
-    if (larkAutoRef.current || !runtime.larkBotCreateChat) return;
-    larkAutoRef.current = true;
-    void (async () => {
-      try {
-        const s = await runtime.larkBotStatus?.();
-        if (s?.running && s?.enabled) await createLarkGroup(true);
-      } catch {
-        /* bot not ready — leave the manual button */
-      }
-    })();
-  }, [runtime, createLarkGroup]);
-
   return (
     <Card
       title={<CardTitle icon={<MobileOutlined />} color={WARN}>{tr('ui.remote.title', 'Điều khiển từ xa')}</CardTitle>}
@@ -557,7 +443,7 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
     >
       <RemoteGuide open={guideOpen} onClose={() => setGuideOpen(false)} onNav={onNav} />
       <Paragraph type="secondary" style={{ marginTop: 0 }}>
-        {tr('ui.remote.desc', 'Bật để điều khiển máy này từ điện thoại: bạn gửi yêu cầu tạo/sửa app từ xa, máy này chạy AI cục bộ và gửi tiến độ về điện thoại. Cần mở app + đăng nhập tài khoản Larkwave.')}
+        {tr('ui.remote.desc', 'Bật để điều khiển máy này từ điện thoại: bạn gửi câu hỏi/yêu cầu từ xa, máy này chạy Trợ lý AI cục bộ và gửi câu trả lời về điện thoại. Cần mở app + đăng nhập tài khoản Larkwave.')}
       </Paragraph>
 
       {!st ? (
@@ -609,7 +495,7 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
                     Chọn thiết bị <b>“{st.deviceName}”</b> (đang <b>online</b>) trong danh sách thiết bị.
                   </li>
                   <li>
-                    Gõ yêu cầu (tạo/sửa app…) rồi <b>Gửi</b> → máy này chạy AI cục bộ, tiến độ hiện ngay trên điện thoại.
+                    Gõ câu hỏi/yêu cầu rồi <b>Gửi</b> → máy này chạy Trợ lý AI cục bộ, kết quả hiện ngay trên điện thoại.
                   </li>
                 </ol>
                 <div style={{ marginTop: 6, color: V.textSub }}>
@@ -802,58 +688,6 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
                 )}
               />
             )}
-            {/* Lark — one-click create a group with the bot, then /run in it */}
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${V.border}` }}>
-              <Text style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                {tr('ui.remote.viaLarkPre', 'Qua Lark (nhắn')} <Text code>/run</Text> {tr('ui.remote.viaLarkPost', 'trong nhóm)')}
-              </Text>
-              {larkChat ? (
-                <Alert
-                  type="success"
-                  showIcon
-                  style={{ marginBottom: 8, maxWidth: 560 }}
-                  message={`${tr('ui.remote.runGroup', 'Nhóm /run:')} “${larkChat.name}” ${tr('ui.remote.botInside', '(bot đã ở trong)')}`}
-                  description={
-                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
-                      {tr('ui.remote.joinThenPre', 'Tham gia nhóm rồi nhắn')} <Text code>/run &lt;yêu cầu&gt;</Text> {tr('ui.remote.joinThenPost', '— máy chạy + trả kết quả về nhóm.')}
-                      <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {larkChat.joinLink && (
-                          <Button size="small" type="primary" onClick={() => runtime.openExternal?.(larkChat.joinLink!)}>
-                            {tr('ui.remote.openJoinGroup', 'Mở / tham gia nhóm')}
-                          </Button>
-                        )}
-                        {runtime.larkBotCreateChat && (
-                          <Button size="small" loading={larkBusy} onClick={() => void createLarkGroup()}>
-                            {tr('ui.remote.createAnotherGroup', 'Tạo nhóm khác')}
-                          </Button>
-                        )}
-                      </div>
-                      {larkChat.joinLink && (
-                        <div style={{ marginTop: 6, wordBreak: 'break-all', color: V.textSub, fontSize: 11 }}>
-                          Link: <a href={larkChat.joinLink} target="_blank" rel="noreferrer">{larkChat.joinLink}</a>
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
-              ) : (
-                runtime.larkBotCreateChat && (
-                  <Button loading={larkBusy} onClick={() => void createLarkGroup()}>
-                    {tr('ui.remote.createLarkGroupBtn', 'Tạo nhóm Lark với Bot (/run)')}
-                  </Button>
-                )
-              )}
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
-                Nhóm /run <b>tự tạo</b> khi Bot Lark đang bật (chỉ tạo một lần rồi nhớ lại). Bật bot + đặt{' '}
-                <b>Encrypt Key</b> ở tab “Bot trong Lark”. Chỉ <b>chủ máy</b> (đăng nhập Lark cá nhân) mới chạy được{' '}
-                <Text code>/run</Text>.
-              </Text>
-              {onNav && (
-                <Button type="link" size="small" style={{ padding: 0, marginTop: 2 }} onClick={() => onNav('lark')}>
-                  {tr('ui.remote.openLarkBotTab', 'Mở tab Bot trong Lark →')}
-                </Button>
-              )}
-            </div>
           </div>
 
           <div>
@@ -931,70 +765,12 @@ function RemoteControlPanel({ onNav }: { onNav?: (v: View) => void }) {
  * Desktop "Cài đặt" screen — the AI runner connections (Claude + Grok/Gemini/Codex)
  * and the remote-control ("Điều khiển từ xa") agent client, in one place.
  */
-/** Global default save location for NEW projects (desktop only). Existing apps aren't moved. */
-function SaveLocationCard() {
-  const runtime = useRuntime();
-  const { t } = useI18n();
-  const [defaultDir, setDefaultDir] = useState('');
-  const [busy, setBusy] = useState(false);
-  const refresh = useCallback(() => {
-    runtime
-      .appLocation?.()
-      .then((l) => setDefaultDir(l.defaultDir))
-      .catch(() => {});
-  }, [runtime]);
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-  if (!runtime.chooseAppLocation || !runtime.setDefaultAppsDir) return null;
-  return (
-    <Card title={<CardTitle icon={<FolderOpenOutlined />} color={OK}>{t('ui.saveLoc.title', 'Vị trí lưu dự án')}</CardTitle>} style={CARD_STYLE}>
-      <Paragraph type="secondary" style={{ marginTop: 0, fontSize: 12.5 }}>
-        {t('ui.saveLoc.desc', 'Thư mục MẶC ĐỊNH cho các dự án mới (mỗi dự án một thư mục con). Đổi tại đây chỉ ảnh hưởng dự án TẠO MỚI — dự án cũ vẫn ở chỗ cũ. Khi tạo app bạn vẫn có thể chọn vị trí riêng cho từng dự án.')}
-      </Paragraph>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Input readOnly value={defaultDir} prefix={<FolderOpenOutlined style={{ color: BRAND }} />} style={{ flex: 1, minWidth: 280 }} />
-        <Button
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const d = await runtime.chooseAppLocation?.();
-              if (d) {
-                await runtime.setDefaultAppsDir?.(d);
-                setDefaultDir(d);
-                message.success(t('ui.saveLoc.changed', 'Đã đổi thư mục lưu mặc định cho dự án mới.'));
-              }
-            } catch (e) {
-              message.error((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {t('ui.composer.change', 'Đổi…')}
-        </Button>
-        <Button
-          type="text"
-          onClick={async () => {
-            await runtime.setDefaultAppsDir?.(null);
-            refresh();
-            message.success(t('ui.saveLoc.reset', 'Đã đặt lại về thư mục mặc định của Larkwave.'));
-          }}
-        >
-          {t('ui.saveLoc.resetDefault', 'Đặt lại mặc định')}
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
 export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => void; cmsAllowed?: boolean } = {}) {
   const { t } = useI18n();
   // Responsive: collapse the 2-col grid to a single column below ~900px.
   const [narrow, setNarrow] = useState(false);
-  // "Làm mới" for the API-Keys card must NOT reload the window (that destroys mounted workspace
-  // tabs + in-flight build generators + running previews). Instead we bump this key so ONLY the
+  // "Làm mới" for the API-Keys card must NOT reload the window (that destroys every mounted
+  // screen + in-flight AI turns). Instead we bump this key so ONLY the
   // <ClaudeKeyManager> remounts and re-fetches on mount.
   const [keyReload, setKeyReload] = useState(0);
   useEffect(() => {
@@ -1044,7 +820,6 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
         </Card>
 
         {/* Compact card paired with API Keys on the same 2-col row */}
-        <SaveLocationCard />
 
         {/* Device manager — login sessions, max 3 per account (phone + 2 computers) */}
         <div style={{ gridColumn: '1 / -1' }}>
@@ -1080,7 +855,6 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
             <Button type="link" size="small" onClick={() => onNav('lark')}>{t('ui.settings.openLark', 'Mở Lark →')}</Button>
             {cmsAllowed && <Button type="link" size="small" onClick={() => onNav('cms-sync')}>{t('ui.settings.openCms', 'Mở Đồng bộ CMS →')}</Button>}
             <Button type="link" size="small" onClick={() => onNav('skills')}>{t('ui.settings.skills', 'Kỹ năng →')}</Button>
-            <Button type="link" size="small" onClick={() => onNav('integrations')}>{t('ui.settings.integrations', 'Tích hợp →')}</Button>
           </div>
         )}
       </div>

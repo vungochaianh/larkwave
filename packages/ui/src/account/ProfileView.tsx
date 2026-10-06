@@ -2,12 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, App, Badge, Button, Card, Form, Input, List, Modal, Popconfirm, Skeleton, Space, Switch, Tag, Typography, Upload } from 'antd';
 import type { UploadProps } from 'antd';
-import {
-  AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckOutlined, CloseCircleOutlined,
-  CloseOutlined, CloudServerOutlined, CopyOutlined, DeleteOutlined, DeploymentUnitOutlined, EditOutlined,
-  FireOutlined, GiftOutlined, LockOutlined, MailOutlined, MessageOutlined, TeamOutlined, ThunderboltOutlined,
-  TrophyOutlined, UploadOutlined,
-} from '@ant-design/icons';
+import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckOutlined, CloseCircleOutlined, CloseOutlined, CloudServerOutlined, CopyOutlined, DeleteOutlined, DeploymentUnitOutlined, EditOutlined, FireOutlined, GiftOutlined, LockOutlined, MailOutlined, MessageOutlined, TeamOutlined, ThunderboltOutlined, TrophyOutlined, UploadOutlined } from '@ant-design/icons';
 import { BLUE, BRAND, CARD_SHADOW, ERR, OK, V, WARN } from '../theme';
 import { IconTile, StatCard } from '../kit';
 import { useAccountAuth } from './auth';
@@ -32,7 +27,7 @@ function PlanBadge({ plan }: { plan?: string | null }) {
 }
 
 /** Native desktop port (core) of the website's /profile. */
-export function ProfileView({ onNav, onCreate }: { onNav?: (v: View) => void; onCreate?: () => void }) {
+export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
   const { user } = useAccountAuth();
   const { message } = App.useApp();
   const [overview, setOverview] = useState<MeOverview | null>(null);
@@ -73,7 +68,7 @@ export function ProfileView({ onNav, onCreate }: { onNav?: (v: View) => void; on
         <ChangePasswordModal open={pwdOpen} onClose={() => setPwdOpen(false)} />
 
         {/* One uniform stat band: overview counters + streak metrics, single idiom (kit StatCard). */}
-        <StatBand overview={overview} activity={activity} loading={loading} onNav={onNav} onCreate={onCreate} />
+        <StatBand overview={overview} activity={activity} loading={loading} onNav={onNav} />
 
         <Card styles={{ body: { padding: 20 } }} style={{ boxShadow: CARD_SHADOW }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -99,16 +94,15 @@ export function ProfileView({ onNav, onCreate }: { onNav?: (v: View) => void; on
 }
 
 /** Overview counters + streak metrics as ONE uniform grid of kit StatCards (one gap, equal size). */
-function StatBand({ overview, activity, loading, onNav, onCreate }: { overview: MeOverview | null; activity: MeActivity | null; loading: boolean; onNav?: (v: View) => void; onCreate?: () => void }) {
-  const toApps = onNav ? () => onNav('apps') : undefined;
+function StatBand({ overview, activity, loading, onNav }: { overview: MeOverview | null; activity: MeActivity | null; loading: boolean; onNav?: (v: View) => void }) {
+  const go = (v: View) => (onNav ? () => onNav(v) : undefined);
   const tiles: { key: string; label: string; value: ReactNode; icon: ReactNode; color: string; onClick?: () => void }[] = [
-    // apps tile deep-links to the app list — or, when the user has none yet, straight into creation.
-    { key: 'apps', label: 'Tổng apps', value: overview?.totalApps, icon: <AppstoreOutlined />, color: BRAND, onClick: (overview?.totalApps ?? 0) === 0 && onCreate ? onCreate : toApps },
-    { key: 'live', label: 'Đang live', value: overview?.liveApps, icon: <CloudServerOutlined />, color: OK, onClick: toApps },
-    { key: 'builds', label: 'Tổng builds', value: overview?.totalBuilds, icon: <ThunderboltOutlined />, color: WARN },
-    { key: 'ok', label: 'Build thành công', value: overview?.succeededBuilds, icon: <CheckCircleOutlined />, color: OK },
-    { key: 'fail', label: 'Build lỗi', value: overview?.failedBuilds, icon: <CloseCircleOutlined />, color: ERR },
-    { key: 'deploy', label: 'Deployments', value: overview?.totalDeployments, icon: <DeploymentUnitOutlined />, color: BLUE, onClick: toApps },
+    { key: 'ai', label: 'Lượt AI', value: overview?.aiRuns, icon: <ThunderboltOutlined />, color: BRAND },
+    { key: 'remote', label: 'Tác vụ từ xa', value: overview?.remoteTasks, icon: <CloudServerOutlined />, color: BLUE },
+    { key: 'skills', label: 'Kỹ năng', value: overview?.skills, icon: <AppstoreOutlined />, color: WARN, onClick: go('skills') },
+    { key: 'artifacts', label: 'Artifacts', value: overview?.artifacts, icon: <DeploymentUnitOutlined />, color: OK },
+    { key: 'scheduled', label: 'Tác vụ định kỳ', value: overview?.scheduledTasks, icon: <CheckCircleOutlined />, color: OK },
+    { key: 'reports', label: 'Báo lỗi', value: overview?.reports, icon: <CloseCircleOutlined />, color: ERR, onClick: go('reports') },
     { key: 'streak', label: 'Chuỗi hiện tại', value: activity?.currentStreak ?? 0, icon: <FireOutlined />, color: WARN },
     { key: 'longest', label: 'Chuỗi dài nhất', value: activity?.longestStreak ?? 0, icon: <TrophyOutlined />, color: BRAND },
     { key: 'contrib', label: 'Tổng đóng góp', value: activity?.total ?? 0, icon: <ThunderboltOutlined />, color: OK },
