@@ -238,7 +238,7 @@ export async function* runLarkChat(
   const RO_TOOLS = ['WebSearch'];
   const RO_DENY = ['Bash', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Read', 'Glob', 'Grep', 'WebFetch'];
 
-  // General chat = the CLI's DEFAULT built-in tools (read/write/bash/web), like the codegen
+  // General chat = the CLI's DEFAULT built-in tools (read/write/bash/web), like a plain CLI session
   // runner (runClaude). We do NOT pass --tools/--allowedTools (a comma list there breaks the
   // spawn); instead bypassPermissions auto-approves every tool headlessly (there's no in-chat
   // permission prompt) so the assistant can actually read attachments + run tools. --add-dir

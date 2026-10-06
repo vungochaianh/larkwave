@@ -58,7 +58,7 @@ import type {
 } from '@larkwave/core';
 import { buildSpec } from './specBuilder';
 
-// ── "Dựng app từ phân tích" snapshot bounds (keep the builder prompt small) ──
+// ── Base snapshot bounds (keep the snapshot small) ──
 const SNAPSHOT_MAX_TABLES = 6;
 const SNAPSHOT_MAX_FIELDS = 40;
 const SNAPSHOT_MAX_ROWS = 5;
@@ -3152,7 +3152,7 @@ export class LarkService {
     return (this.store.getSettings().apiMode ?? false) && !!this.resolveApiKey(runner);
   }
 
-  /** Direct-API config for a runner — SHARED by the Lark agent AND codegen (Tạo app),
+  /** Direct-API config for a runner — SHARED by the Lark agent AND the general assistant,
    *  so the user configures "API trực tiếp" + keys once and both surfaces honour it. */
   apiConfig(runner: string): { apiMode: boolean; apiKey: string | null } {
     const apiMode = this.store.getSettings().apiMode ?? false;
@@ -3500,8 +3500,8 @@ export class LarkService {
 
   /**
    * Snapshot a Base's structure + a few sample rows per table — the grounding for
-   * the "dựng app từ phân tích" handoff into the builder. Bounded (tables/fields/rows
-   * capped) so the synthesized builder prompt stays small. Best-effort per table:
+   * any caller that needs a quick picture of a Base (also exposed over the relay RPC). Bounded (tables/fields/rows
+   * capped) so the snapshot stays small. Best-effort per table:
    * a table whose fields/records aren't readable is included with whatever resolved.
    */
   async baseSnapshot(appToken: string): Promise<LarkBaseSnapshot> {

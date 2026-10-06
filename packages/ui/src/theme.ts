@@ -183,7 +183,7 @@ export const THEME_CSS = [
   `.tw-breathe{animation:tw-breathe 4.5s ease-in-out infinite;}`,
   `@media (prefers-reduced-motion: reduce){.tw-rise,.tw-breathe{animation:none;}}`,
   // Khối trượt mở/đóng. Dùng grid-template-rows 0fr→1fr thay vì max-height: không phải đoán
-  // trước chiều cao (bảng tuỳ chọn của ô tạo app dài ngắn tuỳ loại), và không bị "giật" ở đoạn
+  // trước chiều cao (bảng tuỳ chọn dài ngắn tuỳ loại), và không bị "giật" ở đoạn
   // cuối như khi đặt max-height dư.
   `.tw-collapsible{display:grid;grid-template-rows:0fr;transition:grid-template-rows .24s ease;}`,
   `.tw-collapsible>div{overflow:hidden;min-height:0;}`,

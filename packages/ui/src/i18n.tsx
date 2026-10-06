@@ -9,6 +9,7 @@ const STORAGE_KEY = 'tw_locale';
 /** Translation dictionary. key -> { vi, en }. Seeded + auto-generated; grows per i18n phase. t()
  *  falls back key -> vi -> raw fallback -> key so a missing translation never renders blank. */
 export const MESSAGES: Record<string, { vi: string; en: string }> = {
+  "social.friendsSubtitle.lw": { vi: "Kết bạn, nhắn tin và cùng nhau làm việc trên Larkwave.", en: "Add friends, chat and work together on Larkwave." },
   "web.pubc.winStep3.lw": { vi: "Chọn AI (Claude/Codex/Gemini/Grok trên máy, hoặc Claude của Larkwave), rồi quét QR để kết nối Lark.", en: "Pick an AI (Claude/Codex/Gemini/Grok on your machine, or Larkwave's Claude), then scan the QR code to connect Lark." },
   "web.pubc.whySub.lw": { vi: "Những thứ chỉ bản desktop có — làm việc trực tiếp trong Lark và chạy AI ngay trên máy bạn.", en: "What only the desktop app has — working directly inside Lark and running AI right on your machine." },
   "web.pubc.macStep3.lw": { vi: "Chọn AI (Claude/Codex/Gemini/Grok trên máy, hoặc Claude của Larkwave), rồi quét QR để kết nối Lark.", en: "Pick an AI (Claude/Codex/Gemini/Grok on your machine, or Larkwave's Claude), then scan the QR code to connect Lark." },
@@ -54,7 +55,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "money.cmpHosted.lw": { vi: "Larkwave chạy hộ khi máy bạn tắt", en: "Larkwave runs it while your computer is off" },
   "money.cmpCms.lw": { vi: "Đồng bộ CMS Bitable nhiều tài khoản Lark", en: "Bitable CMS sync across multiple Lark accounts" },
   "money.cmpAssistant.lw": { vi: "Trợ lý AI · Kỹ năng · Artifacts", en: "AI Assistant · Skills · Artifacts" },
-  "landing.splash.tagline.lw": { vi: "Trợ lý AI làm việc thật trên Lark", en: "An AI assistant that does real work in Lark" },
+  "landing.splash.tagline.lw": { vi: "Trợ lý AI cho Lark", en: "The AI assistant for Lark" },
   "landing.footer.tagline.lw": { vi: "· Trợ lý AI cho Lark", en: "· AI assistant for Lark" },
   "home.lpWhyTitle.lw": { vi: "Vì sao chọn Larkwave?", en: "Why Larkwave?" },
   "home.lpWhy4Title.lw": { vi: "Nói thẳng giới hạn", en: "Straight about limits" },

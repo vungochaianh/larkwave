@@ -1,7 +1,7 @@
 # @larkwave/desktop
 
 Nextron (Electron + Next.js) shell for Larkwave. Same UI as the web app
-(`@larkwave/ui`), but codegen runs through the **local Claude CLI** — see
+(`@larkwave/ui`), but the AI runs through the user's **local CLI runners** (Claude/Codex/Gemini/Grok) — see
 [../../docs/desktop-architecture.md](../../docs/desktop-architecture.md).
 
 ## Layout

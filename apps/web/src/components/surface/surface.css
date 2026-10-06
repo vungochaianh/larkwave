@@ -3,7 +3,7 @@
    Đặt ở file riêng, KHÔNG nhét vào globals.css: globals đang được sửa song song cho admin/auth,
    và mọi rule dưới đây đều móc vào `.tw-app` nên không có gì cần đứng cạnh phần còn lại.
 
-   NGUYÊN TẮC: đây là mặt LÀM VIỆC. Người dùng dựng app, đọc bảng, sửa dữ liệu — nên:
+   NGUYÊN TẮC: đây là mặt LÀM VIỆC. Người dùng trò chuyện, đọc bảng, sửa dữ liệu — nên:
      • không WebGL sau lưng, không đèn rọi bám chuột, không lực hút;
      • chiều sâu đến từ ÁNH SÁNG (vệt sáng 1px mép trên, viền phát sáng khi hover, quầng tím tĩnh)
        và LỚP (nền → kính thanh bên/đầu trang → thẻ kính → nội dung);

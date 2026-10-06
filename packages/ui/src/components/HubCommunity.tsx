@@ -73,7 +73,7 @@ export function HubPeople() {
 
   return (
     <div style={{ background: V.surface, border: `1px solid ${V.border}`, borderRadius: 16, boxShadow: CARD_SHADOW, padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <PanelHead icon={<TeamOutlined />} color="#4FB6FF" title="Người dùng" sub="Kết bạn, nhắn tin, cùng nhau vibe code" />
+      <PanelHead icon={<TeamOutlined />} color="#4FB6FF" title="Người dùng" sub="Kết bạn, nhắn tin, cùng nhau làm việc" />
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         <Input value={email} onChange={(e) => setEmail(e.target.value)} onPressEnter={() => void addByEmail()} placeholder="Kết bạn qua email…" prefix={<UserAddOutlined style={{ color: V.textFaint }} />} style={{ flex: 1 }} />
         <Button type="primary" loading={adding} onClick={() => void addByEmail()}>Mời</Button>

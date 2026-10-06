@@ -615,7 +615,7 @@ export interface LarkBaseRef {
   description?: string;
 }
 
-/** A Base's structure + a few sample rows — grounds the "dựng app từ phân tích" handoff. */
+/** A Base's structure + a few sample rows (bounded read-only snapshot). */
 export interface LarkSnapshotField {
   name: string;
   type: string; // readable kind, e.g. "Văn bản" | "Số" | "Ngày giờ"
@@ -623,7 +623,7 @@ export interface LarkSnapshotField {
 export interface LarkSnapshotTable {
   tableName: string;
   fields: LarkSnapshotField[];
-  /** Simplified sample rows ({ columnName: value }) — bounded for the builder prompt. */
+  /** Simplified sample rows ({ columnName: value }) — bounded. */
   sample: Record<string, unknown>[];
 }
 export interface LarkBaseSnapshot {
@@ -1346,7 +1346,7 @@ export interface RuntimeAdapter {
 
 
 
-  // ── Skills (Claude-style SKILL.md folders the local CLI uses in BOTH builder + Lark) ──
+  // ── Skills (Claude-style SKILL.md folders the local CLI uses in Lark + Trợ lý AI) ──
   /** List the user's imported/created skills. */
   listSkills?(): Promise<SkillInfo[]>;
   /** Just the skills that have a `/command`, for a composer's "/" menu — lighter than listSkills()
@@ -1624,7 +1624,7 @@ export interface RuntimeAdapter {
 
   /** List the Bitable Bases registered for Claude to operate on. */
   larkListBases?(): Promise<LarkBaseRef[]>;
-  /** Snapshot a Base's schema + a few sample rows (for the "dựng app từ phân tích" handoff). */
+  /** Snapshot a Base's schema + a few sample rows (bounded, read-only). */
   larkBaseSnapshot?(appToken: string): Promise<LarkBaseSnapshot>;
   /** Auto-discover the user's Bases by walking their Drive (needs the personal login). */
   larkDiscoverBases?(): Promise<LarkBaseRef[]>;

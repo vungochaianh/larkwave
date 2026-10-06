@@ -54,8 +54,8 @@ export class UsersService {
   }
 
   /**
-   * Admin support drill-down summary: lightweight counts across a user's apps / builds /
-   * errors / deployments / payments / feedback + last activity — so the per-user support
+   * Admin support drill-down summary: lightweight counts across a user's hosted AI runs /
+   * remote tasks / payments / feedback + last activity — so the per-user support
    * page loads one cheap call. Opening it is the AUDIT ANCHOR ('admin viewed this user'),
    * mirroring impersonate's audit so every look shows up in /admin/audit. Admin-only.
    */

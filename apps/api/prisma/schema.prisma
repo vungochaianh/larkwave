@@ -988,7 +988,7 @@ model MaicSession {
 model MaicRun {
   /// runId do MAIC cấp.
   id        String    @id
-  /// Bề mặt gọi: codegen | agent | server-deploy — để đọc log biết cái gì bỏ lại rác.
+  /// Bề mặt gọi (vd. agent) — để đọc log biết cái gì bỏ lại rác.
   kind      String    @default("agent")
   userId    String?
   createdAt DateTime  @default(now())

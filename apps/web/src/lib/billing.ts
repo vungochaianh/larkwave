@@ -86,7 +86,7 @@ export function handleQuotaError(
         title: "Chế độ miễn phí đang tắt",
         content:
           body.message ??
-          "Vui lòng nâng cấp lên gói trả phí để tiếp tục tạo app.",
+          "Vui lòng nâng cấp lên gói trả phí để tiếp tục dùng Trợ lý AI.",
         okText: "Xem các gói",
         okButtonProps: { type: "primary" },
         onOk: () => onUpgrade(),

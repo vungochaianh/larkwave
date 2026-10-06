@@ -11,7 +11,7 @@ import { contextUsageFromResult, CONTEXT_WARN_THRESHOLD } from './contextBudget'
  * with ENOENT even when the user has installed + logged in `claude` (it lives in
  * an nvm/homebrew/npm-global bin that the Finder-launched app never sees). We
  * query the user's LOGIN shell once for its PATH and use that for every `claude`
- * spawn — both here (codegen) and in the Lark agent. Cached for the process.
+ * spawn — both here and in the Lark agent. Cached for the process.
  */
 let cachedPath: string | null = null;
 export function resolvedPath(): string {
@@ -107,7 +107,7 @@ export function claudeEnv(opts?: { noKey?: boolean }): NodeJS.ProcessEnv {
  * version pinning and uses whatever `claude` the user already has authed.
  */
 
-// The builder runs `claude -p` HEADLESSLY — there's no TTY/UI to answer an
+// Larkwave runs `claude -p` HEADLESSLY — there's no TTY/UI to answer an
 // interactive permission prompt mid-run. So any prompting mode (`default`) writes
 // NOTHING (Claude asks, gets auto-denied, scaffolds zero files → broken app). Every
 // write-capable mode must therefore auto-accept. `plan` stays read-only (proposes a
@@ -551,7 +551,7 @@ function mapEvent(obj: any, model?: string, lastAssistantUsage?: any): BuildEven
       out.push({
         type: 'log',
         level: 'warn',
-        message: `⚠️ Hội thoại đã dùng ~${Math.round(usage.percentUsed * 100)}% ngữ cảnh của Claude — nên tạo app/cuộc trò chuyện mới để Claude không quên phần trước.`,
+        message: `⚠️ Hội thoại đã dùng ~${Math.round(usage.percentUsed * 100)}% ngữ cảnh của Claude — nên mở cuộc trò chuyện mới để Claude không quên phần trước.`,
       });
     }
     return out;

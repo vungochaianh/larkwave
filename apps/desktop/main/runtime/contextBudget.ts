@@ -1,5 +1,5 @@
 /**
- * contextBudget.ts — detect when a Claude conversation (Lark chat OR the app-builder
+ * contextBudget.ts — detect when a Claude conversation (Lark chat OR the general assistant
  * "Trò chuyện") is approaching the model's context-window limit, so the UI can warn the
  * user and offer a fresh session before Claude silently auto-compacts / loses context.
  *

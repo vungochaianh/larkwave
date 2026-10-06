@@ -160,7 +160,7 @@ export default function FriendsPage() {
           {t("social.friends", "Bạn bè")}
         </Title>
         <Text type="secondary">
-          {t("social.friendsSubtitle", "Kết bạn, nhắn tin và cùng nhau vibe code trên Larkwave.")}
+          {t("social.friendsSubtitle.lw", "Kết bạn, nhắn tin và cùng nhau làm việc trên Larkwave.")}
         </Text>
       </div>
 

@@ -378,7 +378,7 @@ body {
 /* Floating "open chat" button (chatbot FAB) shown when the panel is closed.
    The WRAPPER carries the fixed position (not the circle) so a hint pill can sit
    beside it: on its own the bare circle never says what it opens, so someone who
-   closes the panel once has no visible way back to "sửa app". */
+   closes the panel once has no visible way back. */
 .tw-chat-fab-wrap {
   position: fixed;
   right: 20px;

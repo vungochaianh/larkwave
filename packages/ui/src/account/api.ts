@@ -1,7 +1,7 @@
 'use client';
 /**
- * Larkwave App Builder API client for the DESKTOP account features (Explore,
- * Friends, Reports, Profile, Billing…). Mirrors apps/web/src/lib/api
+ * Larkwave API client for the DESKTOP account features (Friends, Reports,
+ * Profile, Billing…). Mirrors apps/web/src/lib/api
  * but standalone so the desktop can talk to the same server (api.toolswave.net)
  * with the user's Larkwave-account JWT. Types are kept local + minimal so this
  * package needn't depend on @larkwave/shared.

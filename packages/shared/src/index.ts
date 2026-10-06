@@ -943,7 +943,7 @@ export interface ClaudeUsageRow {
 
 /** Hosted-Claude (MAIC) usage & gateway-health report for the admin console. Aggregates the
  *  `MaicUsage` table (hosted "Trợ lý AI" chat = kind `ask`, scheduled tasks = kind `scheduled`) —
- *  the spend that the profit report (`AdminReport`, codegen builds only) does NOT cover. */
+ *  the spend that the profit report (`AdminReport`) aggregates by kind. */
 export interface ClaudeReport {
   period: ReportPeriod;
   /** Live MAIC gateway health (the shared token's global pool), or disabled/unreachable. */

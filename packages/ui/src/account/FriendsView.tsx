@@ -117,7 +117,7 @@ export function FriendsView() {
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <div>
         <Title level={3} style={{ margin: 0 }}>Bạn bè</Title>
-        <Text type="secondary">Kết bạn, nhắn tin và cùng nhau vibe code trên Larkwave.</Text>
+        <Text type="secondary">Kết bạn, nhắn tin và cùng nhau làm việc trên Larkwave.</Text>
       </div>
 
       <Space direction="vertical" size={20} style={{ width: '100%' }}>
