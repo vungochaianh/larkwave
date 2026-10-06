@@ -25,13 +25,3 @@ win-deploy-token.txt
 toolswave-secrets.enc
 *.enc
 
-# Trạng thái của scripts/blog-autopost.mjs: chủ đề đã đăng, để không đăng trùng.
-# Của riêng từng máy treo — không chia sẻ qua git.
-.blog-autopost-used.txt
-
-# Khoá chống chạy chồng của scripts/blog-refresh.mjs — của riêng từng máy.
-.blog-refresh.lock
-
-# Mốc thời gian đã nhắn Telegram cho từng chỗ kẹt (scripts/lib/notify.mjs).
-# Của riêng từng máy — không chia sẻ qua git.
-.notify-state.json

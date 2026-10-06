@@ -415,7 +415,7 @@ export default function AdminClaudePage() {
             Claude — Trợ lý AI (hosted)
           </Title>
           <Text type="secondary">
-            Lượng dùng &amp; chi phí Claude qua cổng MAIC (chat /claude, desktop, tác vụ định kỳ) — chưa gồm codegen (xem Báo cáo lợi nhuận)
+            Lượng dùng &amp; chi phí Claude qua cổng MAIC (chat /claude, desktop, tác vụ định kỳ)
           </Text>
         </div>
         <Space wrap>
@@ -577,8 +577,8 @@ export default function AdminClaudePage() {
           description={
             <Text type="secondary" style={{ fontSize: 12.5 }}>
               Báo cáo này gồm các lượt Claude hosted được ghi vào MaicUsage (chat + tác vụ định kỳ). Các luồng MAIC sau
-              hiện <b>chưa được ghi nhận</b> nên không xuất hiện ở đây: {report.unmeteredSurfaces.join(", ")}. Chi phí
-              codegen xem ở <b>Báo cáo lợi nhuận</b> / <b>Quản lý AI</b>.
+              hiện <b>chưa được ghi nhận</b> nên không xuất hiện ở đây: {report.unmeteredSurfaces.join(", ")}. Lợi nhuận tổng
+              xem ở <b>Báo cáo lợi nhuận</b>.
             </Text>
           }
         />

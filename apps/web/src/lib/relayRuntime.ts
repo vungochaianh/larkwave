@@ -192,7 +192,7 @@ function hostedMaicChat(input: LarkChatInput, onReq: (id: string) => void): Asyn
 
 /**
  * A web `RuntimeAdapter` whose chat runs on the signed-in DESKTOP's local CLI via the relay,
- * while codegen/apps keep using the normal web API (WebRuntimeAdapter). Passing this to
+ * while everything else (skills, uploads…) keeps using the normal web API (WebRuntimeAdapter). Passing this to
  * `<RuntimeProvider>` lets the shared `AgentChat` render on the web with full parity — the
  * ChatGPT-style history/sidebar is the component's own; turns execute on the desktop.
  */
@@ -249,7 +249,7 @@ export function createRelayRuntime(): RuntimeAdapter {
 /**
  * A web `RuntimeAdapter` whose general "Trợ lý AI" chat runs SERVER-SIDE via the hosted MAIC gateway
  * (no desktop, no local Claude). Used by `/remote/chat` so the assistant works standalone for users
- * on a Larkwave plan/trial. Codegen/apps still use the normal web API (WebRuntimeAdapter). There is
+ * on a Larkwave plan/trial. Everything else still uses the normal web API (WebRuntimeAdapter). There is
  * no Lark RPC here — hosted chat is scope='general' only (Lark tool turns still need the desktop).
  */
 export function createHostedRuntime(): RuntimeAdapter {

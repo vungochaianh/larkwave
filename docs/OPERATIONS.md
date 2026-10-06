@@ -1,5 +1,8 @@
 # Operations runbook
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 Server `100.100.164.92` (Tailscale, Ubuntu 24.04). Everything runs as the
 unprivileged `app` user under `/home/app/toolswave`. Nothing here touches the
 other services already on the box.

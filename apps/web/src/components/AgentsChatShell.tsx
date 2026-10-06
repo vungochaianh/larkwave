@@ -489,7 +489,7 @@ export default function AgentsChatShell({ children }: { children: ReactNode }) {
 
   return (
     // `tw-app` + SurfaceScope: cùng bộ bề mặt (thẻ kính, bảng, nhãn, bảng màu đen-tím khi tối) với
-    // AppShell, để bấm từ /apps sang đây không thấy "hai sản phẩm". Xem components/surface.
+    // AppShell, để bấm từ /overview sang đây không thấy "hai sản phẩm". Xem components/surface.
     <SurfaceScope>
     <div className="tw-app" style={{ display: "flex", height: "100vh", overflow: "hidden", background: V.layer }}>
       {isDesktop ? (

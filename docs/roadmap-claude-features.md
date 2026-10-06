@@ -1,5 +1,8 @@
 # Roadmap — kéo các tính năng kiểu Claude về Toolswave
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 > **✅ ĐÃ HOÀN TẤT CẢ 3 (2026-08-28) — đều kiểm chứng E2E:**
 > - #1 Tác vụ định kỳ (Scheduled) → 1.0.270 — `/scheduled`, model `ScheduledTask`, in-process cron runner.
 > - #2 Dự án (Projects) → 1.0.271 — `/projects`, `AgentChatProject.instructions` inject vào Trợ lý AI.

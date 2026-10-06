@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BellOutlined,
-  BugOutlined,
-  CheckOutlined,
-  InfoCircleOutlined,
-  MessageOutlined,
-  ThunderboltOutlined,
-} from "@ant-design/icons";
+import { BellOutlined, BugOutlined, CheckOutlined, InfoCircleOutlined, MessageOutlined } from "@ant-design/icons";
 import { App, Button, Empty, List, Space, Tag, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -22,13 +15,11 @@ const { Title, Text } = Typography;
 const TYPE_ICON: Record<NotificationType, ReactNode> = {
   message: <MessageOutlined style={{ color: "#6C5CE7" }} />,
   feedback: <BugOutlined style={{ color: "#EF4444" }} />,
-  build: <ThunderboltOutlined style={{ color: "#16B98D" }} />,
   system: <InfoCircleOutlined style={{ color: "#9AA3B5" }} />,
 };
 const TYPE_LABEL: Record<NotificationType, { key: string; vi: string }> = {
   message: { key: "social.notifMessage", vi: "Tin nhắn" },
   feedback: { key: "social.notifFeedback", vi: "Báo lỗi" },
-  build: { key: "social.notifBuild", vi: "Build" },
   system: { key: "social.notifSystem", vi: "Hệ thống" },
 };
 
@@ -91,7 +82,7 @@ export default function NotificationsPage() {
             <BellOutlined style={{ color: "#6C5CE7", marginInlineEnd: 8 }} />
             {t("social.notifications", "Thông báo")}
           </Title>
-          <Text type="secondary">{t("social.notificationsSubtitle", "Tin nhắn, báo lỗi, app build xong… — bấm để mở đúng nội dung.")}</Text>
+          <Text type="secondary">{t("social.notificationsSubtitle", "Tin nhắn, báo lỗi, tác vụ AI xong… — bấm để mở đúng nội dung.")}</Text>
         </div>
         {unread > 0 && (
           <Button icon={<CheckOutlined />} onClick={() => void markAll()}>

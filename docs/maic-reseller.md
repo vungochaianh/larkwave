@@ -1,5 +1,8 @@
 # MAIC — hạn mức theo từng người dùng Toolswave
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 Toolswave là **đại lý** của MAIC: ta bán gói cho người dùng của mình, MAIC chạy
 máy phía sau. Tài liệu này mô tả phần nối giữa hai bên.
 

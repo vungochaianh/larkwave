@@ -6,42 +6,42 @@ import DownloadClient from "./DownloadClient";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
-/** Vỏ server mỏng: metadata + JSON-LD — xem chú thích ở `explore/page.tsx`. */
+/** Vỏ server mỏng: metadata + JSON-LD; thân trang là island DownloadClient. */
 export async function generateMetadata({ searchParams }: { searchParams: SP }): Promise<Metadata> {
   const sp = await searchParams;
   return metaSongNgu(
     "/download",
     {
       vi: {
-        title: "Tải Larkwave Desktop — dựng app bằng AI trên máy bạn",
+        title: "Tải Larkwave Desktop — Trợ lý AI cho Lark trên máy bạn",
         description:
-          "Dùng Claude CLI ngay trên máy bạn để sinh code, tích hợp sâu Lark × Agents, chạy được cả khi offline. Tải cho Windows & macOS, cài một lần và tự cập nhật.",
+          "Kết nối Lark bằng QR, để AI đọc/ghi Base, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn; tự động hoá theo lịch. Chạy bằng AI của bạn. Windows & macOS, tự cập nhật.",
         keywords: [
           "tải Larkwave desktop",
           "Larkwave app",
-          "Claude desktop app",
           "Lark Agents",
-          "tải app dựng app bằng AI",
+          "trợ lý AI cho Lark",
+          "tự động hoá Lark Base",
           "download Larkwave",
         ],
-        ogTitle: "Tải Larkwave Desktop — AI trên máy bạn + tích hợp Lark sâu",
+        ogTitle: "Tải Larkwave Desktop — Lark × Agents trên máy bạn",
         ogDescription:
-          "Dựng app bằng Claude CLI của bạn (chi phí gần như 0), Lark × Agents toàn quyền, dựng app từ phân tích, chạy offline. Windows & macOS, tự cập nhật.",
+          "AI làm việc trong Lark với tư cách bạn: Bitable, Docs, Sheets, Wiki, Drive, Lịch, tin nhắn. Chạy bằng Claude/Codex/Gemini/Grok của bạn, tự động hoá theo lịch. Windows & macOS.",
       },
       en: {
-        title: "Download Larkwave Desktop — build apps with AI on your machine",
+        title: "Download Larkwave Desktop — an AI assistant for Lark on your machine",
         description:
-          "Run your own Claude CLI to generate code, with deep Lark × Agents integration and offline support. For Windows & macOS — install once, it updates itself.",
+          "Connect Lark with a QR code and let AI read/write Base, Docs, Sheets, Wiki, Drive, Calendar and messages; scheduled automation. Runs on your own AI. Windows & macOS.",
         keywords: [
           "download Larkwave desktop",
           "Larkwave app",
-          "Claude desktop app",
           "Lark Agents",
-          "AI app builder download",
+          "AI assistant for Lark",
+          "Lark Base automation",
         ],
-        ogTitle: "Download Larkwave Desktop — AI on your machine, deep Lark integration",
+        ogTitle: "Download Larkwave Desktop — Lark × Agents on your machine",
         ogDescription:
-          "Build with your own Claude CLI (near-zero cost), full Lark × Agents access, build straight from an analysis, work offline. Windows & macOS, self-updating.",
+          "AI that works in Lark as you: Bitable, Docs, Sheets, Wiki, Drive, Calendar, messages. Runs on your own Claude/Codex/Gemini/Grok, with scheduled automation. Windows & macOS.",
       },
     },
     { absolute: true, queryLang: sp.lang },
@@ -61,7 +61,7 @@ export default async function DownloadPage({ searchParams }: { searchParams: SP 
         "@type": "SoftwareApplication",
         "@id": `${SITE}/download#app`,
         name: "Larkwave Desktop",
-        applicationCategory: "DeveloperApplication",
+        applicationCategory: "BusinessApplication",
         operatingSystem: "Windows, macOS",
         url: `${SITE}/download`,
         publisher: { "@id": ORG_ID },

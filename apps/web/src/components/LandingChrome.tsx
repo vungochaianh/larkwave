@@ -13,7 +13,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 // (falls back to Vietnamese), so this stays a lightweight client component.
 //
 // Màu đi qua biến `--tw-*` (kèm fallback sáng) chứ không cứng: header này dùng ở cả trang ép SÁNG
-// (đăng nhập) lẫn trang ép TỐI (/welcome, /download, /blog, …) — một thanh trắng trên nền đen-tím
+// (đăng nhập) lẫn trang ép TỐI (/, /download, /pricing, …) — một thanh trắng trên nền đen-tím
 // là thứ đầu tiên phá hỏng cảm giác "tối hẳn". Nền header là nền trang pha trong suốt (color-mix)
 // + blur, nên ở tối nó là kính đen, ở sáng là kính trắng như trước.
 
@@ -31,11 +31,9 @@ function Bolt({ size = 18 }: { size?: number }) {
 }
 
 const SECONDARY_LINKS: { href: string; key: string; vi: string }[] = [
-  { href: "/explore", key: "landing.nav.explore", vi: "Khám phá" },
-  { href: "/store", key: "landing.nav.store", vi: "Cửa hàng" },
   { href: "/pricing", key: "landing.nav.pricing", vi: "Gói & Giá" },
-  { href: "/blog", key: "landing.nav.blog", vi: "Blog" },
   { href: "/download", key: "landing.nav.download", vi: "Tải app" },
+  { href: "/support", key: "landing.nav.support", vi: "Hỗ trợ" },
 ];
 
 export function LandingHeader({ lang }: { lang?: Locale } = {}) {
@@ -279,7 +277,7 @@ export function LandingHeader({ lang }: { lang?: Locale } = {}) {
  * Việt ở nước ngoài và người nước ngoài ở Việt Nam đều bị cờ chỉ sai.
  *
  * Bấm đổi là đổi NGAY TẠI TRANG ĐANG XEM, không đá về trang chủ. `setLocale` ghi cả localStorage
- * lẫn cookie; cookie mới là thứ những trang kết xuất ở máy chủ (blog, bài viết) đọc được — thiếu
+ * lẫn cookie; cookie mới là thứ những trang kết xuất ở máy chủ (trang chủ, bảng giá) đọc được — thiếu
  * nó thì giao diện đổi sang tiếng Anh mà bài vẫn hiện tiếng Việt, đúng lỗi vừa phải sửa.
  *
  * `router.refresh()` là bắt buộc: đổi cookie thôi không làm Next dựng lại phần máy chủ, nên nếu
@@ -366,13 +364,10 @@ export function LandingFooter({ lang }: { lang?: Locale } = {}) {
             <Bolt size={14} />
           </span>
           <span style={{ fontWeight: 700, color: "var(--tw-text, #1E2230)" }}>Larkwave</span>
-          <span style={{ fontSize: 13 }}>{t("landing.footer.tagline", "· Tạo app bằng AI")}</span>
+          <span style={{ fontSize: 13 }}>{t("landing.footer.tagline.lw", "· Trợ lý AI cho Lark")}</span>
         </div>
         <nav style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 14 }}>
-          <Link href="/explore" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.explore", "Khám phá")}</Link>
-          <Link href="/store" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.store", "Cửa hàng")}</Link>
           <Link href="/pricing" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.pricing", "Gói & Giá")}</Link>
-          <Link href="/blog" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.blog", "Blog")}</Link>
           <Link href="/download" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.download", "Tải app")}</Link>
           <Link href="/support" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.support", "Hỗ trợ")}</Link>
           <Link href="/login" style={{ color: "var(--tw-text-sub, #6B7280)" }}>{t("landing.nav.login", "Đăng nhập")}</Link>

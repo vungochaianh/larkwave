@@ -22,63 +22,63 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  passwordHash String
-  name         String     @default("")
-  avatarUrl    String?
-  role         Role       @default(user)
-  status       UserStatus @default(active)
+  id                String     @id @default(cuid())
+  email             String     @unique
+  passwordHash      String
+  name              String     @default("")
+  avatarUrl         String?
+  role              Role       @default(user)
+  status            UserStatus @default(active)
   /// Session revocation counter. Every issued JWT carries the value at sign time; the
   /// auth guard rejects a token whose value no longer matches. Bumped on password change
   /// so a password change invalidates every existing session (device), while an unchanged
   /// password keeps sessions valid indefinitely (tokens are long-lived by design).
   /// Additive Int with a default → `prisma db push` needs no destructive flag.
-  tokenVersion Int        @default(0)
+  tokenVersion      Int        @default(0)
   /// Danh tính từ một hệ NGOÀI, dạng `<hệ>:<id>` — vd `fbinbox:1234`.
   ///
   /// Khoá liên kết cho đường cấp tài khoản service-to-service. Liên kết theo TRƯỜNG NÀY chứ
   /// KHÔNG theo email, và đó là cả điểm mấu chốt: nếu liên kết theo email thì một máy chủ ngoài
   /// chỉ cần khai "người dùng của tôi có email admin@..." là nhận được token của tài khoản đó.
   /// Nullable + @unique → `prisma db push` thêm được mà không mất dữ liệu (xem ghi chú deviceLimit).
-  externalId   String?    @unique
+  externalId        String?    @unique
   /// Per-account device-cap override. null → the default MAX_DEVICES (3). A positive
   /// value sets a custom cap; 0 (or negative) means UNLIMITED devices (eviction is
   /// skipped). Nullable Int → additive `prisma db push`, no data loss.
-  deviceLimit  Int?
+  deviceLimit       Int?
   // Subscription + monthly CREDIT usage (see src/billing/plans.ts for the catalog).
   // quotaUsed now holds CREDITS USED this month; quotaResetAt is the reset boundary.
-  plan         String     @default("free")
+  plan              String     @default("free")
   /// Whether this user appears in the public "discover users" directory + can be
   /// found by others to friend. false = private (still reachable by exact email).
-  discoverable Boolean    @default(true)
-  quotaUsed    Int        @default(0)
-  quotaResetAt DateTime?
+  discoverable      Boolean    @default(true)
+  quotaUsed         Int        @default(0)
+  quotaResetAt      DateTime?
   /// Precise instant the CURRENT credit window was established (set on every reset
   /// AND every plan grant). Unlike quotaResetAt (a month boundary that two windows
   /// in the same month share), this is monotonic/unique — used as the refund window
   /// key so a same-month renewal can't be mistaken for the original window.
-  quotaWindowAt DateTime?
+  quotaWindowAt     DateTime?
   // GitLab/GitHub usernames from an OAuth LOGIN (display only — no provider token is stored;
   // Larkwave has no repo features).
-  gitlabUsername String?
-  githubUsername String?
+  gitlabUsername    String?
+  githubUsername    String?
   /// Public handle (community display). Lazily generated on first need.
   /// Uniqueness is enforced at the app layer (ensureIdentity) — NOT a DB @unique,
   /// so adding it via `prisma db push` needs no destructive --accept-data-loss flag.
-  handle       String?
+  handle            String?
   /// Referral: this user's own shareable code, and who referred them.
-  referralCode String?
-  referredById String?
+  referralCode      String?
+  referredById      String?
   /// Ad-hoc credits ADDED to the monthly plan allowance (signup grant, referral
   /// rewards). available = planCredits + bonusCredits - quotaUsed.
-  bonusCredits Int        @default(0)
+  bonusCredits      Int        @default(0)
   /// Dung lượng lưu trữ MUA THÊM (MB), cộng vào phần được tặng theo gói
   /// (PlanCatalogEntry.storageMb).
   ///
   /// Tách khỏi hạn mức token vì bản chất khác nhau: token tiêu hết mỗi tháng rồi làm mới, còn
   /// dung lượng TÍCH LUỸ — video và mã nguồn nằm đó tới khi người dùng xoá.
-  storageBonusMb Int      @default(0)
+  storageBonusMb    Int        @default(0)
   /// Hạn của phần mua thêm. KHÁC bonusCredits (cộng vĩnh viễn): đây là tiền THUÊ CHỖ theo tháng,
   /// hết hạn mà không gia hạn thì phần mua thêm không còn tính nữa. Null = chưa từng mua.
   ///
@@ -87,37 +87,37 @@ model User {
   storageBonusUntil DateTime?
   /// True once the user who referred this account has been rewarded (anti-abuse:
   /// the referrer is paid only on this account's FIRST successful build).
-  referralRewarded Boolean @default(false)
+  referralRewarded  Boolean    @default(false)
   /// Per-user webhook token (sha256 hex) for the external `POST /v1/agent/webhook`
   /// enqueue endpoint. Nullable column → additive `prisma db push`, no data loss.
-  agentTokenHash String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  agentTokenHash    String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  payments            Payment[]
-  passwordResetTokens PasswordResetToken[]
-  sentFriendRequests     Friendship[] @relation("FriendRequester")
-  receivedFriendRequests Friendship[] @relation("FriendAddressee")
-  sentMessages           Message[]    @relation("MsgSender")
-  receivedMessages       Message[]    @relation("MsgRecipient")
+  payments               Payment[]
+  passwordResetTokens    PasswordResetToken[]
+  sentFriendRequests     Friendship[]            @relation("FriendRequester")
+  receivedFriendRequests Friendship[]            @relation("FriendAddressee")
+  sentMessages           Message[]               @relation("MsgSender")
+  receivedMessages       Message[]               @relation("MsgRecipient")
   uploads                Upload[]
   feedback               Feedback[]
   notifications          Notification[]
   socialPosts            SocialPost[]
   socialPostLikes        SocialPostLike[]
   socialComments         SocialComment[]
-  referredBy             User?        @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals              User[]       @relation("Referrals")
+  referredBy             User?                   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals              User[]                  @relation("Referrals")
   larkBackup             LarkBackup?
   larkShares             LarkShare[]
-  larkGrantsOwned        LarkGrant[]   @relation("LarkGrantOwner")
-  larkGrantsReceived     LarkGrant[]   @relation("LarkGrantGrantee")
+  larkGrantsOwned        LarkGrant[]             @relation("LarkGrantOwner")
+  larkGrantsReceived     LarkGrant[]             @relation("LarkGrantGrantee")
   larkGrantInvites       LarkGrantInvite[]
   larkRunnerLease        LarkRunnerLease?
   larkHostedRunner       LarkHostedRunner?
   larkGrantCalls         LarkGrantCall[]
-  devices                AgentDevice[] @relation("UserDevices")
-  remoteTasks            RemoteTask[]  @relation("UserRemoteTasks")
+  devices                AgentDevice[]           @relation("UserDevices")
+  remoteTasks            RemoteTask[]            @relation("UserRemoteTasks")
   agentWebhookTokens     AgentWebhookToken[]
   agentConversations     AgentConversation[]
   agentChatConversations AgentChatConversation[]
@@ -125,7 +125,7 @@ model User {
   assistantShares        AssistantShare[]
   telegramBindings       TelegramBinding[]
   telegramLinkCodes      TelegramLinkCode[]
-  loginSessions          LoginSession[] @relation("UserLoginSessions")
+  loginSessions          LoginSession[]          @relation("UserLoginSessions")
   skills                 Skill[]
   scheduledTasks         ScheduledTask[]
   artifacts              Artifact[]
@@ -343,34 +343,34 @@ model TelegramLinkCode {
 /// An AI task enqueued from the phone/web/webhook/Telegram, pushed to an online AgentDevice
 /// over SSE, run locally by the desktop's AI assistant, with progress POSTed back as RemoteTaskEvents.
 model RemoteTask {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation("UserRemoteTasks", fields: [userId], references: [id], onDelete: Cascade)
-  deviceId   String?
-  device     AgentDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  runner     String   @default("claude")
-  model      String?
-  prompt     String   @db.Text
-  status     String   @default("queued")
-  result     String?  @db.Text
-  error      String?  @db.Text
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  startedAt  DateTime?
-  finishedAt DateTime?
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation("UserRemoteTasks", fields: [userId], references: [id], onDelete: Cascade)
+  deviceId    String?
+  device      AgentDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  runner      String       @default("claude")
+  model       String?
+  prompt      String       @db.Text
+  status      String       @default("queued")
+  result      String?      @db.Text
+  error       String?      @db.Text
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  startedAt   DateTime?
+  finishedAt  DateTime?
   /// Lần cuối tác vụ này được ĐẨY xuống desktop. Khác `startedAt` (desktop báo đã chạy):
   /// dùng để không gửi lại cùng một tác vụ mỗi lần SSE nối lại — xem `flushQueued`.
   deliveredAt DateTime?
 
   /// Where this task was triggered from: phone | webhook | telegram | lark.
-  source     String   @default("phone")
+  source               String    @default("phone")
   /// OUTBOUND reply/notify targets carried from the trigger (chat to reply into,
   /// or the token's configured notify target). Sent when the task reaches a terminal state.
   notifyLarkWebhookUrl String?
   notifyTelegramChatId String?
   /// Set once, atomically, when the terminal notify is claimed — guards against a
   /// duplicate notification when two of the user's desktops both post a terminal event.
-  notifiedAt DateTime?
+  notifiedAt           DateTime?
 
   /// The named conversation this task belongs to (null = the default/unfiled thread).
   conversationId String?
@@ -422,19 +422,19 @@ model AgentChatConversation {
 /// A PUBLIC, chat-able link to a user's hosted "Trợ lý AI". Anyone with /g/<slug> can chat; the
 /// turn runs on hosted MAIC and is metered to the OWNER's % budget (read-only, rate-limited).
 model AssistantShare {
-  id           String   @id @default(cuid())
+  id           String              @id @default(cuid())
   ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  slug         String   @unique
-  label        String   @default("")
-  enabled      Boolean  @default(true)
+  owner        User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug         String              @unique
+  label        String              @default("")
+  enabled      Boolean             @default(true)
   /// Optional: inject this AgentChatProject's instructions (+ the owner's enabled skills).
   projectId    String?
-  turnsPerHour Int      @default(20)
-  turnsPerDay  Int      @default(100)
-  usesTotal    Int      @default(0)
+  turnsPerHour Int                 @default(20)
+  turnsPerDay  Int                 @default(100)
+  usesTotal    Int                 @default(0)
   lastUsedAt   DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime            @default(now())
   hits         AssistantShareHit[]
 
   @@index([ownerId])
@@ -442,11 +442,11 @@ model AssistantShare {
 
 /// One anonymous use of a public assistant link — for per-slug / per-IP rate limiting.
 model AssistantShareHit {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   shareId   String
   share     AssistantShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
-  ip        String   @default("")
-  createdAt DateTime @default(now())
+  ip        String         @default("")
+  createdAt DateTime       @default(now())
 
   @@index([shareId, createdAt])
 }
@@ -454,11 +454,11 @@ model AssistantShareHit {
 /// A ChatGPT-style "Project" (folder) grouping AgentChat conversations. Small; the whole set is
 /// replaced per user on change.
 model AgentChatProject {
-  id     String @id
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name   String @default("")
-  ord    Int    @default(0)
+  id           String @id
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String @default("")
+  ord          Int    @default(0)
   /// Custom instructions for THIS project (like Claude Projects) — injected into the hosted
   /// assistant's system prompt for every conversation in the project. Additive, default "".
   instructions String @default("")
@@ -469,12 +469,12 @@ model AgentChatProject {
 /// One streamed progress event of a RemoteTask (log/stage/status/progress/
 /// result/error). `payload` is the desktop event as-is, replayed on detail.
 model RemoteTaskEvent {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   taskId    String
   task      RemoteTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   kind      String
   payload   Json
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
 
   @@index([taskId, createdAt])
 }
@@ -502,36 +502,36 @@ model Notification {
 /// In-app error / bug report submitted by a user from any page. Admins triage +
 /// resolve these in /admin/feedback. `context` holds page URL + captured logs.
 model Feedback {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// The user's description of the bug/error.
-  message    String   @db.Text
+  message       String     @db.Text
   /// Page URL where it was reported.
-  url        String?
+  url           String?
   /// { userAgent, logs: string[] } — recent console errors + environment.
-  context    Json?
+  context       Json?
   /// Uploaded attachments: [{ id, name, kind, mime, size }].
-  attachments Json?
+  attachments   Json?
   /// "open" | "resolved" | "duplicate" | "rejected".
-  status     String   @default("open")
+  status        String     @default("open")
   /// Bug-bounty triage: "low" | "medium" | "high" | "critical" (null until triaged).
-  severity   String?
+  severity      String?
   /// Tester points awarded for this report (0 for duplicates/rejected).
-  points     Int      @default(0)
+  points        Int        @default(0)
   /// Monetary reward in VND the admin grants for this report.
-  rewardVnd  Int      @default(0)
+  rewardVnd     Int        @default(0)
   /// Whether the reward has been paid out, and when.
-  rewardPaid   Boolean   @default(false)
-  rewardPaidAt DateTime?
+  rewardPaid    Boolean    @default(false)
+  rewardPaidAt  DateTime?
   /// If this is a duplicate, points go to the FIRST reporter (the canonical row).
   duplicateOfId String?
   duplicateOf   Feedback?  @relation("FeedbackDup", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates    Feedback[] @relation("FeedbackDup")
-  adminNote  String?  @db.Text
-  resolvedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  adminNote     String?    @db.Text
+  resolvedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([status, createdAt])
   @@index([userId])
@@ -542,27 +542,27 @@ model Feedback {
 // are stored base64 (fed to Claude vision); text-like files store extracted text
 // (appended to the prompt). Kept small (size-capped at upload).
 model Upload {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name      String
   mime      String
   kind      String // image | text | pdf
   /// base64 (image/pdf) or raw utf8 text (text; incl. extracted Office docs).
-  data      String   @db.Text
+  data      String    @db.Text
   /// Original file bytes, base64 — ONLY for kinds where `data` is not the original (office/text,
   /// where `data` holds extracted text). Null for image/pdf: `data` already IS the original, and
   /// storing it twice would double the row for the largest files. Null on rows created before
   /// this column existed — those can be previewed but not downloaded, and the API says so.
-  rawData   String?  @db.Text
-  size      Int      @default(0)
+  rawData   String?   @db.Text
+  size      Int       @default(0)
   /// What this upload is FOR: 'chat' | 'feedback' | 'marketing' | 'build' | null (unknown/legacy).
   /// The retention job purges ONLY 'chat'. Anything else — a bug-report screenshot an admin
   /// re-reads months later, a marketing source image, a build reference — is still being read by
   /// another feature long after 30 days, so a blanket age rule would silently destroy it. Null
   /// means "not tagged", which is deliberately the KEEP side of the fence.
   purpose   String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   /// Set when the 30-day retention job deleted the blob. The row SURVIVES as a tombstone so an old
   /// conversation can say "removed because it expired" instead of the indistinguishable "not found".
   purgedAt  DateTime?
@@ -638,30 +638,30 @@ model AuditLog {
 // `code`; the SePay webhook matches an incoming transfer by `code` + amount and
 // activates the user's plan. `sepayId` is the SePay transaction id (idempotency).
 model Payment {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Với đơn mua GÓI: id gói. Với đơn mua DUNG LƯỢNG: giữ gói hiện tại của người dùng để lịch sử
   /// đọc được, còn thứ quyết định là `kind`.
-  plan      String
+  plan          String
   /// 'plan' (mặc định, mua/nâng gói) | 'storage' (mua thêm dung lượng theo tháng).
   /// Có trường này thì `settle()` biết phải cấp gì, thay vì đoán từ `plan`.
-  kind      String    @default("plan")
+  kind          String    @default("plan")
   /// Số GB mua thêm — chỉ dùng khi kind = 'storage'.
-  storageGb Int       @default(0)
-  code      String    @unique
-  amountVnd Int
-  status    String    @default("pending") // pending | paid
-  gateway   String?
-  sepayId   String?   @unique
-  createdAt DateTime  @default(now())
-  paidAt    DateTime?
+  storageGb     Int       @default(0)
+  code          String    @unique
+  amountVnd     Int
+  status        String    @default("pending") // pending | paid
+  gateway       String?
+  sepayId       String?   @unique
+  createdAt     DateTime  @default(now())
+  paidAt        DateTime?
   // Upgrade-proration intent context: when `prorated`, amountVnd is only the
   // time-scaled price DIFFERENCE and settle() must KEEP the cycle (not grant a
   // fresh month). `cycleAnchorAt` = the user's quotaResetAt the proration was
   // priced against; settle re-validates it still matches before honoring the
   // upgrade, so a stale intent paid after the window changed can't over-grant.
-  prorated     Boolean   @default(false)
+  prorated      Boolean   @default(false)
   cycleAnchorAt DateTime?
 
   @@index([userId])
@@ -670,15 +670,15 @@ model Payment {
 
 // Single-row platform configuration, edited from the admin CMS.
 model Setting {
-  id        String   @id @default("singleton")
-  config    Json
+  id          String   @id @default("singleton")
+  config      Json
   /// AES-256-GCM encrypted JSON of optional provider API keys { openai?, grok? }
   /// set from the admin "AI Keys" page. Services prefer these over env vars.
-  aiKeysEnc String?
+  aiKeysEnc   String?
   /// AES-256-GCM encrypted JSON { botToken, botUsername?, webhookSecret } for the
   /// Telegram remote-run bot, set from the admin page (no redeploy). Env is the fallback.
   telegramEnc String?
-  updatedAt DateTime @updatedAt
+  updatedAt   DateTime @updatedAt
 }
 
 // "Deploy lên Server (Docker)" — one per app. Tracks a docker-compose deploy on
@@ -711,20 +711,20 @@ model Setting {
 ///     qua endpoint nội bộ chắn bằng `LARK_RUNNER_SERVICE_KEY`.
 ///   • Người dùng tắt là xoá hàng, không phải đánh dấu disabled.
 model LarkHostedRunner {
-  userId    String   @id
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String    @id
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// app_id của Lark custom app (không phải bí mật — hiện được ở giao diện).
-  appId     String
+  appId      String
   /// app_secret đã mã: "v1:<iv>:<tag>:<ciphertext>". KHÔNG BAO GIỜ rời máy chủ.
-  secretEnc String
+  secretEnc  String
   /// Nhãn người đọc được, hiện ở chỗ "ai đang giữ quyền chạy lịch".
-  label     String   @default("Larkwave chạy hộ")
+  label      String    @default("Larkwave chạy hộ")
   /// Lần cuối tiến trình runner thật sự nạp được tenant này.
   lastSeenAt DateTime?
   /// Lỗi gần nhất của tenant này (sai khoá, hết hạn…) — hiện cho người dùng tự sửa.
-  lastError String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastError  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([updatedAt])
 }
@@ -769,27 +769,27 @@ model LarkBackup {
 /// phạm vi model này: chia sẻ không bao giờ chuyển khoá. Đừng suy ra từ đây rằng máy chủ
 /// sạch khoá Lark — xem chú thích ở `LarkHostedRunner` để biết thứ thật sự được cất.
 model LarkGrant {
-  id        String  @id @default(cuid())
-  ownerId   String
-  owner     User    @relation("LarkGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  granteeId String?
-  grantee   User?   @relation("LarkGrantGrantee", fields: [granteeId], references: [id], onDelete: SetNull)
+  id             String    @id @default(cuid())
+  ownerId        String
+  owner          User      @relation("LarkGrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  granteeId      String?
+  grantee        User?     @relation("LarkGrantGrantee", fields: [granteeId], references: [id], onDelete: SetNull)
   /// lark = share the owner's Lark connection (base-scoped); agentchat = share the general
   /// "Trợ lý AI" assistant (no base scope, always read-only). The server relay is identical
   /// for both — only the owner's desktop picks a different, kind-appropriate executor.
-  kind      String  @default("lark")
-  label     String  @default("")
+  kind           String    @default("lark")
+  label          String    @default("")
   /// pending | active | suspended | revoked
-  status    String  @default("pending")
+  status         String    @default("pending")
   /// ask = read-only Q&A; build = writes allowed (each write still needs owner approval)
-  mode      String  @default("ask")
-  expiresAt DateTime?
-  turnsPerHour   Int @default(60)
-  turnsPerDay    Int @default(300)
-  tokenBudgetPct Int @default(5)
-  createdAt DateTime @default(now())
-  revokedAt DateTime?
-  lastUsedAt DateTime?
+  mode           String    @default("ask")
+  expiresAt      DateTime?
+  turnsPerHour   Int       @default(60)
+  turnsPerDay    Int       @default(300)
+  tokenBudgetPct Int       @default(5)
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
 
   invites LarkGrantInvite[]
   scopes  LarkGrantScopeRef[]
@@ -804,7 +804,7 @@ model LarkGrant {
 /// The invitation IS this row, keyed to one specific user — there is no code, link or
 /// deep link anywhere, which removes the entire "invite leaked via URL/log/chat" class.
 model LarkGrantInvite {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   grantId       String
   grant         LarkGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
   inviteeUserId String
@@ -820,7 +820,7 @@ model LarkGrantInvite {
 /// Human-readable scope for display/audit only. NEVER an app_token — the enforcing copy
 /// is on the owner's machine, so a compromised server cannot widen what a grant reaches.
 model LarkGrantScopeRef {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   grantId    String
   grant      LarkGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
   baseName   String
@@ -902,18 +902,18 @@ model LarkConvItem {
 
 /// One tool call made through a grant — the owner's per-person access log.
 model LarkGrantCall {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   grantId        String
   grant          LarkGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
   actorId        String
   actor          User      @relation(fields: [actorId], references: [id], onDelete: Cascade)
   conversationId String?
   tool           String
-  targetName     String   @default("")
+  targetName     String    @default("")
   /// allowed | denied_scope | denied_rate | denied_owner | error
   decision       String
-  latencyMs      Int      @default(0)
-  createdAt      DateTime @default(now())
+  latencyMs      Int       @default(0)
+  createdAt      DateTime  @default(now())
 
   @@index([grantId, createdAt])
   @@index([actorId])
@@ -943,7 +943,7 @@ model MaicUsage {
   userId    String
   costUsd   Float
   tokens    Int
-  kind      String   // 'ask' | 'run' | 'lark'
+  kind      String // 'ask' | 'run' | 'lark'
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -1000,15 +1000,15 @@ model MaicRun {
 /// Bài đăng trong "Cộng đồng" — dòng thời gian kiểu Threads: ai cũng đọc được, chủ bài tự xoá
 /// được, quản trị xoá được mọi bài.
 model SocialPost {
-  id        String   @id @default(cuid())
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  content   String
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content     String
   /// Tệp đính kèm: mảng JSON [{url, name, mime, size}]. Ảnh hiện thành lưới, thứ khác thành thẻ
   /// tải về. Lưu URL chứ không lưu id upload: bài đăng là dữ liệu CÔNG KHAI và tồn tại lâu, nếu
   /// kho tệp đổi cách đánh id thì mọi bài cũ mất ảnh.
-  attachments Json   @default("[]")
-  createdAt DateTime @default(now())
+  attachments Json     @default("[]")
+  createdAt   DateTime @default(now())
 
   likes    SocialPostLike[]
   comments SocialComment[]
@@ -1031,11 +1031,11 @@ model SocialPostLike {
 }
 
 model SocialComment {
-  id        String     @id @default(cuid())
+  id        String          @id @default(cuid())
   postId    String
   authorId  String
-  post      SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post      SocialPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
   content   String
   /// Trả lời một bình luận khác. MỘT cấp duy nhất — nhắm vào một trả lời thì gắn lên cha của nó
   /// (xem community.service). Lồng sâu trên điện thoại là thụt lề mấy tầng, không ai đọc nổi.
@@ -1045,25 +1045,8 @@ model SocialComment {
   parentId  String?
   parent    SocialComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   SocialComment[] @relation("CommentReplies")
-  createdAt DateTime   @default(now())
+  createdAt DateTime        @default(now())
 
   @@index([postId, createdAt])
   @@index([parentId])
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CỬA HÀNG — giai đoạn 2: danh mục về ở đây, thôi đọc nhờ portal
-//
-// Kế hoạch đầy đủ: docs/hop-nhat-cua-hang-va-nen-tang.md. Ba quyết định đã chốt ngày
-// 24/09/2026, ghi ở đây vì chúng nhìn từ lược đồ mới thấy được:
-//
-//  1. ĐƯỜNG GIAO HÀNG (driveLink, zipFileUrl, gitlabRepoId) nằm ở cột MÃ HOÁ riêng, KHÔNG nằm
-//     trong `detail`. Mục 4 của kế hoạch bỏ quên chúng, và chỗ duy nhất "tiện" để nhét là
-//     `detail` — nhưng `detail` đi thẳng ra API công khai, nên nhét vào đó là mở lại đúng lỗ rò
-//     vừa bịt bên portal hôm 23/09. Tách cột là thứ khiến lỗi đó không thể tái diễn do sơ ý.
-//  2. `slug` duy nhất THEO TỪNG LOẠI, không duy nhất toàn cục: đường dẫn đang chạy thật là
-//     /store/<kind>/<slug>, nên hai loại hàng trùng slug vẫn ra hai trang khác nhau.
-//  3. Giá là Int VND, không Decimal — khớp `Payment.amountVnd` và phần còn lại của lược đồ.
-//     Portal trả Decimal ra JSON dạng CHUỖI ("100000.00"), script nhập làm tròn khi chuyển.
-// ─────────────────────────────────────────────────────────────────────────────
-

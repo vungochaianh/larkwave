@@ -14,10 +14,10 @@ const OFFICIAL_ORIGIN = "https://toolswave.net";
 export const CLONE_ALLOWED_HOSTS = [
   // Sau lần hoán đổi tên miền 22/09/2026, trang chính nằm ở `toolswave.net` (trước là
   // `app.toolswave.net`). Không cần liệt kê từng subdomain vì mục `.toolswave.net` phía dưới đã
-  // bắt hết — kể cả `cms.` (quản trị) lẫn các subdomain app người dùng tự tạo.
+  // bắt hết — kể cả `cms.` (quản trị) và `lark.` (Larkwave).
   "toolswave.net",
   ".toolswave.net", // mọi subdomain hiện tại + tương lai
-  ".pages.dev", // preview build trên Cloudflare Pages
+  ".pages.dev", // bản dựng web/desktop renderer trên Cloudflare Pages
   ".trycloudflare.com", // tunnel tạm khi dev/demo — thà rộng còn hơn tự khoá mình
   "localhost",
   ".localhost",

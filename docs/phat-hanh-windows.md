@@ -1,5 +1,8 @@
 # Dựng bản cài Windows trên một máy Windows riêng
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 Bản `.dmg` dựng được trên máy Mac, nhưng `.exe` thì không — `electron-builder` cần chạy trên
 Windows. Tài liệu này mô tả cách để một máy Windows dựng và phát hành bản đó mà **không** phải
 mang khoá của máy chính sang.

@@ -1,5 +1,8 @@
 # Biến máy Windows thành máy phát hành chính
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 Mục tiêu: sau khi dựng xong, ở máy Windows chỉ cần `git pull` → sửa → chạy lệnh, không phải quay
 về máy Mac.
 

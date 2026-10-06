@@ -1,5 +1,8 @@
 # Toolswave Web + Desktop — kiến trúc dùng chung & cách sync
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 Mục tiêu: **một codebase, hai vỏ** (web + desktop), giao diện y hệt, nhưng desktop
 chạy codegen bằng **Claude CLI cục bộ** (chi phí ≈ 0 cho Toolswave).
 

@@ -1,58 +1,18 @@
 "use client";
 
-import {
-  AppstoreOutlined,
-  CalendarOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  CloudServerOutlined,
-  CopyOutlined,
-  DeleteOutlined,
-  DeploymentUnitOutlined,
-  EditOutlined,
-  FireOutlined,
-  LockOutlined,
-  MailOutlined,
-  ThunderboltOutlined,
-  TrophyOutlined,
-  UploadOutlined,
-} from "@ant-design/icons";
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Form,
-  Grid,
-  Input,
-  Modal,
-  Progress,
-  Skeleton,
-  Space,
-  Switch,
-  Tooltip,
-  Typography,
-  Upload,
-} from "antd";
+import { AppstoreOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudServerOutlined, CopyOutlined, DeleteOutlined, DeploymentUnitOutlined, EditOutlined, FireOutlined, LockOutlined, MailOutlined, ThunderboltOutlined, TrophyOutlined, UploadOutlined } from "@ant-design/icons";
+import { Alert, App, Button, Card, Form, Grid, Input, Modal, Skeleton, Space, Switch, Tooltip, Typography, Upload } from "antd";
 import type { UploadProps } from "antd";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  computeXp,
-  levelInfo,
-  type ActivityDay,
-  type MeActivity,
-  type MeOverview,
-  type User,
-} from "@larkwave/shared";
+import { type ActivityDay, type MeActivity, type MeOverview, type User } from "@larkwave/shared";
 import Link from "next/link";
-import { TrophyOutlined as TrophyIcon } from "@ant-design/icons";
 import { api, ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { CARD_SHADOW } from "@/lib/theme";
 import { DeviceManager, useI18n, V } from "@larkwave/ui";
 import UsageWidget from "@/components/UsageWidget";
-import { AchievementsCard } from "@/components/Achievements";
+import { AchievementsCard } from "@larkwave/ui";
 import { AdminBadge, PlanBadge, UserAvatar } from "@/components/UserAvatar";
 
 const { Title, Text } = Typography;
@@ -122,8 +82,6 @@ export default function ProfilePage() {
       {/* Streak cards */}
       <StreakRow activity={activity} loading={loading} />
 
-      {/* XP & level */}
-      <LevelCard overview={overview} loading={loading} />
 
       {/* Achievement badge collection */}
       <AchievementsCard
@@ -630,90 +588,6 @@ function ChangePasswordModal({
   );
 }
 
-function LevelCard({
-  overview,
-  loading,
-}: {
-  overview: MeOverview | null;
-  loading: boolean;
-}) {
-  const { t } = useI18n();
-  const xp = overview
-    ? computeXp({
-        apps: overview.totalApps,
-        succeededBuilds: overview.succeededBuilds,
-        deployments: overview.totalDeployments,
-        visits: overview.totalVisits ?? 0,
-      })
-    : 0;
-  const lvl = levelInfo(xp);
-  const pct = lvl.xpForNext > 0 ? Math.round((lvl.xpInLevel / lvl.xpForNext) * 100) : 0;
-
-  return (
-    <Card
-      styles={{ body: { padding: 20 } }}
-      style={{ boxShadow: CARD_SHADOW }}
-      title={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <TrophyIcon style={{ color: "#F59E0B" }} />
-          {t("money.levelXp", "Cấp độ & XP")}
-        </span>
-      }
-      extra={
-        <Link href="/leaderboard">
-          <Button type="link" size="small">
-            {t("money.leaderboard", "Bảng xếp hạng")} →
-          </Button>
-        </Link>
-      }
-    >
-      {loading ? (
-        <Skeleton active paragraph={{ rows: 2 }} />
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              background: "linear-gradient(135deg, #6C5CE7 0%, #A66BFF 100%)",
-              color: "#fff",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 8px 20px rgba(108,92,231,0.30)",
-            }}
-          >
-            <span style={{ fontSize: 10, opacity: 0.85, lineHeight: 1 }}>LV</span>
-            <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{lvl.level}</span>
-          </div>
-          <div style={{ flex: 1, minWidth: "min(220px, 100%)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <Text strong style={{ fontSize: 15 }}>
-                {lvl.title}
-              </Text>
-              <Text type="secondary" style={{ fontSize: 12.5 }}>
-                {lvl.xp.toLocaleString("vi-VN")} XP
-              </Text>
-            </div>
-            <Progress
-              percent={pct}
-              showInfo={false}
-              strokeColor={{ "0%": "#6C5CE7", "100%": "#A66BFF" }}
-              style={{ margin: "8px 0 2px" }}
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {t("money.remaining", "Còn")} {(lvl.xpForNext - lvl.xpInLevel).toLocaleString("vi-VN")} {t("money.xpToLevel", "XP để lên cấp")} {lvl.level + 1}
-            </Text>
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}
-
 function StatGrid({
   overview,
   loading,
@@ -730,46 +604,46 @@ function StatGrid({
     bg: string;
   }[] = [
     {
-      label: t("money.statTotalApps", "Tổng apps"),
-      value: overview?.totalApps,
-      icon: <AppstoreOutlined />,
+      label: t("money.statAiRuns", "Lượt AI"),
+      value: overview?.aiRuns,
+      icon: <ThunderboltOutlined />,
       color: "#6C5CE7",
       bg: "rgba(108,92,231,0.12)",
     },
     {
-      label: t("money.statLive", "Đang live"),
-      value: overview?.liveApps,
+      label: t("money.statRemoteTasks", "Tác vụ từ xa"),
+      value: overview?.remoteTasks,
       icon: <CloudServerOutlined />,
       color: "#16B98D",
       bg: "rgba(22,185,141,0.14)",
     },
     {
-      label: t("money.statTotalBuilds", "Tổng builds"),
-      value: overview?.totalBuilds,
-      icon: <ThunderboltOutlined />,
+      label: t("money.statSkills", "Kỹ năng"),
+      value: overview?.skills,
+      icon: <AppstoreOutlined />,
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.14)",
     },
     {
-      label: t("money.statSucceeded", "Build thành công"),
-      value: overview?.succeededBuilds,
+      label: "Artifacts",
+      value: overview?.artifacts,
+      icon: <DeploymentUnitOutlined />,
+      color: "#4FB6FF",
+      bg: "rgba(79,182,255,0.16)",
+    },
+    {
+      label: t("money.statScheduled", "Tác vụ định kỳ"),
+      value: overview?.scheduledTasks,
       icon: <CheckCircleOutlined />,
       color: "#16B98D",
       bg: "rgba(22,185,141,0.14)",
     },
     {
-      label: t("money.statFailed", "Build lỗi"),
-      value: overview?.failedBuilds,
+      label: t("money.statReports", "Báo lỗi"),
+      value: overview?.reports,
       icon: <CloseCircleOutlined />,
       color: "#EF4444",
       bg: "rgba(239,68,68,0.12)",
-    },
-    {
-      label: "Deployments",
-      value: overview?.totalDeployments,
-      icon: <DeploymentUnitOutlined />,
-      color: "#4FB6FF",
-      bg: "rgba(79,182,255,0.16)",
     },
   ];
 
@@ -1165,7 +1039,7 @@ function ReferralCard() {
       <Text type="secondary" style={{ fontSize: 13, display: "block", marginTop: 4 }}>
         {data ? (
           <>
-            {t("money.referDesc1", "Mỗi người bạn giới thiệu tạo app đầu tiên thành công: cả hai cùng nhận +")}
+            {t("money.referDesc1", "Bạn của bạn nhận credit khi đăng ký; khi họ kích hoạt gói trả phí đầu tiên, bạn nhận +")}
             {data.rewardPerReferral}{t("money.referDesc2", " credit. Bạn đã giới thiệu ")}{data.referrals}{t("money.referDesc3", " người.")}
           </>
         ) : errored ? (

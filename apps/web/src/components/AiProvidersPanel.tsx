@@ -148,46 +148,17 @@ export default function AiProvidersPanel() {
           </Space>
         </div>
 
-        {/* Operation logic */}
+        {/* How the keys are used */}
         <Alert
           type="info"
           showIcon
-          message={t("wcomp.aiRouterTitle", "Cơ chế chọn model (auto-router)")}
+          message={t("wcomp.aiUsageTitle.lw", "Key dùng vào việc gì")}
           description={
             <div style={{ fontSize: 13 }}>
-              <p style={{ margin: "0 0 6px" }}>
-                <b>{t("wcomp.aiAutoLabel", "Tự động (mặc định, 1 credit):")}</b>{" "}
-                {t("wcomp.aiAutoS1", "một bộ đánh giá")} <b>Haiku</b>{" "}
-                {t("wcomp.aiAutoS2", "đọc yêu cầu rồi chọn")} <b>Haiku</b>{" "}
-                {t("wcomp.aiAutoS3", "(app đơn giản) hoặc")} <b>Sonnet</b>{" "}
-                {t("wcomp.aiAutoS4", "(phức tạp). Không bao giờ tự chọn Opus.")}
-              </p>
-              <p style={{ margin: "0 0 6px" }}>
-                <b>{t("wcomp.aiOpusLabel", "Opus (5 credit):")}</b>{" "}
-                {t("wcomp.aiOpusDesc", "chỉ khi người dùng chọn tay — chất lượng cao nhất.")}
-              </p>
-              <p style={{ margin: "0 0 6px" }}>
-                <b>{t("wcomp.aiSubStepLabel", "Bước phụ")}</b>{" "}
-                {t("wcomp.aiSubStepA", "(phân loại + đặc tả) chạy Haiku để tiết kiệm;")}{" "}
-                <b>codegen/blueprint/fix</b>{" "}
-                {t("wcomp.aiSubStepB", "dùng model build để giữ chất lượng.")}
-              </p>
-              <p style={{ margin: "0 0 6px" }}>
-                <b>{t("wcomp.aiFailoverLabel", "Luân chuyển provider (failover):")}</b>{" "}
-                {t(
-                  "wcomp.aiFailoverDesc",
-                  "router gọi Anthropic Haiku → nếu lỗi/nghẽn → OpenAI → Grok (nếu đã cấu hình key).",
-                )}
-              </p>
-              <p style={{ margin: 0 }}>
-                <b>{t("wcomp.aiTemplateLabel", "Template:")}</b>{" "}
-                {t(
-                  "wcomp.aiTemplateA",
-                  "app loại phổ biến (landing, todo, dashboard, shop, blog, portfolio) được bơm khung chuẩn để ra đầy đủ & đẹp, ít lỗi build (= tiết kiệm token). Chi phí mọi lệnh đều vào",
-                )}{" "}
-                <b>{t("wcomp.aiTemplateReport", "báo cáo Thu–Chi")}</b>{" "}
-                {t("wcomp.aiTemplateBelow", "bên dưới.")}
-              </p>
+              {t(
+                "wcomp.aiUsageDesc.lw",
+                "Anthropic: trợ lý trợ giúp (dự phòng khi MAIC chưa cấu hình) và phân loại báo lỗi. OpenAI: tạo ảnh AI trong Trợ lý. Trợ lý AI chính chạy qua MAIC (Claude hosted) hoặc CLI trên máy người dùng — không dùng các key này.",
+              )}
             </div>
           }
         />

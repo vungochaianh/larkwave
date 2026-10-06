@@ -11,16 +11,8 @@ const PUBLIC_PATHS = [
   "/forgot",
   "/reset",
   "/auth/callback",
-  "/explore",
   "/pricing",
-  // Public content marketing blog — list + per-post detail.
-  "/blog",
-  // Cửa hàng công khai — danh mục + trang bán từng món. KHÔNG trùng "/shop": "/shop" là đường
-  // CŨ của hệ kia và vẫn 301 sang portal (xem DUONG_HE_KIA) cho tới khi việc đặt mua dọn về đây.
-  "/store",
-  // Public per-app showcase pages — "/app/<slug>" (NOT the authed "/apps").
-  "/app",
-  // Public shared Artifacts — "/a/<slug>" (NOT the authed "/apps"/"/assistant").
+  // Public shared Artifacts — "/a/<slug>" (NOT the authed "/artifacts"/"/assistant").
   "/a",
   // Public shared Trợ lý AI conversation transcript — "/s/<slug>" (read-only).
   "/s",
@@ -55,31 +47,6 @@ function isPublic(pathname: string): boolean {
 }
 
 /**
- * NHÁNH ĐƯỜNG DẪN THUỘC VỀ HỆ THỐNG KIA (cửa hàng/portal), sau khi hai hệ hoán đổi tên miền.
- *
- * Trước 22/09/2026 những đường này nằm ở `toolswave.net` và đã được lập chỉ mục ở đó. Nay
- * `toolswave.net` là hệ này, nên nếu không làm gì thì mọi liên kết cũ — cả từ Google lẫn từ dấu
- * trang của người dùng — rơi vào luật "không công khai thì đẩy sang /login". Đo được ngày 23/09:
- * `/shop/software/<slug>` trả 307 về trang đăng nhập. Người dùng thấy một trang đăng nhập lạ
- * thay vì sản phẩm; máy tìm kiếm thấy một chuyển hướng tạm thời và bỏ toàn bộ uy tín của URL đó.
- *
- * 301 (vĩnh viễn) chứ không phải 307: cấu trúc này cố định, và 301 mới dồn uy tín sang địa chỉ mới.
- */
-const DUONG_HE_KIA = [
-  "/shop",
-  "/tools",
-  "/upgrade",
-  "/about",
-  "/contact",
-  "/privacy",
-  "/terms",
-  "/account",
-  "/canva",
-  "/semrush",
-];
-const GOC_HE_KIA = "https://app.toolswave.net";
-
-/**
  * NHÁNH CẦN ĐĂNG NHẬP.
  *
  * Danh sách này thay cho luật cũ "mọi thứ không công khai đều đẩy sang /login" — luật đó biến mọi
@@ -93,8 +60,6 @@ const GOC_HE_KIA = "https://app.toolswave.net";
  */
 const DUONG_CAN_DANG_NHAP = [
   "/overview",
-  "/create-website",
-  "/apps",
   "/agent",
   "/agents-chat",
   "/artifacts",
@@ -102,9 +67,6 @@ const DUONG_CAN_DANG_NHAP = [
   "/billing",
   "/community",
   "/friends",
-  "/import",
-  "/integrations",
-  "/leaderboard",
   "/notifications",
   "/profile",
   "/projects",
@@ -113,9 +75,6 @@ const DUONG_CAN_DANG_NHAP = [
   "/scheduled",
   "/skills",
   "/storage",
-  "/studio",
-  "/templates",
-  "/api",
 ];
 
 const khopNhanh = (pathname: string, ds: string[]): boolean =>
@@ -132,7 +91,7 @@ const FALLBACK_HOST = "toolswave.net";
 /**
  * A gated page must never end up in a search index, even if a bot somehow
  * reaches it — robots.txt is advisory, this header is not. Public pages are
- * left untouched so /welcome, /blog, /explore keep ranking.
+ * left untouched so /, /pricing, /download keep ranking.
  */
 function noindex(res: NextResponse): NextResponse {
   res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -170,8 +129,8 @@ function publicRedirect(request: NextRequest, pathname: string, search = ""): UR
 
 /**
  * Host-routed surfaces:
- *  - Host starts with 'aapp' -> admin surface, rewrite to /admin/*
- *  - Otherwise (app., localhost, anything) -> public Builder surface
+ *  - Host starts with 'cms.' -> admin surface, redirect to /admin/*
+ *  - Otherwise (localhost, anything) -> public Larkwave surface
  * Auth: missing tw_token cookie on a protected page -> redirect to /login.
  *
  * (Next.js 16 renamed `middleware` -> `proxy`; logic is identical.)
@@ -219,7 +178,7 @@ export function proxy(request: NextRequest): NextResponse {
   //
   // SCOPED TO PUBLIC PATHS ONLY. This used to return early for EVERY path, and
   // the User-Agent is just a string anyone can send — so `curl -A Googlebot`
-  // walked straight past the gate onto /admin/* and the whole builder. That
+  // walked straight past the gate onto /admin/* and the whole private area. That
   // leaked no data (real data needs a Bearer token) but it handed the entire
   // private-area HTML + JS bundle graph to anyone willing to type one flag,
   // which is exactly the scrape/clone surface we're closing. A crawler has no
@@ -233,14 +192,7 @@ export function proxy(request: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
-  // ── Đường dẫn cũ nay thuộc hệ thống kia ───────────────────────────────────
-  // Đặt TRƯỚC mọi luật đăng nhập: những đường này không thuộc hệ thống này nữa, nên hỏi token
-  // hay đẩy sang /login đều vô nghĩa — việc duy nhất đúng là chỉ sang địa chỉ mới của chúng.
-  if (khopNhanh(pathname, DUONG_HE_KIA)) {
-    return NextResponse.redirect(`${GOC_HE_KIA}${pathname}${search}`, 301);
-  }
-
-  // ── Admin surface (aapp.*) ────────────────────────────────────────────────
+  // ── Admin surface (cms.*) ────────────────────────────────────────────────
   if (isAdminHost) {
     // login/register stay public even on the admin host.
     if (isPublic(pathname)) {
@@ -254,7 +206,7 @@ export function proxy(request: NextRequest): NextResponse {
     if (!pathname.startsWith("/admin")) {
       // Redirect (not rewrite) to /admin/* on the public origin. A rewrite would
       // proxy to the internal localhost origin (TLS↔plaintext mismatch / loops);
-      // the admin panel simply lives under /admin on the aapp host.
+      // the admin panel simply lives under /admin on the cms host.
       return NextResponse.redirect(
         publicRedirect(request, `/admin${pathname === "/" ? "" : pathname}`, search),
       );
@@ -262,7 +214,7 @@ export function proxy(request: NextRequest): NextResponse {
     return noindex(NextResponse.next());
   }
 
-  // ── Builder surface (app.* / localhost / anything else) ───────────────────
+  // ── Public surface (localhost / anything else) ───────────────────────────
   // Block direct access to /admin paths from the public host.
   if (pathname.startsWith("/admin")) {
     return NextResponse.redirect(publicRedirect(request, "/"));

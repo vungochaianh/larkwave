@@ -21,13 +21,10 @@ const POS_KEY = "tw-chatbot-pos";
 
 /** Common questions shown as one-tap chips in the empty assistant state. */
 const FAQS: { key: string; vi: string }[] = [
-  { key: "wcomp.faqCreateApp", vi: "Làm sao để tạo app mới?" },
-  { key: "wcomp.faqDeploy", vi: "App của tôi deploy ở đâu, tên miền thế nào?" },
-  { key: "wcomp.faqBuildError", vi: "Build bị lỗi thì sửa thế nào?" },
-  {
-    key: "wcomp.faqUpgradeFullstack",
-    vi: "Nâng cấp app tĩnh thành full-stack (có cơ sở dữ liệu) thế nào?",
-  },
+  { key: "wcomp.faqLarkConnect.lw", vi: "Làm sao kết nối tài khoản Lark?" },
+  { key: "wcomp.faqAutomation.lw", vi: "Đặt lịch tự động hoá Lark thế nào?" },
+  { key: "wcomp.faqSkills.lw", vi: "Kỹ năng (Skills) và lệnh /lệnh dùng ra sao?" },
+  { key: "wcomp.faqRemote.lw", vi: "Điều khiển máy desktop từ điện thoại thế nào?" },
   { key: "wcomp.faqPlanCredit", vi: "Gói cước & credit hoạt động ra sao?" },
 ];
 
@@ -180,8 +177,8 @@ export default function ChatbotWidget() {
               <div>
                 <Text type="secondary" style={{ fontSize: 13 }}>
                   {t(
-                    "wcomp.chatbotWelcome",
-                    "Chào bạn 👋 Mình là trợ lý Larkwave. Hỏi mình về cách sửa app, deploy, tên miền, lỗi build… hoặc chọn nhanh một câu hỏi thường gặp:",
+                    "wcomp.chatbotWelcome.lw",
+                    "Chào bạn 👋 Mình là trợ lý Larkwave. Hỏi mình về Lark × Agents, tự động hoá, kỹ năng, gói cước… hoặc chọn nhanh một câu hỏi thường gặp:",
                   )}
                 </Text>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>

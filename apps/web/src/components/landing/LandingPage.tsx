@@ -5,31 +5,27 @@ import {
   ArrowRightOutlined,
   CheckCircleFilled,
   ClockCircleOutlined,
+  CloudSyncOutlined,
   CodeOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   DesktopOutlined,
   EditOutlined,
-  FileDoneOutlined,
   FilePdfOutlined,
   GlobalOutlined,
-  PictureOutlined,
-  PlayCircleOutlined,
+  MessageOutlined,
   ReadOutlined,
   RobotOutlined,
   SafetyCertificateOutlined,
-  ShoppingCartOutlined,
   SolutionOutlined,
   TableOutlined,
+  TeamOutlined,
   ThunderboltOutlined,
-  VideoCameraOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import type { BlogPostListItem } from "@larkwave/shared";
-import { OK, V, type Locale } from "@larkwave/ui";
-import { useLangT, useNgonNguIsland } from "@/lib/useLangT";
-import { api } from "@/lib/api";
+import { type CSSProperties, type ReactNode } from "react";
+import { OK, type Locale } from "@larkwave/ui";
+import { useLangT } from "@/lib/useLangT";
 import Reveal from "@/components/Reveal";
 import { CursorGlow, HeroShader, Magnetic, ParallaxLayers, TiltCard, type ParallaxLayer } from "@/components/fx";
 import { LandingHeader, LandingFooter } from "@/components/LandingChrome";
@@ -40,21 +36,18 @@ const GRADIENT =
   "linear-gradient(120deg, #6C5CE7 0%, #A66BFF 40%, #FF7AB6 70%, #4FB6FF 100%)";
 
 /**
- * TRANG CHỦ — định vị BỐN TRỤ CỘT: trợ lý AI trả về tệp thật · tạo web app full-stack · video/ảnh/
- * bài viết · tự động hoá Lark Base. Sản phẩm dùng được ở mọi nơi (giao diện Việt/Anh tự theo trình
- * duyệt); tiếng Việt là thế mạnh được nêu ra, không phải điều kiện để dùng.
+ * TRANG CHỦ LARKWAVE — định vị BỐN TRỤ CỘT: Lark Agents (AI đọc/ghi Lark) · tự động hoá theo lịch ·
+ * Trợ lý AI trên web · chia sẻ & điều khiển từ xa. Giao diện Việt/Anh tự theo trình duyệt; tiếng
+ * Việt là thế mạnh được nêu ra, không phải điều kiện để dùng.
  *
- * Nguyên tắc viết: mỗi câu phải có thật và kiểm được trong mã nguồn. Landing nói quá là cách nhanh
- * nhất mất niềm tin, nên những giới hạn quan trọng (Lark cần app máy tính, lịch đăng gửi qua
- * Telegram, app cần máy chủ riêng ở gói Chuyên nghiệp) được viết THẲNG vào mô tả thay vì giấu đi.
- * Vài con số đã đối chiếu: 54 công cụ Lark (đếm `name:` trong desktop/main/runtime/lark/tools),
- * gói và quyền lợi theo apps/api/src/billing/plans.ts (KHÔNG có gói "Maker"; gỡ nhãn là Pro+).
+ * Nguyên tắc viết: mỗi câu phải có thật và kiểm được trong mã nguồn. Giới hạn quan trọng (Lark
+ * Agents cần app máy tính; chạy hộ khi tắt máy ở gói Chuyên nghiệp trở lên) được viết THẲNG vào
+ * mô tả thay vì giấu đi. Gói và quyền lợi theo apps/api/src/billing/plans.ts.
  *
- * BẪY i18n — lý do lần trước 21/57 câu trên trang thật khác mã nguồn: `t(key, fallback)` ƯU TIÊN
- * bảng `MESSAGES` trong packages/ui/src/i18n.tsx; câu thứ hai chỉ hiện khi THIẾU khoá. Vì vậy mọi
- * khoá `home.lp*` ở đây đều có cả `vi` lẫn `en` trong bảng, và `vi` phải khớp từng chữ với câu dự
- * phòng — sửa chữ ở đây mà không sửa bảng thì khách vẫn thấy câu cũ. Trong mọi object, trường
- * `xKey` luôn đứng NGAY TRƯỚC trường `x` để script đo lệch bắt được cặp (khoá, câu).
+ * BẪY i18n: `t(key, fallback)` ƯU TIÊN bảng `MESSAGES` trong packages/ui/src/i18n.tsx; câu thứ hai
+ * chỉ hiện khi THIẾU khoá. Mọi khoá ở đây mang hậu tố `.lw` (khoá mới, không trùng bản dịch cũ của
+ * thời còn tạo app) và phải có cả `vi` lẫn `en` trong bảng, `vi` khớp từng chữ với câu dự phòng.
+ * Trong mọi object, trường `xKey` luôn đứng NGAY TRƯỚC trường `x` để script đo lệch bắt được cặp.
  */
 
 /** Bốn trụ cột: mỗi thẻ có mô tả, ba điểm kiểm được, một giới hạn (nếu có) và một nút. */
@@ -75,239 +68,236 @@ const PILLARS: {
 }[] = [
   {
     n: "01",
-    icon: <RobotOutlined />,
-    accent: "#A66BFF",
-    titleKey: "home.lpP1Title",
-    title: "Trợ lý AI làm ra sản phẩm thật",
-    descKey: "home.lpP1Desc",
-    desc: "Không chỉ trả lời. Gửi cho nó bảng tính, PDF, Word hay ảnh — nó đọc rồi trả về đúng tệp bạn cần. Chạy trên máy chủ: mở trình duyệt là dùng, không phải cài gì.",
+    icon: <ApiOutlined />,
+    accent: "#6C5CE7",
+    titleKey: "home.lpP1Title.lw",
+    title: "Lark Agents: AI làm việc trong Lark",
+    descKey: "home.lpP1Desc.lw",
+    desc: "Kết nối tài khoản Lark/Feishu bằng mã QR rồi giao việc bằng lời: AI đọc và ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn — với tư cách chính bạn.",
     bullets: [
-      { key: "home.lpP1B1", text: "Đọc Excel, Word, PDF, ảnh; trả về tệp để tải" },
-      { key: "home.lpP1B2", text: "Dự án có chỉ dẫn riêng; chia sẻ kết quả bằng một link công khai" },
-      { key: "home.lpP1B3", text: "Kỹ năng riêng lưu thành lệnh tắt /tên-lệnh" },
+      { key: "home.lpP1B1.lw", text: "Bitable: bảng, trường, view, bản ghi hàng loạt, phân quyền Base" },
+      { key: "home.lpP1B2.lw", text: "Tạo Base có tên, đặt đúng thư mục; đính kèm tệp vào hội thoại" },
+      { key: "home.lpP1B3.lw", text: "Mọi thao tác ghi đều hỏi bạn duyệt trước" },
     ],
-    ctaKey: "home.lpP1Cta",
-    cta: "Bắt đầu trò chuyện",
-    href: "/register",
+    noteKey: "home.lpP1Note.lw",
+    note: "Phần này chạy qua app máy tính Larkwave (macOS/Windows).",
+    ctaKey: "home.lpP1Cta.lw",
+    cta: "Tải app máy tính",
+    href: "/download",
   },
   {
     n: "02",
-    icon: <ThunderboltOutlined />,
+    icon: <ClockCircleOutlined />,
     accent: "#4FB6FF",
-    titleKey: "home.lpP2Title",
-    title: "Tạo web app full-stack",
-    descKey: "home.lpP2Desc",
-    desc: "Mô tả bằng ngôn ngữ của bạn — nhận về giao diện, cơ sở dữ liệu, API và trang quản trị, deploy sẵn ra link công khai. Dán một địa chỉ web để sao chép giao diện cũng được.",
+    titleKey: "home.lpP2Title.lw",
+    title: "Tự động hoá Lark theo lịch",
+    descKey: "home.lpP2Desc.lw",
+    desc: "\"Mỗi ngày 9h tổng hợp đơn mới rồi gửi vào nhóm\" — đặt một lần, trợ lý tự chạy. Kích hoạt theo giờ, bằng bot hoặc webhook.",
     bullets: [
-      { key: "home.lpP2B1", text: "Cơ sở dữ liệu Cloudflare D1 + API /api/* + trang quản trị" },
-      { key: "home.lpP2B2", text: "Link công khai <tên>.toolswave.net, SSL sẵn" },
-      { key: "home.lpP2B3", text: "Sửa tiếp bằng hội thoại; tải mã nguồn hoặc nhập từ GitLab/GitHub" },
+      { key: "home.lpP2B1.lw", text: "Lịch hằng ngày, hằng tuần hoặc theo giờ bạn chọn" },
+      { key: "home.lpP2B2.lw", text: "Kích hoạt bằng bot Lark, webhook hoặc Telegram" },
+      { key: "home.lpP2B3.lw", text: "Larkwave chạy hộ: lịch vẫn chạy khi máy bạn tắt" },
     ],
-    noteKey: "home.lpP2Note",
-    note: "App cần máy chủ riêng chạy trên Docker — có ở gói Chuyên nghiệp.",
-    ctaKey: "home.lpP2Cta",
-    cta: "Tạo app đầu tiên",
+    noteKey: "home.lpP2Note.lw",
+    note: "Chạy hộ khi tắt máy có ở gói Chuyên nghiệp trở lên.",
+    ctaKey: "home.lpP2Cta.lw",
+    cta: "Đặt lịch đầu tiên",
     href: "/register",
   },
   {
     n: "03",
-    icon: <VideoCameraOutlined />,
-    accent: "#FF7AB6",
-    titleKey: "home.lpP3Title",
-    title: "Video, ảnh và bài viết",
-    descKey: "home.lpP3Desc",
-    desc: "Video được dựng thật từng khung hình trên máy chủ rồi ghép lồng tiếng AI; ảnh nhiều slide; bài viết theo hướng chuẩn SEO. Bạn xem tiến trình từng bước.",
+    icon: <RobotOutlined />,
+    accent: "#A66BFF",
+    titleKey: "home.lpP3Title.lw",
+    title: "Trợ lý AI trả về tệp thật",
+    descKey: "home.lpP3Desc.lw",
+    desc: "Gửi bảng tính, PDF, Word hay ảnh — trợ lý đọc rồi trả về đúng tệp bạn cần. Dùng ngay trên trình duyệt hoặc trong app máy tính.",
     bullets: [
-      { key: "home.lpP3B1", text: "Kịch bản → giọng đọc → dựng cảnh → render, dọc 9:16 hoặc ngang 16:9" },
-      { key: "home.lpP3B2", text: "Giọng tiếng Việt tự nhiên đứng đầu danh sách, nghe thử trước khi chọn" },
-      { key: "home.lpP3B3", text: "Lên lịch tạo tự động: hằng ngày, hằng tuần hoặc T2–T6" },
+      { key: "home.lpP3B1.lw", text: "Xuất xlsx, docx, pdf, csv để tải về" },
+      { key: "home.lpP3B2.lw", text: "Dự án có chỉ dẫn riêng; Artifacts chia sẻ bằng link công khai" },
+      { key: "home.lpP3B3.lw", text: "Tủ tệp lưu tài liệu bạn đã gửi cho trợ lý" },
     ],
-    noteKey: "home.lpP3Note",
-    note: "Lịch đăng hiện gửi qua Telegram.",
-    ctaKey: "home.lpP3Cta",
-    cta: "Làm video đầu tiên",
+    ctaKey: "home.lpP3Cta.lw",
+    cta: "Bắt đầu trò chuyện",
     href: "/register",
   },
   {
     n: "04",
-    icon: <ApiOutlined />,
-    accent: "#6C5CE7",
-    titleKey: "home.lpP4Title",
-    title: "Tự động hoá Lark Base",
-    descKey: "home.lpP4Desc",
-    desc: "Đọc/ghi bản ghi, phân quyền, workflow, đồng bộ CMS, đọc cả tệp đính kèm trong Bitable — 54 công cụ, thao tác với tư cách chính bạn.",
+    icon: <TeamOutlined />,
+    accent: "#FF7AB6",
+    titleKey: "home.lpP4Title.lw",
+    title: "Chia sẻ và điều khiển từ xa",
+    descKey: "home.lpP4Desc.lw",
+    desc: "Cho đồng đội dùng trợ lý Lark của bạn bằng quyền uỷ thác — không lộ mật khẩu hay khoá. Ra ngoài vẫn giao việc cho máy tính ở nhà từ điện thoại.",
     bullets: [
-      { key: "home.lpP4B1", text: "Bitable: bảng, trường, view, bản ghi hàng loạt, vai trò" },
-      { key: "home.lpP4B2", text: "Docs, Sheets, Wiki, Drive, Lịch và tin nhắn" },
-      { key: "home.lpP4B3", text: "Hẹn giờ để tác vụ Lark tự chạy" },
+      { key: "home.lpP4B1.lw", text: "Cấp và thu hồi quyền cho từng người; hội thoại dùng chung" },
+      { key: "home.lpP4B2.lw", text: "Trò chuyện từ điện thoại/web, chạy trên app máy tính của bạn" },
+      { key: "home.lpP4B3.lw", text: "Webhook API và Telegram để kích hoạt tác vụ AI" },
     ],
-    noteKey: "home.lpP4Note",
-    note: "Phần này chạy qua app máy tính Larkwave (Windows/macOS).",
-    ctaKey: "home.lpP4Cta",
-    cta: "Tải app máy tính",
-    href: "/download",
+    ctaKey: "home.lpP4Cta.lw",
+    cta: "Tạo tài khoản",
+    href: "/register",
   },
 ];
 
 /** Ba thứ dùng chung cho cả bốn trụ cột. */
 const SHARED: { icon: ReactNode; titleKey: string; title: string; descKey: string; desc: string }[] = [
   {
-    icon: <ClockCircleOutlined />,
-    titleKey: "home.lpShared1Title",
-    title: "Đặt lịch cho trợ lý",
-    descKey: "home.lpShared1Desc",
-    desc: "Hẹn giờ theo múi giờ của bạn; máy chủ tự chạy kể cả khi bạn tắt máy. Xong việc có thông báo trong app và lưu lại toàn văn kết quả.",
+    icon: <ThunderboltOutlined />,
+    titleKey: "home.lpShared1Title.lw",
+    title: "Kỹ năng và lệnh /tắt",
+    descKey: "home.lpShared1Desc.lw",
+    desc: "Lưu cách làm quen tay thành Kỹ năng, gọi lại bằng /tên-lệnh. Nối nhiều kỹ năng thành chuỗi được kiểm chéo từng bước.",
   },
   {
     icon: <DashboardOutlined />,
-    titleKey: "home.lpShared2Title",
-    title: "Một hạn mức cho tất cả",
-    descKey: "home.lpShared2Desc",
-    desc: "Không mua lẻ từng công cụ: mỗi gói có một hạn mức dùng chung mỗi tháng, tiêu tới đâu tính tới đó — cho cả bốn mảng trên.",
+    titleKey: "home.lpShared2Title.lw",
+    title: "Dùng AI của bạn, hoặc của Larkwave",
+    descKey: "home.lpShared2Desc.lw",
+    desc: "Chạy bằng Claude, Codex, Gemini hay Grok đã cài trên máy — không trừ hạn mức. Không muốn cài gì thì dùng Claude của Larkwave, trừ theo % hạn mức tháng.",
   },
   {
     icon: <GlobalOutlined />,
-    titleKey: "home.lpShared3Title",
+    titleKey: "home.lpShared3Title.lw",
     title: "Tiếng Việt và tiếng Anh",
-    descKey: "home.lpShared3Desc",
-    desc: "Giao diện có cả hai, tự theo ngôn ngữ trình duyệt và đổi được bất cứ lúc nào. Tiếng Việt được chăm kỹ — từ giao diện đến giọng lồng tiếng — là thế mạnh, không phải giới hạn.",
+    descKey: "home.lpShared3Desc.lw",
+    desc: "Giao diện có cả hai, tự theo ngôn ngữ trình duyệt và đổi được bất cứ lúc nào. Tiếng Việt được chăm kỹ — là thế mạnh, không phải giới hạn.",
   },
 ];
 
 const STEPS: { n: string; icon: ReactNode; titleKey: string; title: string; descKey: string; desc: string }[] = [
   {
     n: "1",
-    icon: <SafetyCertificateOutlined />,
-    titleKey: "home.lpStep1Title",
-    title: "Đăng ký",
-    descKey: "home.lpStep1Desc",
-    desc: "Tài khoản miễn phí, không cần thẻ. Mở trình duyệt là làm việc được ngay.",
+    icon: <DesktopOutlined />,
+    titleKey: "home.lpStep1Title.lw",
+    title: "Cài app, quét QR",
+    descKey: "home.lpStep1Desc.lw",
+    desc: "Tải app máy tính, đăng nhập Lark bằng mã QR. Tài khoản Larkwave miễn phí, không cần thẻ.",
   },
   {
     n: "2",
     icon: <EditOutlined />,
-    titleKey: "home.lpStep2Title",
+    titleKey: "home.lpStep2Title.lw",
     title: "Nói điều bạn cần",
-    descKey: "home.lpStep2Desc",
-    desc: "Gõ một câu, đính kèm tệp nếu có — tiếng Việt hay tiếng Anh. Chọn mảng: trò chuyện, tạo app, làm video hay Lark.",
+    descKey: "home.lpStep2Desc.lw",
+    desc: "Gõ một câu, đính kèm tệp nếu có — tiếng Việt hay tiếng Anh. Trợ lý tự tìm đúng Base, tài liệu, nhóm chat.",
   },
   {
     n: "3",
-    icon: <FileDoneOutlined />,
-    titleKey: "home.lpStep3Title",
-    title: "Nhận kết quả thật",
-    descKey: "home.lpStep3Desc",
-    desc: "Tệp để tải, app có link công khai, video đã render, bản ghi Lark đã cập nhật — bạn xem tiến trình trực tiếp.",
+    icon: <SafetyCertificateOutlined />,
+    titleKey: "home.lpStep3Title.lw",
+    title: "Duyệt rồi nhận kết quả",
+    descKey: "home.lpStep3Desc.lw",
+    desc: "Mỗi thao tác ghi hiện để bạn duyệt. Kết quả là bản ghi đã cập nhật, tài liệu đã tạo hoặc tệp để tải.",
   },
   {
     n: "4",
     icon: <ClockCircleOutlined />,
-    titleKey: "home.lpStep4Title",
-    title: "Lặp lại hoặc đặt lịch",
-    descKey: "home.lpStep4Desc",
-    desc: "Sửa tiếp bằng hội thoại, hoặc hẹn giờ để máy chủ tự chạy lại — kể cả khi bạn tắt máy.",
+    titleKey: "home.lpStep4Title.lw",
+    title: "Đặt lịch để tự chạy",
+    descKey: "home.lpStep4Desc.lw",
+    desc: "Biến việc vừa làm thành lịch hằng ngày hay hằng tuần — Larkwave chạy hộ kể cả khi bạn tắt máy.",
   },
 ];
 
 const USE_CASE_CARDS: { icon: ReactNode; titleKey: string; title: string; descKey: string; desc: string }[] = [
   {
-    icon: <ShoppingCartOutlined />,
-    titleKey: "home.lpUc1Title",
-    title: "Cửa hàng & landing bán hàng",
-    descKey: "home.lpUc1Desc",
-    desc: "Trang giới thiệu sản phẩm, giỏ hàng, danh mục và form đặt hàng — có link công khai để chạy quảng cáo ngay.",
-  },
-  {
-    icon: <SolutionOutlined />,
-    titleKey: "home.lpUc2Title",
-    title: "CRM & phần mềm quản lý",
-    descKey: "home.lpUc2Desc",
-    desc: "Quản lý khách hàng, đơn hàng, công việc với cơ sở dữ liệu thật + phân quyền — thay cho file Excel rời rạc.",
-  },
-  {
     icon: <FilePdfOutlined />,
-    titleKey: "home.lpUc3Title",
-    title: "Báo cáo từ bảng tính",
-    descKey: "home.lpUc3Desc",
-    desc: "Gửi Excel/CSV cho trợ lý, nhận về báo cáo hay bản tóm tắt dưới dạng tệp — không phải tự làm công thức.",
-  },
-  {
-    icon: <PlayCircleOutlined />,
-    titleKey: "home.lpUc4Title",
-    title: "Video ngắn đều đặn",
-    descKey: "home.lpUc4Desc",
-    desc: "Chủ đề + giọng đọc → video dọc 9:16 hoặc ngang 16:9, tự tạo theo lịch và gửi về Telegram.",
-  },
-  {
-    icon: <PictureOutlined />,
-    titleKey: "home.lpUc5Title",
-    title: "Bài viết SEO & ảnh mạng xã hội",
-    descKey: "home.lpUc5Desc",
-    desc: "Bài blog theo hướng chuẩn SEO, ảnh nhiều slide cho bài đăng — cùng một hạn mức với mọi thứ khác.",
+    titleKey: "home.lpUc1Title.lw",
+    title: "Báo cáo từ Base",
+    descKey: "home.lpUc1Desc.lw",
+    desc: "Tổng hợp doanh thu, đơn hàng, tiến độ từ Bitable rồi xuất thành xlsx/docx/pdf — hoặc gửi thẳng vào nhóm chat.",
   },
   {
     icon: <TableOutlined />,
-    titleKey: "home.lpUc6Title",
-    title: "Vận hành Lark Base",
-    descKey: "home.lpUc6Desc",
-    desc: "Nhập/cập nhật bản ghi hàng loạt, tạo bảng và trường, phân quyền, đồng bộ sang CMS — qua app máy tính.",
+    titleKey: "home.lpUc2Title.lw",
+    title: "Nhập liệu hàng loạt",
+    descKey: "home.lpUc2Desc.lw",
+    desc: "Gửi Excel/CSV, trợ lý ghép đúng trường và ghi hàng trăm bản ghi vào Base — bạn duyệt trước khi ghi.",
+  },
+  {
+    icon: <DatabaseOutlined />,
+    titleKey: "home.lpUc3Title.lw",
+    title: "Dựng Base và phân quyền",
+    descKey: "home.lpUc3Desc.lw",
+    desc: "Tạo Base có tên, đặt đúng thư mục, thêm bảng, trường, view và vai trò chỉ bằng một câu mô tả.",
+  },
+  {
+    icon: <SolutionOutlined />,
+    titleKey: "home.lpUc4Title.lw",
+    title: "Tóm tắt tin nhắn và lịch",
+    descKey: "home.lpUc4Desc.lw",
+    desc: "Tóm tắt nhóm chat, liệt kê việc cần làm, đọc lịch họp trong tuần — theo yêu cầu hoặc theo lịch.",
+  },
+  {
+    icon: <ReadOutlined />,
+    titleKey: "home.lpUc5Title.lw",
+    title: "Đặc tả sống từ Lark",
+    descKey: "home.lpUc5Desc.lw",
+    desc: "Một tài liệu đặc tả luôn mới, kéo trực tiếp từ Docs/Wiki của Lark — không phải chép tay mỗi lần đổi.",
+  },
+  {
+    icon: <CloudSyncOutlined />,
+    titleKey: "home.lpUc6Title.lw",
+    title: "Đồng bộ CMS Bitable",
+    descKey: "home.lpUc6Desc.lw",
+    desc: "Giữ dữ liệu Bitable khớp với CMS, xem thống kê, tìm và sửa bản ghi — trên nhiều tài khoản Lark.",
   },
 ];
 
 const USE_CASE_TAGS: { key: string; label: string }[] = [
-  { key: "home.lpTag1", label: "Landing page sản phẩm/dịch vụ" },
-  { key: "home.lpTag2", label: "Cửa hàng online + giỏ hàng" },
-  { key: "home.lpTag3", label: "Form khảo sát / đăng ký sự kiện" },
-  { key: "home.lpTag4", label: "Blog / trang tin có CMS" },
-  { key: "home.lpTag5", label: "Tóm tắt & dịch tài liệu" },
-  { key: "home.lpTag6", label: "Nhập liệu Lark Base hàng loạt" },
+  { key: "home.lpTag1.lw", label: "Báo cáo tuần từ Bitable" },
+  { key: "home.lpTag2.lw", label: "Nhập đơn hàng từ Excel" },
+  { key: "home.lpTag3.lw", label: "Tóm tắt nhóm chat mỗi sáng" },
+  { key: "home.lpTag4.lw", label: "Soạn tài liệu vào Wiki" },
+  { key: "home.lpTag5.lw", label: "Tóm tắt & dịch tài liệu" },
+  { key: "home.lpTag6.lw", label: "Nhắc lịch họp trong ngày" },
 ];
 
 const WHY: { icon: ReactNode; titleKey: string; title: string; descKey: string; desc: string }[] = [
   {
-    icon: <FileDoneOutlined />,
-    titleKey: "home.lpWhy1Title",
-    title: "Không chỉ trả lời — trả về sản phẩm",
-    descKey: "home.lpWhy1Desc",
-    desc: "Tệp thật, app có link, video đã render, bản ghi đã ghi vào Lark. Mọi kết quả đều tải về hoặc chia sẻ được.",
-  },
-  {
-    icon: <GlobalOutlined />,
-    titleKey: "home.lpWhy2Title",
-    title: "Dùng ở mọi nơi, tiếng Việt là thế mạnh",
-    descKey: "home.lpWhy2Desc",
-    desc: "Giao diện Việt/Anh tự theo trình duyệt. Với tiếng Việt còn có giọng lồng tiếng tự nhiên, blog hướng dẫn và cộng đồng bằng tiếng Việt.",
+    icon: <SafetyCertificateOutlined />,
+    titleKey: "home.lpWhy1Title.lw",
+    title: "Ghi gì cũng hỏi trước",
+    descKey: "home.lpWhy1Desc.lw",
+    desc: "AI không tự ý sửa dữ liệu Lark: mỗi thao tác ghi hiện rõ sẽ làm gì để bạn duyệt hoặc bỏ.",
   },
   {
     icon: <CodeOutlined />,
-    titleKey: "home.lpWhy3Title",
-    title: "Bạn sở hữu mã nguồn",
-    descKey: "home.lpWhy3Desc",
-    desc: "Xem và tải toàn bộ source code của app bất cứ lúc nào. Không khoá bạn vào nền tảng — muốn tự host cũng được.",
+    titleKey: "home.lpWhy2Title.lw",
+    title: "Chạy bằng AI của bạn",
+    descKey: "home.lpWhy2Desc.lw",
+    desc: "Đã có Claude, Codex, Gemini hay Grok trên máy? Larkwave dùng luôn — không tốn thêm phí AI, không trừ hạn mức.",
+  },
+  {
+    icon: <TeamOutlined />,
+    titleKey: "home.lpWhy3Title.lw",
+    title: "Chia sẻ mà không lộ khoá",
+    descKey: "home.lpWhy3Desc.lw",
+    desc: "Đồng đội dùng trợ lý của bạn qua quyền uỷ thác, thu hồi lúc nào cũng được — không ai phải cầm mật khẩu hay app secret.",
   },
   {
     icon: <DatabaseOutlined />,
-    titleKey: "home.lpWhy4Title",
+    titleKey: "home.lpWhy4Title.lw",
     title: "Nói thẳng giới hạn",
-    descKey: "home.lpWhy4Desc",
-    desc: "Lark cần app máy tính; lịch đăng gửi qua Telegram; app cần máy chủ riêng thì ở gói Chuyên nghiệp. Ghi rõ ở đây, không giấu trong điều khoản.",
+    descKey: "home.lpWhy4Desc.lw",
+    desc: "Lark Agents cần app máy tính; chạy hộ khi tắt máy ở gói Chuyên nghiệp. Ghi rõ ở đây, không giấu trong điều khoản.",
   },
 ];
 
 const TRUST_BADGES: { key: string; label: string }[] = [
-  { key: "home.lpTrust1", label: "Chạy trên trình duyệt, không cài gì" },
-  { key: "home.lpTrust2", label: "Tệp vào — tệp ra (Excel, PDF, ảnh)" },
-  { key: "home.lpTrust3", label: "Deploy thật ra Cloudflare" },
-  { key: "home.lpTrust4", label: "Tải mã nguồn về bất cứ lúc nào" },
-  { key: "home.lpTrust5", label: "54 công cụ Lark Base" },
-  { key: "home.lpTrust6", label: "Giao diện tiếng Việt & tiếng Anh" },
+  { key: "home.lpTrust1.lw", label: "Bitable · Docs · Sheets · Wiki · Drive · Lịch" },
+  { key: "home.lpTrust2.lw", label: "Mọi thao tác ghi đều hỏi trước" },
+  { key: "home.lpTrust3.lw", label: "Xuất xlsx · docx · pdf · csv" },
+  { key: "home.lpTrust4.lw", label: "Tự chạy theo lịch, kể cả khi tắt máy" },
+  { key: "home.lpTrust5.lw", label: "App macOS & Windows" },
+  { key: "home.lpTrust6.lw", label: "Giao diện tiếng Việt & tiếng Anh" },
 ];
 
 /**
  * Ba gói đầu của bảng giá, đúng theo apps/api/src/billing/plans.ts: Miễn phí · Khởi đầu (starter)
- * · Chuyên nghiệp (pro). Bản trước ghi "Maker" và gán "gỡ thương hiệu" cho gói giữa — không có gói
- * nào tên thế và gỡ nhãn là quyền của Pro trở lên. Không ghi giá ở đây: giá theo VND nằm ở
- * /pricing, trang chủ chỉ nói quyền lợi.
+ * · Chuyên nghiệp (pro). Không ghi giá ở đây: giá theo VND nằm ở /pricing, trang chủ chỉ nói
+ * quyền lợi.
  */
 const PLAN_TEASER: {
   nameKey: string;
@@ -323,43 +313,37 @@ const PLAN_TEASER: {
     taglineKey: "home.lpPlanFreeTagline",
     tagline: "Bắt đầu không cần thẻ",
     points: [
-      { key: "home.lpPlanFreeP1", text: "Đủ cả bốn mảng, hạn mức cơ bản mỗi tháng" },
-      { key: "home.lpPlanFreeP2", text: "App đầy đủ: giao diện + dữ liệu + quản trị" },
-      { key: "home.lpPlanFreeP3", text: "1 app chạy đồng thời, deploy thật" },
+      { key: "home.lpPlanFreeP1.lw", text: "Lark Agents đủ Bitable, Docs, Sheets, Wiki, Drive, Lịch" },
+      { key: "home.lpPlanFreeP2.lw", text: "Chạy trên AI của máy bạn — không tính hạn mức" },
+      { key: "home.lpPlanFreeP3.lw", text: "Trợ lý AI · Kỹ năng · Artifacts" },
     ],
     highlight: false,
   },
   {
     nameKey: "home.lpPlanStarterName",
     name: "Khởi đầu",
-    taglineKey: "home.lpPlanStarterTagline",
-    tagline: "Cho người làm đều tay",
+    taglineKey: "home.lpPlanStarterTagline.lw",
+    tagline: "Cho người dùng hằng ngày",
     points: [
       { key: "home.lpPlanStarterP1", text: "Hạn mức gấp ~10× gói Miễn phí" },
-      { key: "home.lpPlanStarterP2", text: "3 app chạy đồng thời" },
-      { key: "home.lpPlanStarterP3", text: "Tải mã nguồn ZIP · đồng bộ GitLab" },
+      { key: "home.lpPlanStarterP2.lw", text: "Claude do Larkwave cung cấp, không cần cài" },
+      { key: "home.lpPlanStarterP3.lw", text: "Tự động hoá theo lịch · Đặc tả · Điều khiển từ xa" },
     ],
     highlight: true,
   },
   {
     nameKey: "home.lpPlanProName",
     name: "Chuyên nghiệp",
-    taglineKey: "home.lpPlanProTagline",
-    tagline: "Cho đội nhóm & sản phẩm",
+    taglineKey: "home.lpPlanProTagline.lw",
+    tagline: "Cho đội nhóm dùng chung",
     points: [
       { key: "home.lpPlanProP1", text: "Hạn mức gấp ~33× gói Miễn phí" },
-      { key: "home.lpPlanProP2", text: "Chạy trên Server (Docker), 12 app đồng thời" },
-      { key: "home.lpPlanProP3", text: "Gỡ nhãn 'Tạo bởi Larkwave' · tên miền riêng" },
+      { key: "home.lpPlanProP2.lw", text: "Larkwave chạy hộ lịch khi máy bạn tắt" },
+      { key: "home.lpPlanProP3.lw", text: "Chia sẻ trợ lý cho đồng đội · CMS nhiều tài khoản" },
     ],
     highlight: false,
   },
 ];
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-}
 
 /**
  * CSS riêng của trang, gắn bằng `<style href precedence>` (React 19) giống FxStyles: có mặt ngay
@@ -367,7 +351,7 @@ function fmtDate(iso: string | null): string {
  * component render lại.
  *
  * Bề mặt thẻ KHÔNG tự khai màu: mọi thẻ mang class `tw-pub-card` (globals.css) để ăn chung token
- * `--tw-pub-card-*` với /explore, /download, /blog — một chỗ chỉnh độ sáng kính là cả site theo.
+ * `--tw-pub-card-*` với /download, /pricing — một chỗ chỉnh độ sáng kính là cả site theo.
  * Ở đây chỉ còn bo góc, padding, viền gradient khi hover và bố cục. Màu chữ/viền/nền phụ đi qua
  * biến `--tw-*` (kèm fallback sáng): trang được ép TỐI ở providers (ForceDark → bảng đen-tím),
  * bản sáng chỉ là đường lùi. Chỉ màu THƯƠNG HIỆU (tím/hồng/xanh) là cố định.
@@ -546,12 +530,6 @@ const LP_CSS = `
   background:${GRADIENT};color:#fff;font-size:12px;font-weight:700;}
 .tw-lp-link-btn{display:inline-block;padding:12px 26px;border:1px solid ${BRAND};color:${BRAND};border-radius:12px;font-weight:700;font-size:15.5px;}
 
-.tw-lp-blog-card{display:flex;flex-direction:column;height:100%;color:var(--tw-text,#1E2230);}
-.tw-lp-blog-cover{height:140px;border-radius:12px;margin:0 0 4px;}
-.tw-lp-blog-body{padding:12px 6px 4px;display:flex;flex-direction:column;gap:8px;flex:1;}
-.tw-lp-blog-body h3{font-size:17px;font-weight:700;margin:0;line-height:1.3;}
-.tw-lp-blog-body p{color:var(--tw-text-sub,#6B7280);font-size:14px;line-height:1.55;margin:0;flex:1;}
-
 .tw-lp-faq{border:1px solid var(--tw-border,#ECEDF3);border-radius:12px;background:var(--tw-surface,#fff);padding:14px 18px;transition:border-color .2s ease;}
 .tw-lp-faq[open]{border-color:rgba(108,92,231,.45);}
 .tw-lp-faq summary{font-weight:600;font-size:15.5px;cursor:pointer;color:var(--tw-text,#1E2230);list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;}
@@ -681,26 +659,18 @@ const FULL: CSSProperties = { height: "100%" };
 /**
  * `lang` được TRUYỀN XUỐNG chứ không lấy từ context: đây là island nằm trong một trang kết xuất ở
  * MÁY CHỦ, mà lúc dựng ở máy chủ context i18n luôn trả 'vi'. Đây là lần thứ BA cùng một lỗi
- * (23/09 ở /blog, 24/09 ở /pricing, 25/09 ở chính trang chủ) — xem `lib/useLangT.ts`.
+ * (24/09 ở /pricing, 25/09 ở chính trang chủ) — xem `lib/useLangT.ts`.
  */
 export default function LandingPage({ lang }: { lang?: Locale }) {
   const t = useLangT(lang);
-  const ngonNgu = useNgonNguIsland(lang);
-  const [posts, setPosts] = useState<BlogPostListItem[]>([]);
-  // `ngonNgu` phải nằm trong danh sách phụ thuộc: đổi tiếng giữa chừng thì khối blog phải nạp lại,
-  // không thì nó giữ nguyên ba bài của thứ tiếng cũ.
-  useEffect(() => {
-    api.featuredBlogPosts(3, ngonNgu).then(setPosts).catch(() => undefined);
-  }, [ngonNgu]);
 
-  /* Bốn ô kết quả trong mockup — mỗi ô một trụ cột. Chữ mẫu (tên tệp, subdomain) là minh hoạ,
-     nhưng DẠNG của chúng là thật: link <tên>.toolswave.net, video 9:16, bản ghi Bitable, lịch có
-     giờ. */
+  /* Bốn ô kết quả trong mockup — mỗi ô một mảng Lark. Chữ mẫu (số bản ghi, giờ) là minh hoạ,
+     nhưng DẠNG của chúng là thật: bản ghi Bitable đã duyệt, lịch có giờ, tài liệu, tin nhắn nhóm. */
   const tiles: { icon: ReactNode; color: string; title: string; sub: string }[] = [
-    { icon: <ThunderboltOutlined />, color: "#4FB6FF", title: t("home.lpMockTileApp", "Web app"), sub: t("home.lpMockTileAppSub", "myshop.toolswave.net · đã deploy") },
-    { icon: <VideoCameraOutlined />, color: "#FF7AB6", title: t("home.lpMockTileVideo", "Video"), sub: t("home.lpMockTileVideoSub", "0:42 · 9:16 · đã gửi Telegram") },
-    { icon: <ApiOutlined />, color: "#6C5CE7", title: t("home.lpMockTileLark", "Lark Base"), sub: t("home.lpMockTileLarkSub", "128 bản ghi đã cập nhật") },
-    { icon: <ClockCircleOutlined />, color: "#A66BFF", title: t("home.lpMockTileSched", "Lịch hẹn"), sub: t("home.lpMockTileSchedSub", "Thứ Hai · 08:00 · tự chạy") },
+    { icon: <ApiOutlined />, color: "#6C5CE7", title: t("home.lpMockTileLark", "Lark Base"), sub: t("home.lpMockTileLarkSub.lw", "128 bản ghi đã cập nhật · đã duyệt") },
+    { icon: <ClockCircleOutlined />, color: "#A66BFF", title: t("home.lpMockTileSched", "Lịch hẹn"), sub: t("home.lpMockTileSchedSub.lw", "Mỗi ngày · 09:00 · chạy hộ") },
+    { icon: <ReadOutlined />, color: "#4FB6FF", title: t("home.lpMockTileDocs.lw", "Docs & Wiki"), sub: t("home.lpMockTileDocsSub.lw", "Đặc tả đã đồng bộ từ Wiki") },
+    { icon: <MessageOutlined />, color: "#FF7AB6", title: t("home.lpMockTileMsg.lw", "Tin nhắn"), sub: t("home.lpMockTileMsgSub.lw", "Đã gửi tóm tắt vào nhóm") },
   ];
 
   return (
@@ -729,25 +699,25 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
           <div className="tw-lp-hero-inner">
             <>
               <span className="tw-pulse tw-lp-badge">
-                <GlobalOutlined /> {t("home.lpBadge", "Nền tảng AI cho công việc · tiếng Việt & tiếng Anh")}
+                <GlobalOutlined /> {t("home.lpBadge.lw", "AI cho Lark & Feishu · tiếng Việt & tiếng Anh")}
               </span>
             </>
             <>
               <h1 className="tw-lp-h1">
-                {t("home.lpH1a", "Trợ lý AI")}{" "}
+                {t("home.lpH1a.lw", "Trợ lý AI")}{" "}
                 <span
                   className="tw-gradient-anim"
                   style={{ background: GRADIENT, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}
                 >
-                  {t("home.lpH1b", "biết làm việc thật")}
+                  {t("home.lpH1b.lw", "làm việc thật trong Lark")}
                 </span>
               </h1>
             </>
             <>
               <p className="tw-lp-lead">
-                {t("home.lpHeroP1", "Một trợ lý, bốn cách để nó làm việc cho bạn: trò chuyện và nhận về")}{" "}
-                <strong>{t("home.lpHeroStrong", "tệp thật")}</strong>
-                {t("home.lpHeroP2", ", tạo web app full-stack, dựng video và bài viết, tự động hoá Lark Base. Nói bằng tiếng Việt hay tiếng Anh đều được.")}
+                {t("home.lpHeroP1.lw", "Kết nối tài khoản Lark, giao việc bằng một câu: AI đọc và ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn —")}{" "}
+                <strong>{t("home.lpHeroStrong.lw", "ghi gì cũng hỏi bạn trước")}</strong>
+                {t("home.lpHeroP2.lw", ". Đặt lịch để nó tự chạy, nhận về tệp xlsx/docx/pdf thật. Nói bằng tiếng Việt hay tiếng Anh đều được.")}
               </p>
             </>
             <>
@@ -759,18 +729,18 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
                   </Link>
                 </Magnetic>
                 <Magnetic>
-                  <Link href="/explore" className="tw-lp-btn tw-lp-btn-ghost">
-                    {t("home.lpCtaExplore", "Xem app cộng đồng")} →
+                  <Link href="/download" className="tw-lp-btn tw-lp-btn-ghost">
+                    {t("home.lpCtaDownload.lw", "Tải app máy tính")} →
                   </Link>
                 </Magnetic>
               </div>
               <p className="tw-lp-note">
-                {t("home.lpHeroNote", "Không cần thẻ tín dụng · Có gói miễn phí · Dùng được ở mọi nơi")}
+                {t("home.lpHeroNote.lw", "Không cần thẻ tín dụng · Có gói miễn phí · macOS & Windows")}
               </p>
             </>
 
-            {/* Mockup: một khung chat bên trái (gửi tệp → nhận tệp) và bốn ô kết quả bên phải — chính
-                là bốn trụ cột trong một tài khoản. Nghiêng nhẹ khi nghỉ, bám theo chuột khi hover
+            {/* Mockup: một khung chat bên trái (giao việc → nhận tệp) và bốn ô kết quả bên phải — các
+                mảng Lark trong cùng một tài khoản. Nghiêng nhẹ khi nghỉ, bám theo chuột khi hover
                 (TiltCard), lơ lửng (tw-float). Góc tối đa 10° (thẻ thường là 18°): mockup rộng gần
                 cả màn, nghiêng hơn là chữ bên trong méo; không hút (magnet=0) vì nó đã lơ lửng sẵn. */}
             {/* Khung mô phỏng cũng KHÔNG bọc `Reveal`: đo ở 375px nó bắt đầu ở 743px, tức vẫn nằm
@@ -786,29 +756,29 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
                         <i style={{ background: "#FF6058" }} />
                         <i style={{ background: "#FFBD2E" }} />
                         <i style={{ background: "#28C840" }} />
-                        <span className="tw-lp-frame-url">toolswave.net/agents-chat</span>
+                        <span className="tw-lp-frame-url">Larkwave · Lark Agents</span>
                       </div>
                       <div className="tw-lp-frame-grid">
                         <div className="tw-lp-frame-left">
                           <div className="tw-lp-frame-label">{t("home.lpMockYouSay", "BẠN NÓI")}</div>
                           <div className="tw-lp-bubble">
-                            {t("home.lpMockBubble", "Từ bảng doanh thu này, làm cho tôi báo cáo tuần dạng PDF, kèm nhận xét từng chi nhánh.")}
+                            {t("home.lpMockBubble.lw", "Từ Base Đơn hàng, tổng hợp doanh thu tuần theo chi nhánh rồi xuất báo cáo PDF, gửi vào nhóm Kinh doanh.")}
                           </div>
                           <div className="tw-lp-frame-label" style={{ marginTop: 16 }}>{t("home.lpMockReply", "TRỢ LÝ TRẢ VỀ")}</div>
                           <div className="tw-lp-file">
                             <span className="tw-lp-file-ico"><FilePdfOutlined /></span>
                             <div style={{ minWidth: 0 }}>
                               <b>bao-cao-tuan-38.pdf</b>
-                              <span>{t("home.lpMockFileState", "Sẵn sàng tải · đọc từ doanh-thu.xlsx")}</span>
+                              <span>{t("home.lpMockFileState.lw", "Sẵn sàng tải · đọc từ Base Đơn hàng")}</span>
                             </div>
                           </div>
                           <div className="tw-lp-live">
                             <i />
-                            {t("home.lpMockRunning", "Chạy trên máy chủ — không cần cài gì")}
+                            {t("home.lpMockRunning.lw", "Chạy trên app máy tính · bằng AI của bạn")}
                           </div>
                         </div>
                         <div className="tw-lp-frame-right">
-                          <div className="tw-lp-frame-label">{t("home.lpMockSameAccount", "CÙNG MỘT TÀI KHOẢN, CÙNG MỘT HẠN MỨC")}</div>
+                          <div className="tw-lp-frame-label">{t("home.lpMockSameAccount.lw", "CÙNG MỘT TÀI KHOẢN LARK")}</div>
                           <div className="tw-lp-tiles">
                             {tiles.map((x) => (
                               <div key={x.title} className="tw-lp-tile">
@@ -852,8 +822,8 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
           <div className="tw-lp-wrap">
             <Reveal>
               <Heading
-                title={t("home.lpPillarsTitle", "Bốn việc, một nền tảng")}
-                sub={t("home.lpPillarsSub", "Mỗi mục dưới đây đều đang chạy thật — kể cả những chỗ có điều kiện, chúng tôi ghi rõ ngay trong thẻ.")}
+                title={t("home.lpPillarsTitle.lw", "Mọi việc trên Lark, một trợ lý")}
+                sub={t("home.lpPillarsSub.lw", "Mỗi mục dưới đây đều đang chạy thật — kể cả những chỗ có điều kiện, chúng tôi ghi rõ ngay trong thẻ.")}
               />
             </Reveal>
             <div className="tw-lp-pillars">
@@ -902,8 +872,8 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
         <div style={{ maxWidth: 1080, margin: "0 auto" }}>
           <Reveal>
             <Heading
-              title={t("home.lpStepsTitle", "Bốn bước, vài phút")}
-              sub={t("home.lpStepsSub", "Cùng một cách làm cho cả bốn mảng: bạn nói, nó làm, bạn nhận kết quả thật.")}
+              title={t("home.lpStepsTitle.lw", "Bốn bước, vài phút")}
+              sub={t("home.lpStepsSub.lw", "Bạn nói, trợ lý làm, bạn duyệt — rồi để nó tự chạy theo lịch.")}
             />
           </Reveal>
           <div className="tw-lp-steps">
@@ -927,8 +897,8 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
       <section className="tw-lp-section" style={{ padding: "56px clamp(16px,5vw,56px)", maxWidth: 1120, margin: "0 auto" }}>
         <Reveal>
           <Heading
-            title={t("home.lpUseCasesTitle", "Bạn có thể làm gì?")}
-            sub={t("home.lpUseCasesSub", "Từ một báo cáo tuần đến phần mềm quản lý full-stack — cùng một tài khoản, cùng một hạn mức.")}
+            title={t("home.lpUseCasesTitle.lw", "Bạn có thể làm gì?")}
+            sub={t("home.lpUseCasesSub.lw", "Từ một báo cáo tuần đến cả quy trình vận hành trên Lark Base — chỉ bằng lời nói.")}
           />
         </Reveal>
         <div className="tw-lp-grid tw-lp-grid-uc" style={{ marginBottom: 26 }}>
@@ -957,7 +927,7 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
       <section className="tw-lp-section tw-lp-alt tw-lp-dots">
         <div style={{ maxWidth: 1120, margin: "0 auto" }}>
           <Reveal>
-            <Heading title={t("home.lpWhyTitle", "Vì sao chọn Larkwave?")} />
+            <Heading title={t("home.lpWhyTitle.lw", "Vì sao chọn Larkwave?")} />
           </Reveal>
           <div className="tw-lp-grid tw-lp-grid-why">
             {WHY.map((w, i) => (
@@ -977,8 +947,8 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
       <section style={{ padding: "56px clamp(16px,5vw,56px)", maxWidth: 1080, margin: "0 auto" }}>
         <Reveal>
           <Heading
-            title={t("home.lpPricingTitle", "Bắt đầu miễn phí, nâng cấp khi cần")}
-            sub={t("home.lpPricingSub", "Một hạn mức cho cả bốn mảng — xem chi tiết hạn mức & giá ở trang Gói & Giá.")}
+            title={t("home.lpPricingTitle.lw", "Bắt đầu miễn phí, nâng cấp khi cần")}
+            sub={t("home.lpPricingSub.lw", "Mỗi gói là một hạn mức dùng AI hàng tháng — xem chi tiết hạn mức & giá ở trang Gói & Giá.")}
           />
         </Reveal>
         <div className="tw-lp-grid tw-lp-grid-plan">
@@ -1013,42 +983,6 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
         </Reveal>
       </section>
 
-      {/* ───────── Blog ───────── */}
-      {posts.length > 0 && (
-        <section style={{ padding: "8px clamp(16px,5vw,56px) 56px", maxWidth: 1140, margin: "0 auto" }}>
-          <Reveal>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
-              <div>
-                <h2 style={{ fontSize: "clamp(22px,4vw,32px)", fontWeight: 800, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 10 }}>
-                  <ReadOutlined style={{ color: BRAND }} /> {t("home.lpBlogTitle", "Từ blog Larkwave")}
-                </h2>
-                <p style={{ color: V.textSub, fontSize: 16, margin: 0 }}>{t("home.lpBlogSub", "Hướng dẫn, mẹo và câu chuyện để bạn đi nhanh hơn.")}</p>
-              </div>
-              <Link href="/blog" style={{ color: BRAND, fontWeight: 700, fontSize: 15 }}>
-                {t("home.lpBlogAll", "Tất cả bài viết")} <ArrowRightOutlined style={{ fontSize: 12 }} />
-              </Link>
-            </div>
-          </Reveal>
-          <div className="tw-lp-grid tw-lp-grid-3" style={{ gap: 22 }}>
-            {posts.map((p, i) => (
-              <Reveal key={p.id} delay={i * 90} style={FULL}>
-                <TiltCard className="tw-pub-card tw-lp-card" style={{ padding: 8 }}>
-                  <Link href={`/blog/${p.slug}`} className="tw-lp-blog-card">
-                    <div className="tw-lp-blog-cover" style={{ background: p.coverImage ? `center/cover no-repeat url(${p.coverImage})` : GRADIENT }} />
-                    <div className="tw-lp-blog-body">
-                      {p.tags[0] && <span style={{ color: BRAND, fontWeight: 600, fontSize: 12.5 }}>{p.tags[0]}</span>}
-                      <h3>{p.title}</h3>
-                      {p.excerpt && <p>{p.excerpt}</p>}
-                      <div style={{ color: V.textFaint, fontSize: 12.5 }}>{fmtDate(p.publishedAt)}</div>
-                    </div>
-                  </Link>
-                </TiltCard>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ───────── FAQ ───────── */}
       <section style={{ padding: "8px clamp(16px,5vw,56px) 56px", maxWidth: 820, margin: "0 auto" }}>
         <Reveal>
@@ -1071,8 +1005,8 @@ export default function LandingPage({ lang }: { lang?: Locale }) {
         <Reveal>
           <div className="tw-lp-cta">
             <SafetyCertificateOutlined style={{ position: "absolute", right: -10, top: -10, fontSize: 130, opacity: 0.12 }} />
-            <h2 style={{ position: "relative" }}>{t("home.lpCtaTitle", "Giao việc cho trợ lý ngay hôm nay")}</h2>
-            <p style={{ position: "relative" }}>{t("home.lpCtaSub", "Miễn phí để thử, không cần thẻ. Một câu mô tả — phần còn lại để nó làm.")}</p>
+            <h2 style={{ position: "relative" }}>{t("home.lpCtaTitle.lw", "Giao việc Lark cho trợ lý ngay hôm nay")}</h2>
+            <p style={{ position: "relative" }}>{t("home.lpCtaSub.lw", "Miễn phí để thử, không cần thẻ. Một câu mô tả — phần còn lại để nó làm, bạn chỉ việc duyệt.")}</p>
             <Link href="/register" className="tw-shine tw-lp-cta-btn" style={{ position: "relative" }}>
               {t("home.lpCtaFinal", "Dùng thử miễn phí")} <ArrowRightOutlined />
             </Link>

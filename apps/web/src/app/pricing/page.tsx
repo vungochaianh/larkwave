@@ -6,7 +6,7 @@ import PricingClient from "./PricingClient";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
-/** Vỏ server mỏng: metadata + JSON-LD — xem chú thích ở `explore/page.tsx`. */
+/** Vỏ server mỏng: metadata + JSON-LD; thân trang là island PricingClient. */
 export async function generateMetadata({ searchParams }: { searchParams: SP }): Promise<Metadata> {
   const sp = await searchParams;
   return metaSongNgu(
@@ -15,17 +15,17 @@ export async function generateMetadata({ searchParams }: { searchParams: SP }): 
       vi: {
         title: "Bảng giá và các gói dịch vụ",
         description:
-          "Bảng giá Larkwave: một hạn mức dùng chung hàng tháng cho trợ lý AI, tạo app, nội dung và Lark. Có gói miễn phí, không cần thẻ.",
+          "Bảng giá Larkwave: hạn mức dùng AI hàng tháng cho trợ lý AI và Lark Agents. Từ 0đ, thanh toán QR tự kích hoạt. Có gói miễn phí, không cần thẻ.",
         ogTitle: "Bảng giá và các gói dịch vụ — Larkwave",
         ogDescription:
-          "Một hạn mức dùng chung mỗi tháng cho tất cả tính năng. Có gói miễn phí để bắt đầu.",
+          "Hạn mức dùng AI hàng tháng cho trợ lý AI và Lark Agents — chạy bằng AI trên máy bạn thì không tính. Có gói miễn phí để bắt đầu.",
       },
       en: {
         title: "Pricing and plans",
         description:
-          "Larkwave pricing: one shared monthly quota across the AI assistant, app building, content and Lark. Free plan to start, no card needed.",
+          "Larkwave pricing: a monthly AI usage quota for the AI assistant and Lark Agents. QR payment with instant activation. Free plan to start, no card needed.",
         ogTitle: "Pricing and plans — Larkwave",
-        ogDescription: "One shared monthly quota across every feature. Free plan to start.",
+        ogDescription: "A monthly AI usage quota for the assistant and Lark Agents — running on your own machine's AI is free. Free plan to start.",
       },
     },
     { queryLang: sp.lang },
@@ -36,7 +36,7 @@ export default async function PricingPage({ searchParams }: { searchParams: SP }
   const sp = await searchParams;
   const lang = await resolveLang(sp.lang);
   const vi = lang === "vi";
-  // siteGraph: Organization ở đây là ĐÚNG một thực thể với trang blog và trang tải về nhờ chung
+  // siteGraph: Organization ở đây là ĐÚNG một thực thể với trang chủ và trang tải về nhờ chung
   // `@id`. Ba trang tự khai riêng thì máy tìm kiếm thấy ba tổ chức trùng tên.
   const graph = siteGraph({
     breadcrumb: [{ name: vi ? "Gói & Giá" : "Plans & pricing", url: `${SITE}/pricing` }],

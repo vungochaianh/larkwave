@@ -71,7 +71,7 @@ function LoginInner({ lang }: { lang?: Locale }) {
     <AuthCard
       lang={lang}
       title={t("auth.signIn", "Đăng nhập")}
-      subtitle={t("auth.loginSubtitle", "Tiếp tục xây dựng app của bạn")}
+      subtitle={t("auth.loginSubtitle.lw", "Tiếp tục làm việc với Lark và Trợ lý AI")}
       footer={
         <>
           {t("auth.noAccount", "Chưa có tài khoản?")}{" "}
@@ -149,7 +149,7 @@ function LoginShell({ lang }: { lang?: Locale }) {
     <AuthCard
       lang={lang}
       title={t("auth.signIn", "Đăng nhập")}
-      subtitle={t("auth.loginSubtitle", "Tiếp tục xây dựng app của bạn")}
+      subtitle={t("auth.loginSubtitle.lw", "Tiếp tục làm việc với Lark và Trợ lý AI")}
       footer={null}
     >
       {null}

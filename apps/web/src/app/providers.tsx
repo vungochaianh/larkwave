@@ -16,18 +16,18 @@ import ForceDark from "@/components/ForceDark";
  * Trang công khai (ngoài dashboard) KHÔNG đi theo toggle sáng/tối của app — mỗi nhóm có một theme
  * cố định, để người đã bật dark trong app không mang theme app ra site và ngược lại:
  *
- *  - Nhóm TỐI: /welcome, /download, /blog và nhóm xác thực (/login, /register, /forgot, /reset) —
+ *  - Nhóm TỐI: /welcome, /download và nhóm xác thực (/login, /register, /forgot, /reset) —
  *    thiết kế tối hẳn (nền đen-tím, kính, viền phát sáng, nền WebGL). Bản tối đã được thiết kế và
  *    là bản CHÍNH; không có bản sáng. Nhóm xác thực chuyển sang đây (09/2026) vì người dùng đi từ
  *    /welcome tối sang một form trắng là thấy "hai sản phẩm"; AuthCard đã có bản tối riêng.
- *  - Nhóm SÁNG: trang chia sẻ app (/app, /a, /lark/s), hồ sơ (/u), và /auth/callback (chỉ là màn
+ *  - Nhóm SÁNG: trang chia sẻ công khai (/a, /lark/s) và /auth/callback (chỉ là màn
  *    chờ vài trăm ms sau OAuth) — bản tối của chúng chưa thiết kế.
  *
- * Hai route "hai vỏ" (khách vs đã đăng nhập trong AppShell) tự ép ở cấp trang: `/pricing`,
- * `/explore` — chúng bọc ForceDark cho nhánh khách.
+ * Route "hai vỏ" (khách vs đã đăng nhập trong AppShell) tự ép ở cấp trang: `/pricing` — nó bọc
+ * ForceDark cho nhánh khách.
  */
-const PUBLIC_DARK_BASES = ["/welcome", "/download", "/blog", "/store", "/login", "/register", "/forgot", "/reset"];
-const PUBLIC_LIGHT_BASES = ["/auth", "/app", "/a", "/lark/s", "/u"];
+const PUBLIC_DARK_BASES = ["/welcome", "/download", "/login", "/register", "/forgot", "/reset"];
+const PUBLIC_LIGHT_BASES = ["/auth", "/a", "/lark/s"];
 /**
  * TRANG CHỦ "/" kiểm RIÊNG chứ không thêm vào mảng: luật tiền tố là `startsWith(b + "/")`, với
  * b="/" thành `startsWith("//")` không khớp gì — và nếu ai "sửa cho gọn" thành `startsWith(b)` thì

@@ -1,35 +1,12 @@
 "use client";
 
-import {
-  AppstoreOutlined,
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  DollarOutlined,
-  FlagOutlined,
-  RiseOutlined,
-  ThunderboltOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
-import {
-  App,
-  Card,
-  Col,
-  Empty,
-  Row,
-  Skeleton,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
+import { ArrowDownOutlined, ArrowUpOutlined, DollarOutlined, FlagOutlined, RiseOutlined, ThunderboltOutlined, UserOutlined } from "@ant-design/icons";
+import { App, Card, Col, Empty, Row, Skeleton, Space, Tag, Tooltip, Typography } from "antd";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AdminReport, AuditLogEntry, Build } from "@larkwave/shared";
+import type { AdminReport, AuditLogEntry } from "@larkwave/shared";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { BuildStatusTag, TrackTag } from "@/components/StatusTags";
 import { BRAND } from "@/lib/theme";
 import { V, OK, WARN, ERR, BLUE } from "@larkwave/ui";
 const { Title, Text } = Typography;
@@ -198,17 +175,13 @@ function MiniChart({ report }: { report: AdminReport }) {
 
 interface Counts {
   users: number;
-  liveApps: number;
-  buildsToday: number;
-  flagged: number;
+  aiRunsToday: number;
+  openFeedback: number;
 }
 
 /** Human label for the common audit actions surfaced on the dashboard. */
 function auditLabel(action: string): string {
   const map: Record<string, string> = {
-    "app.suspend": "Tạm ngưng app",
-    "app.unsuspend": "Khôi phục app",
-    "app.delete": "Xoá app",
     "user.update": "Cập nhật người dùng",
     "settings.update": "Cập nhật cấu hình",
     "billing.update": "Cập nhật gói & giá",
@@ -220,7 +193,6 @@ export default function AdminDashboard() {
   const { message } = App.useApp();
   const [report, setReport] = useState<AdminReport | null>(null);
   const [counts, setCounts] = useState<Counts | null>(null);
-  const [recentBuilds, setRecentBuilds] = useState<Build[]>([]);
   const [recentAudit, setRecentAudit] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -229,24 +201,19 @@ export default function AdminDashboard() {
       try {
         const todayIso = new Date();
         todayIso.setHours(0, 0, 0, 0);
-        const [rep, users, liveApps, flagged, builds, todayBuilds, audit] =
-          await Promise.all([
-            api.adminReports("30d"),
-            api.listUsers({ pageSize: 1 }),
-            api.listApps({ pageSize: 1, status: "live" }),
-            api.adminApps({ pageSize: 1, flagged: true }),
-            api.listBuilds({ pageSize: 8 }),
-            api.adminReports("today"),
-            api.listAudit({ pageSize: 8 }),
-          ]);
+        const [rep, users, openFeedback, today, audit] = await Promise.all([
+          api.adminReports("30d"),
+          api.listUsers({ pageSize: 1 }),
+          api.adminFeedback({ status: "open", pageSize: 1 }),
+          api.adminReports("today"),
+          api.listAudit({ pageSize: 8 }),
+        ]);
         setReport(rep);
         setCounts({
           users: users.total,
-          liveApps: liveApps.total,
-          buildsToday: todayBuilds.builds.total,
-          flagged: flagged.total,
+          aiRunsToday: today.apiCost.runs,
+          openFeedback: openFeedback.total,
         });
-        setRecentBuilds(builds.items);
         setRecentAudit(audit.items);
       } catch (e) {
         message.error((e as Error).message);
@@ -259,35 +226,6 @@ export default function AdminDashboard() {
   const profitUp = (report?.profit.profitVnd ?? 0) >= 0;
   const profitColor = profitUp ? OK : ERR;
 
-  const buildColumns: ColumnsType<Build> = [
-    {
-      title: "Yêu cầu",
-      dataIndex: "prompt",
-      key: "prompt",
-      ellipsis: true,
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      width: 130,
-      render: (_, r) => <BuildStatusTag status={r.status} />,
-    },
-    {
-      title: "Loại",
-      dataIndex: "track",
-      key: "track",
-      width: 92,
-      render: (_, r) => <TrackTag track={r.track} />,
-    },
-    {
-      title: "Tạo lúc",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      width: 160,
-      render: (v) => <Text type="secondary">{formatDate(v)}</Text>,
-    },
-  ];
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
@@ -343,7 +281,7 @@ export default function AdminDashboard() {
                 {usd(report?.apiCost.totalUsd ?? 0)}
               </span>
             }
-            sub={`${num(report?.apiCost.builds ?? 0)} builds tính phí`}
+            sub={`${num(report?.apiCost.runs ?? 0)} lượt AI tính phí`}
           />
         </Col>
         <Col xs={12} md={8} xl={4}>
@@ -358,22 +296,12 @@ export default function AdminDashboard() {
         </Col>
         <Col xs={12} md={8} xl={4}>
           <Kpi
-            title="App đang chạy"
-            icon={<AppstoreOutlined />}
-            color={BRAND}
-            loading={loading}
-            value={num(counts?.liveApps ?? 0)}
-            sub="đang phát hành"
-          />
-        </Col>
-        <Col xs={12} md={8} xl={4}>
-          <Kpi
-            title="Builds hôm nay"
+            title="Lượt AI hôm nay"
             icon={<ThunderboltOutlined />}
             color={BRAND}
             loading={loading}
-            value={num(counts?.buildsToday ?? 0)}
-            sub="trong ngày"
+            value={num(counts?.aiRunsToday ?? 0)}
+            sub="trong ngày (MAIC)"
           />
         </Col>
       </Row>
@@ -423,13 +351,13 @@ export default function AdminDashboard() {
                     </Text>
                   </Space>
                   <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>
-                    {loading ? "—" : num(counts?.flagged ?? 0)}
+                    {loading ? "—" : num(counts?.openFeedback ?? 0)}
                   </div>
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    app gắn cờ vi phạm
+                    báo lỗi chưa xử lý
                   </Text>
                 </div>
-                <Link href="/admin/moderation?tab=flagged">Kiểm duyệt →</Link>
+                <Link href="/admin/feedback">Báo lỗi →</Link>
               </Space>
             </Card>
 
@@ -488,20 +416,6 @@ export default function AdminDashboard() {
         </Col>
       </Row>
 
-      {/* Recent builds */}
-      <Card
-        title="Build gần đây"
-        extra={<Link href="/admin/builds">Xem tất cả →</Link>}
-      >
-        <Table<Build>
-          rowKey="id"
-          loading={loading}
-          columns={buildColumns}
-          dataSource={recentBuilds}
-          pagination={false}
-          size="middle"
-        />
-      </Card>
     </Space>
   );
 }

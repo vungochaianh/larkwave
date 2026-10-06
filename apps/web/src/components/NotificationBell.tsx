@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BellOutlined,
-  BugOutlined,
-  CheckOutlined,
-  InfoCircleOutlined,
-  MessageOutlined,
-  ThunderboltOutlined,
-} from "@ant-design/icons";
+import { BellOutlined, BugOutlined, CheckOutlined, InfoCircleOutlined, MessageOutlined } from "@ant-design/icons";
 import { Badge, Button, Empty, List, Popover, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -23,7 +16,6 @@ const { Text } = Typography;
 const TYPE_ICON: Record<NotificationType, ReactNode> = {
   message: <MessageOutlined style={{ color: "#6C5CE7" }} />,
   feedback: <BugOutlined style={{ color: "#EF4444" }} />,
-  build: <ThunderboltOutlined style={{ color: "#16B98D" }} />,
   system: <InfoCircleOutlined style={{ color: "#9AA3B5" }} />,
 };
 

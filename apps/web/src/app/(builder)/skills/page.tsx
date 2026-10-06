@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { RuntimeProvider, SkillsScreen, WebRuntimeAdapter } from "@larkwave/ui";
 import { getToken, API_BASE } from "@/lib/api";
 
@@ -13,14 +12,13 @@ import { getToken, API_BASE } from "@/lib/api";
  * flow — SkillsScreen hides "import folder" when the runtime lacks it.)
  */
 export default function SkillsPage() {
-  const router = useRouter();
   const runtime = useMemo(() => new WebRuntimeAdapter(API_BASE, getToken), []);
   return (
     <RuntimeProvider runtime={runtime}>
       {/* Constrain the width like the desktop shell does — the (builder) content area is full-width,
           which left the Skills page stretched edge-to-edge. */}
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-        <SkillsScreen onCreate={() => router.push("/")} />
+        <SkillsScreen />
       </div>
     </RuntimeProvider>
   );

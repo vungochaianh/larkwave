@@ -326,7 +326,7 @@ export class MaicService implements OnModuleInit {
    * returns normal JSON instead of an event-stream), the whole answer is delivered as one delta —
    * so this is safe to ship NOW and lights up automatically once MAIC adds SSE streaming.
    *
-   * Expected SSE line shape (see docs/maic-upgrade-request.md): `data: {json}` where json is
+   * Expected SSE line shape: `data: {json}` where json is
    *  - { type:'delta', text }      incremental token chunk
    *  - { type:'done', sessionId, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, costUsd, runId, durationMs }
    *  - { type:'error', message }

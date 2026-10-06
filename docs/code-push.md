@@ -1,5 +1,8 @@
 # Desktop code push (renderer OTA)
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 The installed desktop app loads its renderer from **Cloudflare Pages**
 (`https://twd-desktop-renderer.pages.dev`) with the bundled renderer as an offline
 fallback. So a renderer/UI change reaches installed apps **without a reinstall** — just

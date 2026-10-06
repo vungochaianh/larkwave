@@ -7,7 +7,7 @@ import { FxStyles, FX_DARK_PALETTE as D } from "@/components/fx";
 
 /**
  * Ép một subtree sang TỐI bất kể toggle sáng/tối của app — đối xứng với ForceLight, dành cho trang
- * công khai (/welcome, /download, /explore, /pricing, /blog) vốn được thiết kế tối hẳn: nền gần đen
+ * công khai (/welcome, /download, /pricing) vốn được thiết kế tối hẳn: nền gần đen
  * có sắc tím, mặt kính, viền phát sáng. Thẩm mỹ này sống bằng nền tối; ép lên nền trắng thì ánh
  * sáng tím thành màu phấn (đó là lý do đợt giao diện trước bị bác).
  *

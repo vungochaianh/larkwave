@@ -1,36 +1,10 @@
 "use client";
 
-import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  DollarOutlined,
-  ReloadOutlined,
-  RiseOutlined,
-  ThunderboltOutlined,
-} from "@ant-design/icons";
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  Empty,
-  Row,
-  Segmented,
-  Skeleton,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
+import { ArrowDownOutlined, ArrowUpOutlined, DollarOutlined, ReloadOutlined, RiseOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { App, Button, Card, Col, Empty, Row, Segmented, Skeleton, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import type {
-  AdminReport,
-  ModelChoice,
-  PlanId,
-  ReportPeriod,
-} from "@larkwave/shared";
+import type { AdminReport, PlanId, ReportPeriod } from "@larkwave/shared";
 import { api } from "@/lib/api";
 import { BRAND } from "@/lib/theme";
 import { V, OK, WARN, ERR, BLUE } from "@larkwave/ui";
@@ -43,10 +17,6 @@ const PERIOD_OPTIONS: { label: string; value: ReportPeriod }[] = [
   { label: "Tất cả", value: "all" },
 ];
 
-const MODEL_LABEL: Record<ModelChoice, string> = {
-  opus: "Opus",
-  sonnet: "Sonnet",
-};
 
 const PLAN_LABEL: Record<PlanId, string> = {
   free: "Miễn phí",
@@ -259,53 +229,29 @@ export default function AdminReportsPage() {
   const profitUp = (report?.profit.profitVnd ?? 0) >= 0;
   const profitColor = profitUp ? OK : ERR;
 
-  // ── model breakdown table ──
-  const modelRows = (["opus", "sonnet"] as ModelChoice[]).map((m) => ({
-    key: m,
-    model: m,
-    ...(report?.byModel[m] ?? {
-      builds: 0,
-      usd: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-    }),
-  }));
+  // ── AI cost by usage kind ──
+  const KIND_LABEL: Record<string, string> = {
+    ask: "Trợ lý AI (hosted)",
+    run: "Chạy có tệp đính kèm",
+    lark: "Lark chạy hộ",
+    scheduled: "Tác vụ định kỳ",
+  };
+  const modelRows = Object.entries(report?.byKind ?? {})
+    .map(([kind, v]) => ({ key: kind, kind, ...v }))
+    .sort((x, y) => y.usd - x.usd);
   const modelColumns: ColumnsType<(typeof modelRows)[number]> = [
     {
-      title: "Model",
-      dataIndex: "model",
-      key: "model",
-      render: (m: ModelChoice) => (
-        <Tag
-          bordered={false}
-          color={m === "opus" ? "purple" : "blue"}
-          style={{ fontWeight: 600 }}
-        >
-          {MODEL_LABEL[m]}
+      title: "Loại",
+      dataIndex: "kind",
+      key: "kind",
+      render: (k: string) => (
+        <Tag bordered={false} color="purple" style={{ fontWeight: 600 }}>
+          {KIND_LABEL[k] ?? k}
         </Tag>
       ),
     },
-    {
-      title: "Builds",
-      dataIndex: "builds",
-      key: "builds",
-      align: "right",
-      render: (v: number) => num(v),
-    },
-    {
-      title: "Token vào",
-      dataIndex: "inputTokens",
-      key: "inputTokens",
-      align: "right",
-      render: (v: number) => tokens(v),
-    },
-    {
-      title: "Token ra",
-      dataIndex: "outputTokens",
-      key: "outputTokens",
-      align: "right",
-      render: (v: number) => tokens(v),
-    },
+    { title: "Lượt chạy", dataIndex: "runs", key: "runs", align: "right", render: (v: number) => num(v) },
+    { title: "Token", dataIndex: "tokens", key: "tokens", align: "right", render: (v: number) => tokens(v) },
     {
       title: "Chi phí (USD)",
       dataIndex: "usd",
@@ -368,7 +314,7 @@ export default function AdminReportsPage() {
             Báo cáo lợi nhuận
           </Title>
           <Text type="secondary">
-            Doanh thu, chi phí Claude API và lợi nhuận theo thời gian
+            Doanh thu, chi phí AI và lợi nhuận theo thời gian
           </Text>
         </div>
         <Space wrap>
@@ -406,7 +352,7 @@ export default function AdminReportsPage() {
         </Col>
         <Col xs={24} sm={12} xl={6}>
           <StatCard
-            title="Chi phí Claude API"
+            title="Chi phí AI"
             icon={<RiseOutlined />}
             color={WARN}
             loading={loading}
@@ -439,19 +385,16 @@ export default function AdminReportsPage() {
         </Col>
         <Col xs={24} sm={12} xl={6}>
           <StatCard
-            title="Builds"
+            title="Lượt AI tính phí"
             icon={<ThunderboltOutlined />}
             color={BRAND}
             loading={loading}
           >
             <Title level={3} style={{ margin: 0 }}>
-              {num(report?.builds.total ?? 0)}
+              {num(report?.apiCost.runs ?? 0)}
             </Title>
             <Text type="secondary" style={{ fontSize: 12.5 }}>
-              Tỷ lệ thành công{" "}
-              <Text strong style={{ color: OK }}>
-                {pct((report?.builds.successRate ?? 0) * 100)}
-              </Text>
+              {tokens(report?.apiCost.tokens ?? 0)} token
             </Text>
           </StatCard>
         </Col>
@@ -470,10 +413,10 @@ export default function AdminReportsPage() {
         {/* Model breakdown */}
         <Col xs={24} lg={14}>
           <Card
-            title="Chi phí theo model"
+            title="Chi phí AI theo loại"
             extra={
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Đã nạp vào Claude API
+                Theo sổ MAIC
               </Text>
             }
           >
@@ -491,15 +434,12 @@ export default function AdminReportsPage() {
                       <Text strong>Tổng</Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={1} align="right">
-                      <Text strong>{num(report.apiCost.builds)}</Text>
+                      <Text strong>{num(report.apiCost.runs)}</Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={2} align="right">
-                      <Text strong>{tokens(report.apiCost.inputTokens)}</Text>
+                      <Text strong>{tokens(report.apiCost.tokens)}</Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={3} align="right">
-                      <Text strong>{tokens(report.apiCost.outputTokens)}</Text>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right">
                       <Text strong style={{ color: WARN }}>
                         {usd(report.apiCost.totalUsd)}
                       </Text>

@@ -142,7 +142,7 @@ export default function AdminUsersPage() {
           const res = await api.impersonateUser(u.id);
           const url = `${APP_BASE_URL}/auth/callback?token=${encodeURIComponent(
             res.token,
-          )}&imp=1&next=${encodeURIComponent("/apps")}`;
+          )}&imp=1&next=${encodeURIComponent("/overview")}`;
           window.open(url, "_blank", "noopener,noreferrer");
           message.success(`Đang mở phiên của ${u.email}…`);
         } catch (e) {

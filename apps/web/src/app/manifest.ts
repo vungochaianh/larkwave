@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Larkwave",
     short_name: "Larkwave",
     description:
-      "Nhập một câu lệnh, ra app ngay — tạo, build và deploy ứng dụng bằng AI.",
+      "Trợ lý AI làm việc trong Lark — Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn.",
     start_url: "/",
     display: "standalone",
     background_color: "#F4F5FB",

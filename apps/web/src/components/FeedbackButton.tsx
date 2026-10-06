@@ -118,7 +118,7 @@ export default function FeedbackButton({ variant = "fab" }: { variant?: "fab" | 
   return (
     <>
       {variant === "header" ? (
-        // Inline header button (next to "Tạo app") — used on the remote-chat pages where a floating
+        // Inline header button (next to "Trò chuyện mới") — used on the remote-chat pages where a floating
         // FAB would cover the composer's Send button. The modal is centered, so no positioning issues.
         <Button
           shape="circle"

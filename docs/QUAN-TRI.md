@@ -1,5 +1,8 @@
 # Tài liệu quản trị Toolswave (CMS)
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 ## 1. Truy cập
 - **URL:** https://aapp.toolswave.net (hoặc https://app.toolswave.net/admin)
 - **Đăng nhập:** tài khoản có vai trò **admin** (vd `deveris.vu@gmail.com`). Tài khoản thường sẽ bị chặn (403).

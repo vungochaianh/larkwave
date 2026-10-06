@@ -1,6 +1,5 @@
-# Toolswave App Builder — CI/CD.
-# build + test run on any runner. deploy (manual, main) needs a runner that can
-# reach the server over Tailscale (self-hosted runner on the box is simplest).
+# Larkwave — CI.
+# build + test run on any runner. (No deploy stage yet — see docs/TACH-APP.md.)
 stages: [build, test]
 
 default:

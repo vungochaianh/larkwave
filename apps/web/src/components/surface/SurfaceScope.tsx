@@ -16,7 +16,7 @@ import "./surface.css";
  * bảng màu đen-tím (`:root[data-theme="dark"]:has(.tw-app)`) móc vào class đó — ConfigProvider
  * không render DOM nên không tự gắn được.
  *
- * Các shell cùng đi qua đây để /apps và /agents-chat ở chế độ tối là cùng một màu: nếu chỉ
+ * Các shell cùng đi qua đây để /overview và /agents-chat ở chế độ tối là cùng một màu: nếu chỉ
  * AppShell chuyển đen-tím còn hai shell kia xám xanh thì bấm qua lại là thấy "hai sản phẩm".
  */
 export default function SurfaceScope({ children }: { children: ReactNode }) {

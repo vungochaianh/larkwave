@@ -19,10 +19,8 @@ const PUBLIC_SPLASH_BASES = [
   "/register",
   "/forgot",
   "/reset",
-  "/explore",
   "/pricing",
-  "/blog",
-  "/app",
+  "/support",
   "/a",
   "/s",
   "/g",
@@ -47,7 +45,7 @@ export default function PublicSplash() {
   const pathname = usePathname();
   const { t } = useI18n();
   if (!isPublicSplashRoute(pathname || "")) return null;
-  // Câu dẫn bám định vị hiện tại của site (cùng câu với <title> ở layout gốc) thay vì mặc định
-  // "Tạo app bằng AI" của component — định vị cũ đó chỉ nói 1/4 những gì nền tảng làm.
-  return <SplashScreen tagline={t("landing.splash.tagline", "Trợ lý AI biết làm việc thật")} />;
+  // Câu dẫn bám định vị hiện tại của site (cùng câu với <title> ở layout gốc) thay vì câu mặc
+  // định của component.
+  return <SplashScreen tagline={t("landing.splash.tagline.lw", "Trợ lý AI làm việc thật trên Lark")} />;
 }

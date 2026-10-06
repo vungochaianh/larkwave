@@ -1,5 +1,8 @@
 # PROMPT — Toolswave QA Agent (kiểm thử tự động 24/7)
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](../TACH-APP.md).
+
 > Dán **toàn bộ phần giữa hai mốc `# BẮT ĐẦU PROMPT` … `# HẾT PROMPT`** vào một agent (Claude / GPT / …)
 > có **công cụ trình duyệt** (Playwright / Puppeteer / browser-use) chạy trên máy 24/7. Điền phần
 > `CẤU HÌNH` trước. Mỗi phiên agent chọn 1–2 nhóm chức năng theo lịch xoay vòng (mục 12), thao tác như

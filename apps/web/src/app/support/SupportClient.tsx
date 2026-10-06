@@ -21,10 +21,10 @@ const GRADIENT =
 /** Chỗ người ta tự tìm được câu trả lời nhanh hơn chờ trả lời. Đặt TRƯỚC ô báo lỗi là có chủ ý. */
 type TFn = (k: string, fb?: string) => string;
 const selfServe = (t: TFn) => [
-  { href: "/blog", title: t("sup.ssBlog", "Hướng dẫn & mẹo"), desc: t("sup.ssBlogD", "Bài viết từng bước: dựng app, deploy, gắn tên miền.") },
-  { href: "/pricing", title: t("sup.ssPrice", "Gói & Giá"), desc: t("sup.ssPriceD", "Hạn mức dùng chung mỗi tháng, và gói miễn phí gồm những gì.") },
-  { href: "/download", title: t("sup.ssApp", "Tải app desktop"), desc: t("sup.ssAppD", "Chạy AI ngay trên máy bạn, dùng được cả khi offline.") },
-  { href: "/explore", title: t("sup.ssExplore", "Sản phẩm cộng đồng"), desc: t("sup.ssExploreD", "Xem người khác đã dựng gì, để biết mô tả thế nào cho ra kết quả.") },
+  { href: "/community", title: t("sup.ssCommunity.lw", "Cộng đồng"), desc: t("sup.ssCommunityD.lw", "Hỏi người dùng khác, xem mẹo dùng Lark Agents và Kỹ năng.") },
+  { href: "/pricing", title: t("sup.ssPrice", "Gói & Giá"), desc: t("sup.ssPriceD.lw", "Hạn mức dùng AI mỗi tháng, và gói miễn phí gồm những gì.") },
+  { href: "/download", title: t("sup.ssApp", "Tải app desktop"), desc: t("sup.ssAppD.lw", "Kết nối Lark bằng QR và chạy AI ngay trên máy bạn.") },
+  { href: "/reports", title: t("sup.ssReports.lw", "Thưởng báo lỗi"), desc: t("sup.ssReportsD.lw", "Báo lỗi được ghi nhận, lên hạng tester và nhận thưởng.") },
 ];
 
 /**

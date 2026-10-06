@@ -881,7 +881,7 @@ body {
   .tw-shine::after { display: none; }
 }
 
-/* ───────────────────── Bề mặt 3D cho trang công khai (/download, /explore) ─────────────────────
+/* ───────────────────── Bề mặt 3D cho trang công khai (/download) ─────────────────────
    Token dùng chung cho các thẻ TiltCard và quầng màu parallax. Ba tầng selector đúng như theme.ts
    và FxStyles: `:root` (sáng), `[data-theme="dark"]` (khớp cả <html> dark lẫn wrapper ForceDark —
    KHÔNG dùng `:root[data-theme="dark"]`, selector đó không khớp wrapper con), và `[data-theme="light"]`

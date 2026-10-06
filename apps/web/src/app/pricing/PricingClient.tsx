@@ -63,15 +63,12 @@ const ANON_CATALOG: PlanCatalogEntry[] = [
     label: "Miễn phí",
     priceVnd: 0,
     monthlyTokens: 3_000_000,
-    maxLiveApps: 1,
     storageMb: 1_024,
-    serverDeploy: false,
     features: [
-      "Hạn mức dùng hàng tháng (gói cơ bản) — tạo & deploy app thật",
-      "App đầy đủ: giao diện + dữ liệu + trang quản trị",
-      "1 app chạy đồng thời",
-      "Deploy thật ra Cloudflare (subdomain công khai)",
-      "Sửa app bằng chat · Xem & tải source",
+      "Hạn mức dùng AI hàng tháng (gói cơ bản)",
+      "Lark Agents trên desktop: Bitable · Docs · Sheets · Wiki · Drive · Lịch · Tin nhắn",
+      "Chạy trên Claude/Codex/Gemini/Grok của máy bạn — không tính hạn mức",
+      "Trợ lý AI · Kỹ năng · Artifacts",
       "Hỗ trợ cộng đồng",
     ],
   },
@@ -80,16 +77,12 @@ const ANON_CATALOG: PlanCatalogEntry[] = [
     label: "Khởi đầu",
     priceVnd: 199000,
     monthlyTokens: 30_000_000,
-    maxLiveApps: 3,
     storageMb: 5_120,
-    serverDeploy: false,
     features: [
       "Hạn mức gấp ~10× gói Miễn phí mỗi tháng",
-      "App đầy đủ: giao diện + dữ liệu (D1) + trang quản trị",
-      "3 app chạy đồng thời",
-      "Tải source code (ZIP) · Đồng bộ GitLab",
-      "Sửa code trong app + deploy lại",
-      "Web · Mobile · Extension",
+      "Trợ lý AI trên Claude do Larkwave cung cấp (không cần cài Claude)",
+      "Tự động hoá Lark theo lịch · Đặc tả · Xuất xlsx/docx/pdf",
+      "Điều khiển máy desktop từ điện thoại/web",
       "Hỗ trợ email",
     ],
   },
@@ -98,18 +91,13 @@ const ANON_CATALOG: PlanCatalogEntry[] = [
     label: "Chuyên nghiệp",
     priceVnd: 499000,
     monthlyTokens: 100_000_000,
-    maxLiveApps: 12,
     storageMb: 10_240,
-    serverDeploy: true,
-    maxServerServices: 8,
     features: [
       "Hạn mức gấp ~33× gói Miễn phí mỗi tháng",
-      "12 app chạy đồng thời",
       "Mọi tính năng gói Khởi đầu",
-      "★ Chạy trên Server (Docker): backend/DB/Python thật, mỗi service 1 subdomain",
-      "Import workspace nhiều service → chạy chung 1 app",
-      "Tên miền riêng cho từng service (custom domain)",
-      "Xoá nhãn 'Tạo bởi Larkwave' · Templates riêng tư",
+      "Larkwave chạy hộ lịch tự động hoá khi máy bạn tắt",
+      "Đồng bộ CMS Bitable nhiều tài khoản Lark",
+      "Chia sẻ trợ lý cho đồng đội (quyền uỷ thác, không lộ khoá)",
       "Hỗ trợ ưu tiên",
     ],
   },
@@ -118,15 +106,10 @@ const ANON_CATALOG: PlanCatalogEntry[] = [
     label: "Doanh nghiệp",
     priceVnd: 999000,
     monthlyTokens: 300_000_000,
-    maxLiveApps: 9999,
     storageMb: 25_600,
-    serverDeploy: true,
-    maxServerServices: 9999,
     features: [
       "Hạn mức gấp ~100× gói Miễn phí mỗi tháng",
-      "App chạy đồng thời KHÔNG giới hạn",
       "Mọi tính năng gói Chuyên nghiệp",
-      "★ Tài nguyên Server cao hơn (RAM/CPU) cho app Docker",
       "Sớm dùng tính năng mới · Hỗ trợ riêng (SLA)",
     ],
   },
@@ -139,15 +122,12 @@ const ANON_CATALOG_EN: PlanCatalogEntry[] = [
     label: "Free",
     priceVnd: 0,
     monthlyTokens: 3_000_000,
-    maxLiveApps: 1,
     storageMb: 1_024,
-    serverDeploy: false,
     features: [
-      "Monthly usage allowance (base) — build & deploy real apps",
-      "Full app: UI + data + admin page",
-      "1 app running at a time",
-      "Real deploy to Cloudflare (public subdomain)",
-      "Edit apps by chat · View & download source",
+      "Monthly AI usage quota (base)",
+      "Lark Agents on desktop: Bitable · Docs · Sheets · Wiki · Drive · Calendar · Messages",
+      "Runs on your machine's Claude/Codex/Gemini/Grok — no quota used",
+      "AI Assistant · Skills · Artifacts",
       "Community support",
     ],
   },
@@ -156,16 +136,12 @@ const ANON_CATALOG_EN: PlanCatalogEntry[] = [
     label: "Starter",
     priceVnd: 199000,
     monthlyTokens: 30_000_000,
-    maxLiveApps: 3,
     storageMb: 5_120,
-    serverDeploy: false,
     features: [
-      "~10× the Free monthly allowance",
-      "Full app: UI + data (D1) + admin page",
-      "3 apps running at a time",
-      "Download source (ZIP) · GitLab sync",
-      "Edit code in-app + redeploy",
-      "Web · Mobile · Extension",
+      "~10× the Free monthly quota",
+      "AI Assistant on Claude provided by Larkwave (no Claude install needed)",
+      "Scheduled Lark automation · Spec · xlsx/docx/pdf export",
+      "Control your desktop from phone/web",
       "Email support",
     ],
   },
@@ -174,18 +150,13 @@ const ANON_CATALOG_EN: PlanCatalogEntry[] = [
     label: "Professional",
     priceVnd: 499000,
     monthlyTokens: 100_000_000,
-    maxLiveApps: 12,
     storageMb: 10_240,
-    serverDeploy: true,
-    maxServerServices: 8,
     features: [
-      "~33× the Free monthly allowance",
-      "12 apps running at a time",
+      "~33× the Free monthly quota",
       "Everything in Starter",
-      "★ Run on Server (Docker): real backend/DB/Python, one subdomain per service",
-      "Import multi-service workspace → run as one app",
-      "Custom domain per service",
-      "Remove the 'Made with Larkwave' badge · Private templates",
+      "Larkwave runs your automation schedules when your computer is off",
+      "Bitable CMS sync across multiple Lark accounts",
+      "Share your assistant with teammates (delegated access, no keys exposed)",
       "Priority support",
     ],
   },
@@ -194,15 +165,10 @@ const ANON_CATALOG_EN: PlanCatalogEntry[] = [
     label: "Enterprise",
     priceVnd: 999000,
     monthlyTokens: 300_000_000,
-    maxLiveApps: 9999,
     storageMb: 25_600,
-    serverDeploy: true,
-    maxServerServices: 9999,
     features: [
-      "~100× the Free monthly allowance",
-      "UNLIMITED apps running at a time",
+      "~100× the Free monthly quota",
       "Everything in Professional",
-      "★ Higher server resources (RAM/CPU) for Docker apps",
       "Early access to new features · Dedicated support (SLA)",
     ],
   },
@@ -216,8 +182,6 @@ const ANON_SUB: MeSubscription = {
   tokensUsed: 0,
   tokensLimit: 0,
   resetAt: null,
-  liveApps: 0,
-  maxLiveApps: 0,
   unlimited: false,
   freePlanEnabled: true,
   catalog: ANON_CATALOG,
@@ -669,8 +633,8 @@ export default function PricingClient({ lang }: { lang?: Locale }) {
         <span className="tw-pr-hero-bar" aria-hidden="true" />
         <Paragraph type="secondary" className="tw-pr-hero-sub" style={{ fontSize: 15, margin: 0 }}>
           {t(
-            "money.pricingSubtitle",
-            "Mỗi lần tạo / chỉnh sửa app tiêu tốn credit theo mô hình bạn chọn. Nâng cấp bất cứ lúc nào để có thêm credit và nhiều app chạy đồng thời hơn.",
+            "money.pricingSubtitle.lw",
+            "Mỗi gói là một hạn mức dùng AI hàng tháng cho Trợ lý AI và Lark Agents. Nâng cấp bất cứ lúc nào để có thêm hạn mức, chạy hộ khi tắt máy và chia sẻ cho đồng đội.",
           )}
         </Paragraph>
       </div>
@@ -854,7 +818,7 @@ export default function PricingClient({ lang }: { lang?: Locale }) {
   // thẳng đó là sai (24/09/2026): bảng giá là trang giới thiệu, không phải màn hình trong app.
   //
   // Nó cũng mâu thuẫn với nguyên tắc đã ghi sẵn ở proxy.ts cho "/": đã đăng nhập thì vẫn cần đọc
-  // blog, xem bảng giá, đọc chính sách — việc cần làm không phải đổi khung cho họ, mà là ĐỔI PHẦN
+  // trang giới thiệu, xem bảng giá, đọc chính sách — việc cần làm không phải đổi khung cho họ, mà là ĐỔI PHẦN
   // ĐẦU TRANG để hiện tài khoản (LandingHeader đã làm việc đó).
   //
   // Lợi thêm: một liên kết /pricing chia sẻ cho nhau nay mở ra CÙNG một thứ với mọi người, thay vì
@@ -1080,11 +1044,11 @@ function ModelNote() {
         <Text style={{ fontSize: 13.5, color: "var(--tw-text, #1E2230)" }}>
           {t("money.modelNote1", "Mỗi gói có ")}
           <Text strong>{t("money.modelNoteQuota", "hạn mức hàng tháng")}</Text>
-          {t("money.modelNote2", ". Mỗi lần tạo/sửa app dùng một phần ")}
+          {t("money.modelNote2.lw", ". Mỗi lượt chạy trên Claude của Larkwave dùng một phần ")}
           <Text strong>{t("money.modelNotePercent", "% của gói")}</Text>
-          {t("money.modelNote3", " theo độ lớn thực tế — app càng lớn càng dùng nhiều %. App luôn được tạo ")}
-          <Text strong>{t("money.modelNoteFull", "đầy đủ")}</Text>
-          {t("money.modelNote4", " (giao diện + dữ liệu + trang quản trị).")}
+          {t("money.modelNote3.lw", " theo khối lượng thực tế. Chạy bằng AI ")}
+          <Text strong>{t("money.modelNoteLocal.lw", "cài trên máy bạn")}</Text>
+          {t("money.modelNote4.lw", " (Claude, Codex, Gemini, Grok) thì không tính vào hạn mức.")}
         </Text>
       </div>
     </Card>
@@ -1120,31 +1084,20 @@ function PricingFooter() {
 }
 
 /**
- * Drop the credit-allowance / concurrency bullets that we already render as the
- * two prominent stat lines, so the detailed services (ZIP, GitLab, custom
- * domain, branding, templates, support…) read cleanly without duplication.
- */
-/**
- * Hai dòng đã được in RIÊNG ở trên (hạn mức tháng, số app chạy đồng thời) thì không in lại trong
- * danh sách chi tiết.
+ * Dòng đầu của `features` luôn là dòng hạn mức tháng và đã được in RIÊNG ở trên (cả thẻ gói, dải
+ * gói Miễn phí lẫn bảng so sánh), nên danh sách chi tiết bỏ đúng dòng đó.
  *
- * Bản trước lọc bằng chuỗi TIẾNG VIỆT ("hạn mức", "app chạy đồng thời"). Với người đã đăng
- * nhập thì danh mục do máy chủ trả về và luôn tiếng Việt nên lọc trúng; nhưng khách CHƯA đăng nhập
- * xem bản tiếng Anh thì danh mục là ANON_CATALOG_EN, không chứa chuỗi nào khớp — nên hai dòng quan
- * trọng nhất của mỗi gói bị in HAI LẦN trên chính trang bán hàng bản tiếng Anh.
- *
- * Nay lọc theo MẪU của cả hai thứ tiếng. Thêm một ngôn ngữ thứ ba thì thêm một mẫu ở đây — và lúc đó
- * nên chuyển hẳn sang danh mục có cấu trúc (mỗi đặc điểm một khoá) thay vì đoán bằng chuỗi.
+ * Không lọc bằng mẫu chữ như bản trước ("hạn mức"…): dòng "không tính hạn mức" của gói Miễn phí
+ * cũng chứa chữ đó và sẽ bị nuốt mất. Thứ tự dòng là hợp đồng của apps/api/src/billing/plans.ts.
  */
-const DONG_DA_IN_RIENG = [
-  /hạn mức/i,
-  /app chạy đồng thời/i,
-  /monthly (usage )?allowance/i,
-  /apps? running at a time/i,
-];
-
 function detailFeatures(features: string[]): string[] {
-  return features.filter((f) => !DONG_DA_IN_RIENG.some((m) => m.test(f)));
+  return features.slice(1);
+}
+
+/** storageMb → "5 GB" (gói luôn là bội số của 1 GB). */
+function formatGb(mb: number): string {
+  const gb = mb / 1024;
+  return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
 }
 
 function FeatureLine({ children }: { children: React.ReactNode }) {
@@ -1315,10 +1268,7 @@ function PlanCard({
                 <Text strong>{plan.features[0] ?? t("money.monthlyQuota", "Hạn mức hàng tháng")}</Text>
               </FeatureLine>
               <FeatureLine>
-                <Text strong>
-                  {plan.maxLiveApps >= 9999 ? t("money.unlimited", "Không giới hạn") : plan.maxLiveApps}
-                </Text>{" "}
-                {t("money.concurrentApps", "app chạy đồng thời")}
+                <Text strong>{formatGb(plan.storageMb)}</Text> {t("money.storageIncluded.lw", "dung lượng lưu trữ")}
               </FeatureLine>
               {detailFeatures(plan.features).map((f) => (
                 <FeatureLine key={f}>{f}</FeatureLine>
@@ -1428,7 +1378,7 @@ function FreeCard({
           </div>
           <Text type="secondary" style={{ fontSize: 13.5 }}>
             {available
-              ? `${plan.features[0] ?? t("money.monthlyQuota", "Hạn mức hàng tháng")} · ${plan.maxLiveApps >= 9999 ? t("money.unlimited", "Không giới hạn") : plan.maxLiveApps} ${t("money.concurrentApps", "app chạy đồng thời")}${
+              ? `${plan.features[0] ?? t("money.monthlyQuota", "Hạn mức hàng tháng")} · ${formatGb(plan.storageMb)} ${t("money.storageIncluded.lw", "dung lượng lưu trữ")}${
                   detailFeatures(plan.features).length
                     ? ` · ${detailFeatures(plan.features).join(" · ")}`
                     : ""
@@ -1464,15 +1414,36 @@ function FreeCard({
 }
 
 /**
- * Bảng so sánh nhanh. CHỈ tái trình bày những số liệu thẻ gói đã hiện — giá, dòng hạn mức,
- * số app đồng thời, có chạy trên Server hay không — xếp cạnh nhau để đối chiếu.
+ * Quyền lợi theo HẠNG gói (0 = Miễn phí … 3 = Doanh nghiệp), đối chiếu tay với
+ * apps/api/src/billing/plans.ts. Mỗi dòng có hạng thấp nhất được hưởng — gói trên luôn có đủ quyền
+ * của gói dưới, nên ma trận ✓/— không bao giờ hiện gói đắt "thiếu" thứ gói rẻ có (lỗi của cách dựng
+ * ma trận từ chuỗi `features`, nơi có dòng "Mọi tính năng gói Khởi đầu"). Sửa plans.ts thì sửa ở đây.
+ */
+const COMPARE_ROWS: { key: string; label: string; minRank: number }[] = [
+  { key: "money.cmpLarkAgents.lw", label: "Lark Agents (Bitable, Docs, Sheets, Wiki, Drive, Lịch, Tin nhắn)", minRank: 0 },
+  { key: "money.cmpLocalAi.lw", label: "Chạy bằng AI trên máy bạn — không tính hạn mức", minRank: 0 },
+  { key: "money.cmpAssistant.lw", label: "Trợ lý AI · Kỹ năng · Artifacts", minRank: 0 },
+  { key: "money.cmpHostedClaude.lw", label: "Claude do Larkwave cung cấp (không cần cài)", minRank: 1 },
+  { key: "money.cmpSchedule.lw", label: "Tự động hoá theo lịch · Đặc tả · Xuất tệp", minRank: 1 },
+  { key: "money.cmpRemote.lw", label: "Điều khiển desktop từ điện thoại/web", minRank: 1 },
+  { key: "money.cmpHosted.lw", label: "Larkwave chạy hộ khi máy bạn tắt", minRank: 2 },
+  { key: "money.cmpCms.lw", label: "Đồng bộ CMS Bitable nhiều tài khoản Lark", minRank: 2 },
+  { key: "money.cmpShare.lw", label: "Chia sẻ trợ lý cho đồng đội", minRank: 2 },
+];
+
+/** Kênh hỗ trợ theo hạng gói — cùng thứ tự với plans.ts. */
+const SUPPORT_BY_RANK: { key: string; label: string }[] = [
+  { key: "money.supportCommunity.lw", label: "Cộng đồng" },
+  { key: "money.supportEmail.lw", label: "Email" },
+  { key: "money.supportPriority.lw", label: "Ưu tiên" },
+  { key: "money.supportSla.lw", label: "Riêng (SLA)" },
+];
+
+/**
+ * Bảng so sánh nhanh: giá, dòng hạn mức, dung lượng (cùng số liệu thẻ gói đã hiện) cộng ma trận
+ * quyền lợi theo hạng ở trên.
  *
- * Cố ý KHÔNG:
- * - in `monthlyTokens`: con số nội bộ, người dùng chỉ thấy % (xem PlanCatalogEntry);
- * - in `storageMb` / `maxServerServices`: chưa từng xuất hiện trên trang giá, thêm vào là thêm
- *   cam kết mới trên trang tiền;
- * - dựng ma trận ✓/— từ chuỗi `features`: các dòng "Mọi tính năng gói Khởi đầu" làm ma trận
- *   hiện SAI (gói trên có vẻ thiếu tính năng gói dưới).
+ * Cố ý KHÔNG in `monthlyTokens`: con số nội bộ, người dùng chỉ thấy % (xem PlanCatalogEntry).
  */
 function PlanCompare({ catalog, currentPlan }: { catalog: PlanCatalogEntry[]; currentPlan: PlanId | null }) {
   const t = useT();
@@ -1487,7 +1458,7 @@ function PlanCompare({ catalog, currentPlan }: { catalog: PlanCatalogEntry[]; cu
           {t("money.compareTitle", "So sánh nhanh các gói")}
         </Title>
         <Text type="secondary" style={{ fontSize: 13.5 }}>
-          {t("money.compareSub", "Cùng số liệu với thẻ gói phía trên, xếp cạnh nhau để dễ đối chiếu.")}
+          {t("money.compareSub.lw", "Giá, hạn mức và quyền lợi của từng gói, xếp cạnh nhau để dễ đối chiếu.")}
         </Text>
       </div>
       <div className="tw-pr-cmp-scroll">
@@ -1526,27 +1497,43 @@ function PlanCompare({ catalog, currentPlan }: { catalog: PlanCatalogEntry[]; cu
               ))}
             </tr>
             <tr>
-              <th scope="row">{t("money.compareConcurrent", "App chạy đồng thời")}</th>
+              <th scope="row">{t("money.compareStorage.lw", "Dung lượng lưu trữ")}</th>
               {catalog.map((p) => (
                 <td key={p.id} className={colClass(p)}>
-                  <Text strong>{p.maxLiveApps >= 9999 ? t("money.unlimited", "Không giới hạn") : p.maxLiveApps}</Text>
+                  <Text strong>{formatGb(p.storageMb)}</Text>
                 </td>
               ))}
             </tr>
+            {COMPARE_ROWS.map((row) => (
+              <tr key={row.key}>
+                <th scope="row">{t(row.key, row.label)}</th>
+                {catalog.map((p) => (
+                  <td key={p.id} className={colClass(p)}>
+                    {rankOf(p.id) >= row.minRank ? (
+                      <CheckOutlined className="tw-pr-yes" aria-label={t("money.compareYes", "Có")} />
+                    ) : (
+                      <MinusOutlined className="tw-pr-no" aria-label={t("money.compareNo", "Không")} />
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
             <tr>
-              <th scope="row">{t("money.compareServer", "Chạy trên Server (Docker)")}</th>
-              {catalog.map((p) => (
-                <td key={p.id} className={colClass(p)}>
-                  {p.serverDeploy ? (
-                    <CheckOutlined className="tw-pr-yes" aria-label={t("money.compareYes", "Có")} />
-                  ) : (
-                    <MinusOutlined className="tw-pr-no" aria-label={t("money.compareNo", "Không")} />
-                  )}
-                </td>
-              ))}
+              <th scope="row">{t("money.compareSupport.lw", "Hỗ trợ")}</th>
+              {catalog.map((p) => {
+                const s = SUPPORT_BY_RANK[Math.min(SUPPORT_BY_RANK.length - 1, rankOf(p.id))];
+                return (
+                  <td key={p.id} className={colClass(p)}>
+                    {t(s.key, s.label)}
+                  </td>
+                );
+              })}
             </tr>
           </tbody>
         </table>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--tw-text-faint, #9AA3B5)", textAlign: "center" }}>
+        {t("money.storageAddonNote.lw", "Cần thêm chỗ lưu tệp? Mua thêm 1 GB với 100.000đ/tháng ở trang Dung lượng — áp dụng cho mọi gói.")}
       </div>
       <div className="tw-pr-cmp-hint">{t("money.compareScrollHint", "Kéo ngang để xem đủ các gói")}</div>
     </section>

@@ -1,46 +1,9 @@
 "use client";
 
-import {
-  CheckCircleFilled,
-  CloseCircleOutlined,
-  DeleteOutlined,
-  DesktopOutlined,
-  EditOutlined,
-  LoadingOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  SendOutlined,
-  StopOutlined,
-  ThunderboltOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
-import {
-  Alert,
-  App,
-  Avatar,
-  Button,
-  Dropdown,
-  Empty,
-  Grid,
-  Input,
-  Modal,
-  Select,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
+import { CheckCircleFilled, CloseCircleOutlined, DeleteOutlined, DesktopOutlined, EditOutlined, LoadingOutlined, MoreOutlined, PlusOutlined, SendOutlined, StopOutlined, ThunderboltOutlined, UserOutlined } from "@ant-design/icons";
+import { Alert, App, Avatar, Button, Dropdown, Empty, Grid, Input, Modal, Select, Spin, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  RUNNER_CATALOG,
-  type AgentConversation,
-  type AgentDevice,
-  type RemoteAppInfo,
-  type RemoteTask,
-  type RemoteTaskEventItem,
-  type RemoteTaskStatus,
-  type RunnerId,
-} from "@larkwave/shared";
+import { RUNNER_CATALOG, type AgentConversation, type AgentDevice, type RemoteTask, type RemoteTaskEventItem, type RemoteTaskStatus, type RunnerId } from "@larkwave/shared";
 import { useI18n } from "@larkwave/ui";
 import { api, streamRemoteTasks } from "@/lib/api";
 import { fromNow } from "@/lib/format";
@@ -154,9 +117,6 @@ export default function AgentPage() {
   // Named conversations (top selector). activeConvId undefined = "Tất cả".
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | undefined>(undefined);
-  // Apps synced from the desktop — target one to send a follow-up edit (else = new app).
-  const [apps, setApps] = useState<RemoteAppInfo[]>([]);
-  const [targetAppId, setTargetAppId] = useState<string | undefined>(undefined);
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
 
   // ── Initial load: tasks + devices ──────────────────────────────────────────
@@ -177,7 +137,6 @@ export default function AgentPage() {
             ...srv,
             events: mergeEvents(local.events, srv.events),
             status: moreAdvancedStatus(local.status, srv.status),
-            appId: srv.appId ?? local.appId,
             result: srv.result ?? local.result,
             error: srv.error ?? local.error,
           };
@@ -213,14 +172,6 @@ export default function AgentPage() {
     }
   }, []);
 
-  const loadApps = useCallback(async () => {
-    try {
-      setApps(await api.listRemoteApps());
-    } catch {
-      /* non-fatal */
-    }
-  }, []);
-
   // Reload the thread whenever the active conversation changes (and on mount).
   useEffect(() => {
     setTasks([]);
@@ -231,15 +182,12 @@ export default function AgentPage() {
   useEffect(() => {
     void loadDevices();
     void loadConversations();
-    void loadApps();
-    // Re-poll devices + the synced app list so a desktop that pushes AFTER the page opened
-    // (e.g. just reconnected) shows up without a manual refresh.
+    // Re-poll devices so a desktop that connects AFTER the page opened shows up without a refresh.
     const t = setInterval(() => {
       void loadDevices();
-      void loadApps();
     }, 20000);
     return () => clearInterval(t);
-  }, [loadDevices, loadConversations, loadApps]);
+  }, [loadDevices, loadConversations]);
 
   // ── Live progress: append events / flip status on the matching task ─────────
   useEffect(() => {
@@ -262,7 +210,6 @@ export default function AgentPage() {
           ...cur,
           status: ev.status,
           events,
-          ...(ev.appId !== undefined ? { appId: ev.appId } : {}),
           ...(ev.result !== undefined ? { result: ev.result } : {}),
           ...(ev.error !== undefined ? { error: ev.error } : {}),
         };
@@ -296,10 +243,7 @@ export default function AgentPage() {
 
   const onlineCount = devices.filter((d) => d.online).length;
 
-  // Per-app conversation view: when an app is selected, scope the thread to that app's
-  // tasks so it reads as ONE conversation about that app (not a free-form mixed list).
-  const selectedApp = targetAppId ? apps.find((a) => a.id === targetAppId) : undefined;
-  const shownTasks = targetAppId ? tasks.filter((t) => t.appId === targetAppId) : tasks;
+  const shownTasks = tasks;
 
   // ── Send a task ─────────────────────────────────────────────────────────────
   const send = useCallback(async () => {
@@ -315,7 +259,6 @@ export default function AgentPage() {
       model,
       prompt: text,
       status: "queued",
-      appId: null,
       result: null,
       error: null,
       createdAt: new Date().toISOString(),
@@ -334,7 +277,6 @@ export default function AgentPage() {
         model,
         ...(deviceId ? { deviceId } : {}),
         ...(activeConvId ? { conversationId: activeConvId } : {}),
-        ...(targetAppId ? { appId: targetAppId } : {}),
       });
       // Replace the optimistic row with the server task.
       setTasks((prev) =>
@@ -357,7 +299,7 @@ export default function AgentPage() {
     } finally {
       setSending(false);
     }
-  }, [prompt, sending, deviceId, runner, model, message, activeConvId, targetAppId, loadConversations, t]);
+  }, [prompt, sending, deviceId, runner, model, message, activeConvId, loadConversations, t]);
 
   // ── Conversation actions ─────────────────────────────────────────────────────
   const newConversation = useCallback(async () => {
@@ -411,8 +353,8 @@ export default function AgentPage() {
         </Title>
         <Text type="secondary" style={{ fontSize: 13, display: "block", marginTop: 2, marginBottom: 10 }}>
           {t(
-            "remote.agent.subtitle",
-            "Gửi yêu cầu lập trình — máy đã đăng nhập của bạn chạy AI cục bộ và báo tiến độ về đây.",
+            "remote.agent.subtitle.lw",
+            "Gửi câu hỏi/yêu cầu — máy đã đăng nhập của bạn chạy Trợ lý AI cục bộ (chỉ đọc) và trả kết quả về đây.",
           )}
         </Text>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -533,68 +475,7 @@ export default function AgentPage() {
           style={{ minWidth: isMobile ? 0 : 150, flex: isMobile ? "1 1 46%" : "1 1 150px" }}
           options={runnerEntry.models.map((m) => ({ value: m.id, label: m.label }))}
         />
-        {/* Target app on the machine — send a follow-up edit, or make a new app */}
-        {apps.length > 0 && (
-          <Select<string>
-            value={targetAppId ?? "__new__"}
-            onChange={(v) => {
-              if (v === "__new__") {
-                setTargetAppId(undefined);
-                return;
-              }
-              setTargetAppId(v);
-              const a = apps.find((x) => x.id === v);
-              if (a) setDeviceId(a.deviceId); // route the follow-up to that app's machine
-            }}
-            style={{ minWidth: isMobile ? 0 : 200, flex: isMobile ? "1 1 100%" : "1 1 200px" }}
-            popupMatchSelectWidth={false}
-            options={[
-              { value: "__new__", label: `＋ ${t("remote.agent.newApp", "Tạo app mới")}` },
-              ...apps.map((a) => ({
-                value: a.id,
-                label: `🧩 ${a.name}${apps.length > 1 ? ` · ${a.deviceName}` : ""}`,
-              })),
-            ]}
-          />
-        )}
       </div>
-      {targetAppId && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={t(
-            "remote.agent.targetAppAlert",
-            "Gửi tiếp vào app “{name}” — yêu cầu sẽ SỬA app này (không tạo mới).",
-            { name: apps.find((a) => a.id === targetAppId)?.name ?? targetAppId ?? "" },
-          )}
-        />
-      )}
-
-      {/* No apps synced yet → tell the user what's required (needs desktop ≥1.0.140 + connected). */}
-      {apps.length === 0 && onlineCount > 0 && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message={t("remote.agent.noProjectsTitle", "Chưa thấy dự án nào từ máy")}
-          description={
-            <span style={{ fontSize: 12.5 }}>
-              {t(
-                "remote.agent.noProjectsDesc1",
-                "Danh sách app trên máy sẽ tự đồng bộ để bạn chọn “App trên máy” + gửi tiếp — khi máy đã ",
-              )}
-              <b>{t("remote.agent.installVersion", "cài bản 1.0.140 trở lên")}</b>
-              {t("remote.agent.noProjectsDesc2", " và đang bật ")}
-              <b>{t("nav.remote", "Điều khiển từ xa")}</b>
-              {t(
-                "remote.agent.noProjectsDesc3",
-                " (thẻ xanh “Đã kết nối”). Kiểm tra phiên bản ở góc app trên máy.",
-              )}
-            </span>
-          }
-        />
-      )}
 
       {/* Offline hint */}
       {devices.length > 0 && onlineCount === 0 && (
@@ -621,12 +502,12 @@ export default function AgentPage() {
               <b>{t("nav.remote", "Điều khiển từ xa")}</b>
               {t("remote.agent.noDeviceDesc1b", " để máy hiện ra ở đây.")}
               <br />
-              <b>{t("remote.agent.noDeviceDesc2", "Nếu trên máy đã báo “đã đồng bộ N app” mà đây vẫn trống:")}</b>
+              <b>{t("remote.agent.noDeviceDesc2.lw", "Nếu trên máy đã bật mà đây vẫn trống:")}</b>
               {t("remote.agent.noDeviceDesc3", " gần như chắc chắn bạn đang đăng nhập trang này bằng ")}
               <b>{t("remote.agent.noDeviceDesc4", "tài khoản khác")}</b>
               {t("remote.agent.noDeviceDesc5", " với tài khoản trên máy. Relay tách theo tài khoản — hãy đăng nhập ")}
               <b>{t("remote.agent.noDeviceDesc6", "đúng tài khoản như trên máy")}</b>
-              {t("remote.agent.noDeviceDesc7", " (xem email hiển thị trong ô “Đồng bộ lên điện thoại” trên máy).")}
+              {t("remote.agent.noDeviceDesc7.lw", " (xem email ở mục Cài đặt → Điều khiển từ xa trên máy).")}
             </span>
           }
         />
@@ -643,44 +524,13 @@ export default function AgentPage() {
           padding: isMobile ? 12 : 16,
         }}
       >
-        {selectedApp && (
-          // Header for the app-scoped conversation view.
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 12,
-              paddingBottom: 10,
-              borderBottom: "1px solid #ECEDF3",
-              flexWrap: "wrap",
-            }}
-          >
-            <Text strong style={{ fontSize: 13 }}>
-              🧩 {t("remote.agent.appConvHeader", "Hội thoại của app: {name}", { name: selectedApp.name || selectedApp.id })}
-            </Text>
-            <Text type="secondary" style={{ fontSize: 11.5 }}>
-              {t("remote.agent.appConvHint", "chỉ hiện yêu cầu gửi tới app này")}
-            </Text>
-            <div style={{ flex: 1 }} />
-            <a onClick={() => setTargetAppId(undefined)} style={{ fontSize: 12 }}>
-              {t("remote.agent.viewAllTasks", "Xem tất cả tác vụ")}
-            </a>
-          </div>
-        )}
         {loading ? (
           <Spin style={{ display: "block", margin: "40px auto" }} />
         ) : shownTasks.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
-              selectedApp
-                ? t(
-                    "remote.agent.emptyForApp",
-                    "Chưa có yêu cầu nào cho app “{name}”. Gửi yêu cầu đầu tiên ở dưới — máy sẽ SỬA đúng app này.",
-                    { name: selectedApp.name || selectedApp.id },
-                  )
-                : t("remote.agent.empty", "Chưa có lệnh nào. Gửi yêu cầu đầu tiên ở dưới.")
+              t("remote.agent.empty", "Chưa có lệnh nào. Gửi yêu cầu đầu tiên ở dưới.")
             }
             style={{ marginTop: 40 }}
           />
@@ -711,7 +561,7 @@ export default function AgentPage() {
         <Input.TextArea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={t("remote.agent.composerPlaceholder", "Ví dụ: Thêm trang đăng nhập cho app của tôi…")}
+          placeholder={t("remote.agent.composerPlaceholder.lw", "Ví dụ: Tóm tắt các file trong thư mục Báo cáo tuần này…")}
           autoSize={{ minRows: 1, maxRows: 5 }}
           style={{ flex: 1 }}
           onPressEnter={(e) => {
@@ -945,13 +795,6 @@ function TaskTurn({
               {task.result && (
                 <Text style={{ fontSize: 13.5, whiteSpace: "pre-wrap" }}>
                   {task.result}
-                </Text>
-              )}
-              {task.appId && (
-                <Text type="secondary" style={{ fontSize: 12.5 }}>
-                  {t("remote.agent.createdOnMachine1", "🖥 Đã tạo trên máy của bạn (")}
-                  <Text code style={{ fontSize: 12, wordBreak: "break-all" }}>{task.appId}</Text>
-                  {t("remote.agent.createdOnMachine2", ") — mở app Larkwave trên máy tính để xem / sửa / đăng.")}
                 </Text>
               )}
             </div>

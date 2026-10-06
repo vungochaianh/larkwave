@@ -1,52 +1,26 @@
 "use client";
 
-import { ArrowLeftOutlined, LoginOutlined, ReloadOutlined } from "@ant-design/icons";
-import {
-  App,
-  Button,
-  Card,
-  Drawer,
-  Space,
-  Statistic,
-  Table,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
+import { ArrowLeftOutlined, LoginOutlined, MessageOutlined, ReloadOutlined } from "@ant-design/icons";
+import { App, Button, Card, Space, Statistic, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { App as AppModel, Build, BuildStatus, Track, User } from "@larkwave/shared";
-import { api, APP_BASE_URL, type AdminUserSupportSummary, type BuildErrorEntry } from "@/lib/api";
+import type { User } from "@larkwave/shared";
+import { api, APP_BASE_URL, type AdminUserSupportSummary, type RunnerErrorRow } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { RoleTag, UserStatusTag } from "@/components/StatusTags";
-import BuildDetail from "@/components/BuildDetail";
 import MessageUserDrawer from "@/components/admin/MessageUserDrawer";
 import { OK, ERR } from "@larkwave/ui";
 
-const { Title, Text, Paragraph } = Typography;
-
-const STATUS_COLOR: Record<string, string> = {
-  succeeded: "green",
-  live: "green",
-  running: "processing",
-  queued: "default",
-  awaiting_approval: "gold",
-  failed: "error",
-  canceled: "default",
-  draft: "default",
-};
-const statusTag = (s?: string | null) =>
-  s ? <Tag color={STATUS_COLOR[s] ?? "default"} bordered={false}>{s}</Tag> : <Text type="secondary">—</Text>;
+const { Title, Text } = Typography;
 
 const ellipsis = (s: string, n = 80) => (s && s.length > n ? s.slice(0, n) + "…" : s || "—");
 
 /**
- * Admin support drill-down for ONE user — joins their profile + counts + apps + builds
- * (the codegen "conversations", with logs/errors via BuildDetail) + errored builds in one
- * place. Opening it calls the AUDITED support-summary (logs "admin viewed this user").
+ * Admin support drill-down for ONE user — profile + activity counts (hosted AI runs, remote
+ * tasks, payments, reports) + the runner errors they hit. Opening it calls the AUDITED
+ * support-summary (logs "admin viewed this user").
  */
 export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -55,32 +29,19 @@ export default function AdminUserDetailPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [summary, setSummary] = useState<AdminUserSupportSummary | null>(null);
-  const [apps, setApps] = useState<AppModel[]>([]);
-  const [builds, setBuilds] = useState<Build[]>([]);
-  const [errors, setErrors] = useState<BuildErrorEntry[]>([]);
+  const [errors, setErrors] = useState<RunnerErrorRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [active, setActive] = useState<{ id: string; track?: Track | null } | null>(null);
-  // Trạng thái RIÊNG cho ngăn nhắn tin: `active` là của ngăn xem build, dùng chung là hai thứ
-  // đóng mở lẫn nhau.
   const [nhanMo, setNhanMo] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // getUser + support-summary first (support-summary is the audit anchor); the lists tolerate
-      // an older backend where ownerId filtering isn't deployed yet (they just return more rows).
-      const [u, s, appRes, buildRes, errRes] = await Promise.all([
-        api.getUser(id),
-        api.getUserSupportSummary(id).catch(() => null),
-        api.listApps({ ownerId: id, pageSize: 50 }).catch(() => ({ items: [] as AppModel[] })),
-        api.listBuilds({ ownerId: id, pageSize: 50 }).catch(() => ({ items: [] as Build[] })),
-        api.adminBuildErrors({ ownerId: id, pageSize: 50 }).catch(() => ({ items: [] as BuildErrorEntry[] })),
-      ]);
+      const [u, s] = await Promise.all([api.getUser(id), api.getUserSupportSummary(id).catch(() => null)]);
       setUser(u);
       setSummary(s);
-      setApps(appRes.items);
-      setBuilds(buildRes.items);
-      setErrors(errRes.items);
+      // Lỗi runner lọc theo email (endpoint chỉ có ô tìm kiếm `q`).
+      const rep = await api.adminRunnerErrors({ days: 90, q: u.email, limit: 50 }).catch(() => null);
+      setErrors((rep?.items ?? []).filter((r) => r.userId === u.id));
     } catch (e) {
       message.error((e as Error).message);
     } finally {
@@ -96,13 +57,13 @@ export default function AdminUserDetailPage() {
     if (!user) return;
     modal.confirm({
       title: "Vào tài khoản người dùng?",
-      content: `Mở phiên của ${user.email} ở toolswave.net (tab mới) để xem hội thoại, app & chẩn đoán lỗi. Hành động này được ghi log.`,
+      content: `Mở phiên của ${user.email} (tab mới) để xem hội thoại & chẩn đoán lỗi. Hành động này được ghi log.`,
       okText: "Vào tài khoản",
       cancelText: "Huỷ",
       onOk: async () => {
         try {
           const res = await api.impersonateUser(user.id);
-          const url = `${APP_BASE_URL}/auth/callback?token=${encodeURIComponent(res.token)}&imp=1&next=${encodeURIComponent("/apps")}`;
+          const url = `${APP_BASE_URL}/auth/callback?token=${encodeURIComponent(res.token)}&imp=1&next=${encodeURIComponent("/overview")}`;
           window.open(url, "_blank", "noopener,noreferrer");
           message.success(`Đang mở phiên của ${user.email}…`);
         } catch (e) {
@@ -112,49 +73,10 @@ export default function AdminUserDetailPage() {
     });
   };
 
-  const buildCols: ColumnsType<Build> = [
-    {
-      title: "Yêu cầu (prompt)",
-      dataIndex: "prompt",
-      key: "prompt",
-      render: (v: string) => <Text style={{ fontSize: 13 }}>{ellipsis(v, 100)}</Text>,
-    },
-    { title: "Trạng thái", dataIndex: "status", key: "status", width: 120, render: (v) => statusTag(v) },
-    { title: "Track", dataIndex: "track", key: "track", width: 90, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{v ?? "—"}</Text> },
-    { title: "Model", dataIndex: "model", key: "model", width: 90, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{v ?? "—"}</Text> },
-    { title: "Lúc", dataIndex: "createdAt", key: "createdAt", width: 150, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(v)}</Text> },
-  ];
-
-  const appCols: ColumnsType<AppModel> = [
-    {
-      title: "App",
-      dataIndex: "name",
-      key: "name",
-      render: (_, r) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{r.name || r.slug}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{r.slug}</Text>
-        </Space>
-      ),
-    },
-    { title: "Trạng thái", dataIndex: "status", key: "status", width: 120, render: (v) => statusTag(v) },
-    { title: "Track", dataIndex: "track", key: "track", width: 90, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{v ?? "—"}</Text> },
-    { title: "Tạo lúc", dataIndex: "createdAt", key: "createdAt", width: 150, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(v)}</Text> },
-  ];
-
-  const errorCols: ColumnsType<BuildErrorEntry> = [
-    { title: "Yêu cầu", dataIndex: "prompt", key: "prompt", render: (v: string) => <Text style={{ fontSize: 13 }}>{ellipsis(v, 70)}</Text> },
-    {
-      title: "Lỗi",
-      dataIndex: "error",
-      key: "error",
-      render: (v: string | null, r) => (
-        <Space direction="vertical" size={0}>
-          <Text type="danger" style={{ fontSize: 12.5 }}>{ellipsis(v || "—", 90)}</Text>
-          {r.failedStage && <Text type="secondary" style={{ fontSize: 11.5 }}>ở bước: {r.failedStage}</Text>}
-        </Space>
-      ),
-    },
+  const errorCols: ColumnsType<RunnerErrorRow> = [
+    { title: "Runner", dataIndex: "runner", key: "runner", width: 110, render: (v: string) => <Tag bordered={false}>{v}</Tag> },
+    { title: "Loại", dataIndex: "kind", key: "kind", width: 120, render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> },
+    { title: "Lỗi", dataIndex: "message", key: "message", render: (v: string) => <Text type="danger" style={{ fontSize: 12.5 }}>{ellipsis(v, 120)}</Text> },
     { title: "Lúc", dataIndex: "createdAt", key: "createdAt", width: 150, render: (v) => <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(v)}</Text> },
   ];
 
@@ -175,6 +97,7 @@ export default function AdminUserDetailPage() {
         </Space>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
+          <Button icon={<MessageOutlined />} onClick={() => setNhanMo(true)} disabled={!user}>Nhắn tin</Button>
           <Button type="primary" icon={<LoginOutlined />} onClick={impersonate} disabled={!user}>Vào tài khoản</Button>
         </Space>
       </div>
@@ -191,70 +114,25 @@ export default function AdminUserDetailPage() {
       )}
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {stat("Apps", summary?.apps ?? apps.length)}
-        {stat("Builds", summary?.builds ?? builds.length)}
-        {stat("Thành công", summary?.succeededBuilds ?? 0, OK)}
-        {stat("Lỗi", summary?.failedBuilds ?? errors.length, ERR)}
-        {stat("Deployments", summary?.deployments ?? 0)}
+        {stat("Lượt AI (hosted)", summary?.aiRuns ?? 0)}
+        {stat("Tác vụ từ xa", summary?.remoteTasks ?? 0, OK)}
+        {stat("Tác vụ lỗi", summary?.failedRemoteTasks ?? 0, ERR)}
         {stat("Thanh toán", summary?.payments ?? 0)}
         {stat("Báo lỗi", summary?.feedback ?? 0)}
       </div>
 
-      <Tabs
-        defaultActiveKey="builds"
-        items={[
-          {
-            key: "builds",
-            label: `Hội thoại / Builds (${builds.length})`,
-            children: (
-              <Table<Build>
-                rowKey="id"
-                loading={loading}
-                columns={buildCols}
-                dataSource={builds}
-                size="small"
-                scroll={{ x: 720 }}
-                onRow={(r) => ({ onClick: () => setActive({ id: r.id, track: (r as { track?: Track | null }).track ?? null }), style: { cursor: "pointer" } })}
-                pagination={{ pageSize: 15, hideOnSinglePage: true }}
-                locale={{ emptyText: "Chưa có build nào" }}
-              />
-            ),
-          },
-          {
-            key: "errors",
-            label: `Lỗi (${errors.length})`,
-            children: (
-              <Table<BuildErrorEntry>
-                rowKey="id"
-                loading={loading}
-                columns={errorCols}
-                dataSource={errors}
-                size="small"
-                scroll={{ x: 640 }}
-                onRow={(r) => ({ onClick: () => setActive({ id: r.id, track: (r.track as Track) ?? null }), style: { cursor: "pointer" } })}
-                pagination={{ pageSize: 15, hideOnSinglePage: true }}
-                locale={{ emptyText: "Không có lỗi" }}
-              />
-            ),
-          },
-          {
-            key: "apps",
-            label: `App (${apps.length})`,
-            children: (
-              <Table<AppModel>
-                rowKey="id"
-                loading={loading}
-                columns={appCols}
-                dataSource={apps}
-                size="small"
-                scroll={{ x: 560 }}
-                pagination={{ pageSize: 15, hideOnSinglePage: true }}
-                locale={{ emptyText: "Chưa có app nào" }}
-              />
-            ),
-          },
-        ]}
-      />
+      <Card title={`Lỗi runner 90 ngày (${errors.length})`}>
+        <Table<RunnerErrorRow>
+          rowKey="id"
+          loading={loading}
+          columns={errorCols}
+          dataSource={errors}
+          size="small"
+          scroll={{ x: 640 }}
+          pagination={{ pageSize: 15, hideOnSinglePage: true }}
+          locale={{ emptyText: "Không có lỗi" }}
+        />
+      </Card>
 
       {user && (
         <MessageUserDrawer
@@ -265,23 +143,6 @@ export default function AdminUserDetailPage() {
           onClose={() => setNhanMo(false)}
         />
       )}
-
-      <Drawer
-        open={!!active}
-        onClose={() => setActive(null)}
-        width={720}
-        title="Chi tiết build (hội thoại codegen + log + lỗi)"
-        destroyOnClose
-      >
-        {active && (
-          <>
-            <Paragraph type="secondary" style={{ fontSize: 12.5 }}>
-              Đây là toàn bộ tiến trình dựng của user: prompt, các bước, log và lỗi.
-            </Paragraph>
-            <BuildDetail buildId={active.id} track={active.track ?? "web"} />
-          </>
-        )}
-      </Drawer>
     </Space>
   );
 }

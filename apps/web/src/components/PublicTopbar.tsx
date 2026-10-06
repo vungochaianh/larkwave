@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useI18n } from "@larkwave/ui";
 import { BRAND_GRADIENT } from "@/lib/theme";
 
-/** Lightweight header for PUBLIC (unauthenticated) showcase pages. */
+/** Lightweight header for PUBLIC (unauthenticated) share pages. */
 export default function PublicTopbar() {
   const { t } = useI18n();
   return (
@@ -47,9 +47,9 @@ export default function PublicTopbar() {
           Larkwave
         </span>
       </Link>
-      <Link href="/">
+      <Link href="/register">
         <Button type="primary" icon={<ThunderboltOutlined />}>
-          {t("wcomp.ptCreateYourApp", "Tạo app của bạn")}
+          {t("wcomp.ptTryLarkwave.lw", "Dùng thử Larkwave")}
         </Button>
       </Link>
     </div>

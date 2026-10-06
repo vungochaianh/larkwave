@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Larkwave — Trợ lý AI biết làm việc thật";
+export const alt = "Larkwave — Trợ lý AI làm việc thật trên Lark";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -80,7 +80,7 @@ export default function OpengraphImage() {
               display: "flex",
             }}
           >
-            TOOLSWAVE
+            LARKWAVE
           </div>
         </div>
 
@@ -96,7 +96,7 @@ export default function OpengraphImage() {
             maxWidth: 980,
           }}
         >
-          Trợ lý AI biết làm việc thật
+          Trợ lý AI làm việc thật trên Lark
         </div>
 
         {/* Subline */}
@@ -109,7 +109,7 @@ export default function OpengraphImage() {
             display: "flex",
           }}
         >
-          Tạo app · Nội dung · Lark · API
+          Bitable · Docs · Sheets · Wiki · Lịch
         </div>
 
         {/* Footer URL */}

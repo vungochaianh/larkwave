@@ -145,7 +145,7 @@ export default function MessageUserDrawer({
         <span style={{ color: V.textFaint }}>— địa chỉ lấy từ hồ sơ, không sửa được ở đây.</span>
       </div>
 
-      <Form form={form} layout="vertical" initialValues={{ email: true, inApp: true, link: "/apps" }}>
+      <Form form={form} layout="vertical" initialValues={{ email: true, inApp: true, link: "/overview" }}>
         <Form.Item
           name="subject"
           label="Tiêu đề"
@@ -178,7 +178,7 @@ export default function MessageUserDrawer({
           extra="Đường dẫn nội bộ, bắt đầu bằng /. Dùng cho nút trong thư và cho chỗ thông báo trỏ tới. Để trống thì không có nút."
           rules={[{ pattern: /^\//, message: "Phải bắt đầu bằng /", warningOnly: false }]}
         >
-          <Input placeholder="/apps" maxLength={300} />
+          <Input placeholder="/overview" maxLength={300} />
         </Form.Item>
       </Form>
 

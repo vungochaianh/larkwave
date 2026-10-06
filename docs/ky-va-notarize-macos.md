@@ -1,5 +1,8 @@
 # Ký và notarize bản macOS
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 ## Hiện trạng — không hỏng, nhưng vướng
 
 Bản `.dmg` cài được và dùng được, **sau khi người dùng tự cho phép** ở lần mở đầu. Đây là trạng

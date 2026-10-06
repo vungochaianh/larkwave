@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
 if [ "${ALLOW_DEPLOY:-}" != "1" ]; then echo "Chặn: script này vẫn trỏ vào hạ tầng Toolswave. Phase deploy chưa làm — đặt ALLOW_DEPLOY=1 khi đã đổi đích." >&2; exit 1; fi
-# Toolswave App Builder — build & release (run as the `app` user from repo root).
+# Larkwave — build & release (run as the `app` user from repo root).
 # Installs deps, builds shared+api(+web), syncs the DB schema, seeds admin.
 # Restarting systemd services is done separately by root (see deploy/README).
 set -euo pipefail
 
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 echo "==> repo: $(pwd)"
-
-# Prune stale route dirs that rsync (no --delete) leaves behind. A reverted optional
-# catch-all left apps/[id]/[[...view]]/page.tsx on the server alongside the restored
-# apps/[id]/page.tsx → two routes at /apps/[id] → `next build` fails. Safe + scoped.
-rm -rf "apps/web/src/app/(builder)/apps/[id]/[[...view]]" 2>/dev/null || true
 
 # load env (DATABASE_URL etc.) without shell-expanding values
 set -a; [ -f .env ] && . ./.env; set +a

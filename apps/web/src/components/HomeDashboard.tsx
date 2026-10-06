@@ -3,49 +3,20 @@
 /**
  * The web "Tổng quan" dashboard — mirrors the desktop Overview (HomeOverview):
  * gradient hero + KPI strip + budget, quick-action chips, an attention band, a
- * rewards/community row and a weekly-activity card. Kept OFF the builder home so
- * that page stays clean; this is its own screen, the way the desktop separates
- * "Tổng quan" from the builder.
+ * rewards/community row and an activity card — centred on the AI assistant, Lark and
+ * remote control.
  */
 
-import {
-  ApiOutlined,
-  AppstoreAddOutlined,
-  ArrowRightOutlined,
-  BugOutlined,
-  CheckCircleFilled,
-  CloudDownloadOutlined,
-  CloudServerOutlined,
-  CompassOutlined,
-  ExperimentOutlined,
-  GiftOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  RobotOutlined,
-  RocketOutlined,
-  TeamOutlined,
-  ThunderboltOutlined,
-  TrophyOutlined,
-  WarningOutlined,
-} from "@ant-design/icons";
-import { Button, Card, Empty, Grid, Progress, Skeleton, Space, theme, Tooltip, Typography } from "antd";
+import { ApiOutlined, ArrowRightOutlined, BugOutlined, CheckCircleFilled, CloudServerOutlined, ExperimentOutlined, GiftOutlined, PlusOutlined, ReloadOutlined, RobotOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from "@ant-design/icons";
+import { Button, Card, Grid, Progress, Space, theme, Tooltip, Typography } from "antd";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import type {
-  App as AppEntity,
-  LeaderboardResponse,
-  MeActivity,
-  MeSubscription,
-  MyFeedbackResponse,
-  Track,
-} from "@larkwave/shared";
+import type { MeActivity, MeSubscription, MyFeedbackResponse } from "@larkwave/shared";
 import { StreakRow, ContributionGraph, useI18n } from "@larkwave/ui";
 import { formatTokens, refPercent } from "@/lib/formatTokens";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AGENTS, BRAND, BRAND_GRADIENT, CARD_SHADOW } from "@/lib/theme";
-import AppPreviewCard from "@/components/AppPreviewCard";
 import { tenGoi } from "@/lib/billing";
 
 const { Title, Text } = Typography;
@@ -90,21 +61,17 @@ function HeroBanner({ isMobile, refreshTick, onRefresh }: { isMobile: boolean; r
   const { t } = useI18n();
   const { user } = useAuth();
   const greetingName = user?.name?.trim() || t("home.greetingGuest", "bạn");
-  const [stats, setStats] = useState<{ apps: number; builds: number; live: number } | null>(null);
+  const [stats, setStats] = useState<{ aiRuns: number; remoteTasks: number; skills: number } | null>(null);
   const [sub, setSub] = useState<MeSubscription | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [apps, builds, live] = await Promise.all([
-          api.listApps({ pageSize: 1 }),
-          api.listBuilds({ pageSize: 1 }),
-          api.listDeployments({ pageSize: 1, status: "live" }),
-        ]);
-        if (!cancelled) setStats({ apps: apps.total, builds: builds.total, live: live.total });
+        const ov = await api.meOverview();
+        if (!cancelled) setStats({ aiRuns: ov.aiRuns, remoteTasks: ov.remoteTasks, skills: ov.skills });
       } catch {
-        if (!cancelled) setStats({ apps: 0, builds: 0, live: 0 });
+        if (!cancelled) setStats({ aiRuns: 0, remoteTasks: 0, skills: 0 });
       }
       try {
         const s = await api.subscription();
@@ -134,18 +101,18 @@ function HeroBanner({ isMobile, refreshTick, onRefresh }: { isMobile: boolean; r
             {t("home.hello", "Xin chào")}, {greetingName} 👋
           </Title>
           <Text style={{ color: "rgba(255,255,255,.86)", fontSize: isMobile ? 13 : 14.5 }}>
-            {t("home.tagline", "Mô tả ý tưởng — Larkwave sinh code, build, preview và deploy ra liên kết công khai.")}
+            {t("home.tagline.lw", "Hỏi Trợ lý AI, làm việc với dữ liệu Lark và điều khiển máy desktop của bạn — tất cả ở một chỗ.")}
           </Text>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <Link href="/">
+          <Link href="/agents-chat/new">
             <Button size="large" icon={<PlusOutlined />} style={{ background: "#fff", color: BRAND, border: "none", fontWeight: 700, boxShadow: "0 8px 20px rgba(0,0,0,.16)" }}>
-              {t("home.createNew", "Tạo app mới")}
+              {t("comp.shell.newChat", "Trò chuyện mới")}
             </Button>
           </Link>
-          <Link href="/import">
-            <Button size="large" ghost icon={<CloudDownloadOutlined />} style={{ borderColor: "rgba(255,255,255,.5)", color: "#fff" }}>
-              {t("home.importGit", "Nhập từ Git")}
+          <Link href="/remote/chat">
+            <Button size="large" ghost icon={<CloudServerOutlined />} style={{ borderColor: "rgba(255,255,255,.5)", color: "#fff" }}>
+              {t("home.remoteDesktop", "Điều khiển máy desktop")}
             </Button>
           </Link>
           <Tooltip title={t("home.refresh", "Làm mới")}>
@@ -154,9 +121,9 @@ function HeroBanner({ isMobile, refreshTick, onRefresh }: { isMobile: boolean; r
         </div>
       </div>
       <div style={{ position: "relative", display: "flex", flexWrap: "wrap", background: "rgba(255,255,255,.12)", borderTop: "1px solid rgba(255,255,255,.2)", backdropFilter: "blur(6px)" }}>
-        <HeroStat first isMobile={isMobile} href="/apps" v={dash ?? stats!.apps} l={t("home.statApps", "Tổng apps")} />
-        <HeroStat isMobile={isMobile} href="/apps" v={dash ?? stats!.builds} l={t("home.statBuilds", "Tổng builds")} />
-        <HeroStat isMobile={isMobile} href="/apps" v={dash ?? stats!.live} l={t("home.statLive", "Đang live")} />
+        <HeroStat first isMobile={isMobile} href="/agents-chat" v={dash ?? stats!.aiRuns} l={t("home.statAiRuns", "Lượt AI")} />
+        <HeroStat isMobile={isMobile} href="/remote/agent" v={dash ?? stats!.remoteTasks} l={t("home.statRemote", "Tác vụ từ xa")} />
+        <HeroStat isMobile={isMobile} href="/skills" v={dash ?? stats!.skills} l={t("home.statSkills", "Kỹ năng")} />
         {sub && (
           <Link href="/billing" style={{ flex: "1 1 150px", padding: isMobile ? "11px 16px" : "13px 22px", borderLeft: "1px solid rgba(255,255,255,.16)", color: "#fff", display: "block" }}>
             <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, letterSpacing: -0.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center", gap: 8 }}>
@@ -188,8 +155,8 @@ const QUICK_ACTIONS: { key: string; href: string; icon: ReactNode; color: string
   { key: "agentsChat", href: "/agents-chat", icon: <RobotOutlined />, color: AGENTS, bg: "rgba(37,99,235,0.12)", label: "Agents Chat", labelKey: "nav.agentsChat" },
   { key: "skills", href: "/skills", icon: <ExperimentOutlined />, color: "#16B98D", bg: "rgba(22,185,141,0.14)", label: "Skills", labelKey: "nav.skills" },
   { key: "remote", href: "/remote/chat", icon: <CloudServerOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", label: "Trò chuyện", labelKey: "nav.remote.chat" },
-  { key: "explore", href: "/explore", icon: <CompassOutlined />, color: BRAND, bg: "rgba(108,92,231,0.12)", label: "Khám phá", labelKey: "nav.explore" },
-  { key: "integrations", href: "/integrations", icon: <ApiOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", label: "Integrations", labelKey: "nav.integrations" },
+  { key: "lark", href: "/remote/lark-chat", icon: <ApiOutlined />, color: BRAND, bg: "rgba(108,92,231,0.12)", label: "Lark × Agents", labelKey: "nav.remote.lark" },
+  { key: "community", href: "/community", icon: <TeamOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", label: "Cộng đồng", labelKey: "nav.community" },
 ];
 
 function QuickActions() {
@@ -209,20 +176,14 @@ function QuickActions() {
 
 function AttentionBand({ refreshTick }: { refreshTick: number }) {
   const { t } = useI18n();
-  const [failed, setFailed] = useState(0);
   const [pendingReward, setPendingReward] = useState(0);
   const [invites, setInvites] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [apps, fb, reqs] = await Promise.allSettled([
-        api.listApps({ status: "failed", pageSize: 1 }),
-        api.myFeedback(),
-        api.friendRequests(),
-      ]);
+      const [fb, reqs] = await Promise.allSettled([api.myFeedback(), api.friendRequests()]);
       if (cancelled) return;
-      if (apps.status === "fulfilled") setFailed(apps.value.total);
       if (fb.status === "fulfilled") setPendingReward(Math.max(0, fb.value.totalRewardVnd - fb.value.paidRewardVnd));
       if (reqs.status === "fulfilled") setInvites(reqs.value.length);
     })();
@@ -232,7 +193,6 @@ function AttentionBand({ refreshTick }: { refreshTick: number }) {
   }, [refreshTick]);
 
   const rows: { key: string; icon: ReactNode; color: string; text: string; href: string }[] = [
-    ...(failed > 0 ? [{ key: "failed", icon: <WarningOutlined />, color: "#FF6B6B", text: `${failed} ${t("home.attnFailed", "app đang gặp lỗi")}`, href: "/apps" }] : []),
     ...(pendingReward > 0 ? [{ key: "reward", icon: <GiftOutlined />, color: "#16B98D", text: `${t("home.attnReward", "Thưởng báo lỗi chờ chi")}: ${vnd(pendingReward)}`, href: "/reports" }] : []),
     ...(invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", text: `${invites} ${t("home.attnInvite", "lời mời kết bạn")}`, href: "/friends" }] : []),
   ];
@@ -259,7 +219,6 @@ function AttentionBand({ refreshTick }: { refreshTick: number }) {
 
 function RewardsStrip({ refreshTick }: { refreshTick: number }) {
   const { t } = useI18n();
-  const [me, setMe] = useState<LeaderboardResponse["me"]>(null);
   const [fb, setFb] = useState<MyFeedbackResponse | null>(null);
   const [invites, setInvites] = useState(0);
   const [referrals, setReferrals] = useState(0);
@@ -267,14 +226,12 @@ function RewardsStrip({ refreshTick }: { refreshTick: number }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [lb, f, reqs, ref] = await Promise.allSettled([
-        api.leaderboard(1),
+      const [f, reqs, ref] = await Promise.allSettled([
         api.myFeedback(),
         api.friendRequests(),
         api.getReferral(),
       ]);
       if (cancelled) return;
-      if (lb.status === "fulfilled") setMe(lb.value.me);
       if (f.status === "fulfilled") setFb(f.value);
       if (reqs.status === "fulfilled") setInvites(reqs.value.length);
       if (ref.status === "fulfilled") setReferrals(ref.value.referrals);
@@ -286,7 +243,6 @@ function RewardsStrip({ refreshTick }: { refreshTick: number }) {
 
   const pendingReward = fb ? Math.max(0, fb.totalRewardVnd - fb.paidRewardVnd) : 0;
   const cards: { key: string; icon: ReactNode; color: string; bg: string; value: string; label: string; hint: string; href: string }[] = [
-    ...(me ? [{ key: "xp", icon: <TrophyOutlined />, color: "#F59E0B", bg: "rgba(245,158,11,0.14)", value: me.xp.toLocaleString("vi-VN"), label: t("home.rwXp", "Điểm XP"), hint: `${t("home.rwLevel", "Cấp")} ${me.level} · ${t("home.rwRank", "Hạng")} #${me.rank}`, href: "/profile" }] : []),
     ...(fb ? [{ key: "reports", icon: <BugOutlined />, color: "#FF6B6B", bg: "rgba(255,107,107,0.14)", value: String(fb.totalReports), label: t("home.rwReports", "Báo lỗi hợp lệ"), hint: pendingReward > 0 ? `${t("home.rwRewardPending", "Thưởng chờ")}: ${vnd(pendingReward)}` : `${fb.totalPoints} ${t("home.rwPoints", "điểm")}`, href: "/reports" }] : []),
     ...(invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", value: String(invites), label: t("home.rwInvites", "Lời mời kết bạn"), hint: t("home.rwInvitesHint", "Chờ phản hồi"), href: "/friends" }] : []),
     ...(referrals > 0 ? [{ key: "ref", icon: <GiftOutlined />, color: "#16B98D", bg: "rgba(22,185,141,0.14)", value: String(referrals), label: t("home.rwReferrals", "Đã giới thiệu"), hint: t("home.rwReferralsHint", "Mời bạn → nhận thưởng"), href: "/profile" }] : []),
@@ -357,60 +313,26 @@ function ActivityCard({ refreshTick }: { refreshTick: number }) {
   );
 }
 
-/** "Tiếp tục làm việc" — recent apps grid (desktop parity). */
-function RecentAppsGrid() {
-  const { t } = useI18n();
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
-  const [apps, setApps] = useState<AppEntity[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    api.listApps({ pageSize: 6 }).then((r) => { if (!cancelled) setApps(r.items); }).catch(() => { if (!cancelled) setApps([]); });
-    return () => { cancelled = true; };
-  }, []);
-  const handleDeleted = (id: string) => setApps((prev) => (prev ? prev.filter((a) => a.id !== id) : prev));
-  const grid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))", gap: isMobile ? 12 : 16 };
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <Title level={5} style={{ margin: 0 }}>{t("home.continue", "Tiếp tục làm việc")}</Title>
-        <Link href="/apps" style={{ fontWeight: 600 }}>{t("home.viewAll", "Xem tất cả")} <ArrowRightOutlined style={{ fontSize: 11 }} /></Link>
-      </div>
-      {apps === null ? (
-        <div style={grid}>{[0, 1, 2].map((i) => <Card key={i} style={{ boxShadow: CARD_SHADOW, borderRadius: 14 }}><Skeleton active paragraph={{ rows: 2 }} /></Card>)}</div>
-      ) : apps.length === 0 ? (
-        <Card style={{ boxShadow: CARD_SHADOW, borderRadius: 14 }}>
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.emptyApps", "Chưa có app nào — hãy tạo app đầu tiên!")}>
-            <Link href="/"><Button icon={<RocketOutlined />}>{t("home.createNew", "Tạo app mới")}</Button></Link>
-          </Empty>
-        </Card>
-      ) : (
-        <div style={grid}>{apps.map((a) => <AppPreviewCard key={a.id} app={a} onDeleted={handleDeleted} />)}</div>
-      )}
-    </div>
-  );
-}
-
 /** "Bắt đầu" — web onboarding checklist with a progress ring (the web-native
  *  counterpart of the desktop's CLI/VM "Sức khỏe hệ thống" card). */
 function OnboardingCard({ refreshTick }: { refreshTick: number }) {
   const { t } = useI18n();
-  const [apps, setApps] = useState<number | null>(null);
-  const [live, setLive] = useState<number | null>(null);
+  const [ov, setOv] = useState<{ aiRuns: number; remoteTasks: number; skills: number } | null>(null);
+  const [friends, setFriends] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([api.listApps({ pageSize: 1 }), api.listDeployments({ pageSize: 1, status: "live" })]).then(([a, l]) => {
+    Promise.allSettled([api.meOverview(), api.friends()]).then(([o, f]) => {
       if (cancelled) return;
-      if (a.status === "fulfilled") setApps(a.value.total);
-      if (l.status === "fulfilled") setLive(l.value.total);
+      if (o.status === "fulfilled") setOv({ aiRuns: o.value.aiRuns, remoteTasks: o.value.remoteTasks, skills: o.value.skills });
+      if (f.status === "fulfilled") setFriends(f.value.length);
     });
     return () => { cancelled = true; };
   }, [refreshTick]);
   const steps = [
-    { key: "app", label: t("home.obApp", "Tạo app đầu tiên"), done: (apps ?? 0) > 0, href: "/", icon: <ThunderboltOutlined /> },
-    { key: "live", label: t("home.obLive", "Deploy 1 app live"), done: (live ?? 0) > 0, href: "/apps", icon: <CloudServerOutlined /> },
-    { key: "int", label: t("home.obIntegration", "Kết nối 1 tích hợp"), done: false, href: "/integrations", icon: <ApiOutlined /> },
-    { key: "friend", label: t("home.obFriend", "Mời 1 người bạn"), done: false, href: "/friends", icon: <TeamOutlined /> },
+    { key: "chat", label: t("home.obChat", "Trò chuyện với Trợ lý AI"), done: (ov?.aiRuns ?? 0) > 0, href: "/agents-chat/new", icon: <ThunderboltOutlined /> },
+    { key: "skill", label: t("home.obSkill", "Tạo kỹ năng đầu tiên"), done: (ov?.skills ?? 0) > 0, href: "/skills", icon: <ExperimentOutlined /> },
+    { key: "desktop", label: t("home.obDesktop", "Cài app desktop (Lark × Agents)"), done: (ov?.remoteTasks ?? 0) > 0, href: "/download", icon: <CloudServerOutlined /> },
+    { key: "friend", label: t("home.obFriend", "Mời 1 người bạn"), done: friends > 0, href: "/friends", icon: <TeamOutlined /> },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const pct = Math.round((doneCount / steps.length) * 100);
@@ -436,56 +358,6 @@ function OnboardingCard({ refreshTick }: { refreshTick: number }) {
   );
 }
 
-/**
- * Sáu thẻ "Gợi ý bắt đầu" ở trang tổng quan.
- *
- * `catKey`/`titleKey`/`descKey` là khoá dịch; ba chuỗi tiếng Việt giữ nguyên làm chuỗi dự phòng —
- * đúng quy ước t("khoá", "chuỗi Việt") của cả kho, và giống cách QUICK_ACTIONS ở trên đang làm.
- * `prompt` thì KHÔNG dịch: nó là yêu cầu gửi cho bộ sinh code, không phải chữ cho người đọc.
- */
-const TEMPLATE_CATS: { cat: string; catKey: string; catColor: string; title: string; titleKey: string; desc: string; descKey: string; prompt: string; track: Track }[] = [
-  { cat: "Tasks & Workflows", catKey: "home.tpl.kanbanCat", catColor: "#6C5CE7", title: "Quản lý công việc (Kanban)", titleKey: "home.tpl.kanbanTitle", desc: "Bảng Kanban kéo-thả: Cần làm / Đang làm / Xong.", descKey: "home.tpl.kanbanDesc", prompt: "Dashboard quản lý công việc dạng Kanban kéo thả với các cột Cần làm/Đang làm/Xong", track: "web" },
-  { cat: "Content & Sites", catKey: "home.tpl.landingCat", catColor: "#16B98D", title: "Landing page sản phẩm", titleKey: "home.tpl.landingTitle", desc: "Hero, tính năng, bảng giá, form đăng ký.", descKey: "home.tpl.landingDesc", prompt: "Landing page giới thiệu sản phẩm: hero, tính năng, bảng giá, form đăng ký", track: "web" },
-  { cat: "CRM & Sales", catKey: "home.tpl.crmCat", catColor: "#F59E0B", title: "CRM khách hàng đơn giản", titleKey: "home.tpl.crmTitle", desc: "Danh sách khách, thêm/sửa, trạng thái phễu.", descKey: "home.tpl.crmDesc", prompt: "CRM khách hàng đơn giản: danh sách khách, thêm/sửa/xoá, trạng thái phễu bán hàng, tìm kiếm", track: "web" },
-  { cat: "Finance", catKey: "home.tpl.invoiceCat", catColor: "#4FB6FF", title: "Tạo hoá đơn", titleKey: "home.tpl.invoiceTitle", desc: "Nhập sản phẩm, số lượng, tự tính tổng + thuế.", descKey: "home.tpl.invoiceDesc", prompt: "App tạo hoá đơn: nhập sản phẩm, số lượng, tự tính tổng + thuế, in/xuất hoá đơn", track: "web" },
-  { cat: "Booking", catKey: "home.tpl.bookingCat", catColor: "#EC4899", title: "Đặt lịch hẹn", titleKey: "home.tpl.bookingTitle", desc: "Chọn dịch vụ, ngày/giờ trống, xác nhận.", descKey: "home.tpl.bookingDesc", prompt: "App đặt lịch hẹn: chọn dịch vụ, chọn ngày/giờ trống, xác nhận đặt lịch", track: "web" },
-  { cat: "Trò chơi", catKey: "home.tpl.gameCat", catColor: "#8B5CF6", title: "Game bắn gạch", titleKey: "home.tpl.gameTitle", desc: "Bóng nảy phá gạch, điểm số, thắng/thua.", descKey: "home.tpl.gameDesc", prompt: "Game bắn gạch: bóng nảy phá gạch, thanh đỡ điều khiển chuột/phím, điểm số, thắng/thua, chơi lại", track: "game" },
-];
-
-/** "Gợi ý bắt đầu" — category-labeled starter cards → open the builder prefilled. */
-function TemplateCategories() {
-  const { t } = useI18n();
-  const router = useRouter();
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <Title level={5} style={{ margin: 0 }}>{t("home.startSuggest", "Gợi ý bắt đầu")}</Title>
-        <Link href="/templates" style={{ fontWeight: 600 }}>{t("home.allTemplates", "Tất cả mẫu")} <ArrowRightOutlined style={{ fontSize: 11 }} /></Link>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))", gap: isMobile ? 12 : 14 }}>
-        {TEMPLATE_CATS.map((c) => (
-          <Card
-            key={c.title}
-            className="tw-lift"
-            style={{ boxShadow: CARD_SHADOW, borderRadius: 14, cursor: "pointer" }}
-            styles={{ body: { padding: 16 } }}
-            onClick={() => router.push(`/?${c.track !== "web" ? `track=${c.track}&` : ""}prompt=${encodeURIComponent(c.prompt)}`)}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: c.catColor, background: `${c.catColor}18`, padding: "3px 9px", borderRadius: 999 }}>{t(c.catKey, c.cat)}</span>
-              <span style={{ fontSize: 11, color: "#9AA3B5" }}>{c.track === "game" ? "Game" : "Web"}</span>
-            </div>
-            <Text strong style={{ fontSize: 14, display: "block", marginBottom: 4 }}>{t(c.titleKey, c.title)}</Text>
-            <Text type="secondary" style={{ fontSize: 12.5, lineHeight: 1.45 }}>{t(c.descKey, c.desc)}</Text>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function HomeDashboard() {
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
@@ -500,22 +372,18 @@ export default function HomeDashboard() {
       {wide ? (
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: 22, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 22, minWidth: 0 }}>
-            <RecentAppsGrid />
             <RewardsStrip refreshTick={refreshTick} />
-            <TemplateCategories />
+            <ActivityCard refreshTick={refreshTick} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16, position: "sticky", top: 8 }}>
             <OnboardingCard refreshTick={refreshTick} />
-            <ActivityCard refreshTick={refreshTick} />
           </div>
         </div>
       ) : (
         <>
-          <RecentAppsGrid />
           <OnboardingCard refreshTick={refreshTick} />
           <RewardsStrip refreshTick={refreshTick} />
           <ActivityCard refreshTick={refreshTick} />
-          <TemplateCategories />
         </>
       )}
     </Space>

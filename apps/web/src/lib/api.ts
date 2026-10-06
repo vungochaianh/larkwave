@@ -1,119 +1,6 @@
-import type {
-  AgentDevice,
-  AgentTokenResponse,
-  AppAnalytics,
-  AssistantChatRequest,
-  AssistantChatResponse,
-  AppSecretItem,
-  AppSecretsResponse,
-  AppSeo,
-  Automation,
-  UpsertAutomationRequest,
-  AdminPayment,
-  AdminReport,
-  ClaudeReport,
-  ClaudeDataOverview,
-  ClaudeUserData,
-  PublicChatConv,
-  PublicAssistantInfo,
-  App,
-  AppMemberEntry,
-  AppMemberRole,
-  AppServicesResponse,
-  AppSuggestion,
-  AuditLogEntry,
-  AuthResponse,
-  BillingConfig,
-  BlogPost,
-  BlogPostListItem,
-  CreateBlogPostRequest,
-  UpdateBlogPostRequest,
-  Blueprint,
-  Build,
-  BuildStatus,
-  ChatMessage,
-  Conversation,
-  CreateRemoteTaskRequest,
-  CreateRemoteTaskResponse,
-  DiscoverUser,
-  Feedback,
-  SubmitFeedbackRequest,
-  MyFeedbackResponse,
-  AdminUpdateFeedbackRequest,
-  FeedbackSimilar,
-  AppNotification,
-  NotificationsResponse,
-  CreateBuildRequest,
-  CreateBuildResponse,
-  CreatePaymentResponse,
-  Deployment,
-  Friend,
-  FriendRequest,
-  GeneratedFile,
-  GitImportResponse,
-  GitProvider,
-  AdminMessageUserBody,
-  AdminMessageUserResult,
-  ImpersonateResponse,
-  GitPushResponse,
-  GitReposResponse,
-  HealthResponse,
-  LoginRequest,
-  MeActivity,
-  MeOverview,
-  MeSubscription,
-  InsufficientCreditsError,
-  LeaderboardResponse,
-  Paginated,
-  Payment,
-  PlanId,
-  PlatformConfig,
-  MakerProfile,
-  PublicApp,
-  RegisterRequest,
-  RemoteTask,
-  RemoteTaskStreamEvent,
-  AgentConversation,
-  RemoteAppInfo,
-  LarkQrStreamEvent,
-  CmsSyncStreamEvent,
-  LarkChatStreamEvent,
-  LarkChatRelayInput,
-  LarkRpcResultEvent,
-  TelegramAdminStatus,
-  ReportPeriod,
-  UploadContent,
-  UploadRef,
-  PrepareServerResponse,
-  ResolvedBillingConfig,
-  Role,
-  ServerDeployInfo,
-  ServerDeployStatusResponse,
-  SseEvent,
-  SuggestionRunEntry,
-  Track,
-  User,
-  UserStatus,
-} from "@larkwave/shared";
-// Quản trị cửa hàng (giai đoạn 2): hình dạng do API định, KHÔNG nằm trong gói dùng chung — lý do
-// đầy đủ ở đầu tệp được nhập vào dưới đây.
-import type {
-  AdminStoreCreateInput,
-  AdminStoreDelivery,
-  AdminStoreDeliveryInput,
-  AdminStoreGrantInput,
-  AdminStoreGrantResult,
-  AdminStoreListing,
-  AdminStoreListingInput,
-  AdminStoreQuery,
-  AdminStoreRow,
-  ListingStatus,
-} from "@/app/admin/store/_types";
+import type { AgentDevice, AgentTokenResponse, AssistantChatRequest, AssistantChatResponse, AdminPayment, AdminReport, ClaudeReport, ClaudeDataOverview, ClaudeUserData, PublicChatConv, PublicAssistantInfo, AuditLogEntry, AuthResponse, BillingConfig, ChatMessage, Conversation, CreateRemoteTaskRequest, CreateRemoteTaskResponse, DiscoverUser, Feedback, SubmitFeedbackRequest, MyFeedbackResponse, AdminUpdateFeedbackRequest, FeedbackSimilar, AppNotification, NotificationsResponse, CreatePaymentResponse, Friend, FriendRequest, AdminMessageUserBody, AdminMessageUserResult, ImpersonateResponse, HealthResponse, LoginRequest, MeActivity, MeOverview, MeSubscription, InsufficientCreditsError, Paginated, Payment, PlanId, RegisterRequest, RemoteTask, RemoteTaskStreamEvent, AgentConversation, LarkQrStreamEvent, CmsSyncStreamEvent, LarkChatStreamEvent, LarkChatRelayInput, LarkRpcResultEvent, TelegramAdminStatus, ReportPeriod, UploadContent, UploadRef, ResolvedBillingConfig, Role, User, UserStatus } from "@larkwave/shared";
 
-/**
- * Public app template returned by GET /templates (no auth required).
- * Not part of the shared package, so it's declared here.
- */
+/** A saved Artifact (`/artifacts`, public at `/a/<slug>`). Not part of the shared package. */
 export interface Artifact {
   id: string;
   title: string;
@@ -149,50 +36,7 @@ export interface ScheduledTask {
   createdAt: string;
 }
 
-export interface AppTemplate {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  track: Track;
-  /** Tailwind/accent colour used for the card accent bar. */
-  accent: string;
-  /** Prompt prefilled into the composer when "Dùng mẫu" is clicked. */
-  prompt: string;
-}
-
-/**
- * Edit-mode build request. When `files` is present the backend SKIPS codegen
- * and builds + deploys these exact files. `appId` is required in this mode.
- */
-export interface CreateBuildWithFilesRequest extends CreateBuildRequest {
-  appId: string;
-  files: GeneratedFile[];
-}
-
 // ── In-workspace database admin (full-stack apps) ──────────────────────────
-export interface DbColumn {
-  name: string;
-  type: string;
-  pk: boolean;
-  notnull: boolean;
-}
-export interface DbTable {
-  name: string;
-  columns: DbColumn[];
-  rowCount: number;
-}
-export interface DbOverview {
-  tables: DbTable[];
-}
-export interface DbRows {
-  table: string;
-  columns: DbColumn[];
-  rows: Record<string, unknown>[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
 
 /** Provider + agent-logic status for the admin AI page (no raw keys). */
 export interface AiKeyMask {
@@ -212,17 +56,14 @@ export interface AiStatus {
 
 /** Admin support drill-down counts for one user (GET /users/:id/support-summary). */
 export interface AdminUserSupportSummary {
-  apps: number;
-  builds: number;
-  failedBuilds: number;
-  succeededBuilds: number;
-  deployments: number;
+  aiRuns: number;
+  remoteTasks: number;
+  failedRemoteTasks: number;
   payments: number;
   feedback: number;
   lastActivityAt: string | null;
 }
 
-/** One errored build for the admin bug/error report. */
 /** Một lỗi runner người dùng gặp (CLI trên máy / Gói Larkwave), do giao diện báo về. */
 export interface RunnerErrorRow {
   id: string;
@@ -242,27 +83,6 @@ export interface RunnerErrorReport {
   topUsers: { userId: string; email: string; count: number }[];
   distinctUsers: number;
   items: RunnerErrorRow[];
-}
-
-export interface BuildErrorEntry {
-  id: string;
-  appId: string;
-  appName: string;
-  appSlug: string;
-  ownerEmail: string;
-  ownerName: string | null;
-  prompt: string;
-  status: string;
-  track: string | null;
-  model: string;
-  error: string | null;
-  failedStage: string | null;
-  stages: { name: string; status: string; detail?: string | null }[];
-  createdAt: string;
-  updatedAt: string;
-  finishedAt: string | null;
-  /** Admin acknowledged/resolved this error in the report. */
-  reviewed: boolean;
 }
 
 
@@ -445,78 +265,6 @@ function extractError(data: unknown): string | null {
   if (typeof obj.message === "string") return obj.message;
   if (typeof obj.error === "string") return obj.error;
   return null;
-}
-
-/**
- * SSE helper. EventSource cannot send Authorization headers, so we use
- * fetch() streaming + getReader() to read the text/event-stream and parse
- * each `data: {json}` line into an SseEvent.
- *
- * Returns an abort function to stop the stream.
- */
-export function streamBuild(
-  buildId: string,
-  onEvent: (event: SseEvent) => void,
-  options: { onError?: (err: Error) => void; onClose?: () => void } = {},
-): () => void {
-  const controller = new AbortController();
-  const token = getToken();
-
-  (async () => {
-    try {
-      const res = await fetch(
-        buildUrl(`/builds/${buildId}/stream`),
-        {
-          method: "GET",
-          headers: {
-            Accept: "text/event-stream",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          signal: controller.signal,
-          cache: "no-store",
-        },
-      );
-
-      if (!res.ok || !res.body) {
-        const txt = await res.text().catch(() => "");
-        throw new ApiError(
-          extractError(safeParse(txt)) ?? "Không kết nối được luồng build",
-          res.status,
-        );
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE messages are separated by a blank line.
-        let sep: number;
-        while ((sep = buffer.indexOf("\n\n")) !== -1) {
-          const chunk = buffer.slice(0, sep);
-          buffer = buffer.slice(sep + 2);
-          for (const rawLine of chunk.split("\n")) {
-            const line = rawLine.trimEnd();
-            if (!line.startsWith("data:")) continue; // skip ': ping' comments
-            const json = line.slice(5).trim();
-            if (!json) continue;
-            const parsed = safeParse(json);
-            if (parsed) onEvent(parsed as SseEvent);
-          }
-        }
-      }
-      options.onClose?.();
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError") return;
-      options.onError?.(err as Error);
-    }
-  })();
-
-  return () => controller.abort();
 }
 
 /** Subscribe to the current user's live chat SSE stream. Returns an abort fn. */
@@ -968,59 +716,6 @@ export function saveBlob(blob: Blob, filename: string): void {
 // chết ở đây chính là cái bẫy "một tính năng sống hai nơi": lần sau sửa hợp đồng API, người ta sửa
 // bản này và tưởng đã xong.
 
-/** A Developer API key row (never includes the secret). */
-export interface ApiKeyRow {
-  id: string;
-  name: string;
-  prefix: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-  createdAt: string;
-  /** Phạm vi quyền. RỖNG = toàn quyền (key phát trước khi có tính năng phạm vi). */
-  scopes: string[];
-  /** Hạn mức lượt gọi mỗi tháng dương lịch; null = không giới hạn. */
-  monthlyLimit: number | null;
-  /** Số lượt đã gọi trong tháng này (máy chủ đếm, kể cả lượt lỗi). */
-  monthUsed: number;
-}
-/** Returned once at creation — `key` is the RAW secret, shown only this once. */
-export interface ApiKeyCreated {
-  id: string;
-  name: string;
-  prefix: string;
-  createdAt: string;
-  scopes: string[];
-  monthlyLimit: number | null;
-  key: string;
-}
-/** Một quyền có thể cấp cho key — nhãn do máy chủ đặt, giao diện không chép cứng. */
-export interface ApiKeyScope {
-  id: string;
-  label: string;
-}
-/** Những gì được sửa trên một key (PATCH). Trường bỏ qua = giữ nguyên. */
-export interface ApiKeyPatch {
-  name?: string;
-  scopes?: string[];
-  monthlyLimit?: number | null;
-}
-/** Báo cáo dùng của MỘT key (`GET /me/api-keys/:id/usage`). */
-export interface ApiKeyUsage {
-  id: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
-  monthlyLimit: number | null;
-  monthUsed: number;
-  windowDays: number;
-  /** Tổng lượt trong cửa sổ `windowDays` (khác monthUsed: tháng dương lịch). */
-  total: number;
-  /** Lượt có mã trạng thái >= 400 trong cửa sổ. */
-  failed: number;
-  routes: { route: string; count: number; avgMs: number }[];
-  recent: { route: string; status: number; ms: number; at: string }[];
-}
-
 export interface MaicEndUser {
   id: string;
   externalId: string;
@@ -1119,116 +814,10 @@ export const api = {
       body: { code, newPassword },
     }),
 
-  // builds
-  createBuild: (body: CreateBuildRequest) =>
-    apiFetch<CreateBuildResponse>("/builds", { method: "POST", body }),
-  /**
-   * Edit mode: redeploy the exact set of files for an app without re-running
-   * codegen. Backend builds + deploys `files` as-is.
-   */
-  redeployFiles: (appId: string, files: GeneratedFile[]) =>
-    apiFetch<CreateBuildResponse>("/builds", {
-      method: "POST",
-      body: {
-        appId,
-        prompt: "Chỉnh sửa code thủ công",
-        files,
-      } satisfies CreateBuildWithFilesRequest,
-    }),
-  listBuilds: (query?: {
-    page?: number;
-    pageSize?: number;
-    status?: BuildStatus;
-    appId?: string;
-    /** Admin-only: scope to one user's builds (ignored server-side for non-admins). */
-    ownerId?: string;
-  }) => apiFetch<Paginated<Build>>("/builds", { query }),
-  /**
-   * Chạy lại một bản dựng. KHÔNG gửi prompt lên — máy chủ tự đọc yêu cầu gốc, vì prompt đã lưu
-   * có thể dài hơn trần 4000 ký tự của DTO và sẽ bị chặn ngay ở cổng kiểm tra.
-   */
-  rerunBuild: (buildId: string) =>
-    apiFetch<CreateBuildResponse>(`/builds/${buildId}/rerun`, { method: "POST" }),
-  /**
-   * Dựng lại CẢ BỘ site theo đúng thứ tự phụ thuộc. `appId` là app bất kỳ trong bộ.
-   * Tồn tại vì thứ tự mới là thứ quyết định — bấm "dựng lại" từng site theo tay dễ ra sai chuỗi.
-   */
-  rebuildSuite: (appId: string) =>
-    apiFetch<{ builds: number }>(`/builds/suite/${appId}/rebuild`, { method: "POST" }),
-  /** Admin: all errored builds platform-wide (bug/error report). `ownerId` scopes to one user. */
-  adminBuildErrors: (query?: { page?: number; pageSize?: number; q?: string; reviewed?: string; ownerId?: string }) =>
-    apiFetch<Paginated<BuildErrorEntry>>("/builds/errors/report", { query }),
-  /** Mark (or re-open) a failed build as resolved in the admin error report. */
-  dismissBuildError: (id: string, reviewed = true) =>
-    apiFetch<{ ok: true }>(`/builds/${id}/error-review`, {
-      method: "PATCH",
-      body: { reviewed },
-    }),
-  /** One-click: mark ALL unresolved errored builds as reviewed. */
-  dismissAllBuildErrors: () =>
-    apiFetch<{ count: number }>("/builds/errors/review-all", { method: "POST" }),
   /** Admin: lỗi runner gần đây người dùng gặp trên máy họ (xác thực/credit CLI, hoặc Gói Larkwave). */
   adminRunnerErrors: (query?: { days?: number; kind?: string; q?: string; limit?: number; offset?: number }) =>
     apiFetch<RunnerErrorReport>("/admin/runner-errors", { query }),
-  getBuild: (id: string) => apiFetch<Build>(`/builds/${id}`),
-  cancelBuild: (id: string) =>
-    apiFetch<{ ok: true }>(`/builds/${id}/cancel`, { method: "POST" }),
-  /** Roll back to a build: re-deploy its files as a new build (no credit cost). */
-  rollbackBuild: (id: string) =>
-    apiFetch<CreateBuildResponse>(`/builds/${id}/rollback`, { method: "POST" }),
-  /**
-   * Re-deploy a build's already-generated source as a free edit build (no AI
-   * codegen / credit). For a build that failed at the deploy step only.
-   */
-  redeployBuild: (id: string) =>
-    apiFetch<CreateBuildResponse>(`/builds/${id}/redeploy`, { method: "POST" }),
-  /** Save edits to a draft Blueprint while a build waits at the approval gate. */
-  updateBlueprint: (id: string, blueprint: Blueprint) =>
-    apiFetch<Build>(`/builds/${id}/blueprint`, { method: "PATCH", body: { blueprint } }),
-  /** Approve the Blueprint at the gate → consume credit + resume codegen. */
-  approveBuild: (id: string) =>
-    apiFetch<{ ok: true }>(`/builds/${id}/approve`, { method: "POST" }),
-  /** Fetch the build's project ZIP (auth via Bearer header → Blob). */
-  downloadBuildZip: (id: string) => downloadBuildZip(id),
 
-  // apps
-  listApps: (query?: {
-    page?: number;
-    pageSize?: number;
-    status?: string;
-    track?: string;
-    q?: string;
-    ownerId?: string;
-    pinned?: boolean;
-  }) => apiFetch<Paginated<App>>("/apps", { query }),
-  /** Pin / unpin an app to the sidebar. */
-  setAppPinned: (id: string, pinned: boolean) =>
-    apiFetch<App>(`/apps/${id}`, { method: "PATCH", body: { pinned } }),
-  /** Publish / unpublish an app to the public showcase. */
-  setAppPublished: (id: string, published: boolean) =>
-    apiFetch<App>(`/apps/${id}`, { method: "PATCH", body: { published } }),
-  // Public showcase (no auth required)
-  publicApps: (query?: {
-    page?: number;
-    pageSize?: number;
-    q?: string;
-    track?: string;
-  }) => apiFetch<Paginated<PublicApp>>("/public/apps", { query }),
-  publicApp: (slug: string) => apiFetch<PublicApp>(`/public/apps/${slug}`),
-  visitPublicApp: (slug: string) =>
-    apiFetch<{ visits: number }>(`/public/apps/${slug}/visit`, { method: "POST" }),
-  /** Remix/fork a published app into the current user's account (auth required). */
-  remixApp: (slug: string) =>
-    apiFetch<{ appId: string; buildId: string }>(`/public/apps/${slug}/remix`, { method: "POST" }),
-  /** Public maker profile (published apps + follower counts). */
-  maker: (handle: string) => apiFetch<MakerProfile>(`/public/makers/${handle}`),
-  /** Toggle following a maker (auth). */
-  followMaker: (handle: string) =>
-    apiFetch<{ following: boolean; followers: number }>(`/me/follow/${handle}`, { method: "POST" }),
-  isFollowingMaker: (handle: string) =>
-    apiFetch<{ following: boolean }>(`/me/follow/${handle}`),
-  /** Activity feed: recent apps from makers the user follows. */
-  feed: () => apiFetch<PublicApp[]>("/me/feed"),
   /** This user's referral code/link + how many people they've referred. */
   getReferral: () =>
     apiFetch<{ code: string; link: string; referrals: number; rewardPerReferral: number }>(
@@ -1259,10 +848,6 @@ export const api = {
     apiFetch<{ ok: true }>(`/friends/${userId}/accept`, { method: "POST" }),
   removeFriend: (userId: string) =>
     apiFetch<{ ok: true }>(`/friends/${userId}`, { method: "DELETE" }),
-  leaderboard: (limit?: number) =>
-    apiFetch<LeaderboardResponse>("/leaderboard", {
-      query: limit ? { limit } : undefined,
-    }),
   conversations: () => apiFetch<Conversation[]>("/messages"),
   unreadMessages: () => apiFetch<{ count: number }>("/messages/unread"),
   // notifications (realtime bell)
@@ -1304,8 +889,6 @@ export const api = {
     apiFetch<{ ok: true }>(`/agent/conversations/${id}`, { method: "DELETE" }),
   /** The user's registered desktop agent devices (with derived online flag). */
   listDevices: () => apiFetch<AgentDevice[]>("/agent/devices"),
-  /** Apps synced from the user's desktop(s) — pick one to send a follow-up edit to. */
-  listRemoteApps: () => apiFetch<RemoteAppInfo[]>("/agent/apps"),
   /** (Re)generate the per-user webhook token (returned once) for external triggers. */
   regenAgentToken: () =>
     apiFetch<AgentTokenResponse>("/agent/token", { method: "POST" }),
@@ -1392,70 +975,6 @@ export const api = {
   adminFeedbackAttachment: (id: string, uploadId: string) =>
     apiFetch<UploadContent>(`/admin/feedback/${id}/attachment/${uploadId}`),
 
-  // blog — public list/detail (no auth) + admin CRUD (/admin/blog)
-  blogPosts: (query?: { page?: number; pageSize?: number; tag?: string }) =>
-    apiFetch<Paginated<BlogPostListItem>>("/blog", { query, token: null }),
-  blogPost: (slug: string) => apiFetch<BlogPost>(`/blog/${slug}`, { token: null }),
-  /**
-   * Bài nổi bật cho khối blog ở trang chủ.
-   *
-   * `locale` là BẮT BUỘC để khối này không nói sai thứ tiếng. Bản trước không gửi tham số nào — khác
-   * hẳn hai đường blog còn lại vốn đều gửi `?locale=` — nên trên trang chủ bản tiếng Anh, phần vỏ
-   * ("From the Larkwave blog") là tiếng Anh còn ba tiêu đề bài bên dưới lại là tiếng Việt.
-   */
-  featuredBlogPosts: (limit = 3, locale?: string) =>
-    apiFetch<BlogPostListItem[]>("/blog/featured", {
-      query: locale ? { limit, locale } : { limit },
-      token: null,
-    }),
-  adminBlogPosts: (query?: { page?: number; pageSize?: number; status?: string }) =>
-    apiFetch<Paginated<BlogPost>>("/admin/blog", { query }),
-  adminBlogPost: (id: string) => apiFetch<BlogPost>(`/admin/blog/${id}`),
-  createBlogPost: (body: CreateBlogPostRequest) =>
-    apiFetch<BlogPost>("/admin/blog", { method: "POST", body }),
-  updateBlogPost: (id: string, body: UpdateBlogPostRequest) =>
-    apiFetch<BlogPost>(`/admin/blog/${id}`, { method: "PATCH", body }),
-  deleteBlogPost: (id: string) =>
-    apiFetch<{ ok: true }>(`/admin/blog/${id}`, { method: "DELETE" }),
-
-  // ── Cửa hàng — quản trị (/admin/store/*, chỉ vai admin) ─────────────────────
-  // Mặt công khai của cửa hàng nằm ở `store.service.ts` và không đi qua đây. Hai nhóm tuyến tách
-  // hẳn nhau ở phía máy chủ (một tệp `@Public()`, một tệp `@Roles('admin')`), nên chúng cũng
-  // đứng thành hai khối ở đây — trộn lại là cách một trường nội bộ lọt ra trang bán.
-  adminStoreListings: (query?: AdminStoreQuery) =>
-    apiFetch<Paginated<AdminStoreRow>>("/admin/store/listings", { query }),
-  adminStoreListing: (id: string) =>
-    apiFetch<AdminStoreListing>(`/admin/store/listings/${id}`),
-  adminCreateStoreListing: (body: AdminStoreCreateInput) =>
-    apiFetch<AdminStoreListing>("/admin/store/listings", { method: "POST", body }),
-  /** PATCH đúng nghĩa: trường không gửi = để yên. Đừng gửi `null` — máy chủ `.trim()` thẳng. */
-  adminUpdateStoreListing: (id: string, body: AdminStoreListingInput) =>
-    apiFetch<AdminStoreListing>(`/admin/store/listings/${id}`, { method: "PATCH", body }),
-  /** Ẩn/hiện/hết hàng. Tuyến riêng để nhật ký có một dòng đọc được, không lẫn vào bản sửa chung. */
-  adminSetStoreListingStatus: (id: string, status: ListingStatus) =>
-    apiFetch<AdminStoreRow>(`/admin/store/listings/${id}/status`, {
-      method: "POST",
-      body: { status },
-    }),
-  /**
-   * Đường giao hàng đã giải mã. MỖI LƯỢT GỌI ĐỀU VÀO NHẬT KÝ — chỉ gọi khi người dùng thật sự
-   * mở thẻ "Giao hàng", đừng nạp sẵn kèm trang chi tiết, nếu không dòng nhật ký "ai đã xem link
-   * tải của món này" sẽ chỉ còn đếm số lần mở trang.
-   */
-  adminStoreDelivery: (id: string) =>
-    apiFetch<AdminStoreDelivery>(`/admin/store/listings/${id}/delivery`),
-  /** THAY cả khối (object rỗng = xoá sạch), không gộp theo khoá. */
-  adminSetStoreDelivery: (id: string, body: AdminStoreDeliveryInput) =>
-    apiFetch<AdminStoreDelivery>(`/admin/store/listings/${id}/delivery`, {
-      method: "PUT",
-      body,
-    }),
-  /**
-   * Cấp thẳng một món vào tài khoản khách (bán tay). Idempotent theo (người nhận, món): gọi lại
-   * trả về đơn cũ với `created=false` chứ không sinh đơn thứ hai — giao diện phải nói rõ điều đó.
-   */
-  adminGrantStoreListing: (body: AdminStoreGrantInput) =>
-    apiFetch<AdminStoreGrantResult>("/admin/store/grants", { method: "POST", body }),
 
   // AI providers + agent logic (admin)
   adminAiStatus: () => apiFetch<AiStatus>("/admin/ai/status"),
@@ -1465,34 +984,6 @@ export const api = {
   adminTelegramStatus: () => apiFetch<TelegramAdminStatus>("/agent/telegram/admin"),
   setTelegramBot: (body: { botToken?: string; botUsername?: string }) =>
     apiFetch<TelegramAdminStatus>("/agent/telegram/admin", { method: "PUT", body }),
-  /**
-   * Admin app list (moderation). Same GET /apps endpoint, but admins also get
-   * the computed `flagged` boolean + `suspendReason` on each app and may filter
-   * by `flagged=true` and `status=suspended`.
-   */
-  adminApps: (query?: {
-    page?: number;
-    pageSize?: number;
-    status?: string;
-    q?: string;
-    ownerId?: string;
-    flagged?: boolean;
-  }) => apiFetch<Paginated<App>>("/apps", { query }),
-  /** Admin: suspend an app (takes it offline). Reason 1..500 chars, required. */
-  suspendApp: (id: string, reason: string) =>
-    apiFetch<App>(`/admin/apps/${id}/suspend`, {
-      method: "POST",
-      body: { reason },
-    }),
-  /** Admin: restore a suspended app (back to live/draft). */
-  unsuspendApp: (id: string) =>
-    apiFetch<App>(`/admin/apps/${id}/unsuspend`, { method: "POST" }),
-  /** Admin: free Cloudflare D1 slots by deleting orphaned tw-* databases. */
-  cleanupOrphanD1: () =>
-    apiFetch<{ total: number; deleted: number; kept: number; names: string[] }>(
-      "/admin/apps/cleanup-d1",
-      { method: "POST" },
-    ),
   /** Admin: all payments (newest first) for reconciliation. */
   adminListPayments: (query?: { status?: string; page?: number; pageSize?: number }) =>
     apiFetch<Paginated<AdminPayment>>("/admin/payments", { query }),
@@ -1504,79 +995,6 @@ export const api = {
     apiFetch<{ checked: number; matched: number }>("/admin/payments/sync", {
       method: "POST",
     }),
-  /** Public: current daily AI suggestions for the builder home. */
-  getSuggestions: () => apiFetch<AppSuggestion[]>("/suggestions"),
-  /** Admin: history of daily suggestion-generation runs. */
-  adminListSuggestionRuns: (query?: { page?: number; pageSize?: number }) =>
-    apiFetch<Paginated<SuggestionRunEntry>>("/admin/suggestions/runs", { query }),
-  /** Admin: regenerate suggestions now. */
-  adminRunSuggestions: () =>
-    apiFetch<SuggestionRunEntry>("/admin/suggestions/run", { method: "POST" }),
-  getApp: (id: string) => apiFetch<App>(`/apps/${id}`),
-  // In-workspace database admin (full-stack apps' D1)
-  appDb: (id: string) => apiFetch<DbOverview>(`/apps/${id}/db`),
-  appDbRows: (id: string, table: string, page = 1, pageSize = 50) =>
-    apiFetch<DbRows>(`/apps/${id}/db/${encodeURIComponent(table)}`, {
-      query: { page, pageSize },
-    }),
-  appDbInsert: (id: string, table: string, values: Record<string, unknown>) =>
-    apiFetch<{ ok: true }>(`/apps/${id}/db/${encodeURIComponent(table)}`, {
-      method: "POST",
-      body: { values },
-    }),
-  appDbUpdate: (id: string, table: string, rowid: number, values: Record<string, unknown>) =>
-    apiFetch<{ ok: true }>(`/apps/${id}/db/${encodeURIComponent(table)}/${rowid}`, {
-      method: "PUT",
-      body: { values },
-    }),
-  appDbDelete: (id: string, table: string, rowid: number) =>
-    apiFetch<{ ok: true }>(`/apps/${id}/db/${encodeURIComponent(table)}/${rowid}`, {
-      method: "DELETE",
-    }),
-  // Collaboration
-  sharedApps: () => apiFetch<App[]>("/apps/shared"),
-  appMembers: (id: string) => apiFetch<AppMemberEntry[]>(`/apps/${id}/members`),
-  addAppMember: (id: string, email: string, role: AppMemberRole) =>
-    apiFetch<AppMemberEntry>(`/apps/${id}/members`, {
-      method: "POST",
-      body: { email, role },
-    }),
-  updateAppMember: (id: string, userId: string, role: AppMemberRole) =>
-    apiFetch<{ ok: true }>(`/apps/${id}/members/${userId}`, {
-      method: "PATCH",
-      body: { role },
-    }),
-  removeAppMember: (id: string, userId: string) =>
-    apiFetch<{ ok: true }>(`/apps/${id}/members/${userId}`, { method: "DELETE" }),
-  updateApp: (id: string, body: { name?: string; status?: string; pinned?: boolean }) =>
-    apiFetch<App>(`/apps/${id}`, { method: "PATCH", body }),
-  deleteApp: (id: string) =>
-    apiFetch<{ ok: true }>(`/apps/${id}`, { method: "DELETE" }),
-  /** Save the app's SEO & GEO config (applied at next deploy). */
-  updateAppSeo: (id: string, seo: AppSeo) =>
-    apiFetch<App>(`/apps/${id}/seo`, { method: "PUT", body: seo }),
-  /** Visit analytics for a deployed app over the last `days` days. */
-  getAppAnalytics: (id: string, days = 30) =>
-    apiFetch<AppAnalytics>(`/apps/${id}/analytics`, { query: { days } }),
-  /** App secrets / env vars (owner/editor; values returned decrypted to the owner). */
-  getAppSecrets: (id: string) => apiFetch<AppSecretsResponse>(`/apps/${id}/secrets`),
-  updateAppSecrets: (id: string, secrets: AppSecretItem[]) =>
-    apiFetch<AppSecretsResponse>(`/apps/${id}/secrets`, { method: "PUT", body: { secrets } }),
-  // automations (scheduled tasks)
-  listAutomations: (appId: string) =>
-    apiFetch<Automation[]>(`/apps/${appId}/automations`),
-  createAutomation: (appId: string, body: UpsertAutomationRequest) =>
-    apiFetch<Automation>(`/apps/${appId}/automations`, { method: "POST", body }),
-  updateAutomation: (appId: string, id: string, body: UpsertAutomationRequest) =>
-    apiFetch<Automation>(`/apps/${appId}/automations/${id}`, { method: "PUT", body }),
-  runAutomation: (appId: string, id: string) =>
-    apiFetch<Automation>(`/apps/${appId}/automations/${id}/run`, { method: "POST" }),
-  deleteAutomation: (appId: string, id: string) =>
-    apiFetch<{ ok: true }>(`/apps/${appId}/automations/${id}`, { method: "DELETE" }),
-  appBuilds: (id: string, query?: { page?: number; pageSize?: number }) =>
-    apiFetch<Paginated<Build>>(`/apps/${id}/builds`, { query }),
-  appDeployments: (id: string, query?: { page?: number; pageSize?: number }) =>
-    apiFetch<Paginated<Deployment>>(`/apps/${id}/deployments`, { query }),
 
   // users (admin)
   listUsers: (query?: { page?: number; pageSize?: number; role?: Role }) =>
@@ -1664,18 +1082,7 @@ export const api = {
       body,
     }),
 
-  // deployments
-  listDeployments: (query?: {
-    page?: number;
-    pageSize?: number;
-    appId?: string;
-    status?: string;
-  }) => apiFetch<Paginated<Deployment>>("/deployments", { query }),
 
-  // settings
-  getConfig: () => apiFetch<PlatformConfig>("/settings/config"),
-  updateConfig: (body: PlatformConfig) =>
-    apiFetch<PlatformConfig>("/settings/config", { method: "PUT", body }),
 
   // MAIC — lớp đại lý. Larkwave bán gói, MAIC chạy máy và chặn hạn mức theo
   // từng người dùng của ta. Mọi lời gọi ở đây đi qua apps/api; token MAIC không
@@ -1756,7 +1163,7 @@ export const api = {
    */
   uploadAvatar: (file: File) => apiUpload<User>("/me/avatar", "file", file),
   /** Upload a file (image/PDF/Office doc/text) to attach to a build conversation. */
-  uploadFile: (file: File, purpose?: "chat" | "feedback" | "marketing" | "build") =>
+  uploadFile: (file: File, purpose?: "chat" | "feedback") =>
     apiUpload<UploadRef>(purpose ? `/uploads?purpose=${purpose}` : "/uploads", "file", file),
   /** GET /uploads/:id — full stored content of an attachment (owner-only) to preview. */
   getUpload: (id: string) => apiFetch<UploadContent>(`/uploads/${id}`),
@@ -1810,21 +1217,6 @@ export const api = {
   communityDeleteComment: (id: string) =>
     apiFetch<{ ok: true }>(`/community/comments/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
-  /** Bản dựng đang chạy + dự đoán còn bao lâu (nút tiến trình trên header). */
-  runningBuilds: () =>
-    apiFetch<
-      {
-        buildId: string;
-        appId: string;
-        appName: string;
-        kind: 'clone' | 'codegen' | 'edit' | 'other';
-        startedAt: string;
-        elapsedSec: number;
-        etaSec: number;
-        overdue: boolean;
-        stage: string | null;
-      }[]
-    >("/builds/running"),
 
   // billing — current plan, monthly build quota & the full plan catalog
   subscription: () => apiFetch<MeSubscription>("/me/subscription"),
@@ -1844,18 +1236,6 @@ export const api = {
     }>("/storage/usage"),
 
   // ── Developer API keys (console) ──────────────────────────────────────────
-  listApiKeys: () => apiFetch<ApiKeyRow[]>("/me/api-keys"),
-  /** Danh sách quyền có thể cấp — dựng ô chọn từ đây để thêm quyền ở máy chủ là giao diện tự có. */
-  apiKeyScopes: () => apiFetch<ApiKeyScope[]>("/me/api-keys/scopes"),
-  createApiKey: (body: { name: string; scopes: string[]; monthlyLimit: number | null }) =>
-    apiFetch<ApiKeyCreated>("/me/api-keys", { method: "POST", body }),
-  /** Sửa tên / phạm vi / hạn mức của key đang có — thu hẹp quyền key nghi lộ mà không phải đổi key. */
-  updateApiKey: (id: string, patch: ApiKeyPatch) =>
-    apiFetch<ApiKeyRow>(`/me/api-keys/${encodeURIComponent(id)}`, { method: "PATCH", body: patch }),
-  apiKeyUsage: (id: string, days = 30) =>
-    apiFetch<ApiKeyUsage>(`/me/api-keys/${encodeURIComponent(id)}/usage`, { query: { days } }),
-  revokeApiKey: (id: string) =>
-    apiFetch<{ ok: boolean }>(`/me/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),
   /**
    * Đổi gói KHÔNG qua thanh toán — và máy chủ chỉ cho HẠ gói bằng đường này.
    *
@@ -1886,68 +1266,7 @@ export const api = {
   /** The current user's full payment history (newest first). */
   payments: () => apiFetch<Payment[]>("/me/payments"),
 
-  // git — connect a provider, import a repo, push code back
-  /**
-   * List the current user's repositories on a linked provider. Returns
-   * `{ connected: false }` when the provider isn't linked yet (the UI then shows
-   * a "Kết nối" button). `q` filters by name server-side.
-   */
-  gitRepos: (provider: GitProvider, q?: string, page?: number) =>
-    apiFetch<GitReposResponse>(`/me/git/${provider}/repos`, {
-      query: {
-        ...(q ? { q } : {}),
-        ...(page && page > 1 ? { page } : {}),
-      },
-    }),
-  /** Detected sub-projects of an imported (mono)repo app. */
-  appServices: (id: string) =>
-    apiFetch<AppServicesResponse>(`/apps/${id}/services`),
-  /** Child apps (built/stored services) of a workspace app. */
-  appChildren: (id: string) => apiFetch<App[]>(`/apps/${id}/children`),
-  /** "Deploy lên Server (Docker)" availability + current state for an app. */
-  serverDeployStatus: (id: string) =>
-    apiFetch<ServerDeployStatusResponse>(`/apps/${id}/server-deploy`),
-  /** AI-synthesize docker-compose + Dockerfiles so a multi-service app can run on the server. */
-  prepareServer: (id: string) =>
-    apiFetch<PrepareServerResponse>(`/apps/${id}/prepare-server`, { method: "POST" }),
-  /** Deploy an app (docker-compose) to the server; returns the deploy state. */
-  deployServer: (id: string) =>
-    apiFetch<ServerDeployInfo>(`/apps/${id}/deploy-server`, { method: "POST" }),
-  /** Build + deploy one sub-project as its own new app. Returns the new app. */
-  buildAppService: (id: string, path: string) =>
-    apiFetch<GitImportResponse>(`/apps/${id}/services/build`, {
-      method: "POST",
-      body: { path },
-    }),
-  /**
-   * Import a repository: the backend downloads its text files, creates an App
-   * and enqueues an edit-mode build that builds + deploys it. Returns the new
-   * `appId` + `buildId` so the caller can open the workspace and watch it build.
-   */
-  gitImport: (
-    body: { provider: GitProvider; repo: string; branch?: string },
-    signal?: AbortSignal,
-  ) => apiFetch<GitImportResponse>("/me/git/import", { method: "POST", body, signal }),
-  /**
-   * Commit the app's latest build files back to its linked repo@branch using the
-   * user's stored provider token. Requires the app to be git-imported. Returns
-   * `{ ok, commitUrl? }`.
-   */
-  gitPush: (id: string, message?: string) =>
-    apiFetch<GitPushResponse>(`/apps/${id}/git/push`, {
-      method: "POST",
-      body: message ? { message } : {},
-    }),
-  /**
-   * Re-pull the latest code from the app's linked repo INTO the same app (keeps its
-   * id/URL): re-classifies, re-derives the build config, refreshes files, then streams
-   * progress to the returned `buildId`. For picking up repo fixes without re-importing.
-   */
-  gitResync: (id: string) =>
-    apiFetch<GitImportResponse>(`/apps/${id}/git/resync`, { method: "POST" }),
 
-  // templates (public — no auth)
-  listTemplates: () => apiFetch<AppTemplate[]>("/templates", { token: null }),
 
   // health
   health: () => apiFetch<HealthResponse>("/health", { token: null }),

@@ -7,7 +7,7 @@ import SupportClient from "./SupportClient";
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 
-/** Vỏ server mỏng: metadata + JSON-LD — xem chú thích ở `explore/page.tsx`. */
+/** Vỏ server mỏng: metadata + JSON-LD; thân trang là island SupportClient. */
 export async function generateMetadata({ searchParams }: { searchParams: SP }): Promise<Metadata> {
   const sp = await searchParams;
   return metaSongNgu(
@@ -16,13 +16,13 @@ export async function generateMetadata({ searchParams }: { searchParams: SP }): 
       vi: {
         title: "Góp ý & Hỗ trợ — Larkwave",
         description:
-          "Báo lỗi, gửi góp ý và tra cứu câu hỏi thường gặp về Larkwave: gói cước, deploy, tên miền riêng, đặt lại mật khẩu và quyền riêng tư của app bạn dựng.",
+          "Báo lỗi, gửi góp ý và tra cứu câu hỏi thường gặp về Larkwave: kết nối Lark, quyền ghi dữ liệu, gói cước, thanh toán, đặt lại mật khẩu và quyền riêng tư.",
         keywords: ["hỗ trợ Larkwave", "báo lỗi Larkwave", "góp ý", "câu hỏi thường gặp"],
       },
       en: {
         title: "Support & feedback — Larkwave",
         description:
-          "Report a bug, send feedback and read the FAQ for Larkwave: plans, deploys, custom domains, password resets and the privacy of the apps you build.",
+          "Report a bug, send feedback and read the FAQ for Larkwave: connecting Lark, write permissions, plans, payment, password resets and privacy.",
         keywords: ["Larkwave support", "report a Larkwave bug", "feedback", "FAQ"],
       },
     },

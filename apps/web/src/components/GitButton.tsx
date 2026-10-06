@@ -3,9 +3,10 @@
 import { GithubFilled, GitlabFilled } from "@ant-design/icons";
 import { Button } from "antd";
 import { useState } from "react";
-import type { GitProvider } from "@larkwave/shared";
 import { useI18n } from "@larkwave/ui";
 import { API_ORIGIN } from "@/lib/api";
+
+type GitProvider = "gitlab" | "github";
 
 const META: Record<
   GitProvider,
@@ -27,9 +28,9 @@ const META: Record<
  * Full-page navigation to the API's GitLab/GitHub OAuth entrypoint. fetch()
  * cannot follow the 302 → provider-consent chain, so we hard-navigate.
  *
- * Pass `linkToken` to connect the provider to the *currently logged-in* user
- * (used by the import flow) — the API carries it through OAuth state and links
- * the provider to that account instead of logging in / creating a new one.
+ * Pass `linkToken` to connect the provider to the *currently logged-in* user —
+ * the API carries it through OAuth state and links the provider to that account
+ * instead of logging in / creating a new one.
  */
 export default function GitButton({
   provider,

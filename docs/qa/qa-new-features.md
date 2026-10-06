@@ -1,5 +1,8 @@
 # QA — CHỈ các tính năng MỚI (Skills kiểu Claude · Tác vụ định kỳ · Dự án · Artifacts)
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](../TACH-APP.md).
+
 > Gửi phần giữa hai mốc `# BẮT ĐẦU` … `# HẾT` cho agent có công cụ trình duyệt. Chỉ test 4 tính năng mới
 > trên `https://app.toolswave.net`. Nếu thấy lỗi → báo: mức (P0–P3), trang, các bước tái hiện, kỳ vọng vs
 > thực tế, ảnh chụp + log console/network.

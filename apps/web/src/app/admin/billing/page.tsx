@@ -41,7 +41,7 @@ const PLANS: { id: PlanId; label: string; color: string }[] = [
 
 interface BillingForm {
   vndPerUsd: number;
-  plans: Record<PlanId, { priceVnd: number; monthlyTokens: number; maxLiveApps: number }>;
+  plans: Record<PlanId, { priceVnd: number; monthlyTokens: number }>;
   freePlanEnabled: boolean;
   discount: { percent: number; until: Dayjs | null; label: string };
 }
@@ -242,7 +242,7 @@ export default function AdminBillingPage() {
             <Col xs={24} sm={16}>
               <Text type="secondary" style={{ fontSize: 13 }}>
                 Hạn mức mỗi gói tính theo <Text strong>token/tháng</Text> (= 100% của gói). Mỗi
-                lần build trừ % theo token thực dùng — chỉnh ở phần “Cấu hình gói” bên dưới.
+                lượt AI hosted trừ % theo token thực dùng — chỉnh ở phần “Cấu hình gói” bên dưới.
               </Text>
             </Col>
           </Row>
@@ -280,12 +280,12 @@ export default function AdminBillingPage() {
                     />
                   </Form.Item>
                 </Col>
-                <Col xs={12} sm={8}>
+                <Col xs={24} sm={16}>
                   <Form.Item
                     name={["plans", p.id, "monthlyTokens"]}
                     label="Hạn mức token / tháng (= 100%)"
                     rules={[{ required: true, message: "Bắt buộc" }]}
-                    tooltip="100% của gói. Mỗi build trừ % = token thực dùng ÷ hạn mức."
+                    tooltip="100% của gói. Mỗi lượt AI trừ % = token thực dùng ÷ hạn mức."
                   >
                     <InputNumber
                       min={0}
@@ -294,15 +294,6 @@ export default function AdminBillingPage() {
                       formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
                       parser={(v) => Number(`${v}`.replace(/\./g, "")) as 0}
                     />
-                  </Form.Item>
-                </Col>
-                <Col xs={12} sm={8}>
-                  <Form.Item
-                    name={["plans", p.id, "maxLiveApps"]}
-                    label="App chạy tối đa"
-                    rules={[{ required: true, message: "Bắt buộc" }]}
-                  >
-                    <InputNumber min={0} step={1} style={{ width: "100%" }} />
                   </Form.Item>
                 </Col>
               </Row>

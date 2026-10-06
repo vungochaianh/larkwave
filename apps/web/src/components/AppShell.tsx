@@ -1,48 +1,15 @@
 "use client";
 
-import {
-  ApiOutlined,
-  AppstoreAddOutlined,
-  AppstoreOutlined,
-  BugOutlined,
-  BulbOutlined,
-  BulbFilled,
-  CloudServerOutlined,
-  DesktopOutlined,
-  ExperimentOutlined,
-  FacebookFilled,
-  HomeOutlined,
-  DashboardOutlined,
-  KeyOutlined,
-  IdcardOutlined,
-  LoginOutlined,
-  LogoutOutlined,
-  MenuFoldOutlined,
-  MessageOutlined,
-  MenuOutlined,
-  MenuUnfoldOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  PushpinFilled,
-  RobotOutlined,
-  SafetyOutlined,
-  TeamOutlined,
-  ThunderboltOutlined,
-  TrophyOutlined,
-} from "@ant-design/icons";
+import { BugOutlined, BulbOutlined, BulbFilled, CloudServerOutlined, DesktopOutlined, ExperimentOutlined, FacebookFilled, DashboardOutlined, IdcardOutlined, LoginOutlined, LogoutOutlined, MenuFoldOutlined, MessageOutlined, MenuOutlined, MenuUnfoldOutlined, MoreOutlined, PlusOutlined, RobotOutlined, SafetyOutlined, TeamOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { Badge, Button, Drawer, Dropdown, Grid, Layout, Menu, Tooltip } from "antd";
 import { V, BRAND_GRADIENT, useThemeMode, useI18n, type Locale } from "@larkwave/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTabTitle } from "@/lib/useTabTitle";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import type { App as AppEntity } from "@larkwave/shared";
-import { chuDau } from "@/lib/chuDau";
 import { api } from "@/lib/api";
-import RunningBuildsButton from "@/components/RunningBuildsButton";
 import SidebarQuotas from "@/components/SidebarQuotas";
 import PlanModal from "@/components/PlanModal";
-import { onAppsChanged } from "@/lib/appEvents";
 import { useAuth } from "@/lib/auth";
 import { FANPAGE_URL } from "@/lib/billing";
 import { AdminBadge, PlanBadge, UserAvatar } from "@/components/UserAvatar";
@@ -62,7 +29,7 @@ const BRAND = "#6C5CE7";
 interface NavChild {
   key: string;
   label: string;
-  /** Mục con trong nhóm vẫn giữ biểu tượng — nhóm "Làm app" có 5 mục, chỉ chữ thì khó quét. */
+  /** Mục con trong nhóm có thể mang biểu tượng riêng. */
   icon?: ReactNode;
 }
 interface NavItem {
@@ -77,26 +44,6 @@ const NAV: NavItem[] = [
   // "Tổng quan" đứng ĐẦU: đây là chỗ nhìn bao quát cả tài khoản, nên nó mở màn thanh bên chứ
   // không nấp sau nhóm làm việc.
   { key: "/overview", label: "Tổng quan", icon: <DashboardOutlined /> },
-  // Mọi thứ thuộc việc LÀM WEBSITE gom về một nhóm: tạo, website của mình, khám phá app người
-  // khác, mẫu để bắt đầu, và tích hợp để nối dịch vụ. Trước đó năm mục này nằm rải rác giữa
-  // Marketing, Claude, Điều khiển từ xa… nên phải quét cả thanh bên mới thấy đủ. App desktop đã
-  // gom kiểu này từ trước (nhóm `grp-app`) — đây là bù cho web cho khớp.
-  {
-    key: "grp-app",
-    label: "Làm website",
-    icon: <ThunderboltOutlined />,
-    children: [
-      { key: "/create-website", label: "Tạo website", icon: <ThunderboltOutlined /> },
-      { key: "/apps", label: "Website của tôi", icon: <AppstoreOutlined /> },
-      // KHÔNG còn mục "Khám phá app" ở đây: khối duyệt app cộng đồng nay nằm ngay dưới trang
-      // "Tạo website", đúng chỗ người ta đang tìm ý tưởng. Một mục riêng trong thanh bên dẫn tới
-      // cùng nội dung chỉ làm thanh bên dài thêm mà không thêm đường đi nào mới.
-      // Trang /explore VẪN CÒN và vẫn công khai — nó là trang người ngoài vào xem và là nguồn
-      // liên kết từ ngoài, xoá đi là mất cả hai.
-      { key: "/templates", label: "Mẫu", icon: <AppstoreAddOutlined /> },
-      { key: "/integrations", label: "Integrations", icon: <ApiOutlined /> },
-    ],
-  },
   // Khu "Agents Chat" gom các tính năng AI (Trò chuyện / Dự án / Artifacts / Tác vụ định kỳ).
   { key: "/agents-chat", label: "Agents Chat", icon: <RobotOutlined /> },
   // KHÔNG còn nhóm "Marketing" (02/10/2026): bộ Make Video / Picture / Blog đã chuyển sang Social
@@ -116,8 +63,6 @@ const NAV: NavItem[] = [
   },
   { key: "/community", label: "Cộng đồng", icon: <MessageOutlined /> },
   { key: "/friends", label: "Bạn bè", icon: <TeamOutlined /> },
-  { key: "/leaderboard", label: "Xếp hạng", icon: <TrophyOutlined /> },
-  { key: "/api", label: "API", icon: <KeyOutlined /> },
   // KHÔNG còn mục "Gói & Thanh toán" ở đây (24/09/2026). Gói hiện tại đã hiện ngay trên trang Hồ
   // sơ, và /pricing nay là trang giới thiệu công khai chứ không phải màn hình trong app — để nó
   // trong thanh bên là dẫn người dùng ra khỏi bảng điều khiển mà không báo trước.
@@ -130,25 +75,17 @@ const NAV: NavItem[] = [
 
 /** NAV item key → i18n message key (for translating labels at render; falls back to the raw label). */
 const NAV_I18N: Record<string, string> = {
-  "grp-app": "nav.buildApps",
-  "/create-website": "nav.createApp",
   "/overview": "nav.overview",
   "/agents-chat": "nav.agentsChat",
   "/skills": "nav.skills",
   "/storage": "nav.storage",
-  "/apps": "nav.apps",
   remote: "nav.remote",
   "/remote/agent": "nav.remote.myMachine",
   "/remote/chat": "nav.remote.chat",
   "/remote/lark-chat": "nav.remote.lark",
   "/remote/lark": "nav.remote.larkCms",
   "/community": "nav.community",
-  "/explore": "nav.explore",
   "/friends": "nav.friends",
-  "/leaderboard": "nav.leaderboard",
-  "/templates": "nav.templates",
-  "/integrations": "nav.integrations",
-  "/api": "nav.api",
   "/pricing": "nav.pricing",
   "/reports": "nav.reports",
   "/profile": "nav.profile",
@@ -175,9 +112,6 @@ function readOpenKeys(selected: string): string[] {
 }
 
 function selectedKey(pathname: string): string {
-  // "/" nay là TRANG CHỦ, không còn là trang tạo website — nên nó KHÔNG được làm sáng mục "Tạo
-  // website" nữa. Người dùng chê đúng chỗ này: nhìn menu thì tưởng trang gốc là trang tạo app.
-  if (pathname.startsWith("/create-website")) return "/create-website";
   if (pathname.startsWith("/overview")) return "/overview";
   if (pathname.startsWith("/assistant")) return "/assistant";
   if (pathname.startsWith("/remote/lark-chat")) return "/remote/lark-chat";
@@ -185,14 +119,8 @@ function selectedKey(pathname: string): string {
   if (pathname.startsWith("/remote/chat")) return "/remote/chat";
   if (pathname.startsWith("/remote")) return "/remote/agent";
   if (pathname.startsWith("/agent")) return "/remote/agent";
-  if (pathname.startsWith("/apps")) return "/apps";
   if (pathname.startsWith("/community")) return "/community";
-  if (pathname.startsWith("/explore")) return "/explore";
   if (pathname.startsWith("/friends")) return "/friends";
-  if (pathname.startsWith("/leaderboard")) return "/leaderboard";
-  if (pathname.startsWith("/templates")) return "/templates";
-  if (pathname.startsWith("/integrations")) return "/integrations";
-  if (pathname.startsWith("/api")) return "/api";
   if (pathname.startsWith("/pricing")) return "/pricing";
   // /billing now redirects to the merged /pricing page — highlight the same item.
   if (pathname.startsWith("/billing")) return "/pricing";
@@ -445,235 +373,6 @@ function ContactLink({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-/**
- * Pinned apps quick-access list in the sidebar. Fetches the user's pinned apps
- * and re-fetches on navigation (so a pin/unpin elsewhere reflects). Hidden when
- * collapsed or empty; any fetch failure is swallowed so it never breaks nav.
- */
-function PinnedApps({
-  collapsed,
-  pathname,
-  onNavigate,
-}: {
-  collapsed: boolean;
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  const { t } = useI18n();
-  const [apps, setApps] = useState<AppEntity[]>([]);
-
-  const load = useCallback(() => {
-    api
-      .listApps({ pinned: true, pageSize: 8 })
-      .then((res) => setApps(res.items))
-      // On a transient failure (e.g. API restarting during a deploy) keep the
-      // last-known-good list so the "Đã ghim" group stays visible. The group
-      // only hides when a SUCCESSFUL response actually returns [] (real-empty).
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, pathname]);
-
-  // Refresh the moment an app is pinned/unpinned/deleted anywhere (no F5 needed).
-  useEffect(() => onAppsChanged(load), [load]);
-
-  const unpin = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setApps((a) => a.filter((x) => x.id !== id));
-    await api.setAppPinned(id, false).catch(() => load());
-  };
-
-  if (collapsed || apps.length === 0) return null;
-
-  return (
-    <div style={{ padding: "8px 12px 0" }}>
-      <div
-        style={{
-          fontSize: 10.5,
-          fontWeight: 800,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: V.textFaint,
-          padding: "0 6px 6px",
-        }}
-      >
-        {t("comp.shell.pinned", "Đã ghim")}
-      </div>
-      {apps.map((a) => (
-        <Link
-          key={a.id}
-          href={`/apps/${a.id}`}
-          onClick={onNavigate}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 8px",
-            borderRadius: 8,
-            color: V.textSub,
-          }}
-          className="tw-pinned-row"
-        >
-          <span
-            style={{
-              width: 20,
-              height: 20,
-              minWidth: 20,
-              borderRadius: 6,
-              background: "rgba(108,92,231,0.12)",
-              color: "#6C5CE7",
-              fontSize: 11,
-              fontWeight: 700,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {chuDau(a.name) || "A"}
-          </span>
-          <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontSize: 13,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {a.name}
-          </span>
-          <Tooltip title={t("comp.shell.unpin", "Bỏ ghim")}>
-            <PushpinFilled
-              onClick={(e) => void unpin(e, a.id)}
-              style={{ color: V.textFaint, fontSize: 12 }}
-            />
-          </Tooltip>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Recently-updated apps in the sidebar (excludes pinned — those have their own
- * group above). Quick access to what you were just working on; refreshes on
- * navigation + whenever apps change. Hidden when collapsed or empty.
- */
-function RecentApps({
-  collapsed,
-  pathname,
-  onNavigate,
-}: {
-  collapsed: boolean;
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  const { t } = useI18n();
-  const [apps, setApps] = useState<AppEntity[]>([]);
-
-  const load = useCallback(() => {
-    api
-      .listApps({ pageSize: 12 })
-      .then((res) => setApps(res.items.filter((a) => !a.pinned).slice(0, 6)))
-      // On a transient failure (e.g. API restarting during a deploy) keep the
-      // last-known-good list so the "Gần đây" group stays visible. The group
-      // only hides when a SUCCESSFUL response actually returns [] (real-empty).
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, pathname]);
-  useEffect(() => onAppsChanged(load), [load]);
-
-  if (collapsed || apps.length === 0) return null;
-
-  return (
-    <div style={{ padding: "10px 12px 0" }}>
-      <div
-        style={{
-          fontSize: 10.5,
-          fontWeight: 800,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: V.textFaint,
-          padding: "0 6px 6px",
-        }}
-      >
-        {t("comp.shell.recent", "Gần đây")}
-      </div>
-      {apps.map((a) => {
-        const base = `/apps/${a.id}`;
-        const active = pathname === base || pathname.startsWith(`${base}/`);
-        return (
-          <Link
-            key={a.id}
-            href={`/apps/${a.id}`}
-            onClick={onNavigate}
-            className="tw-pinned-row"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 8px",
-              borderRadius: 8,
-              color: active ? "#5B4FC2" : V.textSub,
-              background: active ? "rgba(108,92,231,0.10)" : "transparent",
-            }}
-          >
-            <span
-              style={{
-                width: 20,
-                height: 20,
-                minWidth: 20,
-                borderRadius: 6,
-                background: "rgba(108,92,231,0.12)",
-                color: "#6C5CE7",
-                fontSize: 11,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {chuDau(a.name) || "A"}
-            </span>
-            <span
-              style={{
-                flex: 1,
-                minWidth: 0,
-                fontSize: 13,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {a.name}
-            </span>
-            {a.status === "live" && (
-              <Tooltip title={t("comp.shell.running", "Đang chạy")}>
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    minWidth: 7,
-                    borderRadius: "50%",
-                    background: "#16B98D",
-                  }}
-                />
-              </Tooltip>
-            )}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
 function SidebarInner({
   collapsed,
   selected,
@@ -691,9 +390,9 @@ function SidebarInner({
   // auto-collapsed chat pages). Hovering the collapsed icon still opens its popup normally.
   // Đọc NGAY trong bộ khởi tạo, không đợi effect.
   //
-  // Vì sao quan trọng: `/explore` nằm NGOÀI nhóm route `(builder)` và tự dựng AppShell của riêng
-  // nó, nên bấm Explore ↔ Templates là AppShell GẮN LẠI. Nếu trạng thái bắt đầu sai rồi mới sửa
-  // trong effect thì mỗi lần gắn lại React vẽ khung sai trước — thanh bên cụp xuống rồi bung ra.
+  // Vì sao quan trọng: trang nào nằm NGOÀI nhóm route `(builder)` mà tự dựng AppShell của riêng nó
+  // thì mỗi lần chuyển qua lại là AppShell GẮN LẠI. Nếu trạng thái bắt đầu sai rồi mới sửa trong
+  // effect thì mỗi lần gắn lại React vẽ khung sai trước — thanh bên cụp xuống rồi bung ra.
   // Máy nhanh chỉ nháy một khung hình nên đo không thấy; máy chậm thì thấy rõ.
   const [openKeys, setOpenKeys] = useState<string[]>(() => readOpenKeys(selected));
 
@@ -791,8 +490,6 @@ function SidebarInner({
                 },
           )}
         />
-        <PinnedApps collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
-        <RecentApps collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
       </div>
       {/* Hạn mức AI + dung lượng: hai con số cùng trả lời "tôi còn bao nhiêu?" nên đứng cạnh nhau. */}
       <SidebarQuotas collapsed={collapsed} />
@@ -840,14 +537,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // Tiêu đề tab đi theo mục đang mở và theo ngôn ngữ — xem `lib/useTabTitle.ts`.
   useTabTitle(sectionTitleKey(pathname) ? title : undefined);
 
-  // The app workspace (/apps/:id) is a full-bleed console — drop the centred
-  // max-width cap and tighten the gutters so the sub-nav sits flush to the
-  // sidebar and Preview/Code use the full remaining width.
   // Chat pages own their full layout (sidebar + chat fill the area) — no centered column.
   const chatBleed = /^\/(assistant|remote\/(chat|lark-chat))(\/|$)/.test(pathname);
-  /** Không gian làm việc của một app: `/apps/<id>` và mọi đường con của nó. */
-  const isAppWorkspace = /^\/apps\/[^/]+(\/|$)/.test(pathname);
-  const fullBleed = isAppWorkspace || chatBleed;
 
   // Close the mobile drawer on navigation.
   useEffect(() => {
@@ -1012,30 +703,29 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </>
           )}
 
-          <RunningBuildsButton />
           <NotificationBell />
 
           {/* On the chat pages the floating "Báo lỗi" FAB would cover the composer's Send button,
-              so it lives here in the header instead (next to Tạo app). Hidden on mobile to save room. */}
+              so it lives here in the header instead. Hidden on mobile to save room. */}
           {/* Báo lỗi lên HEADER ở các màn hình có khung trò chuyện riêng: để nổi thì nó đè lên
               nút Gửi và trông như một nút chat nữa. */}
-          {(chatBleed || isAppWorkspace) && !isMobile && <FeedbackButton variant="header" />}
+          {chatBleed && !isMobile && <FeedbackButton variant="header" />}
 
-          {/* Chat cộng đồng sống trên HEADER chứ không phải FAB góc phải dưới: trên /apps/:id góc đó
-              đã có nút báo lỗi + nút chat sửa app, ba bong bóng chồng lên nhau. Ở đây nó cũng mount trên
-              MỌI trang — trước kia nằm trong nhóm FAB nên /remote/agent mất luôn openMessenger(). */}
+          {/* Chat cộng đồng sống trên HEADER chứ không phải FAB góc phải dưới (góc đó đã có nút báo lỗi).
+              Ở đây nó mount trên MỌI trang — trước kia nằm trong nhóm FAB nên /remote/agent mất luôn
+              openMessenger(). */}
           <MessengerWidget variant="header" />
 
-          <Link href="/create-website" style={{ flex: "0 0 auto" }}>
+          <Link href="/agents-chat/new" style={{ flex: "0 0 auto" }}>
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              aria-label={t("comp.shell.createApp", "Tạo website")}
-              title={t("comp.shell.createApp", "Tạo website")}
+              aria-label={t("comp.shell.newChat", "Trò chuyện mới")}
+              title={t("comp.shell.newChat", "Trò chuyện mới")}
               // Vivid gradient pill — matches the desktop header's primary CTA.
               style={{ background: BRAND_GRADIENT, border: "none", boxShadow: "0 6px 16px rgba(108,92,231,0.35)", fontWeight: 600 }}
             >
-              <span className="hidden sm:inline">{t("comp.shell.createApp", "Tạo website")}</span>
+              <span className="hidden sm:inline">{t("comp.shell.newChat", "Trò chuyện mới")}</span>
             </Button>
           </Link>
         </Header>
@@ -1050,12 +740,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     maxWidth: "none",
                     margin: 0,
                     padding: 0,
-                  }
-                : fullBleed
-                ? {
-                    maxWidth: "none",
-                    margin: 0,
-                    padding: "18px 20px 56px",
                   }
                 : {
                     // Wide, near-full-width content area so dashboards/grids use
@@ -1077,21 +761,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </Layout>
 
       {/* Floating helpers on every page: bug report + draggable AI assistant.
-          On an app-detail page (/apps/:id) the in-page chat panel IS the assistant
-          (context-aware: iterate + help), so hide the global one to avoid two FABs.
           On /remote/agent AND the remote-chat pages the page has its own bottom composer + Send
           button, so hide ALL the floating FABs there (they covered Send); Báo lỗi moves to the header. */}
       {!/^\/remote\/agent/.test(pathname ?? "") && !chatBleed && (
         <>
-          {/* Không gian làm việc của một app (`/apps/<id>` VÀ mọi đường con) đã có khung trò
-              chuyện riêng — thêm nút nổi ở đây là ba nút chat chồng nhau trên cùng màn hình.
-
-              Luật này TRƯỚC ĐÂY dùng `$` ở cuối trong khi `fullBleed` ngay trên thì không, tức là
-              hai luật cho cùng một trang khác nhau đúng một ký tự. Hệ quả: ở đường con bất kỳ dưới
-              /apps/<id>, trang vẫn toàn màn nhưng ChatbotWidget lại hiện — đúng nút chat thứ ba
-              người dùng gặp. Nay cả hai dùng chung một biến, không thể lệch nữa. */}
-          {!isAppWorkspace && <FeedbackButton />}
-          {!isAppWorkspace && <ChatbotWidget />}
+          <FeedbackButton />
+          <ChatbotWidget />
         </>
       )}
 

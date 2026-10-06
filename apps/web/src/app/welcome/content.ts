@@ -5,63 +5,64 @@
 // packages/ui/src/i18n.tsx: t() ưu tiên bảng dịch, câu ở đây chỉ là dự phòng khi thiếu khoá.
 // Sửa một bên mà quên bên kia là bản trên máy chủ khác bản trong mã (đã xảy ra một lần).
 //
-// Định vị: sản phẩm dùng được ở mọi nơi (giao diện Việt/Anh tự theo trình duyệt); tiếng Việt là
-// thế mạnh được nêu, không phải điều kiện. Mỗi câu trả lời chỉ nói thứ đang chạy thật, và ghi rõ
-// giới hạn (Lark cần app máy tính, lịch đăng gửi qua Telegram, app cần máy chủ riêng ở gói Pro).
+// Định vị: AI làm việc trong Lark. Mỗi câu trả lời chỉ nói thứ đang chạy thật, và ghi rõ giới
+// hạn (Lark Agents cần app máy tính; chạy hộ khi tắt máy ở gói Chuyên nghiệp trở lên).
+//
+// Khoá mang hậu tố `.lw` để bản dịch cũ (thời còn tạo app) trong i18n.tsx không đè lên câu mới.
 
 export const FAQS: { q: string; a: string; qKey: string; aKey: string }[] = [
   {
-    qKey: "home.lpFaq1Q",
+    qKey: "home.lpFaq1Q.lw",
     q: "Larkwave là gì?",
-    aKey: "home.lpFaq1A",
-    a: "Nền tảng AI cho công việc: trò chuyện với trợ lý AI (gửi tệp, nhận lại tệp), tạo web app full-stack, dựng video/ảnh/bài viết, và tự động hoá Lark Base — dùng chung một hạn mức mỗi tháng. Giao diện có tiếng Việt và tiếng Anh.",
+    aKey: "home.lpFaq1A.lw",
+    a: "Trợ lý AI làm việc ngay trong Lark: kết nối tài khoản Lark/Feishu rồi trò chuyện để AI đọc và ghi Bitable (Base), Docs, Sheets, Wiki, Drive, Lịch và tin nhắn; tự động hoá theo lịch; xuất tệp xlsx/docx/pdf/csv. Có thêm Trợ lý AI trên web với Dự án, Artifacts và Kỹ năng. Giao diện có tiếng Việt và tiếng Anh.",
   },
   {
-    qKey: "home.lpFaq2Q",
-    q: "Tôi không ở Việt Nam, dùng được không?",
-    aKey: "home.lpFaq2A",
-    a: "Được. Larkwave chạy trên trình duyệt, dùng từ bất cứ đâu; giao diện tự chuyển sang tiếng Anh theo ngôn ngữ trình duyệt và bạn đổi lại bất cứ lúc nào. Tiếng Việt được chăm kỹ — từ giao diện đến giọng lồng tiếng — nên với người dùng tiếng Việt đó là một lợi thế, không phải điều kiện.",
+    qKey: "home.lpFaq2Q.lw",
+    q: "Tôi kết nối Lark thế nào?",
+    aKey: "home.lpFaq2A.lw",
+    a: "Cài app máy tính Larkwave (macOS/Windows), mở Lark Agents rồi quét mã QR bằng app Lark để đăng nhập tài khoản cá nhân — hoặc dùng app tự tạo (custom app) của doanh nghiệp bạn. Larkwave thao tác với tư cách chính bạn, chỉ trong phạm vi quyền bạn đang có.",
   },
   {
-    qKey: "home.lpFaq3Q",
+    qKey: "home.lpFaq3Q.lw",
+    q: "AI có tự ý sửa dữ liệu Lark của tôi không?",
+    aKey: "home.lpFaq3A.lw",
+    a: "Không. Mọi thao tác GHI — thêm/sửa bản ghi, tạo Base, đổi quyền, gửi tin nhắn — đều hiện yêu cầu xác nhận để bạn duyệt trước. Đọc dữ liệu thì không cần hỏi.",
+  },
+  {
+    qKey: "home.lpFaq4Q.lw",
     q: "Tôi có phải cài gì không?",
-    aKey: "home.lpFaq3A",
-    a: "Trợ lý AI, tạo app và bộ công cụ nội dung chạy thẳng trên trình duyệt — chỉ cần đăng ký tài khoản. Riêng phần tự động hoá Lark Base chạy qua app máy tính Larkwave (Windows/macOS), vì nó thao tác trực tiếp với phiên Lark của bạn.",
+    aKey: "home.lpFaq4A.lw",
+    a: "Trợ lý AI trên web chạy thẳng trên trình duyệt — chỉ cần đăng ký. Phần làm việc với Lark (Lark Agents) chạy qua app máy tính Larkwave (macOS/Windows), vì nó dùng phiên Lark của bạn. Từ điện thoại hay trình duyệt, bạn vẫn điều khiển được app máy tính đó từ xa.",
   },
   {
-    qKey: "home.lpFaq4Q",
-    q: "Trợ lý AI khác gì một chatbot thông thường?",
-    aKey: "home.lpFaq4A",
-    a: "Nó trả về sản phẩm chứ không chỉ câu trả lời: đọc bảng tính/PDF/Word/ảnh bạn gửi lên, tạo ra tệp thật để tải về, ghi nhớ kỹ năng riêng của bạn dưới dạng lệnh tắt, và chạy được theo lịch hẹn kể cả khi bạn tắt máy.",
+    qKey: "home.lpFaq5Q.lw",
+    q: "Tự động hoá chạy được khi tôi tắt máy không?",
+    aKey: "home.lpFaq5A.lw",
+    a: "Được. Đặt lịch kiểu \"mỗi ngày 9h tổng hợp đơn mới trong Base\" là app máy tính tự chạy; với tính năng \"Larkwave chạy hộ\", lịch vẫn chạy trên máy chủ kể cả khi máy bạn tắt. Lịch còn có thể kích hoạt bằng bot/webhook.",
   },
   {
-    qKey: "home.lpFaq5Q",
-    q: "App tạo ra có cơ sở dữ liệu thật không?",
-    aKey: "home.lpFaq5A",
-    a: "Có. Mỗi web app được dựng đầy đủ: giao diện + cơ sở dữ liệu (Cloudflare D1) + API /api/* + trang quản trị, rồi deploy ra link công khai dạng <tên>.toolswave.net. App cần máy chủ riêng chạy trên Docker (gói Chuyên nghiệp).",
+    qKey: "home.lpFaq6Q.lw",
+    q: "Tôi dùng AI nào? Có tốn phí AI không?",
+    aKey: "home.lpFaq6A.lw",
+    a: "Trên app máy tính, bạn chạy bằng Claude, Codex, Gemini hoặc Grok đã cài trên máy mình — không trừ hạn mức Larkwave. Nếu không muốn cài gì, dùng Claude do Larkwave cung cấp, trừ theo % hạn mức của gói.",
   },
   {
-    qKey: "home.lpFaq6Q",
-    q: "Video và bài viết được tạo ra thế nào?",
-    aKey: "home.lpFaq6A",
-    a: "Video được dựng thật từng khung hình trên máy chủ rồi ghép lồng tiếng AI — giọng tiếng Việt tự nhiên đứng đầu danh sách, nghe thử được trước khi chọn. Ảnh hỗ trợ nhiều slide, bài viết theo hướng chuẩn SEO. Bạn có thể đặt lịch để tự tạo và gửi về Telegram.",
+    qKey: "home.lpFaq7Q.lw",
+    q: "Tôi có thể chia sẻ trợ lý cho đồng đội không?",
+    aKey: "home.lpFaq7A.lw",
+    a: "Có. Bạn cấp quyền uỷ thác cho từng người để họ dùng trợ lý Lark/AI của bạn — không phải gửi mật khẩu hay khoá bí mật, thu hồi lúc nào cũng được. Hội thoại có thể dùng chung.",
   },
   {
-    qKey: "home.lpFaq7Q",
-    q: "Tự động hoá Lark Base làm được những gì?",
-    aKey: "home.lpFaq7A",
-    a: "Đọc và ghi bản ghi, tra cấu trúc bảng, xem phân quyền, đọc/giải thích workflow, đồng bộ dữ liệu sang CMS, và đọc được cả nội dung tệp đính kèm (Excel, PDF, ảnh) trong Bitable — 54 công cụ, thao tác với tư cách chính bạn. Phần này cần app máy tính.",
-  },
-  {
-    qKey: "home.lpFaq8Q",
+    qKey: "home.lpFaq8Q.lw",
     q: "Tính phí thế nào?",
-    aKey: "home.lpFaq8A",
-    a: "Mỗi gói có một hạn mức dùng chung hàng tháng cho tất cả tính năng; mỗi lượt dùng trừ một phần % theo khối lượng thực tế. Có gói miễn phí để bắt đầu, không cần thẻ tín dụng.",
+    aKey: "home.lpFaq8A.lw",
+    a: "Mỗi gói có một hạn mức dùng AI hàng tháng; mỗi lượt chạy trên AI của Larkwave trừ một phần % theo khối lượng thực tế. Có gói Miễn phí để bắt đầu, không cần thẻ; thanh toán gói trả phí bằng chuyển khoản QR, tự kích hoạt.",
   },
   {
-    qKey: "home.lpFaq9Q",
-    q: "Tôi có thể nhập dự án có sẵn từ GitLab/GitHub không?",
-    aKey: "home.lpFaq9A",
-    a: "Có. Larkwave nhập repo của bạn, tự nhận diện framework (React, Vue, Next.js…), build và deploy — kèm cả ảnh và tài nguyên của dự án.",
+    qKey: "home.lpFaq9Q.lw",
+    q: "Dữ liệu Lark của tôi có an toàn không?",
+    aKey: "home.lpFaq9A.lw",
+    a: "Phiên đăng nhập Lark nằm trên máy bạn. Khi chia sẻ cho người khác, Larkwave dùng quyền uỷ thác thay vì chia sẻ khoá bí mật; chỉ khi bạn bật \"Larkwave chạy hộ\" thì máy chủ mới giữ thông tin cần thiết để chạy lịch, và bạn tắt được bất cứ lúc nào.",
   },
 ];

@@ -1,33 +1,6 @@
 "use client";
 
-import {
-  ApiOutlined,
-  AppstoreOutlined,
-  AuditOutlined,
-  BarChartOutlined,
-  BugOutlined,
-  BulbFilled,
-  BulbOutlined,
-  CommentOutlined,
-  CreditCardOutlined,
-  CloudServerOutlined,
-  DashboardOutlined,
-  DeploymentUnitOutlined,
-  DollarOutlined,
-  FileTextOutlined,
-  FlagOutlined,
-  LogoutOutlined,
-  MenuFoldOutlined,
-  MenuOutlined,
-  MenuUnfoldOutlined,
-  RobotOutlined,
-  MessageOutlined,
-  RocketOutlined,
-  SettingOutlined,
-  ShopOutlined,
-  ThunderboltOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { ApiOutlined, AppstoreOutlined, AuditOutlined, BarChartOutlined, BulbFilled, BulbOutlined, CommentOutlined, CreditCardOutlined, CloudServerOutlined, DashboardOutlined, DollarOutlined, LogoutOutlined, MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, RobotOutlined, MessageOutlined, RocketOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, ConfigProvider, Drawer, Dropdown, Grid, Layout, Menu, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import Link from "next/link";
@@ -72,22 +45,9 @@ const NAV: NavGroup[] = [
   {
     title: "Vận hành",
     items: [
-      { key: "/admin/moderation", icon: <FlagOutlined />, label: "Kiểm duyệt" },
       { key: "/admin/users", icon: <UserOutlined />, label: "Người dùng" },
-      { key: "/admin/apps", icon: <AppstoreOutlined />, label: "Apps" },
-      // Cửa hàng nằm ở "Vận hành" chứ không ở "Cấu hình": đây là chỗ làm việc hằng ngày của
-      // người bán (ẩn/hiện hàng, sửa đặc tả, cấp dự án cho khách vừa chuyển khoản), không phải
-      // chỗ chỉnh một lần rồi thôi như Gói & Giá.
-      { key: "/admin/store", icon: <ShopOutlined />, label: "Cửa hàng" },
-      { key: "/admin/builds", icon: <ThunderboltOutlined />, label: "Builds" },
-      { key: "/admin/build-errors", icon: <BugOutlined />, label: "Báo cáo lỗi" },
       { key: "/admin/runner-errors", icon: <CloudServerOutlined />, label: "Lỗi runner" },
       { key: "/admin/feedback", icon: <CommentOutlined />, label: "Báo lỗi người dùng" },
-      {
-        key: "/admin/deployments",
-        icon: <DeploymentUnitOutlined />,
-        label: "Deployments",
-      },
     ],
   },
   {
@@ -95,11 +55,8 @@ const NAV: NavGroup[] = [
     items: [
       { key: "/admin/ai", icon: <RobotOutlined />, label: "Quản lý AI" },
       { key: "/admin/maic", icon: <ApiOutlined />, label: "MAIC — hạn mức" },
-      { key: "/admin/suggestions", icon: <BulbOutlined />, label: "Gợi ý" },
-      { key: "/admin/blog", icon: <FileTextOutlined />, label: "Blog" },
       { key: "/admin/billing", icon: <DollarOutlined />, label: "Gói & Giá" },
       { key: "/admin/payments", icon: <CreditCardOutlined />, label: "Thanh toán" },
-      { key: "/admin/settings", icon: <SettingOutlined />, label: "Cấu hình" },
       { key: "/admin/audit", icon: <AuditOutlined />, label: "Nhật ký" },
     ],
   },

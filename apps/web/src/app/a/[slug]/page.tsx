@@ -56,7 +56,7 @@ export default function PublicArtifactPage() {
             textDecoration: "none",
           }}
         >
-          {t("web.pubc.createWithAi", "Tạo app bằng AI")}
+          {t("web.pubc.tryLarkwave.lw", "Dùng thử Larkwave")}
         </Link>
       </header>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { App, Button, Modal, Progress, Tag, Tooltip } from "antd";
+import { App, Button, Modal, Progress, Tag } from "antd";
 import { CrownOutlined, ReloadOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import type { MeSubscription, PlanCatalogEntry, PlanId, CreatePaymentResponse } from "@larkwave/shared";
@@ -187,24 +187,20 @@ function TheGoi({
  * và mục "Gói & Thanh toán" cũng đã được bỏ khỏi thanh bên. Nhưng người đang dùng app cần hai
  * việc rất khác việc đọc bảng giá: xem mình còn bao nhiêu, và nâng gói mà KHÔNG rời việc đang
  * làm. Trước đây cả hai đều dẫn tới `router.push('/pricing')` ở bảy chỗ trong mã — kể cả lúc họ
- * vừa bấm dựng app và gặp lỗi 402, tức bị ném ra khỏi bảng điều khiển đúng lúc đang làm việc.
+ * vừa chạy trợ lý và gặp lỗi 402, tức bị ném ra khỏi bảng điều khiển đúng lúc đang làm việc.
  *
  * Thanh bên vẫn giữ hai thanh mỏng như cũ — chúng trả lời "còn bao nhiêu" trong một cái liếc.
- * Bảng này là phần còn lại: tên gói, ngày làm mới, dung lượng theo nhóm, số site đang chạy, và
+ * Bảng này là phần còn lại: tên gói, ngày làm mới, dung lượng theo nhóm, và
  * lưới chọn gói với đúng số tiền phải trả.
  *
- * BỐN ĐIỀU KHÔNG ĐƯỢC PHÁ
+ * BA ĐIỀU KHÔNG ĐƯỢC PHÁ
  *
  *  1. KHÔNG hiện số token thô cho người dùng thường. Quy ước ghi trong `plans.ts` và
  *     `packages/shared`: người dùng chỉ thấy PHẦN TRĂM. Ngoại lệ duy nhất là tài khoản không
  *     giới hạn (admin) — phần trăm vô nghĩa với họ nên hiện số đã dùng.
- *  2. KHÔNG vẽ thanh tiến trình cho "site đang chạy". `getPlanMaxLiveApps` ở billing.service
- *     KHÔNG có một chỗ gọi nào, tức trần đó chưa được thực thi ở đâu cả — vẽ thành thanh là hiển
- *     thị một giới hạn không tồn tại. Đo 24/09/2026: một tài khoản gói miễn phí (trần ghi là 1)
- *     đang có 2 site live. Nên chỗ này là một con số kèm chú thích, không phải một hàng rào.
- *  3. KHÔNG nói "hết hạn ngày X" hay "tự động gia hạn". Không có gì trong hệ thống hạ gói khi
+ *  2. KHÔNG nói "hết hạn ngày X" hay "tự động gia hạn". Không có gì trong hệ thống hạ gói khi
  *     hết chu kỳ, và `resetAt` là mốc làm mới HẠN MỨC, không phải ngày hết hạn gói.
- *  4. Nâng gói PHẢI đi qua `POST /payments/create`. `POST /me/plan` ném 403 cho mọi lần nâng gói
+ *  3. Nâng gói PHẢI đi qua `POST /payments/create`. `POST /me/plan` ném 403 cho mọi lần nâng gói
  *     trả phí — nó chỉ dùng để HẠ gói.
  */
 export default function PlanModal() {
@@ -392,7 +388,7 @@ export default function PlanModal() {
                 </span>
               ) : (
                 <span style={{ fontSize: 12, color: V.textFaint }}>
-                  {t("money.noCycleYet", "Chu kỳ bắt đầu từ lần dựng đầu tiên")}
+                  {t("money.noCycleYet.lw", "Chu kỳ bắt đầu từ lượt dùng AI đầu tiên")}
                 </span>
               )}
             </div>
@@ -428,18 +424,6 @@ export default function PlanModal() {
                   }
                 />
               ) : null}
-              {/* Số site đang chạy: một CON SỐ, không phải thanh. Trần này chưa được thực thi ở
-                  đâu trong máy chủ (xem chú thích đầu tệp), nên vẽ thành hàng rào là nói sai. */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-                <span style={{ fontSize: 13, color: V.text }}>
-                  {t("money.liveSites", "Website đang chạy")}
-                </span>
-                <Tooltip title={t("money.liveSitesTip", "Số website của bạn đang ở trạng thái chạy thật.")}>
-                  <span style={{ fontSize: 13, color: V.textSub, fontVariantNumeric: "tabular-nums" }}>
-                    {sub.liveApps}
-                  </span>
-                </Tooltip>
-              </div>
             </div>
 
             <div

@@ -1,35 +1,10 @@
 "use client";
 
-import {
-  AppstoreOutlined,
-  ArrowLeftOutlined,
-  CloseOutlined,
-  MessageOutlined,
-  MinusOutlined,
-  SendOutlined,
-  TeamOutlined,
-} from "@ant-design/icons";
-import {
-  App,
-  Badge,
-  Button,
-  Empty,
-  Grid,
-  Input,
-  List,
-  Modal,
-  Skeleton,
-  Spin,
-  Typography,
-} from "antd";
+import { ArrowLeftOutlined, CloseOutlined, MessageOutlined, MinusOutlined, SendOutlined } from "@ant-design/icons";
+import { App, Badge, Button, Empty, Grid, Input, List, Skeleton, Spin, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  App as AppEntity,
-  ChatMessage,
-  Conversation,
-  Friend,
-} from "@larkwave/shared";
+import type { ChatMessage, Conversation, Friend } from "@larkwave/shared";
 import { useI18n } from "@larkwave/ui";
 import { api, streamMessages } from "@/lib/api";
 import { fromNow } from "@/lib/format";
@@ -37,24 +12,6 @@ import { onOpenMessenger } from "@/lib/messenger";
 import { UserAvatar } from "@/components/UserAvatar";
 
 const { Text } = Typography;
-
-// A shared project is sent as a normal message whose body is a sentinel + JSON,
-// so it round-trips through the existing Message model with NO schema change.
-// The sentinel wraps a private-use char (U+E000) so it never collides with text;
-// it MUST match the original /friends encoder for backward-compat.
-const APP_MSG = "tw-app";
-type AppRef = { id: string; name: string; url: string | null };
-function encodeAppMsg(a: AppRef): string {
-  return APP_MSG + JSON.stringify(a);
-}
-function decodeAppMsg(body: string): AppRef | null {
-  if (!body.startsWith(APP_MSG)) return null;
-  try {
-    return JSON.parse(body.slice(APP_MSG.length)) as AppRef;
-  } catch {
-    return null;
-  }
-}
 
 const WIN_W = 328;
 
@@ -66,8 +23,7 @@ const WIN_W = 328;
  */
 /**
  * `variant` quyết định chỗ đặt NÚT MỞ, không đổi gì khác: cửa sổ chat bật ra vẫn là position:fixed.
- * "header" để nó nằm trên thanh đầu trang — góc phải dưới đã có nút báo lỗi và trên trang
- * /apps/:id còn chồng thêm nút chat sửa app, ba bong bóng đụng nhau.
+ * "header" để nó nằm trên thanh đầu trang — góc phải dưới đã có nút báo lỗi, hai bong bóng đụng nhau.
  *
  * CHỈ ĐƯỢC MOUNT MỘT LẦN: nó đăng ký onOpenMessenger, mount hai lần thì openMessenger() mở hai cửa sổ.
  */
@@ -269,16 +225,7 @@ export default function MessengerWidget({ variant = "fab" }: { variant?: "fab" |
                 <List
                   dataSource={conversations}
                   renderItem={(c) => {
-                    const appRef = decodeAppMsg(c.lastMessage);
-                    // The server truncates lastMessage to ~80 chars, which can cut a
-                    // shared-app payload's JSON mid-string → decodeAppMsg returns null.
-                    // Fall back to the sentinel prefix so the preview never shows the
-                    // raw `tw-app{…` fragment.
-                    const preview = appRef
-                      ? `📎 ${appRef.name}`
-                      : c.lastMessage.startsWith(APP_MSG)
-                        ? `📎 ${t("wcomp.msgSharedProject", "Đã chia sẻ một dự án")}`
-                        : c.lastMessage;
+                    const preview = c.lastMessage;
                     return (
                       <div
                         onClick={() => openWindow(friendFromConversation(c))}
@@ -380,9 +327,6 @@ function ChatWindow({
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [appPickerOpen, setAppPickerOpen] = useState(false);
-  const [myApps, setMyApps] = useState<AppEntity[]>([]);
-  const [appsLoading, setAppsLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fetchThread = useCallback(
@@ -435,36 +379,6 @@ function ChatWindow({
       message.error((e as Error).message);
     } finally {
       setSending(false);
-    }
-  };
-
-  const openPicker = () => {
-    setAppPickerOpen(true);
-    setAppsLoading(true);
-    api
-      .listApps({ pageSize: 50 })
-      .then((r) => setMyApps(r.items))
-      .catch(() => setMyApps([]))
-      .finally(() => setAppsLoading(false));
-  };
-
-  const shareApp = async (a: AppEntity) => {
-    try {
-      try {
-        await api.addAppMember(a.id, friend.email, "editor");
-      } catch {
-        /* already a member / not the owner — sharing the link still works */
-      }
-      const m = await api.sendMessage(
-        friend.id,
-        encodeAppMsg({ id: a.id, name: a.name, url: a.currentUrl ?? null }),
-      );
-      setMessages((prev) => [...prev, m]);
-      setAppPickerOpen(false);
-      onActivity();
-      message.success(t("wcomp.msgShareSuccess", "Đã chia sẻ dự án và thêm bạn vào cộng tác."));
-    } catch (e) {
-      message.error((e as Error).message);
     }
   };
 
@@ -579,58 +493,15 @@ function ChatWindow({
                       boxShadow: "0 1px 2px rgba(17,24,39,0.05)",
                     }}
                   >
-                    {(() => {
-                      const ref = decodeAppMsg(m.body);
-                      if (!ref)
-                        return (
-                          <div
-                            style={{
-                              fontSize: 13.5,
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {m.body}
-                          </div>
-                        );
-                      return (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: m.mine
-                                ? "rgba(255,255,255,0.22)"
-                                : "rgba(108,92,231,0.1)",
-                              color: m.mine ? "#fff" : "#6C5CE7",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <AppstoreOutlined />
-                          </span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{ref.name}</div>
-                            {/* Open the BUILDER WORKSPACE (shared conversation) so
-                                both can contribute — not the deployed website. The
-                                sharer added the recipient as an editor on send. */}
-                            <a
-                              href={`/apps/${ref.id}`}
-                              style={{
-                                fontSize: 11.5,
-                                color: m.mine ? "#fff" : "#6C5CE7",
-                                textDecoration: "underline",
-                              }}
-                            >
-                              <TeamOutlined /> {t("wcomp.msgOpenToCollab", "Mở để cùng làm")}
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {m.body}
+                    </div>
                     <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3, textAlign: "right" }}>
                       {fromNow(m.createdAt)}
                     </div>
@@ -652,12 +523,6 @@ function ChatWindow({
               flexShrink: 0,
             }}
           >
-            <Button
-              size="small"
-              icon={<AppstoreOutlined />}
-              onClick={openPicker}
-              title={t("wcomp.msgShareProject", "Chia sẻ dự án")}
-            />
             <Input.TextArea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -682,33 +547,6 @@ function ChatWindow({
         </>
       )}
 
-      <Modal
-        open={appPickerOpen}
-        onCancel={() => setAppPickerOpen(false)}
-        title={t("wcomp.msgShareProjectWith", "Chia sẻ dự án với bạn")}
-        footer={null}
-      >
-        {appsLoading ? (
-          <Skeleton active paragraph={{ rows: 3 }} />
-        ) : myApps.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("wcomp.msgNoApps", "Bạn chưa có app nào.")} />
-        ) : (
-          <List
-            dataSource={myApps}
-            renderItem={(a) => (
-              <List.Item
-                actions={[
-                  <Button key="s" size="small" type="primary" onClick={() => void shareApp(a)}>
-                    {t("wcomp.msgSend", "Gửi")}
-                  </Button>,
-                ]}
-              >
-                <List.Item.Meta title={a.name} description={a.currentUrl || t("wcomp.msgNotDeployed", "Chưa deploy")} />
-              </List.Item>
-            )}
-          />
-        )}
-      </Modal>
     </div>
   );
 }

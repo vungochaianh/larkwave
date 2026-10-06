@@ -9,7 +9,7 @@ const SITE = "https://toolswave.net";
  * TRANG CHỦ — `toolswave.net/`.
  *
  * Trước đây "/" không phải trang chủ: khách và bot bị 307 sang `/welcome`, còn người đã đăng nhập
- * thấy màn hình tạo website. Ba cái sai cùng lúc:
+ * thấy màn hình khác. Ba cái sai cùng lúc:
  *
  *   1. URL có thẩm quyền cao nhất của site trả CHUYỂN HƯỚNG thay vì nội dung. Google lập chỉ mục
  *      `/welcome`, và giá trị liên kết trỏ về gốc — thứ mọi backlink tự nhiên đều trỏ tới — bị
@@ -37,53 +37,46 @@ const CHU = {
   vi: {
     // Giữ ngắn: Google cắt quanh 60 ký tự, và KHÔNG thêm hậu tố "· Larkwave" vì template ở layout
     // gốc chỉ áp cho trang con — trang này tự khai title nên phải tự mang thương hiệu đúng một lần.
-    title: "Larkwave — Trợ lý AI biết làm việc thật",
-    // Định vị TOÀN CẦU: sản phẩm dùng được ở mọi nơi, giao diện Việt/Anh. Tiếng Việt là thế mạnh
-    // được nêu ("hỗ trợ tiếng Việt tốt"), không phải phạm vi ("nền tảng AI tiếng Việt" như trước —
-    // câu đó bảo người không nói tiếng Việt đi chỗ khác).
-    // 209 ký tự thì Google cắt quanh 155 — một phần tư câu không ai đọc được, và phần bị cắt lại là
-    // "dùng thử miễn phí", tức là đúng chỗ đáng giữ nhất. Rút còn 152.
+    title: "Larkwave — Trợ lý AI làm việc thật trên Lark",
+    // Dưới ~155 ký tự để Google không cắt mất "dùng thử miễn phí".
     description:
-      "Nền tảng AI cho công việc: trò chuyện và nhận về tệp thật, dựng web app, app mobile, game, video và bài viết chuẩn SEO. Dùng thử miễn phí, không cần thẻ.",
+      "Trợ lý AI đọc/ghi Lark Base, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn; tự động hoá theo lịch, xuất tệp thật. Dùng thử miễn phí, không cần thẻ.",
     ogDescription:
-      "Trò chuyện và nhận về tệp thật, tạo web app full-stack, dựng video và bài viết, tự động hoá Lark Base — tiếng Việt hay tiếng Anh đều được.",
+      "Kết nối tài khoản Lark và trò chuyện với AI: đọc/ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch — mọi thao tác ghi đều hỏi bạn trước. Tự động hoá theo lịch, kể cả khi tắt máy.",
     twDescription:
-      "Trò chuyện nhận về tệp thật, tạo app, dựng nội dung, tự động hoá Lark Base — tiếng Việt & tiếng Anh.",
+      "AI cho Lark: đọc/ghi Base, Docs, Sheets, Wiki, Drive, Lịch; tự động hoá theo lịch; xuất xlsx/docx/pdf.",
     keywords: [
       "trợ lý AI",
-      "trợ lý AI tiếng Việt",
-      "AI assistant",
-      "AI agent",
+      "trợ lý AI cho Lark",
+      "AI cho Lark",
+      "Lark Agents",
       "tự động hoá Lark Base",
       "Lark Base automation",
+      "Bitable AI",
       "đồng bộ Bitable",
-      "tạo web app bằng AI",
-      "AI app builder",
-      "tạo app không cần code",
-      "AI viết bài chuẩn SEO",
-      "công cụ AI tạo video ngắn",
-      "lồng tiếng AI tiếng Việt",
+      "Feishu AI",
+      "AI assistant",
+      "AI agent",
       "Larkwave",
     ],
   },
   en: {
-    title: "Larkwave — an AI assistant that does real work",
+    title: "Larkwave — an AI assistant that works inside Lark",
     description:
-      "AI platform for work: chat and get real files back, build full-stack web apps, mobile apps, games, video and SEO-ready posts. Free to try, no card needed.",
+      "AI that reads and writes Lark Base, Docs, Sheets, Wiki, Drive, Calendar and messages; scheduled automation, real file exports. Free to try, no card.",
     ogDescription:
-      "Chat and get real files back, build full-stack web apps, produce video and written content, automate Lark Base — in English or Vietnamese.",
+      "Connect your Lark account and chat with AI that reads and writes Bitable, Docs, Sheets, Wiki, Drive and Calendar — every write asks you first. Scheduled automation, even with your computer off.",
     twDescription:
-      "Chat and get real files back, build apps, produce content, automate Lark Base — English & Vietnamese.",
+      "AI for Lark: read/write Base, Docs, Sheets, Wiki, Drive, Calendar; scheduled automation; xlsx/docx/pdf export.",
     keywords: [
       "AI assistant",
-      "AI agent",
-      "AI app builder",
-      "build web app with AI",
-      "no-code app builder",
+      "AI for Lark",
+      "Lark Agents",
       "Lark Base automation",
+      "Bitable AI",
       "Bitable sync",
-      "AI SEO writer",
-      "AI short video tool",
+      "Feishu AI assistant",
+      "AI agent",
       "Larkwave",
     ],
   },
@@ -144,7 +137,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
       "@type": "Offer",
       price: "0",
       priceCurrency: "VND",
-      description: "Gói miễn phí để bắt đầu; các gói trả phí tính theo hạn mức dùng hàng tháng.",
+      description: "Gói miễn phí để bắt đầu; các gói trả phí tính theo % hạn mức dùng AI hàng tháng.",
       url: `${SITE}/pricing`,
     },
   };
@@ -157,7 +150,7 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
     logo: `${SITE}/icon`,
     description: t.description,
   };
-  // Cho phép ô tìm kiếm hiện ngay trong kết quả Google, trỏ vào trang khám phá app công khai.
+  // Không khai SearchAction: Larkwave không có trang tìm kiếm công khai.
   const siteLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -166,11 +159,6 @@ export default async function HomePage({ searchParams }: { searchParams: SP }) {
     url: SITE,
     inLanguage: vi ? "vi-VN" : "en-US",
     publisher: { "@id": `${SITE}/#organization` },
-    potentialAction: {
-      "@type": "SearchAction",
-      target: { "@type": "EntryPoint", urlTemplate: `${SITE}/explore?q={search_term_string}` },
-      "query-input": "required name=search_term_string",
-    },
   };
   // FAQ chỉ phát ở bản tiếng Việt. Nguồn chữ là welcome/content.ts, còn bản tiếng Anh của nó nằm
   // trong từ điển i18n — một module "use client", nên server component không đọc được giá trị

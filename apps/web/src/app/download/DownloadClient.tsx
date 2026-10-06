@@ -37,29 +37,29 @@ const FEATURES: { icon: string; tk: string; title: string; dk: string; desc: str
     icon: "⚡",
     tk: "web.pubc.featAiTitle",
     title: "AI chạy trên máy bạn",
-    dk: "web.pubc.featAiDesc",
-    desc: "Dùng AI CLI (Claude/Grok/...) + gói của bạn để sinh code — chi phí gần như bằng 0, không tốn token của Larkwave.",
+    dk: "web.pubc.featAiDesc.lw",
+    desc: "Dùng Claude, Codex, Gemini hoặc Grok đã cài trên máy để chạy Lark Agents và Trợ lý AI — không tốn hạn mức Larkwave.",
   },
   {
     icon: "🔗",
     tk: "web.pubc.featLarkTitle",
     title: "Lark × Agents toàn quyền",
-    dk: "web.pubc.featLarkDesc",
-    desc: "Đăng nhập Lark bằng QR (tài khoản cá nhân) → AI thao tác với tư cách bạn trên mọi Base, Docs, Sheets, Wiki, Drive, tin nhắn. Tự động nạp Base.",
+    dk: "web.pubc.featLarkDesc.lw",
+    desc: "Đăng nhập Lark bằng QR (tài khoản cá nhân) hoặc app riêng → AI đọc/ghi Base, Docs, Sheets, Wiki, Drive, Lịch, tin nhắn với tư cách bạn. Mọi thao tác ghi đều hỏi trước.",
   },
   {
-    icon: "🚀",
-    tk: "web.pubc.featBuildTitle",
-    title: "Dựng app từ phân tích",
-    dk: "web.pubc.featBuildDesc",
-    desc: "Từ một cuộc phân tích dữ liệu Lark, bấm một nút là ra brief app full-stack (schema + dữ liệu mẫu + phân tích) — chỉnh rồi build.",
+    icon: "⏰",
+    tk: "web.pubc.featScheduleTitle.lw",
+    title: "Tự động hoá theo lịch",
+    dk: "web.pubc.featScheduleDesc.lw",
+    desc: "Hẹn giờ, bot hoặc webhook để tác vụ Lark tự chạy; bật \"Larkwave chạy hộ\" để lịch vẫn chạy khi máy tắt.",
   },
   {
-    icon: "📡",
-    tk: "web.pubc.featOfflineTitle",
-    title: "Chạy offline-first",
-    dk: "web.pubc.featOfflineDesc",
-    desc: "Server lỗi vẫn xem được dữ liệu đã lưu trên máy + báo mất kết nối; mượt mạng lại tự đồng bộ.",
+    icon: "📱",
+    tk: "web.pubc.featRemoteTitle.lw",
+    title: "Điều khiển từ điện thoại",
+    dk: "web.pubc.featRemoteDesc.lw",
+    desc: "Từ điện thoại hay trình duyệt, giao việc cho app máy tính ở nhà — chạy trên AI và phiên Lark của chính máy đó.",
   },
   {
     icon: "🔄",
@@ -80,12 +80,12 @@ const FEATURES: { icon: string; tk: string; title: string; dk: string; desc: str
 const STEPS_WIN = [
   { k: "web.pubc.winStep1", vi: "Tải bản Windows (.zip) bên trên." },
   { k: "web.pubc.winStep2", vi: "Giải nén, chạy Larkwave.exe (chưa ký số → bấm More info → Run anyway)." },
-  { k: "web.pubc.winStep3", vi: "Cài AI CLI (Claude/Grok/...) + đăng nhập/key (hoặc dán trong app)." },
+  { k: "web.pubc.winStep3.lw", vi: "Chọn AI (Claude/Codex/Gemini/Grok trên máy, hoặc Claude của Larkwave), rồi quét QR để kết nối Lark." },
 ];
 const STEPS_MAC = [
   { k: "web.pubc.macStep1", vi: "Tải bản macOS (.dmg) bên trên." },
   { k: "web.pubc.macStep2", vi: "Mở .dmg, kéo Larkwave vào Applications (lần đầu: chuột phải → Open)." },
-  { k: "web.pubc.macStep3", vi: "Cài Claude CLI + đăng nhập (hoặc dán token ngay trong app)." },
+  { k: "web.pubc.macStep3.lw", vi: "Chọn AI (Claude/Codex/Gemini/Grok trên máy, hoặc Claude của Larkwave), rồi quét QR để kết nối Lark." },
 ];
 
 /**
@@ -323,12 +323,12 @@ function PrimaryDownload({ os, url, otherUrl, loaded, lang }: { os: Platform; ur
             <>
               {t("web.pubc.dlNoBuildHint", "Bản {label} đang được đóng gói — đường tải sẽ bật ngay khi phát hành. Trong lúc chờ:", { label })}{" "}
               <a href={otherUrl}>{t("web.pubc.dlFor", "Tải cho {label}", { label: other })}</a> ·{" "}
-              <Link href="/welcome">{t("web.pubc.useWebVersion", "Dùng bản web →")}</Link>
+              <Link href="/assistant">{t("web.pubc.useWebVersion", "Dùng bản web →")}</Link>
             </>
           ) : (
             <>
               {t("web.pubc.packagingNote", "Bản cài đang được đóng gói — đường tải sẽ bật ngay khi phát hành. Trong lúc chờ, dùng")}{" "}
-              <Link href="/welcome">{t("web.pubc.webVersion", "bản web")}</Link>.
+              <Link href="/assistant">{t("web.pubc.webVersion", "bản web")}</Link>.
             </>
           )}
         </p>
@@ -468,12 +468,12 @@ export default function DownloadClient({ lang }: { lang?: Locale }) {
         <div className="tw-dl-hero-in">
           <span className="tw-dl-badge">{t("web.pubc.heroBadge", "🖥️ Larkwave Desktop · phiên bản {version}", { version })}</span>
           <h1 className="tw-dl-h1">
-            {t("web.pubc.heroTitle1", "Claude dựng app")} <span className="tw-dl-grad">{t("web.pubc.heroTitle2", "ngay trên máy bạn")}</span>
+            {t("web.pubc.heroTitle1.lw", "Trợ lý AI cho Lark")} <span className="tw-dl-grad">{t("web.pubc.heroTitle2", "ngay trên máy bạn")}</span>
           </h1>
           <p className="tw-dl-sub">
             {t(
-              "web.pubc.heroSub",
-              "Bản desktop dùng AI CLI (Claude/Grok/...) của bạn để sinh code (chi phí gần như 0), tích hợp sâu Lark × Agents (đăng nhập QR toàn quyền), dựng app từ phân tích dữ liệu và chạy được offline.",
+              "web.pubc.heroSub.lw",
+              "Bản desktop kết nối tài khoản Lark bằng QR để AI đọc/ghi Base, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn, tự động hoá theo lịch — chạy bằng Claude/Codex/Gemini/Grok của bạn, không tốn hạn mức.",
             )}
           </p>
 
@@ -487,7 +487,7 @@ export default function DownloadClient({ lang }: { lang?: Locale }) {
           </div>
 
           <p className="tw-dl-note">
-            {t("web.pubc.heroNote", "🔄 Cài một lần — app tự cập nhật giao diện (code-push). · Miễn phí · Cần")}{" "}
+            {t("web.pubc.heroNote.lw", "🔄 Cài một lần — app tự cập nhật. · Miễn phí · Dùng AI CLI của bạn, ví dụ")}{" "}
             <a href="https://docs.claude.com/claude-code" target="_blank" rel="noreferrer">
               Claude CLI
             </a>
@@ -517,7 +517,7 @@ export default function DownloadClient({ lang }: { lang?: Locale }) {
       <section className="tw-dl-section">
         <Heading
           title={t("web.pubc.whyTitle", "Vì sao dùng bản desktop?")}
-          sub={t("web.pubc.whySub", "Những thứ chỉ bản desktop có — chạy Claude cục bộ và can thiệp sâu vào Lark.")}
+          sub={t("web.pubc.whySub.lw", "Những thứ chỉ bản desktop có — làm việc trực tiếp trong Lark và chạy AI ngay trên máy bạn.")}
         />
         <div className="tw-dl-feats">
           {FEATURES.map((f) => (
@@ -537,13 +537,13 @@ export default function DownloadClient({ lang }: { lang?: Locale }) {
         <div className="tw-dl-cta-wrap">
           <Starfield variant="grid" speed={0.8} />
           <div className="tw-dl-cta-in">
-            <h2>{t("web.pubc.ctaTitle", "Sẵn sàng dựng app trên máy bạn?")}</h2>
-            <p>{t("web.pubc.ctaSub", "Tải về, đăng nhập Claude, kết nối Lark — và bắt đầu biến ý tưởng + dữ liệu thành app.")}</p>
+            <h2>{t("web.pubc.ctaTitle.lw", "Sẵn sàng giao việc Lark cho AI?")}</h2>
+            <p>{t("web.pubc.ctaSub.lw", "Tải về, chọn AI, quét QR kết nối Lark — rồi giao việc đầu tiên bằng một câu.")}</p>
             <div className="tw-dl-cta-row">
               {/* Cùng một component với hero: trạng thái "chưa có bản" ở đây cũng nói y hệt, không
                   bao giờ thành nút giả dẫn tới "#". */}
               <PrimaryDownload lang={lang} os={primaryOs} url={primaryUrl} otherUrl={otherUrl} loaded={loaded} />
-              <Link href="/welcome" className="tw-dl-ghost">
+              <Link href="/assistant" className="tw-dl-ghost">
                 {t("web.pubc.useWebVersion", "Dùng bản web →")}
               </Link>
             </div>

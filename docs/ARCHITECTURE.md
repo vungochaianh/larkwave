@@ -1,5 +1,8 @@
 # Architecture
 
+> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
+> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+
 ## Surfaces & routing
 
 One NestJS API (`apia`) and one Next.js app serving two host-routed surfaces

@@ -5,14 +5,11 @@ import AntiClone from "@/components/AntiClone";
 import RefCapture from "@/components/RefCapture";
 import PublicSplash from "@/components/PublicSplash";
 
-// Định vị RỘNG theo đúng phạm vi sản phẩm hiện tại (trợ lý AI · tạo app · Lark), thay cho định vị
-// cũ chỉ nói về dựng app — vốn bỏ quên phần lớn những gì nền tảng làm được.
-//
-// BỎ "marketing" khỏi định vị: bộ làm video/ảnh/bài viết đã chuyển sang Social Wave. Quảng cáo một
-// tính năng không còn ở đây là hứa với người mới một thứ họ sẽ không tìm thấy.
-const TITLE_DEFAULT = "Larkwave — Trợ lý AI biết làm việc thật";
+// Định vị: Larkwave là trợ lý AI làm việc trong Lark (Lark Agents · tự động hoá · Trợ lý AI ·
+// chia sẻ). Không quảng cáo tạo app/video/bài viết — các phần đó không có trong Larkwave.
+const TITLE_DEFAULT = "Larkwave — Trợ lý AI làm việc thật trên Lark";
 const DESCRIPTION =
-  "Nền tảng AI tiếng Việt: trò chuyện với trợ lý AI, tạo web app full-stack, tự động hoá Lark Base. Dùng thử miễn phí.";
+  "Trợ lý AI cho Lark: đọc/ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn, tự động hoá theo lịch, xuất tệp thật. Dùng thử miễn phí.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://toolswave.net"),
@@ -28,32 +25,25 @@ export const metadata: Metadata = {
     title: "Larkwave",
     statusBarStyle: "default",
   },
-  // Chia đều theo 4 trụ cột. Cố ý BỎ các cụm tiếng Anh trần ("no-code", "low-code",
-  // "AI app builder"): từ một tên miền Việt Nam thì đó là cuộc đua toàn cầu với Lovable/Bolt
-  // gần như không có cửa, trong khi cụm tiếng Việt vừa đúng người tìm vừa còn chỗ trống.
+  // Cụm tiếng Việt về Lark/Bitable là mảng ít cạnh tranh nhất và đúng người tìm nhất.
   // Lưu ý: Google đã ngừng dùng thẻ meta keywords từ 2009 — giá trị SEO thật nằm ở H1/H2,
   // nội dung trang và sitemap; giữ thẻ này chủ yếu cho các máy tìm kiếm khác và cho nội bộ.
   keywords: [
     "Larkwave",
-    // Trợ lý AI
-    "trợ lý AI tiếng Việt",
-    "trợ lý ảo AI",
-    "AI agent tiếng Việt",
-    "giải pháp AI cho doanh nghiệp",
-    // Lark / Bitable — mảng ít cạnh tranh nhất
+    // Lark / Bitable
+    "trợ lý AI cho Lark",
+    "AI cho Lark Base",
     "tự động hoá Lark Base",
     "đồng bộ Bitable",
-    "kết nối Lark với phần mềm",
-    // Tạo app
-    "tạo web app bằng AI",
-    "tạo app không cần code",
-    "làm web bằng AI",
-    // Lập trình viên
-    "API cho lập trình viên",
-    "tích hợp AI vào website",
+    "Lark Agents",
+    "Feishu AI",
+    // Trợ lý AI
+    "trợ lý AI tiếng Việt",
+    "AI agent tiếng Việt",
+    "giải pháp AI cho doanh nghiệp",
     // Biến thể không dấu — người dùng gõ nhanh trên điện thoại thường bỏ dấu.
-    "cong cu AI tieng Viet",
-    "tao web bang AI",
+    "tro ly AI cho Lark",
+    "tu dong hoa Lark Base",
   ],
   authors: [{ name: "Larkwave", url: "https://toolswave.net" }],
   creator: "Larkwave",
@@ -72,7 +62,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Larkwave — Trợ lý AI biết làm việc thật",
+        alt: "Larkwave — Trợ lý AI làm việc thật trên Lark",
       },
     ],
   },
@@ -106,7 +96,7 @@ export default function RootLayout({
   //
   // Vì sao KHÔNG đọc cookie ở đây để đặt thẳng cho đúng ngay trong HTML máy chủ: `cookies()` trong layout GỐC
   // biến MỌI trang của site thành kết xuất động, kể cả những trang hôm nay còn dựng tĩnh được
-  // (/skills, /templates, /welcome…). Đó là một đánh đổi về hiệu năng cho toàn site để đổi lấy một thuộc
+  // (/skills, /pricing, /welcome…). Đó là một đánh đổi về hiệu năng cho toàn site để đổi lấy một thuộc
   // tính; nên chỗ này chọn sửa cho NGƯỜI ĐỌC (trình đọc màn hình, ngắt dòng, tự dịch của trình duyệt
   // đều đọc thuộc tính SAU khi kịch bản chạy) và chấp nhận máy tìm kiếm thấy 'vi' trong HTML thô.
   // Ngôn ngữ thật của từng trang vẫn được khai đúng qua `alternates.languages` và `openGraph.locale`.
