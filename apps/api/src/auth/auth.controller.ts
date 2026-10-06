@@ -14,7 +14,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { GitProvider } from '../engine/git-providers.service';
+import type { OAuthProvider } from './oauth-providers.service';
 import type { Request, Response } from 'express';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { AuthResponse, User } from '@larkwave/shared';
@@ -220,7 +220,7 @@ export class AuthController {
   // ── GitLab / GitHub OAuth (PUBLIC) ────────────────────────────────────────────
 
   /** Validate the path provider segment; 400 on anything else. */
-  private parseProvider(provider: string): GitProvider {
+  private parseProvider(provider: string): OAuthProvider {
     if (provider !== 'gitlab' && provider !== 'github') {
       throw new BadRequestException('Nhà cung cấp không hợp lệ');
     }
@@ -333,7 +333,7 @@ export class AuthController {
 
   /**
    * GitLab/GitHub OAuth callback: exchange `code`, resolve the target user
-   * (linked current user or find/create by email), store the provider token +
+   * (linked current user or find/create by email), store the provider
    * username, issue a JWT and 302 back to the web app. Errors -> /login?error=<p>.
    */
   @Public()
@@ -349,7 +349,7 @@ export class AuthController {
     const { link, origin } = decoded;
     const web = this.resolveWebOrigin(origin);
     const desktop = this.resolveDesktopRedirect(decoded.desktop);
-    let p: GitProvider;
+    let p: OAuthProvider;
     try {
       p = this.parseProvider(provider);
     } catch {
@@ -365,17 +365,11 @@ export class AuthController {
       const linkUserId = await this.auth.resolveLinkUserId(link);
       const token = await this.auth.gitOAuthLogin(p, code, linkUserId, this.deviceCtx(req));
       if (desktop) {
-        // Desktop: hand the fresh JWT to the app via the deep link; it refreshes
-        // the account (now provider-connected) and repo listing works as on web.
+        // Desktop: hand the fresh JWT to the app via the deep link.
         res.redirect(`${desktop}?token=${encodeURIComponent(token)}&linked=1`);
         return;
       }
-      // Land back on the import page (connected) rather than the home page — the
-      // user came here to pick a repo. `next` is honoured by /auth/callback.
-      const next = encodeURIComponent(`/import?provider=${p}&linked=1`);
-      res.redirect(
-        `${web}/auth/callback?token=${encodeURIComponent(token)}&next=${next}`,
-      );
+      res.redirect(`${web}/auth/callback?token=${encodeURIComponent(token)}`);
     } catch {
       if (desktop) {
         res.redirect(`${desktop}?error=${p}`);

@@ -7,10 +7,9 @@ import { normalizePlanId } from '../billing/plans';
 import type { AuthUser } from '../common/auth-user';
 
 /**
- * Gate + meter for MAIC (hosted Claude) usage, sharing the SAME monthly % token-budget
- * as codegen. MAIC returns costUsd; the budget unit is tokens (User.quotaUsed), so cost is
- * converted via MAIC_USD_PER_MTOK. Mirrors PipelineService.meterBuildTokens + BuildsService's
- * quota gate (kept self-contained to avoid refactoring those hot paths). Admins are unlimited.
+ * Gate + meter for MAIC (hosted Claude) usage against the monthly % token-budget of the
+ * user's plan. MAIC returns costUsd; the budget unit is tokens (User.quotaUsed), so cost is
+ * converted via MAIC_USD_PER_MTOK. Admins are unlimited.
  * The per-user gate — NOT MAIC's global /v1/usage — is what enforces plans/trials per user.
  */
 @Injectable()
@@ -27,7 +26,7 @@ export class MaicUsageService {
     private readonly maicAdmin: MaicAdminService,
   ) {}
 
-  /** Month boundary — identical rule to PipelineService.meterBuildTokens (same-day next month, UTC). */
+  /** Month boundary — same-day next month, UTC (same rule as PaymentsService.nextMonthStart). */
   private nextMonthStart(from: Date): Date {
     return new Date(
       Date.UTC(
@@ -44,8 +43,8 @@ export class MaicUsageService {
 
   /**
    * Block a MAIC turn when the user is out of monthly budget or the free plan is off —
-   * same 402 semantics as BuildsService.assertUnderQuota/assertPlanUsable, so hosted-agent
-   * usage and codegen share one budget. Admins are never gated. Call BEFORE hitting MAIC.
+   * 402 with a machine-readable `code` the clients turn into an upgrade prompt.
+   * Admins are never gated. Call BEFORE hitting MAIC.
    */
   async assertMaicAllowed(user: AuthUser): Promise<void> {
     // Tự vũ trang hàng rào bên MAIC.

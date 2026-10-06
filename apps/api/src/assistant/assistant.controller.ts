@@ -16,18 +16,6 @@ export class AssistantController {
     return this.assistant.chat(dto, user);
   }
 
-  /**
-   * Render an HTML/SVG artifact (drawn by the assistant in chat) to a real PNG and return its URL —
-   * so the web assistant can produce an actual image file (the chat text path has no file output).
-   */
-  @Post('render')
-  render(
-    @CurrentUser() user: AuthUser,
-    @Body() body: { html: string; width?: number; height?: number },
-  ): Promise<{ url: string }> {
-    return this.assistant.renderImage(body?.html, body?.width, body?.height, user);
-  }
-
   /** Generate a REAL AI image (OpenAI) from a text prompt → returns its stored URL. */
   @Post('image')
   image(

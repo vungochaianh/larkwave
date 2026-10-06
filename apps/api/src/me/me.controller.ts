@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpCode,
-  Param,
   Patch,
   Post,
   Query,
@@ -11,7 +10,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MeActivity, MeOverview, MeSubscription, Payment, PublicApp, User } from '@larkwave/shared';
+import { MeActivity, MeOverview, MeSubscription, Payment, User } from '@larkwave/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../common/auth-user';
 import { PaymentsService } from '../payments/payments.service';
@@ -59,7 +58,7 @@ export class MeController {
     return this.payments.listMine(user);
   }
 
-  // ── Referral + maker social ────────────────────────────────────────────────
+  // ── Referral ────────────────────────────────────────────────
   @Get('referral')
   referral(
     @CurrentUser() user: AuthUser,
@@ -75,30 +74,6 @@ export class MeController {
     @Body() body: { ref?: string },
   ): Promise<{ applied: boolean }> {
     return this.me.captureReferral(user, body?.ref ?? '');
-  }
-
-  /** Toggle following a maker by handle. */
-  @Post('follow/:handle')
-  @HttpCode(200)
-  follow(
-    @CurrentUser() user: AuthUser,
-    @Param('handle') handle: string,
-  ): Promise<{ following: boolean; followers: number }> {
-    return this.me.follow(user, handle);
-  }
-
-  @Get('follow/:handle')
-  isFollowing(
-    @CurrentUser() user: AuthUser,
-    @Param('handle') handle: string,
-  ): Promise<{ following: boolean }> {
-    return this.me.isFollowing(user, handle);
-  }
-
-  /** Activity feed: recent apps from makers the user follows. */
-  @Get('feed')
-  feed(@CurrentUser() user: AuthUser): Promise<PublicApp[]> {
-    return this.me.feed(user);
   }
 
   // ── Self profile editing (current user only — NOT admin) ─────────────────────

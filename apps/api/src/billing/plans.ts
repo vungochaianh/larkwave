@@ -2,38 +2,29 @@ import type { PlanCatalogEntry, PlanId } from '@larkwave/shared';
 
 /**
  * Subscription plan catalog — the single source of truth for the monthly USAGE
- * BUDGET, live-app caps and pricing. CONFIGURABLE: tweak `monthlyTokens` /
- * `maxLiveApps` / `priceVnd` / `features` here and the whole quota system +
- * `/v1/me/subscription` follow automatically.
+ * BUDGET, storage and pricing. CONFIGURABLE: tweak `monthlyTokens` / `priceVnd` /
+ * `features` here and the whole quota system + `/v1/me/subscription` follow.
  *
  * Billing model: each plan grants a MONTHLY TOKEN BUDGET (`monthlyTokens` = 100%
- * of the plan). Every build meters its REAL token usage (input + output) against
- * that budget; the user only ever sees a PERCENT used. A big/complex app uses more
- * tokens → consumes more % (fairer than a flat per-build credit). Token numbers
- * are INTERNAL/admin-only — never shown to end users. Every app is generated
- * full-stack (frontend + backend/data + admin CMS); heavier builds simply use
- * more of the monthly %.
- *
- * Budgets are calibrated so Free allows a handful of real builds (the
- * "prompt → live app" aha moment) and each paid tier multiplies the allowance.
+ * of the plan). Every hosted AI run (Trợ lý AI on Larkwave's Claude, hosted Lark
+ * turns, the help assistant) meters its REAL token usage against that budget; the
+ * user only ever sees a PERCENT used. Token numbers are INTERNAL/admin-only.
+ * Running the assistant on the user's OWN local Claude/Codex/Gemini/Grok CLI on the
+ * desktop is not metered.
  */
 export const PLANS: Record<PlanId, PlanCatalogEntry> = {
   free: {
     id: 'free',
     label: 'Miễn phí',
     priceVnd: 0,
-    // Generous free allowance (owner: "max everything") so new accounts can build
-    // several real full-stack apps before hitting the cap. Admin-tunable at runtime.
+    // Admin-tunable at runtime (billing config).
     monthlyTokens: 3_000_000,
-    maxLiveApps: 1,
     storageMb: 1_024,
-    serverDeploy: false,
     features: [
-      'Hạn mức dùng hàng tháng (gói cơ bản) — tạo & deploy app thật',
-      'App đầy đủ: giao diện + dữ liệu + trang quản trị',
-      '1 app chạy đồng thời',
-      'Deploy thật ra Cloudflare (subdomain công khai)',
-      'Sửa app bằng chat · Xem & tải source',
+      'Hạn mức dùng AI hàng tháng (gói cơ bản)',
+      'Lark Agents trên desktop: Bitable · Docs · Sheets · Wiki · Drive · Lịch · Tin nhắn',
+      'Chạy trên Claude/Codex/Gemini/Grok của máy bạn — không tính hạn mức',
+      'Trợ lý AI · Kỹ năng · Artifacts',
       'Hỗ trợ cộng đồng',
     ],
   },
@@ -42,16 +33,12 @@ export const PLANS: Record<PlanId, PlanCatalogEntry> = {
     label: 'Khởi đầu',
     priceVnd: 199000,
     monthlyTokens: 30_000_000,
-    maxLiveApps: 3,
     storageMb: 5_120,
-    serverDeploy: false,
     features: [
       'Hạn mức gấp ~10× gói Miễn phí mỗi tháng',
-      'App đầy đủ: giao diện + dữ liệu (D1) + trang quản trị',
-      '3 app chạy đồng thời',
-      'Tải source code (ZIP) · Đồng bộ GitLab',
-      'Sửa code trong app + deploy lại',
-      'Web · Mobile · Extension',
+      'Trợ lý AI trên Claude do Larkwave cung cấp (không cần cài Claude)',
+      'Tự động hoá Lark theo lịch · Đặc tả · Xuất xlsx/docx/pdf',
+      'Điều khiển máy desktop từ điện thoại/web',
       'Hỗ trợ email',
     ],
   },
@@ -60,18 +47,13 @@ export const PLANS: Record<PlanId, PlanCatalogEntry> = {
     label: 'Chuyên nghiệp',
     priceVnd: 499000,
     monthlyTokens: 100_000_000,
-    maxLiveApps: 12,
     storageMb: 10_240,
-    serverDeploy: true,
-    maxServerServices: 8,
     features: [
       'Hạn mức gấp ~33× gói Miễn phí mỗi tháng',
-      '12 app chạy đồng thời',
       'Mọi tính năng gói Khởi đầu',
-      '★ Chạy trên Server (Docker): backend/DB/Python thật, mỗi service 1 subdomain',
-      'Import workspace nhiều service → chạy chung 1 app',
-      'Tên miền riêng cho từng service (custom domain)',
-      "Xoá nhãn 'Tạo bởi Larkwave' · Templates riêng tư",
+      'Larkwave chạy hộ lịch tự động hoá khi máy bạn tắt',
+      'Đồng bộ CMS Bitable nhiều tài khoản Lark',
+      'Chia sẻ trợ lý cho đồng đội (quyền uỷ thác, không lộ khoá)',
       'Hỗ trợ ưu tiên',
     ],
   },
@@ -80,15 +62,10 @@ export const PLANS: Record<PlanId, PlanCatalogEntry> = {
     label: 'Doanh nghiệp',
     priceVnd: 999000,
     monthlyTokens: 300_000_000,
-    maxLiveApps: 9999,
     storageMb: 25_600,
-    serverDeploy: true,
-    maxServerServices: 9999,
     features: [
       'Hạn mức gấp ~100× gói Miễn phí mỗi tháng',
-      'App chạy đồng thời KHÔNG giới hạn',
       'Mọi tính năng gói Chuyên nghiệp',
-      '★ Tài nguyên Server cao hơn (RAM/CPU) cho app Docker',
       'Sớm dùng tính năng mới · Hỗ trợ riêng (SLA)',
     ],
   },
@@ -105,25 +82,6 @@ export const PLAN_CATALOG: PlanCatalogEntry[] = [
 /** Resolve a (possibly stale/unknown) plan string to a valid catalog entry. */
 export function resolvePlan(plan: string | null | undefined): PlanCatalogEntry {
   return PLANS[(plan ?? 'free') as PlanId] ?? PLANS.free;
-}
-
-/** Whether a plan may RUN apps on the Docker server (Pro tier and above). */
-export function planAllowsServerDeploy(plan: string | null | undefined): boolean {
-  return planRank(plan) >= planRank('pro');
-}
-
-/** Whether a plan REMOVES the "Tạo bằng Larkwave" badge from deployed apps (Pro+). */
-export function planRemovesBranding(plan: string | null | undefined): boolean {
-  return planRank(plan) >= planRank('pro');
-}
-
-/**
- * Max Docker services one app may run on the server for a plan (0 = not allowed).
- * INTENTIONALLY compile-time (the static catalog), NOT CMS-tunable like price/credits
- * — it maps to real host RAM/CPU, so it's a capacity guardrail, not a soft quota.
- */
-export function serverServiceLimit(plan: string | null | undefined): number {
-  return resolvePlan(plan).maxServerServices ?? 0;
 }
 
 /**

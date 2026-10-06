@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
-import { SseEvent } from '@larkwave/shared';
 
 /**
- * In-process pub/sub keyed by buildId. The pipeline publishes live events;
- * the SSE controller subscribes a connected client. Single-instance only —
- * for multi-instance, swap the emitter for Redis pub/sub.
+ * In-process pub/sub: per-user channels (chat, notifications, relay results) and per-user
+ * desktop AGENT command channels. Single-instance only — for multi-instance, swap the
+ * emitter for Redis pub/sub.
  */
 @Injectable()
 export class EventsService {
@@ -13,17 +12,6 @@ export class EventsService {
 
   constructor() {
     this.emitter.setMaxListeners(0);
-  }
-
-  publish(buildId: string, event: SseEvent): void {
-    this.emitter.emit(buildId, event);
-  }
-
-  subscribe(buildId: string, listener: (event: SseEvent) => void): () => void {
-    this.emitter.on(buildId, listener);
-    return () => {
-      this.emitter.off(buildId, listener);
-    };
   }
 
   /** Per-user channel (chat etc.) — pushed to a user's connected SSE stream. */

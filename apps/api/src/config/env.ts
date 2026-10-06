@@ -19,8 +19,9 @@ const EnvSchema = z.object({
   // Database
   DATABASE_URL: z.string().min(10),
 
-  // Claude — the codegen brain
-  ANTHROPIC_API_KEY: z.string().min(10),
+  // Claude — direct Anthropic API, used by the help assistant (fallback when MAIC is unset)
+  // and feedback triage. Optional: those paths degrade gracefully without it.
+  ANTHROPIC_API_KEY: z.string().optional().default(''),
   ANTHROPIC_MODEL: z.string().default('claude-opus-4-8'),
   // OpenAI (optional) — secondary provider for failover / cheap aux tasks. Inert
   // until set. Use a PROJECT key (sk-proj-…), NEVER an admin key (sk-admin-…).
@@ -48,62 +49,12 @@ const EnvSchema = z.object({
   MAIC_URL: z.string().optional().default(''),
   MAIC_TOKEN: z.string().optional().default(''),
   MAIC_USD_PER_MTOK: z.coerce.number().positive().default(10),
-  // ElevenLabs TTS — Video Studio narration voices. Inert until set (header `xi-api-key`).
-  ELEVENLABS_API_KEY: z.string().optional().default(''),
-  // Video Studio render: where Playwright's Chromium lives (shared, readable by the `app` user).
-  PLAYWRIGHT_BROWSERS_PATH: z.string().optional().default(''),
-
-  // Cloudflare — Pages deploy target
-  CF_ACCOUNT_ID: z.string().min(8),
-  CF_API_TOKEN: z.string().min(8),
-  DOMAIN_GOC: z.string().default('toolswave.net'),
-  // Optional: a DNS-edit token + zone id + the apps tunnel id enable
-  // <slug>.toolswave.net domains (served via our reverse-proxy tunnel).
-  CF_DNS_API_TOKEN: z.string().optional().default(''),
-  CF_ZONE_ID: z.string().optional().default(''),
-  TW_APPS_TUNNEL_ID: z.string().optional().default(''),
-
-  // GitLab — optional; auto-detected at runtime
-  GITLAB_TOKEN: z.string().optional().default(''),
-  GITLAB_GROUP: z.string().default('toolswave'),
-  GITLAB_HOST: z.string().default('https://gitlab.com'),
-  // Deploy-token mode: push each app as a folder into one pre-created monorepo.
-  GITLAB_DEPLOY_USER: z.string().optional().default(''),
-  GITLAB_MONOREPO: z.string().optional().default(''),
-
-  // Filesystem (build scratch + downloadable artefacts)
-  WORKSPACE_DIR: z.string().default('.workspace'),
-  ARTIFACTS_DIR: z.string().default('.artifacts'),
   // User uploads (avatars). Served statically at the API origin under /uploads.
   UPLOADS_DIR: z.string().default('./uploads'),
   // API public ORIGIN (no path) — uploaded avatar URLs are `${PUBLIC_API_URL}/uploads/...`.
   // NOTE: static /uploads is served OUTSIDE the global 'v1' prefix, so this is the
   // bare origin, not the /v1 base.
   PUBLIC_API_URL: z.string().default('https://api.toolswave.net'),
-
-  // Backend của PORTAL (hệ B) — nguồn danh mục cửa hàng ở giai đoạn 1, xem
-  // `docs/hop-nhat-cua-hang-va-nen-tang.md`. Mặc định là địa chỉ công khai để chạy được ở mọi
-  // máy; trên máy chủ thật nên đặt `http://127.0.0.1:4001/api` vì hai hệ nằm CÙNG một máy —
-  // đi vòng qua Cloudflare rồi quay lại chỉ thêm độ trễ và thêm một chỗ hỏng.
-  // Để RỖNG là tắt hẳn cửa hàng (API trả danh mục rỗng, không lỗi).
-  PORTAL_API_BASE: z.string().optional().default('https://apia.toolswave.net/api'),
-
-  // Địa chỉ công khai của portal — nơi DUY NHẤT còn nhận đơn ở giai đoạn 1, nên mọi nút "Mua"
-  // trỏ về đây. Giai đoạn 3 chuyển sang đường mua nội bộ và biến này thành thừa.
-  PORTAL_PUBLIC_URL: z.string().optional().default('https://app.toolswave.net'),
-
-  // Nguồn danh mục cửa hàng. Mặc định `auto`: có hàng trong bảng `Listing` thì đọc bảng, chưa có
-  // thì đọc portal — nghĩa là việc NHẬP DỮ LIỆU của giai đoạn 2 tự nó lật nguồn, không cần một
-  // lần deploy thứ hai đi kèm, và cũng không có khoảnh khắc nào mặt tiền trắng ở giữa.
-  //
-  // Hai giá trị ép là van khoá tay, mỗi cái cho một tình huống đã lường trước:
-  //   `portal` — nhập hỏng giữa chừng (thiếu ảnh, sai giá, mất nửa danh mục). Đổi một biến rồi
-  //              khởi động lại là cửa hàng quay về đúng thứ đang chạy tốt hôm nay, trong khi
-  //              dữ liệu được dọn lại; không phải revert mã, không phải deploy.
-  //   `local`  — soi nhánh mới trên máy chủ thật trước khi tin nó. Ép local thì lỗi cơ sở dữ
-  //              liệu HIỆN RA (danh mục rỗng + log) thay vì được portal đỡ hộ — tự cứu ngầm là
-  //              đúng cách làm cho thứ ta đang muốn kiểm không bao giờ lộ mặt.
-  STORE_SOURCE: z.enum(['local', 'portal', 'auto']).optional().default('auto'),
 
   // Security / surfaces
   ADMIN_EMAIL: z.string().email().default('admin@toolswave.net'),
@@ -162,9 +113,8 @@ const EnvSchema = z.object({
     .optional()
     .default('https://api.toolswave.net/v1/auth/google/callback'),
 
-  // GitLab OAuth (connect/import). All optional — routes return 503 / hide the
+  // GitLab OAuth (login). All optional — routes return 503 / hide the
   // button until GITLAB_OAUTH_CLIENT_ID + GITLAB_OAUTH_CLIENT_SECRET are set.
-  // These are the PER-USER OAuth app creds (distinct from the platform GITLAB_TOKEN).
   GITLAB_OAUTH_CLIENT_ID: z.string().optional().default(''),
   GITLAB_OAUTH_CLIENT_SECRET: z.string().optional().default(''),
   GITLAB_OAUTH_REDIRECT: z
@@ -172,7 +122,7 @@ const EnvSchema = z.object({
     .optional()
     .default('https://api.toolswave.net/v1/auth/gitlab/callback'),
 
-  // GitHub OAuth (connect/import). All optional — same degrade-gracefully rule.
+  // GitHub OAuth (login). All optional — same degrade-gracefully rule.
   GITHUB_OAUTH_CLIENT_ID: z.string().optional().default(''),
   GITHUB_OAUTH_CLIENT_SECRET: z.string().optional().default(''),
   GITHUB_OAUTH_REDIRECT: z
@@ -190,26 +140,6 @@ const EnvSchema = z.object({
   // nhập Google xong, người dùng bị ném sang portal của hệ khác. Nay .env đã đặt tường minh, và
   // mặc định ở đây cũng sửa cho khớp.
   WEB_PUBLIC_URL: z.string().optional().default('https://toolswave.net'),
-
-  // Server (Docker) deploy target — optional. Enables the "Deploy lên Server"
-  // feature for full-stack apps (a docker-compose.yml) when host + ssh creds +
-  // tunnel are set. Fully inert (feature hidden) until configured.
-  SERVER_DEPLOY_HOST: z.string().optional().default(''),       // e.g. root@100.100.164.92
-  SERVER_DEPLOY_SSH_PASS: z.string().optional().default(''),   // root ssh password (legacy; prefer SSH_KEY)
-  SERVER_DEPLOY_SSH_KEY: z.string().optional().default(''),    // path to a private key for key-auth (no password stored)
-  SERVER_DEPLOY_TUNNEL_ID: z.string().optional().default(''),  // cloudflared tunnel id
-  // Origin cert authorising DNS edits for the DEPLOY domain's zone. The default
-  // root cert may belong to a DIFFERENT zone (→ route dns creates the CNAME under
-  // the wrong domain → NXDOMAIN), so point at the toolswave.net origin cert.
-  SERVER_DEPLOY_ORIGIN_CERT: z.string().optional().default('/home/deveris/.cloudflared/cert-toolswave.pem'),
-  SERVER_DEPLOY_DIR: z.string().optional().default('/var/www/tw-apps'),
-  SERVER_DEPLOY_DOMAIN: z.string().optional().default('toolswave.net'),
-  SERVER_DEPLOY_PORT_BASE: z.coerce.number().int().positive().default(9200),
-
-  // Limits
-  MAX_CONCURRENT_JOBS: z.coerce.number().int().positive().default(2),
-  COST_LIMIT_USD: z.coerce.number().positive().default(5),
-  MAX_FIX_ATTEMPTS: z.coerce.number().int().nonnegative().default(2),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -224,7 +154,7 @@ export function loadEnv(raw: NodeJS.ProcessEnv = process.env): Env {
   }
   // In production, loudly warn (non-fatal, to avoid bricking a running API) if the
   // master secrets are still the dev defaults. JWT_SECRET both signs JWTs AND keys
-  // the at-rest encryption of API keys / app secrets — a known default is unsafe.
+  // the at-rest encryption of stored secrets — a known default is unsafe.
   if (raw.NODE_ENV === 'production') {
     if (parsed.data.JWT_SECRET === 'toolswave-dev-secret-change-me-please-now') {
       // eslint-disable-next-line no-console

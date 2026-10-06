@@ -6,7 +6,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { decryptJson, encryptJson } from '../common/secret-crypto';
 
 export type Provider = 'anthropic' | 'openai' | 'grok';
-/** Secondary providers (OpenAI/Grok) — kept for OpenaiService's local typing. */
+/** Secondary providers (OpenAI/Grok) — managed from the admin AI-keys page. */
 export type CompatProvider = 'openai' | 'grok';
 type KeyStore = Partial<Record<Provider, string>>;
 
@@ -24,7 +24,7 @@ const KEY_MARKERS: Record<Provider, string[]> = {
  * Keys set from the admin "AI Keys" page are AES-encrypted in Setting.aiKeysEnc;
  * env vars are the fallback. An in-memory cache keeps `keyFor`/`enabled` SYNC
  * (no DB hit on the hot path); it's refreshed on boot + whenever keys are saved.
- * @Global so OpenaiService (engine) and the admin controller share one instance.
+ * @Global so every consumer and the admin controller share one instance.
  */
 @Injectable()
 export class AiKeysService implements OnModuleInit {
@@ -128,10 +128,10 @@ export class AiKeysService implements OnModuleInit {
           id: 'anthropic',
           label: 'Anthropic Claude',
           enabled: this.enabled('anthropic'),
-          role: 'Codegen chính + auto-router (Opus / Sonnet / Haiku)',
+          role: 'Trợ lý trợ giúp (dự phòng khi chưa có MAIC) + phân loại báo lỗi',
         },
-        { id: 'openai', label: 'OpenAI GPT', enabled: this.enabled('openai'), role: 'Failover cho router/aux' },
-        { id: 'grok', label: 'xAI Grok', enabled: this.enabled('grok'), role: 'Failover cho router/aux' },
+        { id: 'openai', label: 'OpenAI GPT', enabled: this.enabled('openai'), role: 'Tạo ảnh AI (Trợ lý)' },
+        { id: 'grok', label: 'xAI Grok', enabled: this.enabled('grok'), role: 'Dự phòng (chưa dùng ở máy chủ)' },
       ],
       keys: {
         anthropic: this.mask('anthropic'),

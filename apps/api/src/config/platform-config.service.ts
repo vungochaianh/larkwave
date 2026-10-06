@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Reads/writes the single `Setting` row holding the editable platform config
- * (tracks, prompt templates, limits). Seeds DEFAULT_CONFIG on first access.
+ * (billing overrides). Seeds DEFAULT_CONFIG on first access.
  */
 @Injectable()
 export class PlatformConfigService {
@@ -21,20 +21,10 @@ export class PlatformConfigService {
     return this.withDefaults(row.config as unknown as PlatformConfig);
   }
 
-  /**
-   * Fill gaps from DEFAULT_CONFIG so a config saved BEFORE a new track/prompt was added still exposes
-   * it at runtime (the stored row is not deep-merged on save). Stored values still win; defaults only
-   * fill missing keys. Critical for new tracks (desktop/game) — codegen reads cfg.tracks[track].
-   */
+  /** Fill gaps from DEFAULT_CONFIG (stored values win). */
   private withDefaults(stored: PlatformConfig): PlatformConfig {
     if (!stored || typeof stored !== 'object') return DEFAULT_CONFIG;
-    return {
-      ...DEFAULT_CONFIG,
-      ...stored,
-      tracks: { ...DEFAULT_CONFIG.tracks, ...(stored.tracks ?? {}) },
-      prompts: { ...DEFAULT_CONFIG.prompts, ...(stored.prompts ?? {}) },
-      limits: { ...DEFAULT_CONFIG.limits, ...(stored.limits ?? {}) },
-    };
+    return { ...DEFAULT_CONFIG, ...stored };
   }
 
   async update(config: PlatformConfig): Promise<PlatformConfig> {

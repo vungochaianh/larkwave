@@ -52,12 +52,6 @@ export class BillingPlanOverrideDto {
   @IsInt()
   @Min(0)
   credits?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  maxLiveApps?: number;
 }
 
 /** Body for `PUT /v1/admin/billing` — partial overrides merged over defaults. */
@@ -72,11 +66,6 @@ export class UpdateBillingDto {
   @IsOptional()
   @IsObject()
   plans?: Record<string, BillingPlanOverrideDto>;
-
-  /** Keyed by ModelChoice (opus|sonnet). */
-  @IsOptional()
-  @IsObject()
-  modelCredits?: Record<string, number>;
 
   /** Toggle whether the free plan is usable (default true). */
   @IsOptional()

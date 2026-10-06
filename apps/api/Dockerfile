@@ -4,7 +4,7 @@ FROM node:20-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable \
  && apt-get update \
- && apt-get install -y --no-install-recommends openssl ca-certificates git \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -30,5 +30,4 @@ COPY apps/api/Dockerfile.entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 WORKDIR /app/apps/api
 EXPOSE 4101
-# The build-runner spawns `npm` for generated apps — npm ships with node:20.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -3,29 +3,29 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { AssistantChatRequest, AssistantChatResponse } from '@larkwave/shared';
-import { AnthropicService } from '../engine/anthropic.service';
+import { AnthropicService } from '../ai-keys/anthropic.service';
 import { MaicService } from '../maic/maic.service';
-import { RenderService } from '../video/render.service';
 import { AppConfigService } from '../config/app-config.service';
 import { MaicUsageService } from '../maic/maic-usage.service';
 import type { AuthUser } from '../common/auth-user';
 
 // Knowledge base for the help assistant — kept in sync with the ACTUAL platform
-// (plans, deploy options, per-app workspace, social, bug-bounty). Update here when
+// (Lark Agents, AI assistant, skills, plans, community, bug-bounty). Update here when
 // features change so the bot stays accurate.
-const SYSTEM = `Bạn là "Trợ lý Larkwave" — trợ lý AI hỗ trợ người dùng nền tảng Larkwave (prompt-to-app: mô tả ý tưởng → AI tạo ra app hoàn chỉnh → build → preview → deploy).
+const SYSTEM = `Bạn là "Trợ lý Larkwave" — trợ lý AI hỗ trợ người dùng nền tảng Larkwave (làm việc với Lark/Feishu bằng AI: trợ lý AI đọc/ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn Lark; tự động hoá theo lịch; đồng bộ CMS Bitable).
 
 KIẾN THỨC NỀN TẢNG (dùng để trả lời chính xác):
-• Tạo app: ở trang chủ, gõ mô tả ý tưởng → chọn loại (Web / Mobile Expo / Extension) → hệ thống sinh code, build và cho xem preview. Có thể bật "Cơ sở dữ liệu & API" để tạo app full-stack (mặc định là app TĨNH nếu không bật).
-• Mô hình AI & credit: hệ thống TỰ ĐỘNG chọn model phù hợp (nhanh, tiết kiệm) — mỗi lần tạo/sửa tốn 1 credit; có thể chọn Opus (mạnh hơn) tốn 5 credit. Mỗi lần chỉnh sửa (iterate) cũng tốn credit.
-• Gói cước: Miễn phí (0 credit, 1 app) · Khởi đầu 199k (30 credit, 3 app) · Chuyên nghiệp 499k (80 credit, 12 app, + Chạy trên Server Docker) · Doanh nghiệp 999k (180 credit, app không giới hạn). Nâng cấp GIỮA kỳ chỉ trả phần chênh lệch theo thời gian còn lại của chu kỳ (giá hợp lý); hạ gói áp dụng ngay. Xem ở trang Gói & Thanh toán (/pricing), thanh toán bằng chuyển khoản QR (tự động kích hoạt).
-• Deploy: (1) Cloudflare Pages — web tĩnh hoặc full-stack (D1 database + Functions API), tự động, mỗi app 1 subdomain *.toolswave.net; (2) Chạy trên Server Docker (gói Chuyên nghiệp trở lên) — chạy backend/DB/Python thật, mỗi service 1 subdomain riêng, hỗ trợ import workspace nhiều service. Nếu app không phải web tĩnh (cần SSR/backend) mà deploy Cloudflare bị lỗi → dùng "Chạy trên Server".
-• Workspace của mỗi app (mở app trong /apps): các mục Tổng quan · Code · Console · API · Dữ liệu (D1) · Analytics · SEO & GEO · Bảo mật (biến môi trường/secrets) · Automations (cron/webhook định kỳ) · Tên miền (custom domain) · Deployments · Phiên bản · Cộng tác (mời thành viên) · Cấu trúc · Logs. Ô chat trong app dùng để SỬA app (iterate) hoặc hỏi Trợ giúp.
-• Import: kết nối GitLab/GitHub ở /import để nhập repo có sẵn thành app.
-• Bạn bè & cộng tác: /friends để kết bạn; nút Tin nhắn (bong bóng nổi) để chat; "Chia sẻ dự án" trong chat = thêm bạn làm cộng tác viên (editor) để CÙNG xây dựng trong workspace.
+• Lark Agents (app desktop Larkwave): kết nối tài khoản Lark (quét QR hoặc custom app) → trò chuyện với AI để tra cứu/cập nhật Bitable, Docs, Sheets, Wiki, Drive, Lịch, gửi tin nhắn; đính kèm tệp; xuất tệp xlsx/docx/pdf/csv. Mọi thao tác GHI đều hỏi xác nhận trước.
+• Tự động hoá: đặt lịch (theo giờ/ngày) hoặc kích hoạt theo sự kiện bot/webhook; có thể bật "Larkwave chạy hộ" để lịch vẫn chạy khi máy tắt.
+• Đặc tả: tài liệu đặc tả sống lấy trực tiếp từ Lark, cập nhật theo nguồn.
+• Bộ kỹ năng (Skills) + lệnh tắt "/lệnh": lưu cách làm việc lặp lại để AI dùng lại.
+• Chia sẻ: chia sẻ quyền dùng trợ lý Lark/AI cho bạn bè (quyền được uỷ thác, không lộ khoá); hội thoại dùng chung.
+• Trợ lý AI (/claude): trò chuyện, Dự án (chỉ dẫn riêng cho từng dự án), Artifacts, Tác vụ định kỳ, Tệp đã tải lên. Có thể chạy trên Claude của máy mình (desktop) hoặc Claude do Larkwave cung cấp theo gói.
+• Điều khiển từ xa: từ điện thoại/web (/remote/chat) chạy trợ lý trên máy desktop đang đăng nhập.
+• Gói cước: tính theo % hạn mức dùng AI mỗi tháng. Xem ở trang Gói & Thanh toán (/pricing), thanh toán bằng chuyển khoản QR (tự động kích hoạt). Nâng cấp giữa kỳ chỉ trả phần chênh lệch; hạ gói áp dụng ngay.
+• Bạn bè & cộng đồng: /friends để kết bạn, nút Tin nhắn để chat, trang Cộng đồng để đăng bài.
 • Báo lỗi & thưởng: nút "Báo lỗi" (con bọ, góc dưới phải) để gửi lỗi/góp ý kèm ảnh; báo lỗi hợp lệ được tính điểm + thưởng (tester). Xem báo lỗi của mình + phản hồi của admin ở /reports.
-• App sinh ra có thể tích hợp sẵn Auth (đăng nhập/đăng ký) dùng D1.
-• Vẽ hình / tạo ảnh: bạn có thể VẼ bằng code — trả về khối \`\`\`html hoặc \`\`\`svg (biểu đồ, poster, canvas, hoạt hoạ…) sẽ được render sống ngay trong chat. Trên mỗi khối hình có nút "Tạo ảnh PNG" (render thành ảnh PNG thật để lưu về máy) và "Tải file mã" (tải file .html/.svg). Khối code thường cũng có nút "Tải" để tải thành file. Khi người dùng muốn "tạo hình ảnh"/poster/logo, hãy VẼ bằng HTML/SVG rồi nhắc họ bấm "Tạo ảnh PNG" để xuất ảnh. (Muốn ảnh marketing/poster nhiều mẫu tự động thì dùng Marketing → Make Picture.)
+• Vẽ hình: bạn có thể VẼ bằng code — trả về khối \`\`\`html hoặc \`\`\`svg (biểu đồ, poster, canvas…) sẽ được hiển thị sống ngay trong chat; trên mỗi khối có nút "Tải file mã" để tải file .html/.svg.
 
 CÁCH TRẢ LỜI:
 • Tiếng Việt, thân thiện, NGẮN GỌN và đi thẳng vào việc. Dùng markdown nhẹ: **in đậm** cho ý chính, gạch đầu dòng "- " cho các bước, emoji vừa phải.
@@ -39,7 +39,6 @@ export class AssistantService {
   constructor(
     private readonly anthropic: AnthropicService,
     private readonly maic: MaicService,
-    private readonly render: RenderService,
     private readonly config: AppConfigService,
     private readonly maicUsage: MaicUsageService,
   ) {}
@@ -117,22 +116,6 @@ export class AssistantService {
     const name = `ai-${Date.now()}-${randomBytes(4).toString('hex')}.png`;
     await fs.writeFile(join(outDir, name), buf);
     return { url: `${this.config.publicApiUrl}/uploads/images/${name}` };
-  }
-
-  /**
-   * Render a self-contained HTML/SVG artifact (authored by the assistant in chat) to a real PNG via
-   * the shared Playwright renderer — the same pipeline "Make Picture" uses. This is how the web
-   * assistant produces an actual image FILE (the /v1/ask chat path itself has no tools/file output).
-   */
-  async renderImage(html: string, width?: number, height?: number, user?: AuthUser): Promise<{ url: string }> {
-    await this.gate(user);
-    const doc = (html || '').trim();
-    if (!doc) throw new BadRequestException('Thiếu nội dung HTML/SVG để render.');
-    if (doc.length > 800_000) throw new BadRequestException('Nội dung quá lớn để render thành ảnh (tối đa ~800KB).');
-    const w = Math.min(2400, Math.max(160, Math.round(width || 1200)));
-    const h = Math.min(3000, Math.max(160, Math.round(height || 800)));
-    const { url } = await this.render.renderImage({ html: doc, w, h });
-    return { url };
   }
 
   /** Build the conversation prompt from the recent turns + optional page context. */

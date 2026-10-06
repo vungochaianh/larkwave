@@ -30,8 +30,7 @@ export class HealthController {
       checks: {
         database,
         anthropic: Boolean(this.config.env.ANTHROPIC_API_KEY),
-        cloudflare: Boolean(this.config.env.CF_API_TOKEN),
-        deployTarget: 'cloudflare-pages',
+        maic: Boolean(this.config.env.MAIC_URL && this.config.env.MAIC_TOKEN),
       },
     };
   }

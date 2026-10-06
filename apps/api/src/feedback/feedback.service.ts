@@ -15,7 +15,7 @@ import type {
 } from '@larkwave/shared';
 import { SEVERITY_POINTS } from '@larkwave/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { AnthropicService } from '../engine/anthropic.service';
+import { AnthropicService } from '../ai-keys/anthropic.service';
 import { MaicService } from '../maic/maic.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthUser } from '../common/auth-user';

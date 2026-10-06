@@ -24,7 +24,6 @@ import type {
   CreateRemoteTaskResponse,
   PublicAssistantInfo,
   PublicChatConv,
-  RemoteAppInfo,
   RemoteTask,
   TelegramBindingInfo,
   TelegramLinkResponse,
@@ -57,7 +56,6 @@ import {
   LarkQrDto,
   PostRemoteTaskEventDto,
   SetTelegramBotDto,
-  SyncAppsDto,
   UpdateTokenNotifyDto,
   MaicToolsDto,
 } from './agent.dto';
@@ -151,19 +149,6 @@ export class AgentController {
   @Get('devices')
   devices(@CurrentUser() user: AuthUser): Promise<AgentDevice[]> {
     return this.agent.listDevices(user.id);
-  }
-
-  /** DESKTOP pushes its local app list so the phone can list + send follow-ups. */
-  @Post('apps')
-  @HttpCode(200)
-  syncApps(@CurrentUser() user: AuthUser, @Body() dto: SyncAppsDto): Promise<{ ok: boolean; count: number }> {
-    return this.agent.syncApps(user.id, dto?.deviceName, dto?.apps);
-  }
-
-  /** PHONE lists the apps synced from the user's device(s). */
-  @Get('apps')
-  listApps(@CurrentUser() user: AuthUser): Promise<RemoteAppInfo[]> {
-    return this.agent.listRemoteApps(user.id);
   }
 
   /** (Re)generate the legacy single per-user webhook token (returned once). */

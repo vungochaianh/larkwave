@@ -2,24 +2,23 @@ import { Injectable } from '@nestjs/common';
 import type {
   BillingConfig,
   DiscountInfo,
-  ModelChoice,
   PlanCatalogEntry,
   PlanId,
   ResolvedBillingConfig,
 } from '@larkwave/shared';
-import { discountActive, discountedVnd, MODEL_COST, PLAN_IDS } from '@larkwave/shared';
+import { discountActive, discountedVnd, PLAN_IDS } from '@larkwave/shared';
 import { PlatformConfigService } from '../config/platform-config.service';
 import { PLANS, normalizePlanId } from './plans';
 
 /**
  * Runtime-editable billing accessor. MERGES the `billing` section stored in the
  * singleton `Setting.config` JSON over the hardcoded defaults from
- * `src/billing/plans.ts` (+ MODEL_COST). When the DB has no billing section the
+ * `src/billing/plans.ts`. When the DB has no billing section the
  * resolved values are identical to the compiled-in catalog, so behaviour is
- * unchanged until an admin edits prices/credits/model-cost from the CMS.
+ * unchanged until an admin edits prices/budgets from the CMS.
  *
- * label/features always come from `plans.ts`; only priceVnd/credits/maxLiveApps
- * (and model credit cost + vndPerUsd) are overridable.
+ * label/features always come from `plans.ts`; only priceVnd/credits/monthlyTokens
+ * (and vndPerUsd) are overridable.
  */
 @Injectable()
 export class BillingService {
@@ -49,17 +48,11 @@ export class BillingService {
           priceVnd: numOr(override.priceVnd, base.priceVnd),
           monthlyTokens: numOr(override.monthlyTokens, base.monthlyTokens),
           credits: numOr(override.credits, base.credits ?? 0),
-          maxLiveApps: numOr(override.maxLiveApps, base.maxLiveApps),
         };
         return acc;
       },
       {} as ResolvedBillingConfig['plans'],
     );
-
-    const modelCredits: Record<ModelChoice, number> = {
-      opus: numOr(billing?.modelCredits?.opus, MODEL_COST.opus),
-      sonnet: numOr(billing?.modelCredits?.sonnet, MODEL_COST.sonnet),
-    };
 
     // Free plan is usable unless explicitly disabled (default true).
     const freePlanEnabled = billing?.freePlanEnabled !== false;
@@ -71,7 +64,7 @@ export class BillingService {
       label: billing?.discount?.label ?? null,
     };
 
-    return { vndPerUsd, plans, modelCredits, freePlanEnabled, discount };
+    return { vndPerUsd, plans, freePlanEnabled, discount };
   }
 
   // ─── Convenience helpers (each does a single resolve) ───────────────────────
@@ -111,26 +104,13 @@ export class BillingService {
       : price;
   }
 
-  async getPlanMaxLiveApps(plan: string | null | undefined): Promise<number> {
-    return (await this.resolve()).plans[normalizePlanId(plan)].maxLiveApps;
-  }
-
-  async getModelCredits(model: ModelChoice): Promise<number> {
-    return (await this.resolve()).modelCredits[model] ?? MODEL_COST[model];
-  }
-
   /** Whether the free plan may be used (default true; admin-toggled). */
   async isFreePlanEnabled(): Promise<boolean> {
     return (await this.resolve()).freePlanEnabled;
   }
 
-  /** Per-build credit cost by model (resolved), for the subscription view. */
-  async getModelCost(): Promise<Record<ModelChoice, number>> {
-    return (await this.resolve()).modelCredits;
-  }
-
   /**
-   * The full plan catalog with priceVnd/credits/maxLiveApps from billing config,
+   * The full plan catalog with priceVnd/credits/monthlyTokens from billing config,
    * but label/features still from `plans.ts`. Ordered cheapest → most expensive.
    */
   async getCatalog(): Promise<PlanCatalogEntry[]> {
@@ -147,7 +127,6 @@ export class BillingService {
         discountedVnd:
           active && o.priceVnd > 0 ? discountedVnd(o.priceVnd, resolved.discount.percent) : null,
         monthlyTokens: o.monthlyTokens,
-        maxLiveApps: o.maxLiveApps,
         // Dung lượng lấy thẳng từ plans.ts: đây là hằng số sản phẩm, không nằm trong phần cấu
         // hình giá chỉnh được lúc chạy (resolved.plans) như priceVnd/monthlyTokens.
         storageMb: base.storageMb,
@@ -168,7 +147,6 @@ export class BillingService {
       storageMb: base.storageMb,
       priceVnd: o.priceVnd,
       monthlyTokens: o.monthlyTokens,
-      maxLiveApps: o.maxLiveApps,
     };
   }
 
@@ -181,7 +159,7 @@ export class BillingService {
 
   /**
    * Persist a billing override into the singleton config. Stores only the
-   * supplied { vndPerUsd, plans, modelCredits }; the rest of PlatformConfig is
+   * supplied { vndPerUsd, plans, freePlanEnabled, discount }; the rest of PlatformConfig is
    * preserved. Returns the effective (merged) values.
    */
   async save(input: BillingConfig): Promise<ResolvedBillingConfig> {
@@ -192,10 +170,6 @@ export class BillingService {
           ? input.vndPerUsd
           : (current.billing?.vndPerUsd ?? BillingService.DEFAULT_VND_PER_USD),
       plans: { ...(current.billing?.plans ?? {}), ...(input.plans ?? {}) },
-      modelCredits: {
-        ...(current.billing?.modelCredits ?? {}),
-        ...(input.modelCredits ?? {}),
-      },
       freePlanEnabled:
         typeof input.freePlanEnabled === 'boolean'
           ? input.freePlanEnabled

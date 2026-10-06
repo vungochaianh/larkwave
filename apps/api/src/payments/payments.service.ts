@@ -18,6 +18,8 @@ import { PLANS, STORAGE_ADDON, normalizePlanId, planRank, resolvePlan } from '..
 import { computeUpgradeAmount } from '../billing/proration';
 import { BillingService } from '../billing/billing.service';
 import { CreatePaymentDto, SepayWebhookBody } from './payments.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { REFERRER_BONUS, rewardReferrerOnce } from '../common/identity';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -32,6 +34,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private readonly config: AppConfigService,
     private readonly billing: BillingService,
     private readonly maicAdmin: MaicAdminService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   onModuleInit(): void {
@@ -548,6 +551,19 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     // Gói vừa đổi → đẩy trần mới sang MAIC. Không await và nuốt lỗi: MAIC sập
     // không được phép làm hỏng một giao dịch đã thu tiền.
     if (settled && !grantSkipped) void this.maicAdmin.syncUser(payment.userId);
+    if (settled && !grantSkipped && payment.kind !== 'storage') {
+      // Người được giới thiệu vừa trả gói đầu tiên → thưởng người giới thiệu (một lần).
+      void rewardReferrerOnce(this.prisma, payment.userId).then((referrerId) => {
+        if (!referrerId) return;
+        void this.notifications.notify(
+          referrerId,
+          'system',
+          'Bạn nhận credit giới thiệu 🎉',
+          `+${REFERRER_BONUS} credit vì người bạn giới thiệu vừa kích hoạt gói trả phí.`,
+          '/',
+        );
+      });
+    }
     if (settled && grantSkipped) {
       // Money received but no plan grant applied — surface for manual reconciliation.
       await this.audit

@@ -1,12 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  AdminReport,
-  ModelChoice,
-  ModelCostBucket,
-  PlanId,
-  ReportPeriod,
-} from '@larkwave/shared';
-import { MODEL_CHOICES, PLAN_IDS } from '@larkwave/shared';
+import type { AdminReport, PlanId, ReportPeriod, UsageCostBucket } from '@larkwave/shared';
+import { PLAN_IDS } from '@larkwave/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { normalizePlanId } from '../billing/plans';
@@ -37,19 +31,20 @@ export class ReportsService {
     return start;
   }
 
-  /** `GET /v1/admin/reports` — profit / cost / revenue dashboard. */
+  /** `GET /v1/admin/reports` — profit / cost / revenue dashboard. AI cost = the metered
+   *  MAIC usage (help assistant, hosted Trợ lý AI runs, hosted Lark turns). */
   async report(period: ReportPeriod): Promise<AdminReport> {
     const start = this.periodStart(period);
-    const buildWhere = start ? { createdAt: { gte: start } } : {};
+    const usageWhere = start ? { createdAt: { gte: start } } : {};
     const paymentWhere = start
       ? { status: 'paid', paidAt: { gte: start } }
       : { status: 'paid' };
 
-    const [builds, payments, vndPerUsd, usersByPlanRaw, totalUsers] =
+    const [usages, payments, vndPerUsd, usersByPlanRaw, totalUsers] =
       await Promise.all([
-        this.prisma.build.findMany({
-          where: buildWhere,
-          select: { model: true, usage: true, status: true, createdAt: true },
+        this.prisma.maicUsage.findMany({
+          where: usageWhere,
+          select: { kind: true, costUsd: true, tokens: true, createdAt: true },
         }),
         this.prisma.payment.findMany({
           where: paymentWhere,
@@ -60,21 +55,11 @@ export class ReportsService {
         this.prisma.user.count(),
       ]);
 
-    // ── API cost (sum Build.usage, guard nulls) + per-model breakdown ──────────
-    const byModel = MODEL_CHOICES.reduce(
-      (acc, m) => {
-        acc[m] = { builds: 0, usd: 0, inputTokens: 0, outputTokens: 0 };
-        return acc;
-      },
-      {} as Record<ModelChoice, ModelCostBucket>,
-    );
-
+    // ── AI cost (sum MaicUsage) + per-kind breakdown ──────────────────────────
+    const byKind: Record<string, UsageCostBucket> = {};
     let totalUsd = 0;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let usageBuilds = 0;
+    let tokens = 0;
 
-    const buildCounts = { total: 0, succeeded: 0, failed: 0, canceled: 0 };
     // Daily series: date -> { apiCostUsd } (revenue filled below).
     const seriesMap = new Map<string, { revenueVnd: number; apiCostUsd: number }>();
     const bumpSeries = (date: string): { revenueVnd: number; apiCostUsd: number } => {
@@ -86,29 +71,18 @@ export class ReportsService {
       return cell;
     };
 
-    for (const b of builds) {
-      buildCounts.total += 1;
-      if (b.status === 'succeeded') buildCounts.succeeded += 1;
-      else if (b.status === 'failed') buildCounts.failed += 1;
-      else if (b.status === 'canceled') buildCounts.canceled += 1;
-
-      const usage = parseUsage(b.usage);
-      if (usage) {
-        const model: ModelChoice = b.model === 'sonnet' ? 'sonnet' : 'opus';
-        totalUsd += usage.usd;
-        inputTokens += usage.inputTokens;
-        outputTokens += usage.outputTokens;
-        usageBuilds += 1;
-
-        const bucket = byModel[model];
-        bucket.builds += 1;
-        bucket.usd += usage.usd;
-        bucket.inputTokens += usage.inputTokens;
-        bucket.outputTokens += usage.outputTokens;
-
-        bumpSeries(this.dayKey(b.createdAt)).apiCostUsd += usage.usd;
-      }
+    for (const u of usages) {
+      const usd = num(u.costUsd);
+      const t = num(u.tokens);
+      totalUsd += usd;
+      tokens += t;
+      const bucket = (byKind[u.kind] ??= { runs: 0, usd: 0, tokens: 0 });
+      bucket.runs += 1;
+      bucket.usd += usd;
+      bucket.tokens += t;
+      bumpSeries(this.dayKey(u.createdAt)).apiCostUsd += usd;
     }
+    for (const k of Object.keys(byKind)) byKind[k].usd = round4(byKind[k].usd);
 
     // ── Revenue (paid payments) + per-plan breakdown ──────────────────────────
     const revenueByPlan = PAID_PLAN_IDS.reduce(
@@ -163,17 +137,8 @@ export class ReportsService {
 
     return {
       period,
-      apiCost: {
-        totalUsd: round4(totalUsd),
-        inputTokens,
-        outputTokens,
-        builds: usageBuilds,
-      },
-      byModel: roundByModel(byModel),
-      builds: {
-        ...buildCounts,
-        successRate: buildCounts.total > 0 ? buildCounts.succeeded / buildCounts.total : 0,
-      },
+      apiCost: { totalUsd: round4(totalUsd), tokens, runs: usages.length },
+      byKind,
       revenue: { paidCount, totalVnd: round0(totalVnd), byPlan: revenueByPlan },
       profit: {
         revenueVnd: round0(totalVnd),
@@ -189,19 +154,6 @@ export class ReportsService {
   }
 }
 
-/** Parse a Build.usage JSON blob into a TokenUsage, guarding nulls/garbage. */
-function parseUsage(
-  raw: unknown,
-): { inputTokens: number; outputTokens: number; usd: number } | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const u = raw as Record<string, unknown>;
-  const usd = num(u.usd);
-  const inputTokens = num(u.inputTokens);
-  const outputTokens = num(u.outputTokens);
-  if (usd === 0 && inputTokens === 0 && outputTokens === 0) return null;
-  return { inputTokens, outputTokens, usd };
-}
-
 function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
@@ -213,10 +165,4 @@ function round2(n: number): number {
 }
 function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
-}
-function roundByModel(
-  byModel: Record<ModelChoice, ModelCostBucket>,
-): Record<ModelChoice, ModelCostBucket> {
-  for (const m of MODEL_CHOICES) byModel[m].usd = round4(byModel[m].usd);
-  return byModel;
 }

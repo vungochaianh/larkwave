@@ -14,8 +14,7 @@ const UNMETERED_SURFACES = [
 ];
 
 /**
- * Aggregates hosted-Claude (MAIC) usage for the admin console — the spend the profit report
- * (codegen builds only) never covered. Reads the `MaicUsage` table (kind `ask` = hosted Trợ lý AI
+ * Aggregates hosted-Claude (MAIC) usage for the admin console. Reads the `MaicUsage` table (kind `ask` = hosted Trợ lý AI
  * chat incl. the /claude workspace + desktop; kind `scheduled` = scheduled tasks) and reports live
  * gateway health from `GET /v1/usage`.
  */

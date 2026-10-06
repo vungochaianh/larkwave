@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
 import { ensureIdentity } from '../common/identity';
-import { GitProvidersService, GitProvider } from '../engine/git-providers.service';
+import { OAuthProvidersService, OAuthProvider } from './oauth-providers.service';
 import { toUser } from '../common/mappers';
 import { parseDurationToSeconds } from '../common/duration';
 import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto';
@@ -84,7 +84,7 @@ export class AuthService {
     private readonly config: AppConfigService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
-    private readonly gitProviders: GitProvidersService,
+    private readonly gitProviders: OAuthProvidersService,
   ) {}
 
   async register(dto: RegisterDto, device?: DeviceCtx): Promise<AuthResponse> {
@@ -573,15 +573,15 @@ export class AuthService {
     return token;
   }
 
-  // ── GitLab / GitHub OAuth (connect or login) ────────────────────────────────
+  // ── GitLab / GitHub OAuth (login, or connect to the current account) ────────────────────────────────
 
   /** Whether a git provider's OAuth is configured (drives /auth/config + 503). */
-  gitProviderEnabled(provider: GitProvider): boolean {
+  gitProviderEnabled(provider: OAuthProvider): boolean {
     return this.gitProviders.isEnabled(provider);
   }
 
   /** Build the GitLab/GitHub consent URL to 302-redirect the user to. */
-  buildGitConsentUrl(provider: GitProvider, state: string): string {
+  buildGitConsentUrl(provider: OAuthProvider, state: string): string {
     return this.gitProviders.buildConsentUrl(provider, state);
   }
 
@@ -606,11 +606,11 @@ export class AuthService {
    * Complete a git-provider OAuth flow: exchange `code` for the user's access
    * token, fetch their provider profile, resolve the target user (the linked
    * current user when `linkUserId` is set, else find-or-create by email), store
-   * the provider token + username on that user, and issue the Larkwave JWT.
+   * the provider username on that user, and issue the Larkwave JWT.
    * Returns the JWT. Throws on failure (controller -> /login?error=<provider>).
    */
   async gitOAuthLogin(
-    provider: GitProvider,
+    provider: OAuthProvider,
     code: string,
     linkUserId: string | null,
     device?: DeviceCtx,
@@ -618,7 +618,6 @@ export class AuthService {
     const tok = await this.gitProviders.exchangeCode(provider, code);
     const profile = await this.gitProviders.fetchProfile(provider, tok.accessToken);
 
-    const tokenField = provider === 'gitlab' ? 'gitlabToken' : 'githubToken';
     const userField = provider === 'gitlab' ? 'gitlabUsername' : 'githubUsername';
 
     let user: PUser | null = null;
@@ -656,18 +655,11 @@ export class AuthService {
 
     if (user.status === 'suspended') throw new ForbiddenException('Tài khoản đã bị khoá');
 
-    // Store the provider token + username on the resolved user (never logged).
-    // For GitLab also persist the refresh token + expiry so the connection
-    // auto-renews instead of forcing a re-authorize every couple of hours.
+    // Remember the provider username for display. The provider token itself is NOT stored —
+    // it was only needed to read the profile above.
     user = await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        [tokenField]: tok.accessToken,
-        [userField]: profile.username || null,
-        ...(provider === 'gitlab'
-          ? { gitlabRefreshToken: tok.refreshToken, gitlabTokenExpiresAt: tok.expiresAt }
-          : {}),
-      },
+      data: { [userField]: profile.username || null },
     });
 
     await this.audit.log(user.id, user.email, `auth.${provider}_connect`, user.id, {

@@ -9,8 +9,8 @@ import { AppConfigService } from './config/app-config.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // Raise the body limit — an edit/redeploy POSTs the whole project file set
-  // ({path,content}[]), well over the 100 KB default. Use Nest's built-in
+  // Raise the body limit — chat-index/body syncs and Lark backups POST large JSON
+  // well over the 100 KB default. Use Nest's built-in
   // configurator (no direct 'express' import — that module isn't a direct dep
   // under pnpm's isolated node_modules and crashes the app at runtime).
   app.useBodyParser('json', { limit: '16mb' });

@@ -63,42 +63,44 @@ export class UsersService {
     actor: AuthUser,
     id: string,
   ): Promise<{
-    apps: number;
-    builds: number;
-    failedBuilds: number;
-    succeededBuilds: number;
-    deployments: number;
+    aiRuns: number;
+    remoteTasks: number;
+    failedRemoteTasks: number;
     payments: number;
     feedback: number;
     lastActivityAt: string | null;
   }> {
     const target = await this.prisma.user.findUnique({ where: { id }, select: { id: true, email: true } });
     if (!target) throw new NotFoundException('Không tìm thấy người dùng');
-    const [apps, builds, failedBuilds, succeededBuilds, deployments, payments, feedback, lastBuild] =
+    const [aiRuns, remoteTasks, failedRemoteTasks, payments, feedback, lastRun, lastTask] =
       await Promise.all([
-        this.prisma.app.count({ where: { ownerId: id } }),
-        this.prisma.build.count({ where: { ownerId: id } }),
-        this.prisma.build.count({ where: { ownerId: id, status: 'failed' } }),
-        this.prisma.build.count({ where: { ownerId: id, status: 'succeeded' } }),
-        this.prisma.deployment.count({ where: { app: { ownerId: id } } }),
+        this.prisma.maicUsage.count({ where: { userId: id } }),
+        this.prisma.remoteTask.count({ where: { userId: id } }),
+        this.prisma.remoteTask.count({ where: { userId: id, status: 'error' } }),
         this.prisma.payment.count({ where: { userId: id } }),
         this.prisma.feedback.count({ where: { userId: id } }),
-        this.prisma.build.findFirst({
-          where: { ownerId: id },
+        this.prisma.maicUsage.findFirst({
+          where: { userId: id },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.remoteTask.findFirst({
+          where: { userId: id },
           orderBy: { createdAt: 'desc' },
           select: { createdAt: true },
         }),
       ]);
     await this.audit.log(actor.id, actor.email, 'user.support.view', id, { targetEmail: target.email });
+    const last = [lastRun?.createdAt, lastTask?.createdAt]
+      .filter((d): d is Date => !!d)
+      .sort((x, y) => y.getTime() - x.getTime())[0];
     return {
-      apps,
-      builds,
-      failedBuilds,
-      succeededBuilds,
-      deployments,
+      aiRuns,
+      remoteTasks,
+      failedRemoteTasks,
       payments,
       feedback,
-      lastActivityAt: lastBuild?.createdAt.toISOString() ?? null,
+      lastActivityAt: last?.toISOString() ?? null,
     };
   }
 
@@ -120,7 +122,6 @@ export class UsersService {
         orderBy: { createdAt: 'desc' },
         skip: q.skip,
         take: q.pageSize,
-        include: { _count: { select: { apps: true } } },
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -130,7 +131,6 @@ export class UsersService {
   async get(id: string): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { _count: { select: { apps: true } } },
     });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
     return toUser(user);
@@ -214,12 +214,9 @@ export class UsersService {
         ...(resetQuota ? { quotaUsed: 0 } : {}),
         quotaResetAt: this.cycleEnd(now, months),
         // Monotonic window key (see PaymentsService.settle): bumping it stops a
-        // refund for a build charged BEFORE this grant from matching the new window.
+        // refund for usage charged BEFORE this grant from matching the new window.
         quotaWindowAt: now,
       },
-      // Same include as `list()` so the response is the exact shape GET /v1/users
-      // returns (incl. appsCount) and the admin table row can be swapped in place.
-      include: { _count: { select: { apps: true } } },
     });
     await this.audit.log(actor.id, actor.email, 'user.plan_grant', id, {
       email: target.email,

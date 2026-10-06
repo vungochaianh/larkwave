@@ -3,7 +3,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthUser } from '../common/auth-user';
 import { StorageService, type StorageCategory, type StorageItem, type StorageUsage } from './storage.service';
 
-const CATEGORIES: StorageCategory[] = ['apps', 'uploads', 'video', 'image', 'chat'];
+const CATEGORIES: StorageCategory[] = ['uploads', 'chat'];
 
 /** Trang "Dung lượng lưu trữ" — xem đang chiếm bao nhiêu, ở đâu, và tự dọn. */
 @Controller('storage')

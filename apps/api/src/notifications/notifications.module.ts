@@ -4,7 +4,7 @@ import { NotificationsService } from './notifications.service';
 
 /**
  * In-app realtime notifications. @Global so SocialService / FeedbackService /
- * PipelineService can inject NotificationsService to emit on relevant events.
+ * PaymentsService can inject NotificationsService to emit on relevant events.
  */
 @Global()
 @Module({

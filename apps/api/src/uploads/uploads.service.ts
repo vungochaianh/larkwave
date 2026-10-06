@@ -70,18 +70,14 @@ export const RETENTION_DAYS = 30;
 const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 /**
- * Chỉ tệp đính kèm trong TRÒ CHUYỆN và khi TẠO APP mới bị dọn theo hạn.
- *
- * 'build' được thêm sau: tệp gửi kèm lúc tạo app là những tệp NẶNG NHẤT người dùng tải lên, mà
- * lại chưa gắn nhãn nào nên hạn 30 ngày không bao giờ chạm tới — đúng ngược với ý định.
+ * Chỉ tệp đính kèm trong TRÒ CHUYỆN mới bị dọn theo hạn.
  *
  * Cùng một bảng Upload còn giữ ảnh chụp màn hình báo lỗi (quản trị viên đọc lại sau nhiều
- * tháng), ảnh nguồn cho marketing, và tệp tham chiếu khi tạo app. Một luật "quá 30 ngày là
- * xoá" áp cho cả bảng sẽ âm thầm phá hết những thứ đó. Dòng chưa gắn nhãn (null) nằm ở phía
- * GIỮ LẠI — đoán sai theo hướng giữ thì chỉ tốn dung lượng, đoán sai theo hướng xoá thì mất
- * dữ liệu của người khác.
+ * tháng). Một luật "quá 30 ngày là xoá" áp cho cả bảng sẽ âm thầm phá những thứ đó. Dòng chưa
+ * gắn nhãn (null) nằm ở phía GIỮ LẠI — đoán sai theo hướng giữ thì chỉ tốn dung lượng, đoán sai
+ * theo hướng xoá thì mất dữ liệu của người khác.
  */
-export const PURGEABLE_PURPOSES = ['chat', 'build'] as const;
+export const PURGEABLE_PURPOSES = ['chat'] as const;
 
 const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 // Text-like files whose content we extract and feed to the model as context.
@@ -387,7 +383,7 @@ export class UploadsService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Resolve attachment ids the user owns into model-ready context:
-   * concatenated text + base64 images + base64 PDF documents. Used by the pipeline.
+   * concatenated text + base64 images + base64 PDF documents. Used by the hosted AI chat.
    */
   async resolveForPrompt(
     ownerId: string,

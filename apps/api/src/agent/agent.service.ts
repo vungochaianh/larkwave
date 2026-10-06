@@ -33,7 +33,6 @@ import type {
   RemoteTask,
   RemoteTaskEventItem,
   RemoteTaskStatus,
-  RemoteAppInfo,
   RemoteTaskStreamEvent,
   RunnerId,
   TelegramBindingInfo,
@@ -214,7 +213,7 @@ function attachExt(mime: string, name: string): string {
  * Pull the assistant's visible text out of an agentic run's event stream.
  *
  * `MaicRunResult` carries only files, so a chat turn has to read its answer from the `assistant`
- * events — the same shape the codegen progress logger already consumes. Tool-use blocks are
+ * events — the same shape the chat progress logger consumes. Tool-use blocks are
  * skipped on purpose: surfacing them is exactly the bug being fixed here, where a raw
  * `{"name":"Bash", …}` JSON blob was shown to the user as if it were the reply.
  */
@@ -415,7 +414,6 @@ export class AgentService {
       model: row.model,
       prompt: row.prompt,
       status: row.status as RemoteTaskStatus,
-      appId: row.appId,
       result: row.result,
       error: row.error,
       createdAt: row.createdAt.toISOString(),
@@ -616,7 +614,6 @@ export class AgentService {
         model: dto.model ?? null,
         prompt: dto.prompt,
         status: 'queued',
-        appId: dto.appId ?? null,
         source: ctx.source ?? 'phone',
         notifyLarkWebhookUrl: ctx.notifyLarkWebhookUrl ?? null,
         notifyTelegramChatId: ctx.notifyTelegramChatId ?? null,
@@ -685,7 +682,6 @@ export class AgentService {
         update.finishedAt = now;
       }
     } else if (dto.kind === 'result') {
-      update.appId = (dto.payload.appId as string | undefined) ?? task.appId;
       update.result =
         typeof dto.payload.result === 'string' ? dto.payload.result : task.result;
       if (!isTerminal(task.status)) {
@@ -707,7 +703,6 @@ export class AgentService {
       taskId,
       status: updated.status as RemoteTaskStatus,
       event: this.toEventItem(event),
-      appId: updated.appId,
       result: updated.result,
       error: updated.error,
     };
@@ -742,7 +737,7 @@ export class AgentService {
     const head = ok ? 'Xong' : task.status === 'canceled' ? 'Đã huỷ' : 'Lỗi';
     const promptLine = task.prompt.length > 160 ? `${task.prompt.slice(0, 160)}…` : task.prompt;
     const body = ok
-      ? (task.result || (task.appId ? `Đã tạo app: ${task.appId}` : 'Hoàn tất.'))
+      ? task.result || 'Hoàn tất.'
       : task.error || 'Thất bại.';
     const bodyLine = body.length > 800 ? `${body.slice(0, 800)}…` : body;
     const text = `${icon} ${head} — ${promptLine}\n\n${bodyLine}`;
@@ -864,66 +859,6 @@ export class AgentService {
       lastSeenAt: d.lastSeenAt.toISOString(),
       createdAt: d.createdAt.toISOString(),
     }));
-  }
-
-  // ── device app-list sync (phone lists desktop apps + sends follow-ups) ───────
-
-  /** `POST /v1/agent/apps` (desktop) — store this device's local app list. Resolves the
-   *  device by name (the same identity the SSE stream registers), else the newest device. */
-  async syncApps(
-    userId: string,
-    deviceName: string | undefined,
-    apps: { id?: string; name?: string; status?: string; url?: string; updatedAt?: string }[] | undefined,
-  ): Promise<{ ok: boolean; count: number }> {
-    // Drop entries without an id up front (they can't be listed anyway) so `count` is honest.
-    const list = (Array.isArray(apps) ? apps : []).filter((a) => a && a.id).slice(0, 200);
-    let device = deviceName
-      ? await this.prisma.agentDevice.findFirst({ where: { userId, name: deviceName } })
-      : await this.prisma.agentDevice.findFirst({ where: { userId }, orderBy: { lastSeenAt: 'desc' } });
-    // Create the device on first sync if it doesn't exist yet (e.g. the user pushed the app
-    // list before ever connecting the remote-control stream) — so syncing NEVER dead-ends
-    // (a no-op with HTTP 200 used to make the desktop falsely report "đã đồng bộ").
-    if (!device) {
-      device = await this.prisma.agentDevice.create({
-        data: { userId, name: deviceName || 'Máy của tôi', platform: '', lastSeenAt: new Date(0) },
-      });
-    }
-    await this.prisma.agentDevice.update({
-      where: { id: device.id },
-      data: { appsJson: JSON.stringify(list), appsSyncedAt: new Date() },
-    });
-    return { ok: true, count: list.length };
-  }
-
-  /** `GET /v1/agent/apps` (phone) — the user's synced apps across devices (newest device
-   *  first), each tagged with the device so a follow-up task targets the right machine. */
-  async listRemoteApps(userId: string): Promise<RemoteAppInfo[]> {
-    const devices = await this.prisma.agentDevice.findMany({
-      where: { userId, appsJson: { not: null } },
-      orderBy: { lastSeenAt: 'desc' },
-    });
-    const out: RemoteAppInfo[] = [];
-    for (const d of devices) {
-      let apps: { id: string; name: string; status?: string; url?: string; updatedAt?: string }[] = [];
-      try {
-        apps = JSON.parse(d.appsJson || '[]');
-      } catch {
-        apps = [];
-      }
-      for (const a of apps) {
-        if (!a?.id) continue;
-        out.push({
-          id: a.id,
-          name: a.name || a.id,
-          status: a.status || 'ready',
-          url: a.url,
-          updatedAt: a.updatedAt,
-          deviceId: d.id,
-          deviceName: d.name,
-        });
-      }
-    }
-    return out;
   }
 
   // ── webhook token ──────────────────────────────────────────────────────────
@@ -1578,7 +1513,7 @@ export class AgentService {
    * told to "read the attached contract" found nothing, tried to shell out, and its raw
    * `{"name":"Bash", …}` tool JSON was rendered to the user as the answer.
    *
-   * `returnFiles: 'none'` — this is a conversation, not codegen; we want the reply, not a diff.
+   * `returnFiles: 'none'` — this is a conversation; we want the reply, not a diff.
    */
   private async runMaicChatWithFiles(
     userId: string,
@@ -1685,9 +1620,8 @@ export class AgentService {
         // 'acceptEdits' CHẶN mọi lệnh chạy, nên trợ lý không thể tạo ra tệp: nó đọc được ảnh rồi
         // báo "mọi lệnh Python đều bị chặn và cần phê duyệt thủ công". Đó cũng là lý do những lần
         // nó thử `ls`/`find` bị chặn giữa chừng và phần lệnh dở dang rò ra chat.
-        // Mọi lượt chạy agent khác trong hệ thống (codegen, deploy máy chủ) và cả mặc định của
-        // MAIC đều là 'bypassPermissions'; workspace là thư mục tạm riêng cho từng lượt chạy, nên
-        // đây không mở rộng phạm vi rủi ro so với thứ sản phẩm vốn đã làm.
+        // Mặc định của MAIC là 'bypassPermissions'; workspace là thư mục tạm riêng cho từng lượt
+        // chạy, nên đây không mở rộng phạm vi rủi ro.
         permissionMode: 'bypassPermissions',
         // Tạo một tệp .xlsx/.pdf tốn hơn hẳn một câu trả lời chữ.
         timeoutSec: 900,

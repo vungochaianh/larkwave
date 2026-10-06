@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { slugify } from '@larkwave/shared';
 import type { PrismaClient } from '@prisma/client';
 
-/** New referred user gets this many bonus credits at signup (so they can build). */
+/** New referred user gets this many bonus credits at signup. */
 export const SIGNUP_REF_BONUS = 5;
-/** Referrer gets this when the referred user's FIRST build succeeds (anti-abuse). */
+/** Referrer gets this when the referred user's FIRST paid plan settles (anti-abuse). */
 export const REFERRER_BONUS = 5;
 
 async function uniqueHandle(
@@ -48,8 +48,8 @@ export async function ensureIdentity(prisma: PrismaClient, userId: string): Prom
 }
 
 /**
- * Resolve a `ref` token (a referralCode OR a userId — the deployed-app badge uses
- * the owner id) to the referrer's user id. Returns null for unknown / self-refer.
+ * Resolve a `ref` token (a referralCode OR a userId)
+ * to the referrer's user id. Returns null for unknown / self-refer.
  */
 export async function resolveReferrer(
   prisma: PrismaClient,
@@ -68,8 +68,8 @@ export async function resolveReferrer(
 
 /**
  * Apply a referral at signup: link the new user to the referrer and grant the new
- * user a starter bonus so they can build immediately. The referrer's reward is
- * deferred to the new user's first successful build (see pipeline). Best-effort.
+ * user a starter bonus. The referrer's reward is deferred to the new user's first
+ * paid plan (see `rewardReferrerOnce`, called from PaymentsService.settle). Best-effort.
  */
 export async function applySignupReferral(
   prisma: PrismaClient,
@@ -84,4 +84,35 @@ export async function applySignupReferral(
       data: { referredById: referrerId, bonusCredits: { increment: SIGNUP_REF_BONUS } },
     })
     .catch(() => undefined);
+}
+
+/**
+ * Referral reward: when a REFERRED user's first paid plan settles, grant the referrer
+ * bonus credits — once (an atomic flag claim prevents a double grant). Returns the
+ * referrer id when a reward was granted (so the caller can notify), else null.
+ * Best-effort; never throws.
+ */
+export async function rewardReferrerOnce(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<string | null> {
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { referredById: true, referralRewarded: true },
+    });
+    if (!u?.referredById || u.referralRewarded) return null;
+    const claim = await prisma.user.updateMany({
+      where: { id: userId, referralRewarded: false },
+      data: { referralRewarded: true },
+    });
+    if (claim.count !== 1) return null; // someone else already claimed
+    await prisma.user.update({
+      where: { id: u.referredById },
+      data: { bonusCredits: { increment: REFERRER_BONUS } },
+    });
+    return u.referredById;
+  } catch {
+    return null;
+  }
 }

@@ -7,7 +7,7 @@
  *
  * `interrupted` là kết cục — nhưng là kết cục TẠM THỜI: MAIC ghi trạng thái này khi tiến trình
  * maic-api khởi động lại giữa lượt chạy (đo ngày 23/09/2026: ba lần tạo lại container trong hai
- * ngày). Phần “thử lại được” do `loiTamThoi` ở pipeline trả lời, không phải chỗ này.
+ * ngày). Phần “thử lại được” do người gọi quyết định, không phải chỗ này.
  */
 const KET_CUC = new Set([
   'succeeded',

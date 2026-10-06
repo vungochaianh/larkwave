@@ -12,8 +12,6 @@ import {
   MeOverview,
   MeSubscription,
   PlanId,
-  PublicApp,
-  Track,
   UpgradeQuote,
   User,
   usagePercent,
@@ -70,36 +68,27 @@ export class MeService {
     });
     if (!account) throw new NotFoundException('Không tìm thấy người dùng');
 
-    const [
-      totalApps,
-      liveApps,
-      totalBuilds,
-      succeededBuilds,
-      failedBuilds,
-      totalDeployments,
-      visitsAgg,
-    ] = await Promise.all([
-      this.prisma.app.count({ where: { ownerId } }),
-      this.prisma.app.count({ where: { ownerId, status: 'live' } }),
-      this.prisma.build.count({ where: { ownerId } }),
-      this.prisma.build.count({ where: { ownerId, status: 'succeeded' } }),
-      this.prisma.build.count({ where: { ownerId, status: 'failed' } }),
-      this.prisma.deployment.count({ where: { app: { ownerId } } }),
-      this.prisma.app.aggregate({ where: { ownerId }, _sum: { visits: true } }),
+    const [aiRuns, remoteTasks, artifacts, skills, scheduledTasks, reports] = await Promise.all([
+      this.prisma.maicUsage.count({ where: { userId: ownerId } }),
+      this.prisma.remoteTask.count({ where: { userId: ownerId } }),
+      this.prisma.artifact.count({ where: { userId: ownerId } }),
+      this.prisma.skill.count({ where: { userId: ownerId } }),
+      this.prisma.scheduledTask.count({ where: { userId: ownerId } }),
+      this.prisma.feedback.count({ where: { userId: ownerId } }),
     ]);
 
     return {
-      totalApps,
-      liveApps,
-      totalBuilds,
-      succeededBuilds,
-      failedBuilds,
-      totalDeployments,
-      totalVisits: visitsAgg._sum.visits ?? 0,
+      aiRuns,
+      remoteTasks,
+      artifacts,
+      skills,
+      scheduledTasks,
+      reports,
       joinedAt: account.createdAt.toISOString(),
     };
   }
 
+  /** Contribution graph: one count per day of AI activity (hosted AI runs + desktop remote tasks). */
   async activity(user: AuthUser, days: number): Promise<MeActivity> {
     const ownerId = user.id;
 
@@ -108,14 +97,20 @@ export class MeService {
     const start = new Date(`${todayKey}T00:00:00.000Z`);
     start.setUTCDate(start.getUTCDate() - (days - 1));
 
-    const builds = await this.prisma.build.findMany({
-      where: { ownerId, createdAt: { gte: start } },
-      select: { createdAt: true },
-    });
+    const [runs, tasks] = await Promise.all([
+      this.prisma.maicUsage.findMany({
+        where: { userId: ownerId, createdAt: { gte: start } },
+        select: { createdAt: true },
+      }),
+      this.prisma.remoteTask.findMany({
+        where: { userId: ownerId, createdAt: { gte: start } },
+        select: { createdAt: true },
+      }),
+    ]);
 
-    // Bucket build counts by UTC calendar day.
+    // Bucket counts by UTC calendar day.
     const counts = new Map<string, number>();
-    for (const b of builds) {
+    for (const b of [...runs, ...tasks]) {
       const key = this.dayKey(b.createdAt);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -165,7 +160,7 @@ export class MeService {
 
     const unlimited = user.role === 'admin';
 
-    // monthlyTokens/price/maxLiveApps come from the runtime-editable billing config
+    // monthlyTokens/price come from the runtime-editable billing config
     // (merged over plans.ts defaults); label/features stay from plans.ts.
     const plan = await this.billing.getPlan(account.plan);
     const [catalog, freePlanEnabled, discount] = await Promise.all([
@@ -175,7 +170,7 @@ export class MeService {
     ]);
 
     // Reflect a rolled-over window as 0 used, without persisting (the lazy reset
-    // happens on the next build's metering). `quotaUsed` holds TOKENS used this month.
+    // happens on the next metered run). `quotaUsed` holds TOKENS used this month.
     const expired =
       !account.quotaResetAt || account.quotaResetAt.getTime() <= Date.now();
     const tokensLimit = plan.monthlyTokens;
@@ -186,10 +181,6 @@ export class MeService {
         : account.quotaUsed;
     // Không giới hạn thì phần trăm vô nghĩa (không có mẫu số) — nhưng SỐ ĐÃ DÙNG ở trên vẫn thật.
     const percentUsed = unlimited ? 0 : usagePercent(tokensUsed, tokensLimit);
-
-    const liveApps = await this.prisma.app.count({
-      where: { ownerId: user.id, status: 'live' },
-    });
 
     // Prorated upgrade quotes (mirror PaymentsService.create) so /pricing shows the
     // reduced cost to move up mid-cycle. Only while on an active PAID plan.
@@ -221,8 +212,6 @@ export class MeService {
       tokensUsed,
       tokensLimit,
       resetAt: account.quotaResetAt ? account.quotaResetAt.toISOString() : null,
-      liveApps,
-      maxLiveApps: plan.maxLiveApps,
       unlimited,
       freePlanEnabled,
       discount,
@@ -234,10 +223,9 @@ export class MeService {
   /**
    * Mức dùng THẬT của một tài khoản không giới hạn (admin).
    *
-   * Admin không bao giờ được cộng vào `User.quotaUsed`: `meterBuildTokens` thoát ngay trước khi
-   * cộng, còn `meterMaic` chỉ ghi bảng kiểm toán rồi dừng. Đọc `quotaUsed` cho admin vì thế LUÔN
-   * ra 0 — màn hình sẽ báo "chưa dùng gì" trong khi thực tế đã chạy rất nhiều. Cộng lại từ chính
-   * hai nguồn đã ghi thật đó.
+   * Admin không bao giờ được cộng vào `User.quotaUsed`: `meterMaic` chỉ ghi bảng kiểm toán rồi
+   * dừng. Đọc `quotaUsed` cho admin vì thế LUÔN ra 0 — màn hình sẽ báo "chưa dùng gì" trong khi
+   * thực tế đã chạy rất nhiều. Cộng lại từ chính sổ MaicUsage đã ghi thật đó.
    *
    * Cửa sổ: giữ cửa sổ đang mở nếu còn hạn, không thì lấy tròn một tháng đổ lại — cùng bước nhảy
    * `nextMonthStart` của người dùng thường, để hai con số còn so được với nhau.
@@ -264,26 +252,11 @@ export class MeService {
             ),
           );
 
-    // `Build.usage` là cột JSON nên cộng ở tầng ứng dụng, KHÔNG ép kiểu trong SQL: ép nhầm một
-    // cột JSON đã từng làm endpoint dung lượng đổ 500 (22P02), mà số bản ghi ở đây thì rất nhỏ.
-    const [maic, builds] = await Promise.all([
-      this.prisma.maicUsage.aggregate({
-        _sum: { tokens: true },
-        where: { userId, createdAt: { gte: since } },
-      }),
-      this.prisma.build.findMany({
-        where: { ownerId: userId, metered: true, createdAt: { gte: since } },
-        select: { usage: true },
-      }),
-    ]);
-
-    const buildTokens = builds.reduce((sum, b) => {
-      const u = b.usage as { inputTokens?: number; outputTokens?: number } | null;
-      const t = (u?.inputTokens ?? 0) + (u?.outputTokens ?? 0);
-      return sum + (Number.isFinite(t) && t > 0 ? t : 0);
-    }, 0);
-
-    return (maic._sum.tokens ?? 0) + buildTokens;
+    const maic = await this.prisma.maicUsage.aggregate({
+      _sum: { tokens: true },
+      where: { userId, createdAt: { gte: since } },
+    });
+    return maic._sum.tokens ?? 0;
   }
 
   /**
@@ -451,57 +424,5 @@ export class MeService {
       select: { referredById: true },
     });
     return { applied: !!after?.referredById };
-  }
-
-  // ── Maker social: follow + feed ───────────────────────────────────────────
-  /** Toggle following a maker (by handle). Returns the new state + follower count. */
-  async follow(user: AuthUser, handle: string): Promise<{ following: boolean; followers: number }> {
-    const target = await this.prisma.user.findFirst({ where: { handle }, select: { id: true } });
-    if (!target) throw new NotFoundException('Không tìm thấy maker');
-    if (target.id === user.id) throw new BadRequestException('Không thể tự theo dõi');
-    const existing = await this.prisma.follow.findUnique({
-      where: { followerId_followingId: { followerId: user.id, followingId: target.id } },
-    });
-    if (existing) await this.prisma.follow.delete({ where: { id: existing.id } });
-    else await this.prisma.follow.create({ data: { followerId: user.id, followingId: target.id } });
-    const followers = await this.prisma.follow.count({ where: { followingId: target.id } });
-    return { following: !existing, followers };
-  }
-
-  /** Whether the current user follows a maker (for the profile's Follow button). */
-  async isFollowing(user: AuthUser, handle: string): Promise<{ following: boolean }> {
-    const target = await this.prisma.user.findFirst({ where: { handle }, select: { id: true } });
-    if (!target) return { following: false };
-    const f = await this.prisma.follow.findUnique({
-      where: { followerId_followingId: { followerId: user.id, followingId: target.id } },
-    });
-    return { following: !!f };
-  }
-
-  /** Recently-published apps from the makers this user follows (the activity feed). */
-  async feed(user: AuthUser): Promise<PublicApp[]> {
-    const follows = await this.prisma.follow.findMany({
-      where: { followerId: user.id },
-      select: { followingId: true },
-    });
-    const ids = follows.map((f) => f.followingId);
-    if (!ids.length) return [];
-    const apps = await this.prisma.app.findMany({
-      where: { ownerId: { in: ids }, published: true },
-      orderBy: { updatedAt: 'desc' },
-      take: 30,
-      include: { owner: { select: { name: true, email: true, handle: true } } },
-    });
-    return apps.map((a) => ({
-      slug: a.slug,
-      name: a.name,
-      description: a.description,
-      track: a.track as Track,
-      url: a.currentUrl ?? null,
-      visits: a.visits ?? 0,
-      author: a.owner?.name?.trim() || a.owner?.email?.split('@')[0] || 'Người dùng',
-      authorHandle: a.owner?.handle ?? null,
-      updatedAt: a.updatedAt.toISOString(),
-    }));
   }
 }

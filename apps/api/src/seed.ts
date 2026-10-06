@@ -83,8 +83,7 @@ async function main(): Promise<void> {
     });
     console.log('[seed] platform config ready');
 
-    // Backfill maker handle + referral code for existing users (new users get
-    // them at register). Lets older makers be linkable at /u/{handle} + own a code.
+    // Backfill handle + referral code for existing users (new users get them at register).
     const missing = await prisma.user.findMany({
       where: { OR: [{ handle: null }, { referralCode: null }] },
       select: { id: true },

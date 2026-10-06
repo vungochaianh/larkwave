@@ -1,8 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { EngineModule } from '../engine/engine.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { OAuthProvidersService } from './oauth-providers.service';
 
 /**
  * Global so the app-wide JwtAuthGuard (registered in AppModule) can resolve
@@ -10,9 +10,9 @@ import { AuthService } from './auth.service';
  */
 @Global()
 @Module({
-  imports: [JwtModule.register({}), EngineModule],
+  imports: [JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, OAuthProvidersService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

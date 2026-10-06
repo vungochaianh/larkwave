@@ -73,7 +73,7 @@ export interface MaicRunInput {
   /** Attribute + cap this run against a Larkwave user. Omit only for system calls. */
   endUser?: MaicEndUserRef;
   prompt: string;
-  /** Seed the ephemeral workspace with these files (the common codegen case). */
+  /** Seed the ephemeral workspace with these files (attachments + skill assets). */
   files?: MaicRunFile[];
   /** Advanced: pass a raw workspace object (tarballBase64 / git) instead of inline files. */
   workspace?: unknown;
@@ -406,7 +406,7 @@ export class MaicService implements OnModuleInit {
     };
   }
 
-  // ── /v1/runs — agent sửa code trong workspace tạm (codegen) ─────────────────────────
+  // ── /v1/runs — agent làm việc trong workspace tạm (chat có tệp đính kèm) ─────────────────────────
 
   /** One file seeded into a run's workspace. */
   private static toRunFiles(files: MaicRunFile[]): MaicRunFile[] {
@@ -414,8 +414,8 @@ export class MaicService implements OnModuleInit {
   }
 
   /**
-   * Run an agentic code-editing turn: seed an EPHEMERAL workspace with `files`, let the MAIC agent
-   * work (npm install / edit / test), stream progress via `onEvent`, then fetch the final files back.
+   * Run an agentic turn: seed an EPHEMERAL workspace with `files`, let the MAIC agent work (read /
+   * run scripts / produce files), stream progress via `onEvent`, then fetch the final files back.
    * No pre-created project needed. Returns status + real token usage + the resulting files.
    */
   async runAgent(
@@ -425,7 +425,7 @@ export class MaicService implements OnModuleInit {
       signal?: AbortSignal;
       /** Gọi ngay khi biết runId — để người gọi LƯU lại, còn huỷ được sau khi máy chủ khởi động lại. */
       onStart?: (runId: string) => void;
-      /** Bề mặt gọi, chỉ để đọc log sau này: codegen | agent | server-deploy. */
+      /** Bề mặt gọi, chỉ để đọc log sau này (vd. agent). */
       kind?: string;
     } = {},
   ): Promise<MaicRunResult> {
@@ -459,7 +459,7 @@ export class MaicService implements OnModuleInit {
       // 503 chứ KHÔNG phải Error thường: một Error trần biến thành "500 Internal server error" ở
       // đường đồng bộ, tức người dùng nhận một lỗi hệ thống vô nghĩa cho một tình huống hoàn toàn
       // bình thường và có thể chờ được. ServiceUnavailableException giữ nguyên câu tiếng Việt và
-      // được pipeline đánh dấu là "thử lại được".
+      // được người gọi coi là "thử lại được".
       throw new ServiceUnavailableException(
         `Trợ lý AI đang hết lượt dùng chung (${why})${reset}. Đây KHÔNG phải lỗi tài khoản của bạn. ${retry}`,
       );

@@ -1,6 +1,6 @@
-// Larkwave App Builder — data model.
-// Multi-tenant: users own apps; apps accumulate builds; successful builds
-// produce versioned deployments. Indexed for list/filter at scale.
+// Larkwave — data model.
+// Accounts, plans/payments, the hosted AI assistant (MAIC), skills/scheduled tasks/artifacts,
+// the desktop remote-agent relay, community, and the Lark sharing/backup/hosted-runner tables.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,14 +11,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Track {
-  web
-  mobile
-  extension
-  desktop
-  game
-}
-
 enum Role {
   admin
   user
@@ -27,40 +19,6 @@ enum Role {
 enum UserStatus {
   active
   suspended
-}
-
-enum AppStatus {
-  draft
-  building
-  live
-  failed
-  archived
-  suspended
-}
-
-enum BuildStatus {
-  queued
-  running
-  // Non-terminal pause: the design Blueprint has been generated and the build
-  // is waiting for the user to approve it at the gate before codegen runs.
-  awaiting_approval
-  succeeded
-  failed
-  canceled
-}
-
-// Kind of backend an app targets. `static` (default) = classic SPA on Cloudflare
-// Pages — fully backward-compatible. `fullstack` is reserved for v1 (SPA +
-// Pages Functions + per-app D1 database).
-enum AppBackendKind {
-  static
-  fullstack
-}
-
-enum DeploymentStatus {
-  live
-  superseded
-  failed
 }
 
 model User {
@@ -101,17 +59,11 @@ model User {
   /// in the same month share), this is monotonic/unique — used as the refund window
   /// key so a same-month renewal can't be mistaken for the original window.
   quotaWindowAt DateTime?
-  // Per-user OAuth access tokens used to read/push the user's own git repos.
-  // Stored as-is for now (TODO: encrypt at rest). Never exposed in API responses.
-  gitlabToken    String?
+  // GitLab/GitHub usernames from an OAuth LOGIN (display only — no provider token is stored;
+  // Larkwave has no repo features).
   gitlabUsername String?
-  // GitLab access tokens expire (~2h); store the refresh token + expiry so the
-  // connection auto-renews instead of forcing the user to re-authorize each visit.
-  gitlabRefreshToken   String?
-  gitlabTokenExpiresAt DateTime?
-  githubToken    String?
   githubUsername String?
-  /// Public maker-profile handle (/u/{handle}). Lazily generated on first need.
+  /// Public handle (community display). Lazily generated on first need.
   /// Uniqueness is enforced at the app layer (ensureIdentity) — NOT a DB @unique,
   /// so adding it via `prisma db push` needs no destructive --accept-data-loss flag.
   handle       String?
@@ -142,27 +94,20 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  apps                App[]
-  builds              Build[]
   payments            Payment[]
   passwordResetTokens PasswordResetToken[]
   sentFriendRequests     Friendship[] @relation("FriendRequester")
   receivedFriendRequests Friendship[] @relation("FriendAddressee")
   sentMessages           Message[]    @relation("MsgSender")
   receivedMessages       Message[]    @relation("MsgRecipient")
-  appMemberships         AppMember[]
   uploads                Upload[]
   feedback               Feedback[]
   notifications          Notification[]
-  blogPosts              BlogPost[]
-  blogComments           BlogComment[]
   socialPosts            SocialPost[]
   socialPostLikes        SocialPostLike[]
   socialComments         SocialComment[]
   referredBy             User?        @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals              User[]       @relation("Referrals")
-  following              Follow[]     @relation("Following")
-  followers              Follow[]     @relation("Followers")
   larkBackup             LarkBackup?
   larkShares             LarkShare[]
   larkGrantsOwned        LarkGrant[]   @relation("LarkGrantOwner")
@@ -178,83 +123,19 @@ model User {
   agentChatConversations AgentChatConversation[]
   agentChatProjects      AgentChatProject[]
   assistantShares        AssistantShare[]
-  videoProjects          VideoProject[]
-  pictureProjects        PictureProject[]
-  blogProjects           BlogProject[]
-  marketingSchedules     MarketingSchedule[]
-  telegramDelivery       TelegramDeliveryConfig?
-  telegramChannels       TelegramChannel[]
-  categories             Category[]
   telegramBindings       TelegramBinding[]
   telegramLinkCodes      TelegramLinkCode[]
   loginSessions          LoginSession[] @relation("UserLoginSessions")
   skills                 Skill[]
   scheduledTasks         ScheduledTask[]
   artifacts              Artifact[]
-  apiKeys                ApiKey[]
   runnerErrors           RunnerError[]
-  storeOrders            Order[]
-  entitlements           Entitlement[]
-  listingsForSale        Listing[]     @relation("ListingSeller")
 
   @@index([role])
   @@index([createdAt])
   @@index([referredById])
   @@index([handle])
   @@index([referralCode])
-}
-
-/// A user-issued Developer API key (for the public API). The raw key is shown ONCE at creation;
-/// only its SHA-256 hash is stored. Auth via `Authorization: Bearer tw_...` on /v1/pub/* endpoints.
-model ApiKey {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  /// Non-secret display prefix, e.g. "tw_live_a1b2c3" (first chars of the key).
-  prefix     String
-  /// SHA-256 hex of the FULL key — the only stored form.
-  hash       String    @unique
-  /// PHẠM VI: mảng JSON các quyền ("apps:read" | "apps:write" | "builds:read" | "account:read").
-  ///
-  /// Rỗng = TOÀN QUYỀN, và đó là cách duy nhất giữ tương thích với các key đã phát trước khi có
-  /// trường này — đổi mặc định thành "không quyền gì" sẽ làm chết mọi tích hợp đang chạy mà không
-  /// báo trước. Key TẠO MỚI thì giao diện luôn gửi phạm vi cụ thể.
-  scopes     Json      @default("[]")
-  /// Trần số lượt gọi mỗi THÁNG DƯƠNG LỊCH cho riêng key này. null = không giới hạn riêng (vẫn
-  /// chịu hạn mức token của cả tài khoản).
-  ///
-  /// Đây là hàng rào theo KEY, khác với hạn mức % của tài khoản: một key lộ ra ngoài có thể đốt
-  /// sạch hạn mức tháng của cả tài khoản trước khi ai kịp nhận ra.
-  monthlyLimit Int?
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-
-  calls      ApiKeyCall[]
-
-  @@index([userId])
-}
-
-/// Một lượt gọi qua Developer API — sổ dùng của TỪNG key.
-///
-/// Vì sao ghi từng lượt thay vì chỉ đếm: khi một key bỗng tốn gấp mười, câu hỏi đầu tiên là "gọi
-/// cái gì, lúc nào, có lỗi không". Một con số đếm không trả lời được câu nào trong ba câu đó.
-///
-/// Giữ gọn: chỉ tuyến đường + mã trạng thái + thời điểm. KHÔNG lưu thân yêu cầu — nó chứa prompt
-/// của người dùng, và một sổ nhật ký không phải chỗ để dữ liệu đó nằm lại.
-model ApiKeyCall {
-  id        String   @id @default(cuid())
-  keyId     String
-  key       ApiKey   @relation(fields: [keyId], references: [id], onDelete: Cascade)
-  /// Ví dụ "POST /pub/apps". Đã chuẩn hoá (id trong đường dẫn thay bằng ":id") để gom nhóm được.
-  route     String
-  status    Int
-  /// Thời gian xử lý, mili giây — để thấy lượt nào chậm bất thường.
-  ms        Int      @default(0)
-  createdAt DateTime @default(now())
-
-  @@index([keyId, createdAt])
 }
 
 /// Một lỗi RUNNER mà người dùng gặp trên MÁY HỌ (Claude CLI hỏng xác thực/hết credit…) hoặc khi
@@ -406,11 +287,6 @@ model AgentDevice {
   lastSeenAt DateTime @default(now())
   createdAt  DateTime @default(now())
 
-  /// JSON array of this device's local apps (id/name/status/url/updatedAt), pushed by
-  /// the desktop so the phone can list them + send follow-up edits. Refreshed on sync.
-  appsJson     String?   @db.Text
-  appsSyncedAt DateTime?
-
   tasks RemoteTask[]
 
   @@index([userId])
@@ -464,8 +340,8 @@ model TelegramLinkCode {
   @@index([userId])
 }
 
-/// A coding task enqueued from the phone, pushed to an online AgentDevice over
-/// SSE, run locally by the desktop, with progress POSTed back as RemoteTaskEvents.
+/// An AI task enqueued from the phone/web/webhook/Telegram, pushed to an online AgentDevice
+/// over SSE, run locally by the desktop's AI assistant, with progress POSTed back as RemoteTaskEvents.
 model RemoteTask {
   id         String   @id @default(cuid())
   userId     String
@@ -476,7 +352,6 @@ model RemoteTask {
   model      String?
   prompt     String   @db.Text
   status     String   @default("queued")
-  appId      String?
   result     String?  @db.Text
   error      String?  @db.Text
   createdAt  DateTime @default(now())
@@ -565,229 +440,6 @@ model AssistantShare {
   @@index([ownerId])
 }
 
-/// An AI-generated video (Video Studio): template + topic + ElevenLabs voice → rendered mp4.
-model VideoProject {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String   @default("")
-  /// game | pixel | draw
-  template    String   @default("draw")
-  /// 9:16 | 16:9
-  aspect      String   @default("9:16")
-  /// colour palette id (auto | sunset | ocean | forest | berry | pastel | mono | neon | gold)
-  palette     String   @default("auto")
-  /// mascot character id (none | sticky | bloop | robo)
-  character   String   @default("none")
-  /// optional Category (danh mục) → routes Telegram delivery to that category's channels
-  categoryId  String?
-  topic       String   @default("") @db.Text
-  voiceId     String   @default("")
-  script      String   @default("") @db.Text
-  /// draft | rendering | done | error
-  status      String   @default("draft")
-  /// progress stage: script | voice | scene | render
-  stage       String   @default("")
-  audioUrl    String   @default("")
-  videoUrl    String   @default("")
-  /// The last generated seekable scene HTML — kept so a refine can EDIT the previous scene.
-  sceneHtml   String   @default("") @db.Text
-  /// Poster frame (PNG) extracted from the video — sent to Telegram before the video.
-  thumbnailUrl String  @default("")
-  /// Short social caption (for the Telegram message).
-  caption     String   @default("") @db.Text
-  durationSec Float    @default(0)
-  error       String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([userId, createdAt])
-}
-
-/// Make Picture — an AI-generated image post: caption + a designed poster (HTML → PNG).
-model PictureProject {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String   @default("")
-  /// quote | announce | tip | promo (see post/templates)
-  template  String   @default("quote")
-  /// 1:1 | 4:5 | 16:9
-  aspect    String   @default("1:1")
-  /// colour palette id (auto | sunset | ocean | forest | berry | pastel | mono | neon | gold)
-  palette   String   @default("auto")
-  /// mascot character id (none | sticky | bloop | robo)
-  character String   @default("none")
-  /// number of images in this post (1 = single, >1 = carousel / nhiều ảnh)
-  count     Int      @default(1)
-  /// optional Category (danh mục) → routes Telegram delivery to that category's channels
-  categoryId String?
-  topic     String   @default("") @db.Text
-  caption   String   @default("") @db.Text
-  /// first/cover image (also the thumbnail); kept for backward-compat + single-image posts
-  imageUrl  String   @default("")
-  /// ALL images of the post (carousel). imageUrls[0] === imageUrl.
-  imageUrls String[] @default([])
-  /// The last generated poster HTML — kept so a refine can EDIT the previous poster.
-  html      String   @default("") @db.Text
-  status    String   @default("draft")
-  /// progress stage: caption | image
-  stage     String   @default("")
-  error     String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, createdAt])
-}
-
-/// Make Blog — an AI-written article: title + body (markdown) + excerpt + optional cover (HTML → PNG).
-model BlogProject {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String   @default("")
-  /// howto | listicle | news | story (see blog/templates)
-  template  String   @default("howto")
-  /// colour palette id for the cover image (auto | sunset | ocean | ... | gold)
-  palette   String   @default("auto")
-  /// mascot character id for the cover (none | sticky | bloop | robo)
-  character String   @default("none")
-  /// number of inline illustration images to generate in the body (0–6)
-  count     Int      @default(3)
-  /// optional Category (danh mục) → routes Telegram delivery to that category's channels
-  categoryId String?
-  topic     String   @default("") @db.Text
-  /// short excerpt used as the Telegram caption
-  caption   String   @default("") @db.Text
-  body      String   @default("") @db.Text
-  coverUrl  String   @default("")
-  status    String   @default("draft")
-  /// progress stage: write | cover
-  stage     String   @default("")
-  error     String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, createdAt])
-}
-
-/// A recurring job that auto-generates a fresh Marketing item (video|picture|blog) and sends it to
-/// the user's configured Telegram (TelegramDeliveryConfig) on a cron schedule. Generic across kinds.
-model MarketingSchedule {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// video | picture | blog
-  kind           String    @default("video")
-  title          String    @default("")
-  template       String    @default("")
-  /// aspect (video/picture); ignored for blog
-  aspect         String    @default("9:16")
-  /// colour palette id (auto | sunset | ... | gold)
-  palette        String    @default("auto")
-  /// mascot character id (none | sticky | bloop | robo)
-  character      String    @default("none")
-  /// number of images per post (picture carousel); ignored for video/blog
-  count          Int       @default(1)
-  /// optional Category (danh mục) → routes Telegram delivery to that category's channels
-  categoryId     String?
-  voiceId        String    @default("")
-  topic          String    @default("") @db.Text
-  /// 5-field cron (minute hour day month weekday), interpreted in `timezone`.
-  cron           String
-  timezone       String    @default("Asia/Ho_Chi_Minh")
-  /// Explicit Telegram chat id override; null → use TelegramDeliveryConfig.chatId.
-  telegramChatId String?
-  /// blog only: also publish each generated post to the PUBLIC site blog (/blog/:slug).
-  /// Defaults to false on purpose — an existing schedule must not start publishing in public
-  /// because of a deploy. The owner opts in per schedule.
-  publishToBlog  Boolean   @default(false)
-  enabled        Boolean   @default(true)
-  nextRunAt      DateTime?
-  lastRunAt      DateTime?
-  lastItemId     String?
-  lastError      String?   @db.Text
-  runCount       Int       @default(0)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([enabled, nextRunAt])
-  @@index([userId, createdAt])
-}
-
-/// Version/commit history for a Marketing item (video|picture|blog): the initial 'create' + every
-/// 'fix' (refine), each snapshotting the result so a version can be viewed or restored. projectId is
-/// polymorphic (points at VideoProject/PictureProject/BlogProject) so there's no FK — the owning
-/// service deletes these when the project is removed.
-model MarketingEdit {
-  id           String   @id @default(cuid())
-  projectId    String
-  userId       String
-  /// video | picture | blog
-  kind         String
-  /// 'create' | 'fix' | 'redo'
-  action       String   @default("fix")
-  /// the fix prompt (or the topic, for 'create')
-  instruction  String   @default("") @db.Text
-  title        String   @default("")
-  caption      String   @default("") @db.Text
-  /// snapshot of the primary media: videoUrl / imageUrl / coverUrl
-  mediaUrl     String   @default("")
-  thumbnailUrl String   @default("")
-  /// snapshot of the text artifact: script (video) / html (picture) / body (blog) — for restore
-  extra        String   @default("") @db.Text
-  durationSec  Float    @default(0)
-  createdAt    DateTime @default(now())
-
-  @@index([projectId, createdAt])
-}
-
-/// Per-user Telegram delivery config (their own bot). Bot token is AES-encrypted at rest.
-model TelegramDeliveryConfig {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// encryptJson({ botToken }) — never returned to the client.
-  botTokenEnc String?
-  chatId      String?
-  threadId    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-/// One of the user's Telegram destinations (own bot + chat/channel). Multiple per user; a Category
-/// routes its content to one or more of these. (TelegramDeliveryConfig above is the legacy single one.)
-model TelegramChannel {
-  id          String     @id @default(cuid())
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String     @default("")
-  /// encryptJson({ botToken }) — never returned to the client.
-  botTokenEnc String?
-  chatId      String?
-  threadId    String?
-  categories  Category[] @relation("CategoryChannels")
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  @@index([userId])
-}
-
-/// A content category (danh mục), shared across video/picture/blog. Picking a category on a piece of
-/// content routes its Telegram delivery to that category's TelegramChannels (many-to-many).
-model Category {
-  id        String            @id @default(cuid())
-  userId    String
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  color     String            @default("")
-  channels  TelegramChannel[] @relation("CategoryChannels")
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  @@index([userId])
-}
-
 /// One anonymous use of a public assistant link — for per-slug / per-IP rate limiting.
 model AssistantShareHit {
   id        String   @id @default(cuid())
@@ -815,7 +467,7 @@ model AgentChatProject {
 }
 
 /// One streamed progress event of a RemoteTask (log/stage/status/progress/
-/// result/error). `payload` is the desktop BuildEvent as-is, replayed on detail.
+/// result/error). `payload` is the desktop event as-is, replayed on detail.
 model RemoteTaskEvent {
   id        String   @id @default(cuid())
   taskId    String
@@ -827,23 +479,8 @@ model RemoteTaskEvent {
   @@index([taskId, createdAt])
 }
 
-/// Maker social graph: `follower` follows `following`. Powers the activity feed
-/// + follower counts on public maker profiles.
-model Follow {
-  id          String   @id @default(cuid())
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
-
-  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followingId])
-}
-
 /// In-app notification (realtime via SSE). Created when something relevant to the
-/// user happens (new DM, feedback triaged, build finished). `link` deep-links to
+/// user happens (new DM, feedback triaged, task finished). `link` deep-links to
 /// the content so clicking jumps straight there.
 model Notification {
   id        String   @id @default(cuid())
@@ -934,21 +571,6 @@ model Upload {
   @@index([purpose, purgedAt, createdAt])
 }
 
-// Project collaboration: a user invited to someone else's app. The app's owner
-// is implicit; members are 'editor' (can iterate/build) or 'viewer' (read-only).
-model AppMember {
-  id        String   @id @default(cuid())
-  appId     String
-  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      String   @default("editor") // editor | viewer
-  createdAt DateTime @default(now())
-
-  @@unique([appId, userId])
-  @@index([userId])
-}
-
 // Social graph: a directed friend request that becomes a mutual friendship once
 // `status` = 'accepted'. Uniqueness is per ordered (requester, addressee) pair.
 model Friendship {
@@ -997,263 +619,6 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
-}
-
-model App {
-  id                  String    @id @default(cuid())
-  ownerId             String
-  owner               User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name                String
-  slug                String    @unique
-  track               Track     @default(web)
-  description         String    @default("") @db.Text
-  status              AppStatus @default(draft)
-  /// Admin moderation: reason the app was suspended (null unless suspended).
-  suspendReason       String?   @db.Text
-  pagesProject        String?   @unique
-  currentUrl          String?
-  currentDeploymentId String?
-  /// Kind of backend this app targets (`static` default; `fullstack` is v1).
-  backendKind         AppBackendKind @default(static)
-  /// Whether the app includes an admin/CMS area (implies full-stack).
-  cms                 Boolean   @default(false)
-  /// User-chosen concrete features (shared.AppFeatureSpec): dark mode, languages,
-  /// blog, auth, payments… Persisted so iterate/edit preserves them; injected into
-  /// codegen so the first build includes them. Null = baseline defaults.
-  featureSpec         Json?
-  /// Public website URL the app was/should be CLONED from. When set, the pipeline
-  /// fetches it and feeds the page's layout/copy/colours/images to codegen as a
-  /// faithful "rebuild this site" reference. Null = no clone source.
-  sourceUrl           String?
-  /// Last APPROVED design Blueprint (shared.Blueprint payload). Null until first approve.
-  blueprint           Json?
-  /// Per-app SEO & GEO config (shared.AppSeo): meta/OG tags + sitemap/robots toggles.
-  /// Applied to the deployed index.html at deploy time. Null = sensible defaults.
-  seo                 Json?
-  /// Per-app secrets/env vars — an AES-256-GCM-ENCRYPTED JSON map {KEY:value}.
-  /// Set as Cloudflare Pages env vars at deploy so Functions read env.KEY. Null = none.
-  secretsEnc          String?   @db.Text
-  /// Full-stack apps: the Cloudflare D1 database uuid bound to this app (null = static).
-  d1DatabaseId        String?
-  /// Whether the D1 schema (schema.sql) has been applied — guards one-time seeding.
-  d1Ready             Boolean   @default(false)
-  /// Git import: which provider this app was imported from ('gitlab'|'github').
-  gitProvider         String?
-  /// Full repo path (e.g. 'user/repo') the app was imported from / pushes back to.
-  gitRepo             String?
-  /// Branch to read from / commit back to.
-  gitBranch           String?   @default("main")
-  /// True once this app was imported from an external git repo.
-  gitImported         Boolean   @default(false)
-  /// Persisted .toolswave build/deploy config (shared.BuildConfig) for an imported,
-  /// directly-buildable repo. Reused on every re-run/redeploy so no LLM/tokens are
-  /// needed. Null = derive on next import / not a config-built app.
-  buildConfig         Json?
-  /// Workspace model: parent app id when this is a sub-project (service) of an
-  /// imported monorepo workspace. Null for standalone apps + the workspace itself.
-  parentId            String?
-  /// Sub-project directory within the parent repo (e.g. 'velvel-admin'). Null unless a child.
-  servicePath         String?
-  /// "Bộ site": id chung của các site được tạo cùng một lượt (website / CMS / portal / API).
-  /// Khác `parentId` ở chỗ mọi thành viên đều là app ĐỘC LẬP — có site riêng, địa chỉ riêng,
-  /// và vẫn hiện trong danh sách app (app con của workspace thì bị ẩn). Null = app đứng một mình.
-  suiteId             String?
-  /// Vai trò của app trong bộ: 'site' | 'cms' | 'portal' | 'api'. Null khi không thuộc bộ nào.
-  surface             String?
-  /// Site ĐẠI DIỆN của bộ — cái duy nhất hiện thành thẻ ở danh sách "Website của tôi"; các site
-  /// còn lại nằm BÊN TRONG thẻ đó. Phải là một cột chứ không suy ra lúc chạy, vì danh sách app
-  /// phân trang + đếm tổng ở tầng SQL: gom sau khi lấy trang về sẽ ra những trang thiếu thẻ và
-  /// một con số tổng nói dối.
-  suitePrimary        Boolean   @default(false)
-  /// Pinned to the user's sidebar for quick access.
-  pinned              Boolean   @default(false)
-  /// Published to the public showcase (anyone can view the app's public page).
-  published           Boolean   @default(false)
-  /// Public-page visit counter (GitHub-style view count).
-  visits              Int       @default(0)
-  /// Remix loop: the app this one was forked from (null = original).
-  remixedFromId       String?
-  /// How many times this app has been remixed/forked by others.
-  remixCount          Int       @default(0)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  parent       App?          @relation("AppChildren", fields: [parentId], references: [id], onDelete: SetNull)
-  children     App[]         @relation("AppChildren")
-  remixedFrom  App?          @relation("AppRemixes", fields: [remixedFromId], references: [id], onDelete: SetNull)
-  remixes      App[]         @relation("AppRemixes")
-  builds       Build[]
-  deployments  Deployment[]
-  blueprints   Blueprint[]
-  serverDeploy ServerDeploy?
-  members      AppMember[]
-  visitDays    AppVisitDay[]
-  automations  Automation[]
-  listings     Listing[]
-
-  @@index([ownerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([parentId])
-  @@index([suiteId])
-}
-
-/// Per-app, per-day visit analytics — ONE row per (app, day), bucket counters
-/// merged in JSON to bound row growth. Written by the public /track beacon that
-/// deployed apps fire on load; read (aggregated) by the Analytics dashboard.
-model AppVisitDay {
-  id        String   @id @default(cuid())
-  appId     String
-  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
-  /// UTC calendar day, "YYYY-MM-DD".
-  day       String
-  /// Total pageviews that day.
-  count     Int      @default(0)
-  /// { "<referrer-host>": count } — capped to the top entries.
-  referrers Json?
-  /// { "mobile": n, "desktop": n } device-class buckets.
-  devices   Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([appId, day])
-  @@index([appId])
-}
-
-/// A scheduled task for an app: the platform calls a PATH on the app's OWN
-/// deployed URL every `intervalMinutes` (SSRF-safe — host is always the app's
-/// public domain, never arbitrary). Runs from the API's in-process scheduler.
-model Automation {
-  id              String    @id @default(cuid())
-  appId           String
-  app             App       @relation(fields: [appId], references: [id], onDelete: Cascade)
-  name            String
-  enabled         Boolean   @default(true)
-  /// Run cadence in minutes (15, 60, 360, 1440=daily, 10080=weekly).
-  intervalMinutes Int       @default(1440)
-  /// HTTP method to call (GET/POST/...).
-  method          String    @default("GET")
-  /// Path on the app's own URL, e.g. "/api/cron/digest".
-  path            String    @default("/")
-  /// Optional JSON body for non-GET calls.
-  body            String?   @db.Text
-  nextRunAt       DateTime  @default(now())
-  lastRunAt       DateTime?
-  /// Last HTTP status (0 = never run / network error).
-  lastStatus      Int       @default(0)
-  lastError       String?   @db.Text
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([appId])
-  @@index([enabled, nextRunAt])
-}
-
-model Build {
-  id         String      @id @default(cuid())
-  appId      String
-  app        App         @relation(fields: [appId], references: [id], onDelete: Cascade)
-  ownerId    String
-  owner      User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  prompt     String      @db.Text
-  name       String?
-  track      Track?
-  status     BuildStatus @default(queued)
-  /// "codegen" (AI generates files) | "edit" (user-edited files, skip codegen)
-  mode       String      @default("codegen")
-  /// Per-build model choice: "opus" (5 credits) | "sonnet" (1 credit).
-  model      String      @default("opus")
-  /// Brand/accent color (`#rrggbb`) fed into codegen. Null when unset.
-  primaryColor String?
-  /// Preferred layout/canvas hint (e.g. "dashboard"|"landing"|"auto").
-  style      String?     @default("auto")
-  /// When the design stage runs, auto-approve the Blueprint instead of pausing
-  /// at the gate. Default true; only the first design of a new app honours false.
-  autoApprove Boolean    @default(true)
-  /// Workflow preset (shared.BuildPreset): "turbo" (bỏ phân loại/thiết kế/đặc tả,
-  /// sinh code thẳng từ yêu cầu) | "balanced" (chạy đủ quy trình, tự duyệt thiết kế)
-  /// | "thorough" (dừng ở cổng duyệt thiết kế). Default "balanced" = hành vi hiện
-  /// tại, nên mọi build cũ và mọi caller không truyền preset giữ nguyên quy trình.
-  preset      String     @default("balanced")
-  stages     Json        @default("[]")
-  spec       String?     @db.Text
-  /// Attached upload refs for the conversation: [{ id, name, kind, mime }].
-  attachments Json       @default("[]")
-  files      Json? // GeneratedFile[]
-  /// Snapshot of the build/deploy config used for THIS build (shared.BuildConfig).
-  /// Makes a deploy reproducible/rollbackable independent of later App.buildConfig
-  /// edits. Null = none (codegen build or pre-feature import).
-  buildConfig Json?
-  logs       Json        @default("[]")
-  result     Json? // BuildResult
-  usage      Json? // TokenUsage
-  /// Whether this build's REAL token usage (usage.input+output) has been metered
-  /// into the owner's monthly quota (User.quotaUsed). Set true once, on SUCCESS only
-  /// (failed/canceled builds are never metered) — guards against double-counting.
-  /// Build này là lượt TỰ ĐỘNG chạy lại của build nào (null = do người dùng tạo).
-  ///
-  /// Vừa để chống lặp vô hạn — một lượt tự chạy lại KHÔNG được đẻ ra lượt nữa — vừa để nhìn ra
-  /// dây chuyền khi soi lỗi: thấy hai build liền nhau cùng một yêu cầu thì biết ngay cái sau là
-  /// máy tự chạy chứ không phải người dùng bấm hai lần.
-  autoRetryOf String?
-
-  metered    Boolean @default(false)
-  /// [legacy] pre-paid credit fields — superseded by post-build token metering.
-  creditsCharged Int     @default(0)
-  creditWindowAt DateTime?
-  error      String?     @db.Text
-  /// Admin acknowledged this failed build in the error report (clears it from the
-  /// default /admin/build-errors view). Does not change the build itself.
-  errorReviewed Boolean  @default(false)
-  createdAt  DateTime    @default(now())
-  startedAt  DateTime?
-  finishedAt DateTime?
-  updatedAt  DateTime    @updatedAt
-
-  deployment Deployment?
-  blueprint  Blueprint?
-
-  @@index([appId])
-  @@index([ownerId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-// Versioned "design intake" produced before codegen and reviewed at the gate.
-// One draft row per design build (`buildId` unique); promoted to `approved` when
-// the user approves. `spec` holds the shared.Blueprint JSON payload.
-model Blueprint {
-  id         String    @id @default(cuid())
-  appId      String
-  app        App       @relation(fields: [appId], references: [id], onDelete: Cascade)
-  buildId    String?   @unique
-  build      Build?    @relation(fields: [buildId], references: [id], onDelete: SetNull)
-  version    Int       @default(1)
-  status     String    @default("draft") // draft | approved | superseded
-  spec       Json
-  approvedAt DateTime?
-  approvedBy String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([appId])
-}
-
-model Deployment {
-  id                String           @id @default(cuid())
-  appId             String
-  app               App              @relation(fields: [appId], references: [id], onDelete: Cascade)
-  buildId           String           @unique
-  build             Build            @relation(fields: [buildId], references: [id], onDelete: Cascade)
-  url               String
-  previewUrl        String?
-  pagesProject      String
-  pagesDeploymentId String?
-  status            DeploymentStatus @default(live)
-  createdAt         DateTime         @default(now())
-
-  @@index([appId])
-  @@index([createdAt])
 }
 
 model AuditLog {
@@ -1570,111 +935,6 @@ model LarkShare {
   @@index([userId])
 }
 
-model ServerDeploy {
-  id        String   @id @default(cuid())
-  appId     String   @unique
-  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
-  status    String   @default("deploying") // deploying | live | failed
-  /// [{ name, subdomain, port, url }]
-  services  Json     @default("[]")
-  log       String?  @db.Text
-  error     String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Daily AI-generated app-idea suggestions shown on the builder home. Each run is
-// kept for history (admin); the most recent run is what users see.
-model SuggestionRun {
-  id        String   @id @default(cuid())
-  /// [{ label, prompt, track? }]
-  items     Json     @default("[]")
-  count     Int      @default(0)
-  model     String   @default("")
-  createdAt DateTime @default(now())
-
-  @@index([createdAt])
-}
-
-// Blog / content marketing posts. Public list+detail (SEO) at /blog; authored and
-// managed by admins in aapp (/admin/blog). Body is Markdown rendered on the web.
-/// Bình luận dưới một bài viết blog.
-///
-/// Vì sao KHÔNG dùng lại `SocialComment`: model đó gắn cứng vào `SocialPost` của trang Cộng đồng
-/// (quan hệ bắt buộc, xoá bài là xoá bình luận). Ghép blog vào đó nghĩa là hai tính năng khác hẳn
-/// nhau dùng chung một bảng và một bộ luật kiểm duyệt — đổi luật cho bên này là đổi luôn bên kia.
-///
-/// `status` có chủ ý mặc định là `visible` chứ không phải `pending`: một blog mà mọi bình luận
-/// phải chờ duyệt thì thực tế là không có bình luận, vì không ai ngồi duyệt. Đổi lại phải có
-/// đường gỡ nhanh — xem `hidden` và chỉ mục theo `status`.
-model BlogComment {
-  id        String   @id @default(cuid())
-  postId    String
-  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  /// Người viết. Bắt buộc đăng nhập — bình luận ẩn danh trên một blog công khai là mời spam.
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  /// Tên hiển thị lúc viết, giữ lại để đổi tên sau không làm lệch lịch sử.
-  authorName String  @default("")
-  content   String   @db.Text
-  /// Trả lời một bình luận khác. Chỉ MỘT cấp — lồng sâu trên blog là không ai đọc nổi.
-  parentId  String?
-  /// visible | hidden — `hidden` do admin gỡ hoặc tác giả tự xoá.
-  status    String   @default("visible")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([postId, status, createdAt])
-  @@index([authorId])
-}
-
-model BlogPost {
-  id          String   @id @default(cuid())
-  /// URL-safe unique slug (/blog/:slug). Derived from title, dedup with a suffix.
-  slug        String   @unique
-  title       String
-  /// Short summary for cards + meta description fallback.
-  excerpt     String?  @db.Text
-  /// Markdown body.
-  content     String   @db.Text
-  /// Cover/hero image URL (optional).
-  coverImage  String?
-  /// "draft" | "published".
-  status      String   @default("draft")
-  /// Chuyên mục CHÍNH — mỗi bài đúng một, là thứ dùng để chia tab trên /blog.
-  /// Tách khỏi `tags` có chủ ý: trước đây hai khái niệm bị gộp làm một mảng, nên không có cách
-  /// nào hỏi "các bài cùng chuyên mục" mà không đoán xem phần tử nào là chuyên mục.
-  category    String?
-  /// string[] — THẺ, mỗi bài nhiều thẻ. Dùng để lọc hẹp, không dùng để chia tab.
-  tags        Json     @default("[]")
-  /// SEO overrides (fall back to title/excerpt when null).
-  seoTitle       String?
-  seoDescription String? @db.Text
-  /// Bản dịch theo ngôn ngữ: { "en": { title, excerpt, content, seoTitle, seoDescription }, ... }
-  ///
-  /// MỘT CỘT JSON chứ không phải thêm cột cho từng thứ tiếng (titleEn, contentEn…): thêm cột thì
-  /// mỗi ngôn ngữ mới là một lần đổi schema kèm migrate; với object thì thêm tiếng Hàn chỉ là ghi
-  /// thêm một khoá, không đụng cơ sở dữ liệu.
-  ///
-  /// Các cột gốc phía trên VẪN LÀ BẢN CHUẨN (đang giữ tiếng Việt); `i18n` chỉ chứa ngôn ngữ KHÁC.
-  /// Nhờ vậy mã cũ đọc `post.title` vẫn chạy nguyên, không bài nào mất trong lúc chuyển đổi.
-  i18n           Json     @default("{}")
-  /// Author (admin User). Denormalised authorName survives author deletion.
-  authorId    String?
-  author      User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  authorName  String?
-  comments    BlogComment[]
-  /// Whether to feature on the landing blog teaser.
-  featured    Boolean  @default(false)
-  views       Int      @default(0)
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([status, publishedAt])
-  @@index([featured, publishedAt])
-}
-
 /// One metered MAIC (Larkwave-hosted Claude) turn. `runId` (from MAIC) is the idempotency
 /// key so a retry can't double-debit. `tokens` = costUsd converted via MAIC_USD_PER_MTOK and
 /// is what gets added to User.quotaUsed (the % budget). Also an audit trail of hosted spend.
@@ -1807,182 +1067,3 @@ model SocialComment {
 //     Portal trả Decimal ra JSON dạng CHUỖI ("100000.00"), script nhập làm tròn khi chuyển.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Một món bán được. MỘT bảng cho mọi loại hàng — trang bán, tìm kiếm, SEO và quản trị đều nhìn
-/// mọi món như nhau; phần khác nhau giữa các loại nằm gọn trong `detail`.
-model Listing {
-  id               String    @id @default(cuid())
-  /// shared.StoreKind: software | document | sourcecode | app | tool | service.
-  kind             String
-  slug             String
-  name             String
-  descriptionShort String?   @db.Text
-  description      String?   @db.Text
-  thumbnailUrl     String?   @db.Text
-  /// string[] — ảnh phụ của trang bán.
-  gallery          Json?
-  priceVnd         Int       @default(0)
-  /// Giá gạch ngang để so sánh. Null = không khuyến mãi.
-  compareAtVnd     Int?
-  category         String?
-  /// active | hidden | sold_out. `hidden` KHÔNG xoá dữ liệu — đơn hàng cũ vẫn phải đọc được tên
-  /// và giá của món đã bán.
-  status           String    @default("active")
-  sortOrder        Int       @default(0)
-  totalSold        Int       @default(0)
-  /// shared.StoreListingDetail — languages, version, prerequisites, specDocument, fileType…
-  /// CHỈ chứa thứ được phép ra ngoài: cột này đi thẳng ra API công khai.
-  detail           Json?
-  /// shared.AppSeo — tiêu đề/mô tả/ảnh riêng cho trang bán, sửa được từ CMS.
-  /// Null = suy ra từ `name` + `descriptionShort`.
-  seo              Json?
-  /// ĐƯỜNG GIAO HÀNG, mã hoá AES-256-GCM (cùng cơ chế với `App.secretsEnc`):
-  /// { driveLink?, zipFileUrl?, gitlabRepoId? }. Chỉ bộ giao hàng giải mã; không có đường nào đi
-  /// ra API công khai. Xem chú thích số 1 ở đầu khối.
-  deliveryEnc      String?   @db.Text
-  /// Ghi chú nội bộ của quản trị. Không bao giờ ra ngoài.
-  notesInternal    String?   @db.Text
-  /// Với kind=app|tool: App của nền tảng đứng sau món này.
-  appId            String?
-  app              App?      @relation(fields: [appId], references: [id], onDelete: SetNull)
-  /// Bản build ĐÓNG BĂNG được bán — người mua hôm nay và tháng sau nhận cùng một thứ.
-  buildId          String?
-  /// Null = Larkwave bán. Có giá trị = người dùng bán (chưa mở, xem mục 12 của kế hoạch).
-  sellerId         String?
-  seller           User?     @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: SetNull)
-  /// Id bên hệ B, để script nhập chạy được NHIỀU LẦN mà không nhân đôi bản ghi.
-  legacyId         String?
-  /// Ngày sửa THEO NGUỒN (hệ B), khác với `updatedAt` là ngày bản ghi này được ghi ở hệ A.
-  ///
-  /// Phải có cột riêng vì `updatedAt` mang `@updatedAt`: Prisma đặt lại nó ở MỌI lượt ghi, nên
-  /// sau một đợt nhập thì cả 209 dự án cùng mang một ngày. Hậu quả không phải chuyện thẩm mỹ —
-  /// mục sắp xếp "Mới cập nhật" thành vô nghĩa, và `lastmod` trong sitemap khai với máy tìm kiếm
-  /// rằng toàn bộ danh mục vừa đổi cùng lúc, đúng kiểu tín hiệu khiến nó bớt tin những lần sau.
-  ///
-  /// Null = món sinh ra ở hệ A (chưa từng qua nhập), lúc đó `updatedAt` mới là ngày thật.
-  sourceUpdatedAt  DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  inventory    Inventory[]
-  orderItems   OrderItem[]
-  entitlements Entitlement[]
-
-  @@unique([kind, slug])
-  @@unique([kind, legacyId])
-  @@index([kind, status])
-  @@index([category])
-  @@index([appId])
-}
-
-/// Một suất hàng có hạn — tài khoản phần mềm hoặc khoá bản quyền. Chỉ kind=software dùng tới;
-/// tài liệu và mã nguồn bán bản sao nên không có khái niệm hết hàng.
-model Inventory {
-  id          String     @id @default(cuid())
-  listingId   String
-  listing     Listing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  /// Nội dung suất hàng (tài khoản/mật khẩu hoặc khoá), mã hoá AES-256-GCM.
-  /// Hệ B lưu cột này ở dạng CHỮ THƯỜNG; mã hoá khi nhập là việc bắt buộc, không phải tuỳ chọn.
-  dataEnc     String     @db.Text
-  /// available | reserved | sold
-  status      String     @default("available")
-  orderItemId String?    @unique
-  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  soldAt      DateTime?
-  legacyId    String?    @unique
-  createdAt   DateTime   @default(now())
-
-  @@index([listingId, status])
-}
-
-/// Đơn hàng — NHIỀU món một đơn. Hệ B gắn productType/productId thẳng vào đơn nên một đơn chỉ
-/// mua được một thứ; khi bán app kèm tài liệu kèm gói hỗ trợ thì đó là hạn chế thật.
-model Order {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  totalVnd  Int      @default(0)
-  /// pending | paid | cancelled | refunded
-  status    String   @default("pending")
-  /// Ý định thanh toán bên `Payment` (kind='order'). Null với đơn do quản trị cấp tay.
-  paymentId String?
-  /// Đơn do nhân viên cấp thẳng vào tài khoản khách — ai cấp, và vì sao.
-  grantedBy String?
-  grantNote String?  @db.Text
-  /// Id đơn bên hệ B, cho lần nhập lịch sử.
-  legacyId  String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items OrderItem[]
-
-  @@index([userId, createdAt])
-  @@index([status])
-}
-
-/// Một dòng hàng. `nameSnapshot`/`priceVnd` là BẢN CHỤP lúc mua: món có thể đổi tên hoặc đổi giá
-/// sau đó, còn hoá đơn thì không được đổi theo.
-model OrderItem {
-  id           String   @id @default(cuid())
-  orderId      String
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  listingId    String?
-  listing      Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  kind         String
-  nameSnapshot String
-  priceVnd     Int      @default(0)
-  qty          Int      @default(1)
-  createdAt    DateTime @default(now())
-
-  inventory   Inventory?
-  fulfillment Fulfillment?
-
-  @@index([orderId])
-  @@index([listingId])
-}
-
-/// Việc giao một dòng hàng. Mỗi bước ghi một mốc vào `steps` để người mua tự theo dõi và quản trị
-/// tự soi — thất bại phải DỪNG ở đúng bước, không nuốt lỗi.
-model Fulfillment {
-  id          String    @id @default(cuid())
-  orderItemId String    @unique
-  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  /// reveal_secret | download | git_invite | app_handover | entitlement | manual
-  method      String
-  /// pending | running | delivered | failed
-  status      String    @default("pending")
-  /// Thứ người mua nhận được: link tải, tên repo, URL app, id app đã nhân bản…
-  payload     Json?
-  /// Mốc tiến trình: [{ buoc, luc, ok, ghiChu? }]
-  steps       Json?
-  error       String?   @db.Text
-  deliveredAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([status])
-}
-
-/// Quyền đã mua, tách khỏi đơn để kiểm tra cho rẻ: hỏi "người này có quyền X không" không phải
-/// duyệt lại toàn bộ lịch sử đơn hàng.
-model Entitlement {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// sourcecode | tool_premium | app_license | subscription
-  kind      String
-  listingId String?
-  listing   Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  /// App đã nhân bản vào tài khoản người mua, nếu có.
-  appId     String?
-  /// Đơn sinh ra quyền này. Null = quản trị cấp tay.
-  orderId   String?
-  grantedBy String?
-  /// Null = vĩnh viễn.
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
-
-  @@unique([userId, kind, listingId])
-  @@index([userId])
-  @@index([listingId])
-}

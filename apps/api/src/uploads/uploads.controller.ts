@@ -15,7 +15,7 @@ import type { AuthUser } from '../common/auth-user';
 import { UploadsService, type UploadedFileLike } from './uploads.service';
 
 /** Nhãn mục đích hợp lệ. Chỉ 'chat' bị dọn theo hạn 30 ngày — xem PURGEABLE_PURPOSE. */
-const ALLOWED_PURPOSE = new Set(['chat', 'feedback', 'marketing', 'build']);
+const ALLOWED_PURPOSE = new Set(['chat', 'feedback']);
 
 @Controller('uploads')
 export class UploadsController {

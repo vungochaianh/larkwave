@@ -34,58 +34,6 @@ export class CreateRemoteTaskDto {
   @IsString()
   @MaxLength(64)
   conversationId?: string;
-
-  /** Iterate an existing app on the device instead of creating a new one. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  appId?: string;
-}
-
-/** One synced app. MUST be a decorated class (not an inline type) — otherwise the global
- *  ValidationPipe (whitelist + transform + enableImplicitConversion) mangles each object
- *  into an empty array `[]`, dropping `id` so the phone lists nothing. */
-export class SyncAppItemDto {
-  // id is the app's on-disk id. Kept optional so one malformed app can't 400 the whole
-  // batch; listRemoteApps drops entries without an id.
-  @IsOptional()
-  @IsString()
-  @MaxLength(128)
-  id?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(256)
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  status?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  url?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  updatedAt?: string;
-}
-
-/** `POST /v1/agent/apps` (desktop) — push this device's local app list to the cloud. */
-export class SyncAppsDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  deviceName?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SyncAppItemDto)
-  apps?: SyncAppItemDto[];
 }
 
 /** `POST /v1/agent/conversations` + `PATCH /v1/agent/conversations/:id` body. */
