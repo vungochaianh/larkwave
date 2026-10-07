@@ -78,7 +78,7 @@ export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <IconTile icon={<CalendarOutlined />} color={BRAND} />
             <Title level={5} style={{ margin: 0, flex: 1 }}>Hoạt động đóng góp</Title>
-            {activity && <Text type="secondary" style={{ fontSize: 12.5 }}>{activity.total} build trong 12 tháng qua</Text>}
+            {activity && <Text type="secondary" style={{ fontSize: 12.5 }}>{activity.total} lượt đóng góp trong 12 tháng qua</Text>}
           </div>
           {loading || !activity ? <Skeleton active paragraph={{ rows: 4 }} /> : <ContributionGraph days={activity.days} />}
         </Card>

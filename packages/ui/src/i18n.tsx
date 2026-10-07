@@ -1079,7 +1079,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "money.paused": { vi: "Tạm ngưng", en: "Paused" },
   "money.freePausedLong": { vi: "Gói miễn phí hiện đang tạm ngưng — vui lòng chọn một gói trả phí ở trên.", en: "The free plan is currently paused — please choose a paid plan above." },
   "money.contributionActivity": { vi: "Hoạt động đóng góp", en: "Contribution activity" },
-  "money.buildsLast12": { vi: "build trong 12 tháng qua", en: "builds in the last 12 months" },
+  "money.buildsLast12": { vi: "lượt đóng góp trong 12 tháng qua", en: "contributions in the last 12 months" },
   "money.user": { vi: "Người dùng", en: "User" },
   "money.joined": { vi: "Tham gia", en: "Joined" },
   "money.changePassword": { vi: "Đổi mật khẩu", en: "Change password" },
