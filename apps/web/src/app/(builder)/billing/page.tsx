@@ -1,19 +1,12 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import Splash from "@/components/Splash";
+import { redirect } from "next/navigation";
 
 /**
- * Billing was merged into the unified "Gói & Thanh toán" page (/pricing), which
- * now shows the current plan + usage, the plans (with any active discount) and
- * the payment history all in one place. This route just redirects there so old
- * links / bookmarks keep working.
+ * Không còn trang "Gói & Thanh toán" riêng trong app (07/10/2026): gói hiện tại, hạn mức và nâng
+ * cấp đều nằm trong Hồ sơ. Bảng giá công khai vẫn ở /pricing.
+ *
+ * Để lại file chuyển hướng (không xoá) để liên kết cũ không thành 404, và để deploy bằng rsync
+ * không --delete ghi đè bản cũ trên máy chủ.
  */
 export default function BillingRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/pricing");
-  }, [router]);
-  return <Splash tagline="Đang mở Gói & Thanh toán…" />;
+  redirect("/profile#plan");
 }

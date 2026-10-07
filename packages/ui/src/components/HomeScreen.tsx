@@ -18,16 +18,19 @@ import { useRuntime } from '../RuntimeProvider';
 import { BRAND, BRAND_GRADIENT, V } from '../theme';
 import { AccountAuthProvider, useAccountAuth } from '../account/auth';
 import { LoginView } from '../account/LoginView';
-import { ReportsView } from '../account/ReportsView';
 import { ProfileView } from '../account/ProfileView';
 import { FriendsView } from '../account/FriendsView';
-import { PricingView } from '../account/PricingView';
+import { FEATURE_FRIENDS } from '../features';
 import { HomeOverview } from './HomeOverview';
 import { useI18n } from '../i18n';
 
-/** Account pages that require a logged-in Larkwave account (not just a local AI runner). */
-type AccountView = 'reports' | 'profile' | 'friends' | 'pricing' | 'storage';
-const ACCOUNT_VIEWS: AccountView[] = ['reports', 'profile', 'friends', 'pricing', 'storage'];
+/**
+ * Account pages that require a logged-in Larkwave account (not just a local AI runner).
+ * 07/10/2026: bỏ 'reports' ("Báo lỗi của tôi" — đi cùng chương trình thưởng báo lỗi) và 'pricing'
+ * (Gói & Thanh toán đã nằm trong Hồ sơ). 'friends' vẫn còn nhưng ẩn sau FEATURE_FRIENDS.
+ */
+type AccountView = 'profile' | 'friends' | 'storage';
+const ACCOUNT_VIEWS: AccountView[] = ['profile', 'friends', 'storage'];
 
 const VIEW_BY_KEY: Record<string, View> = {
   'tw-agents': 'agents',
@@ -39,18 +42,14 @@ const VIEW_BY_KEY: Record<string, View> = {
   'tw-skills': 'skills',
   'tw-skills-cross': 'skills-cross',
   'tw-settings': 'settings',
-  'tw-reports': 'reports',
   'tw-profile': 'profile',
   'tw-friends': 'friends',
-  'tw-pricing': 'pricing',
   'tw-storage': 'storage',
 };
 
 const WEB_URL: Record<string, string> = {
-  reports: 'https://toolswave.net/reports',
   profile: 'https://toolswave.net/profile',
   friends: 'https://toolswave.net/friends',
-  pricing: 'https://toolswave.net/pricing',
   storage: 'https://toolswave.net/storage',
 };
 
@@ -69,10 +68,8 @@ const KEY_BY_VIEW: Record<View, string> = {
   skills: 'tw-skills',
   'skills-cross': 'tw-skills-cross',
   settings: 'tw-settings',
-  reports: 'tw-reports',
   profile: 'tw-profile',
   friends: 'tw-friends',
-  pricing: 'tw-pricing',
   storage: 'tw-storage',
 };
 
@@ -126,11 +123,10 @@ function AccountGate({ view, nav }: { view: AccountView; nav?: (v: View) => void
     );
   }
   if (!user) return <LoginView />;
-  if (view === 'reports') return <ReportsView />;
   // Hồ sơ also hosts "Bạn bè của tôi" + "Gói & Thanh toán" (with a history modal).
   if (view === 'profile') return <ProfileView onNav={nav} />;
-  if (view === 'friends') return <FriendsView />;
-  if (view === 'pricing') return <PricingView onNav={nav} />;
+  // Bạn bè tắt → mọi lối vào đã ẩn; nếu vẫn lọt tới đây (điều hướng cũ) thì về Hồ sơ.
+  if (view === 'friends') return FEATURE_FRIENDS ? <FriendsView /> : <ProfileView onNav={nav} />;
   // Dung lượng lưu trữ — CÙNG màn hình với web, không dựng bản sao riêng cho desktop.
   if (view === 'storage') return <StorageScreen />;
   return <ComingSoon view={view} />;
@@ -253,7 +249,7 @@ function HomeShell() {
       activeKey={selectedKey}
       cmsAllowed={cmsAllowed}
       headerExtra={
-        <FeedbackButton variant="header" onOpenReports={() => navigate('reports')} page={String(view)} />
+        <FeedbackButton variant="header" page={String(view)} />
       }
     >
       {showLoadingOverlay && (

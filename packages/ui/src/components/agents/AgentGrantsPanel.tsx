@@ -5,6 +5,7 @@ import { ShareAltOutlined, StopOutlined, PauseCircleOutlined, PlayCircleOutlined
 import { accountApi, type LarkGrant, type LarkGrantCall, type AssistantShareInfo } from '../../account/api';
 import { V, BRAND } from '../../theme';
 import { useI18n } from '../../i18n';
+import { FEATURE_FRIENDS } from '../../features';
 
 interface Friend {
   id: string;
@@ -95,8 +96,13 @@ export function AgentGrantsPanel({ onChanged }: { onChanged?: () => void }) {
   };
 
   useEffect(() => {
-    void reload();
     void loadShares();
+    // Phần chia sẻ cho BẠN BÈ (lời mời / người đang dùng) ẩn khi FEATURE_FRIENDS tắt — chỉ còn link công khai.
+    if (!FEATURE_FRIENDS) {
+      setLoading(false);
+      return;
+    }
+    void reload();
     void accountApi
       .friends()
       .then((f) => setFriends(f as unknown as Friend[]))
@@ -185,6 +191,7 @@ export function AgentGrantsPanel({ onChanged }: { onChanged?: () => void }) {
         </Button>
       </div>
 
+      {FEATURE_FRIENDS && (<>
       <div
         style={{
           display: 'flex',
@@ -356,6 +363,7 @@ export function AgentGrantsPanel({ onChanged }: { onChanged?: () => void }) {
           </div>
         </Space>
       </Modal>
+      </>)}
 
       <Modal open={!!logFor} title={`${t('chat.logTitle', 'Nhật ký')} — ${who(logFor?.grantee)}`} footer={null} onCancel={() => setLogFor(null)} width={screens.md ? 720 : '94vw'}>
         {calls === null ? (

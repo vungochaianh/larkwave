@@ -25,7 +25,6 @@ export default function robots(): MetadataRoute.Robots {
         "/agents-chat",
         "/remote",
         "/profile",
-        "/billing",
         "/storage",
         "/friends",
         "/community",

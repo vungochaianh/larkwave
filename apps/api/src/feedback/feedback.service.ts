@@ -13,7 +13,6 @@ import type {
   SubmitFeedbackRequest,
   UploadContent,
 } from '@larkwave/shared';
-import { SEVERITY_POINTS } from '@larkwave/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnthropicService } from '../ai-keys/anthropic.service';
 import { MaicService } from '../maic/maic.service';
@@ -50,10 +49,6 @@ export class FeedbackService {
         f.severity && VALID_SEVERITY.includes(f.severity as FeedbackSeverity)
           ? (f.severity as FeedbackSeverity)
           : null,
-      points: f.points ?? 0,
-      rewardVnd: f.rewardVnd ?? 0,
-      rewardPaid: !!f.rewardPaid,
-      rewardPaidAt: f.rewardPaidAt ? f.rewardPaidAt.toISOString() : null,
       duplicateOfId: f.duplicateOfId ?? null,
       adminNote: f.adminNote ?? null,
       resolvedAt: f.resolvedAt ? f.resolvedAt.toISOString() : null,
@@ -109,34 +104,22 @@ export class FeedbackService {
     return this.toDto(f);
   }
 
-  /** A user's own reports + their tester scoreboard. */
+  /**
+   * A user's own reports (+ how many were handled) — shown on /support so a reporter sees where
+   * their report went. Chương trình thưởng báo lỗi (điểm/thưởng/tester) đã bỏ 07/10/2026.
+   */
   async mine(user: AuthUser): Promise<MyFeedbackResponse> {
-    // Lifetime totals are computed with DB aggregates over ALL rows (not capped
-    // by the 200-row display window). Duplicate/rejected rows are forced to 0
-    // points + 0 reward on write, so summing every row is correct.
-    const [rows, agg, paidAgg, resolvedCount, totalReports] = await Promise.all([
+    const [rows, resolvedCount, totalReports] = await Promise.all([
       this.prisma.feedback.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
         take: 200,
       }),
-      this.prisma.feedback.aggregate({
-        where: { userId: user.id },
-        _sum: { points: true, rewardVnd: true },
-      }),
-      this.prisma.feedback.aggregate({
-        where: { userId: user.id, rewardPaid: true },
-        _sum: { rewardVnd: true },
-      }),
       this.prisma.feedback.count({ where: { userId: user.id, status: 'resolved' } }),
-      // Tester "danh hiệu" counts valid (non-rejected) reports.
       this.prisma.feedback.count({ where: { userId: user.id, status: { not: 'rejected' } } }),
     ]);
     return {
       items: rows.map((r) => this.toDto(r)),
-      totalPoints: agg._sum.points ?? 0,
-      totalRewardVnd: agg._sum.rewardVnd ?? 0,
-      paidRewardVnd: paidAgg._sum.rewardVnd ?? 0,
       resolvedCount,
       totalReports,
     };
@@ -182,38 +165,20 @@ export class FeedbackService {
     return rows.map((r) => this.toDto(r));
   }
 
-  /** Admin triage: severity/points/reward/status/duplicate/note in one call. */
+  /** Admin triage: severity/status/duplicate/note in one call. */
   async adminUpdate(id: string, dto: AdminUpdateFeedbackRequest): Promise<Feedback> {
     const exists = await this.prisma.feedback.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException('Không tìm thấy báo cáo');
 
     const data: Prisma.FeedbackUncheckedUpdateInput = {};
-    // Track the resulting status so the credit guard below can zero points/reward
-    // for duplicate/rejected rows regardless of the order fields arrive in.
-    let effStatus: string = exists.status;
-    const existingSeverity =
-      exists.severity && VALID_SEVERITY.includes(exists.severity as FeedbackSeverity)
-        ? (exists.severity as FeedbackSeverity)
-        : null;
 
     if (dto.status && VALID_STATUS.includes(dto.status)) {
       data.status = dto.status;
       data.resolvedAt = dto.status === 'resolved' ? new Date() : null;
-      effStatus = dto.status;
     }
     if (dto.severity !== undefined) {
       data.severity =
         dto.severity && VALID_SEVERITY.includes(dto.severity) ? dto.severity : null;
-    }
-    if (dto.points !== undefined) {
-      data.points = Math.max(0, Math.min(100000, Math.round(Number(dto.points) || 0)));
-    }
-    if (dto.rewardVnd !== undefined) {
-      data.rewardVnd = Math.max(0, Math.round(Number(dto.rewardVnd) || 0));
-    }
-    if (dto.rewardPaid !== undefined) {
-      data.rewardPaid = !!dto.rewardPaid;
-      data.rewardPaidAt = dto.rewardPaid ? new Date() : null;
     }
     if (dto.adminNote !== undefined) data.adminNote = String(dto.adminNote).slice(0, 4000);
     if (dto.duplicateOfId !== undefined) {
@@ -225,30 +190,16 @@ export class FeedbackService {
           where: { id: dto.duplicateOfId },
         });
         if (!canonical) throw new BadRequestException('Báo cáo gốc không tồn tại.');
-        // Credit stays with the FIRST reporter (canonical); this one earns 0 (guard below).
         data.duplicateOfId = dto.duplicateOfId;
         data.status = 'duplicate';
-        effStatus = 'duplicate';
       } else {
         data.duplicateOfId = null;
-        // Returning from duplicate → re-open and restore the severity-suggested
-        // credit (marking duplicate zeroed it), so the fix isn't destructive.
-        if (exists.status === 'duplicate') {
-          if (!dto.status) {
-            data.status = 'open';
-            data.resolvedAt = null;
-            effStatus = 'open';
-          }
-          if (existingSeverity) data.points = SEVERITY_POINTS[existingSeverity];
+        // Returning from duplicate → re-open, so un-marking isn't destructive.
+        if (exists.status === 'duplicate' && !dto.status) {
+          data.status = 'open';
+          data.resolvedAt = null;
         }
       }
-    }
-
-    // Credit guard: duplicate + rejected reports earn nothing (matches the schema
-    // contract + keeps the scoreboard honest). Wins over any explicit points/reward.
-    if (effStatus === 'duplicate' || effStatus === 'rejected') {
-      data.points = 0;
-      data.rewardVnd = 0;
     }
 
     const f = await this.prisma.feedback.update({
@@ -257,33 +208,30 @@ export class FeedbackService {
       include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    // Notify the reporter on ANY admin response: a triage (status change), a
-    // reward payout, OR an admin note/message (the admin replying on the report).
+    // Notify the reporter on ANY admin response: a triage (status change) OR an
+    // admin note/message (the admin replying on the report).
     const statusChanged = dto.status && dto.status !== exists.status;
-    const newlyPaid = dto.rewardPaid === true && !exists.rewardPaid;
     const noteChanged =
       dto.adminNote !== undefined && String(dto.adminNote) !== (exists.adminNote ?? '');
-    if (statusChanged || newlyPaid || noteChanged) {
+    if (statusChanged || noteChanged) {
       const note = (f.adminNote ?? '').trim();
-      const title = newlyPaid
-        ? 'Bạn đã được thưởng cho báo lỗi 🎉'
-        : f.status === 'resolved'
+      const title = f.status === 'resolved'
           ? 'Báo lỗi của bạn đã được xử lý ✓'
           : f.status === 'rejected'
             ? 'Báo lỗi của bạn bị từ chối'
             : noteChanged && !statusChanged
               ? 'Admin đã phản hồi báo lỗi của bạn 💬'
               : 'Báo lỗi của bạn đã được cập nhật';
-      const credit =
-        (f.points ? `+${f.points} điểm` : '') +
-        (f.rewardVnd ? `${f.points ? ' · ' : ''}${f.rewardVnd.toLocaleString('vi-VN')}đ` : '');
-      // Prefer the admin's actual message as the body; else the credit; else the report text.
+      // Prefer the admin's actual message as the body; else the report text.
       const body = note
         ? note.length > 90
           ? note.slice(0, 90) + '…'
           : note
-        : credit || (f.message.length > 60 ? f.message.slice(0, 60) + '…' : f.message);
-      void this.notifications.notify(f.userId, 'feedback', title, body, '/reports');
+        : f.message.length > 60
+          ? f.message.slice(0, 60) + '…'
+          : f.message;
+      // Trang "Báo lỗi của tôi" (/reports) đã bỏ — người gửi xem báo cáo của mình ở /support.
+      void this.notifications.notify(f.userId, 'feedback', title, body, '/support');
     }
     return this.toDto(f);
   }

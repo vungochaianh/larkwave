@@ -90,22 +90,17 @@ export interface Feedback {
   id: string;
   message: string;
   severity: FeedbackSeverity | null;
-  points: number;
-  rewardVnd: number;
-  rewardPaid: boolean;
   status: FeedbackStatus;
   createdAt: string;
   url?: string | null;
   attachments: { id?: string; uploadId?: string; name?: string }[];
   adminNote?: string | null;
 }
+/** GET /feedback/mine — the user's own reports (reward program removed 07/10/2026). */
 export interface MyFeedbackResponse {
   items: Feedback[];
-  totalPoints: number;
   resolvedCount: number;
-  totalRewardVnd: number;
-  paidRewardVnd: number;
-  /** Valid (non-rejected) reports — drives the tester danh hiệu badges. */
+  /** Valid (non-rejected) reports. */
   totalReports: number;
 }
 
@@ -713,7 +708,7 @@ export const accountApi = {
 
 
 
-  // reports / feedback (tester rewards)
+  // feedback (bug reports)
   myFeedback: () => apiFetch<MyFeedbackResponse>('/feedback/mine'),
   /** Submit a bug report / feedback (auto-attaches app context + recent logs). */
   submitFeedback: (body: SubmitFeedbackRequest) =>

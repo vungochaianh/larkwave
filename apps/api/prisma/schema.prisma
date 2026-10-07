@@ -515,16 +515,9 @@ model Feedback {
   attachments   Json?
   /// "open" | "resolved" | "duplicate" | "rejected".
   status        String     @default("open")
-  /// Bug-bounty triage: "low" | "medium" | "high" | "critical" (null until triaged).
+  /// Triage: "low" | "medium" | "high" | "critical" (null until triaged).
   severity      String?
-  /// Tester points awarded for this report (0 for duplicates/rejected).
-  points        Int        @default(0)
-  /// Monetary reward in VND the admin grants for this report.
-  rewardVnd     Int        @default(0)
-  /// Whether the reward has been paid out, and when.
-  rewardPaid    Boolean    @default(false)
-  rewardPaidAt  DateTime?
-  /// If this is a duplicate, points go to the FIRST reporter (the canonical row).
+  /// If this is a duplicate, the canonical (first) report.
   duplicateOfId String?
   duplicateOf   Feedback?  @relation("FeedbackDup", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates    Feedback[] @relation("FeedbackDup")

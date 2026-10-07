@@ -942,10 +942,10 @@ export const api = {
   // AI help assistant (floating chatbot)
   assistantChat: (body: AssistantChatRequest) =>
     apiFetch<AssistantChatResponse>("/assistant/chat", { method: "POST", body }),
-  // feedback — in-app bug/error reports + tester rewards
+  // feedback — in-app bug/error reports
   submitFeedback: (body: SubmitFeedbackRequest) =>
     apiFetch<Feedback>("/feedback", { method: "POST", body }),
-  /** The signed-in user's own reports + tester scoreboard. */
+  /** The signed-in user's own reports (shown on /support). */
   myFeedback: () => apiFetch<MyFeedbackResponse>("/feedback/mine"),
   /** Preview an attachment on the user's own report. */
   getFeedbackAttachment: (id: string, uploadId: string) =>

@@ -24,6 +24,8 @@ import {
   Typography,
 } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FEATURE_FRIENDS } from "@larkwave/ui/features";
 import type { DiscoverUser, Friend, FriendRequest } from "@larkwave/shared";
 import { useI18n } from "@larkwave/ui";
 import { api } from "@/lib/api";
@@ -34,7 +36,19 @@ import { UserAvatar } from "@/components/UserAvatar";
 
 const { Title, Text } = Typography;
 
-export default function FriendsPage() {
+/**
+ * Bạn bè đang tạm ẩn (FEATURE_FRIENDS, packages/ui/src/features.ts) — trang vẫn giữ nguyên để bật
+ * lại là chạy; khi cờ tắt thì ai gõ thẳng /friends cũng được đưa về Tổng quan.
+ */
+export default function FriendsRoute() {
+  const router = useRouter();
+  useEffect(() => {
+    if (!FEATURE_FRIENDS) router.replace("/overview");
+  }, [router]);
+  return FEATURE_FRIENDS ? <FriendsPage /> : null;
+}
+
+function FriendsPage() {
   const { message } = App.useApp();
   const { t } = useI18n();
   const [friends, setFriends] = useState<Friend[]>([]);

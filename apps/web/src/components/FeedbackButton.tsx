@@ -3,14 +3,13 @@
 import { BugOutlined, InboxOutlined } from "@ant-design/icons";
 import { App, Button, Input, Modal, Typography, Upload } from "antd";
 import type { UploadFile, UploadProps } from "antd";
-import Link from "next/link";
 import { useEffect, useState, type ClipboardEvent } from "react";
 import type { UploadRef } from "@larkwave/shared";
 import { useI18n } from "@larkwave/ui";
 import { api } from "@/lib/api";
 import { getRecentLogs, installErrorCapture } from "@/lib/errorLog";
 
-const { Paragraph, Text } = Typography;
+const { Paragraph } = Typography;
 
 /** Floating "report a bug / error" button, present on every signed-in page. */
 export default function FeedbackButton({ variant = "fab" }: { variant?: "fab" | "header" } = {}) {
@@ -159,15 +158,9 @@ export default function FeedbackButton({ variant = "fab" }: { variant?: "fab" | 
       >
         <Paragraph type="secondary" style={{ fontSize: 13 }}>
           {t(
-            "wcomp.fbIntro",
-            "Mô tả lỗi bạn gặp. Hệ thống tự đính kèm trang hiện tại + log gần đây để admin dễ kiểm tra và sửa. Báo lỗi hợp lệ được",
-          )}{" "}
-          <Text strong>{t("wcomp.fbScoredRewarded", "tính điểm & thưởng")}</Text>{" "}
-          {t("wcomp.fbSeeAt", "— xem ở")}{" "}
-          <Link href="/reports" onClick={() => setOpen(false)}>
-            {t("wcomp.fbMyReports", "Báo lỗi của tôi")}
-          </Link>
-          .
+            "wcomp.fbIntroPlain",
+            "Mô tả lỗi bạn gặp. Hệ thống tự đính kèm trang hiện tại + log gần đây để admin dễ kiểm tra và sửa. Bạn sẽ nhận thông báo khi admin phản hồi.",
+          )}
         </Paragraph>
         {pageUrl && (
           <div

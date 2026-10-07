@@ -7,21 +7,20 @@
  * remote control.
  */
 
-import { ApiOutlined, ArrowRightOutlined, BugOutlined, CheckCircleFilled, CloudServerOutlined, ExperimentOutlined, GiftOutlined, PlusOutlined, ReloadOutlined, RobotOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from "@ant-design/icons";
+import { ApiOutlined, ArrowRightOutlined, CheckCircleFilled, CloudServerOutlined, ExperimentOutlined, GiftOutlined, PlusOutlined, ReloadOutlined, RobotOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined } from "@ant-design/icons";
 import { Button, Card, Grid, Progress, Space, theme, Tooltip, Typography } from "antd";
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import type { MeActivity, MeSubscription, MyFeedbackResponse } from "@larkwave/shared";
+import type { MeActivity, MeSubscription } from "@larkwave/shared";
 import { StreakRow, ContributionGraph, useI18n } from "@larkwave/ui";
 import { formatTokens, refPercent } from "@/lib/formatTokens";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AGENTS, BRAND, BRAND_GRADIENT, CARD_SHADOW } from "@/lib/theme";
 import { tenGoi } from "@/lib/billing";
+import { FEATURE_FRIENDS } from "@larkwave/ui/features";
 
 const { Title, Text } = Typography;
-
-const vnd = (n: number) => `${Math.round(n).toLocaleString("vi-VN")} đ`;
 
 function HeroStat({
   v,
@@ -125,7 +124,8 @@ function HeroBanner({ isMobile, refreshTick, onRefresh }: { isMobile: boolean; r
         <HeroStat isMobile={isMobile} href="/remote/agent" v={dash ?? stats!.remoteTasks} l={t("home.statRemote", "Tác vụ từ xa")} />
         <HeroStat isMobile={isMobile} href="/skills" v={dash ?? stats!.skills} l={t("home.statSkills", "Kỹ năng")} />
         {sub && (
-          <Link href="/billing" style={{ flex: "1 1 150px", padding: isMobile ? "11px 16px" : "13px 22px", borderLeft: "1px solid rgba(255,255,255,.16)", color: "#fff", display: "block" }}>
+          // Gói & hạn mức nằm trong Hồ sơ — không còn trang /billing riêng.
+          <Link href="/profile#plan" style={{ flex: "1 1 150px", padding: isMobile ? "11px 16px" : "13px 22px", borderLeft: "1px solid rgba(255,255,255,.16)", color: "#fff", display: "block" }}>
             <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, letterSpacing: -0.5, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center", gap: 8 }}>
               {sub.unlimited ? "∞" : `${Math.round(sub.percentUsed)}%`}
               {sub.unlimited ? (
@@ -176,25 +176,25 @@ function QuickActions() {
 
 function AttentionBand({ refreshTick }: { refreshTick: number }) {
   const { t } = useI18n();
-  const [pendingReward, setPendingReward] = useState(0);
   const [invites, setInvites] = useState(0);
 
   useEffect(() => {
+    // Bạn bè đang ẩn (FEATURE_FRIENDS) → không có lời mời nào để nhắc.
+    if (!FEATURE_FRIENDS) return;
     let cancelled = false;
-    (async () => {
-      const [fb, reqs] = await Promise.allSettled([api.myFeedback(), api.friendRequests()]);
-      if (cancelled) return;
-      if (fb.status === "fulfilled") setPendingReward(Math.max(0, fb.value.totalRewardVnd - fb.value.paidRewardVnd));
-      if (reqs.status === "fulfilled") setInvites(reqs.value.length);
-    })();
+    api
+      .friendRequests()
+      .then((reqs) => {
+        if (!cancelled) setInvites(reqs.length);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [refreshTick]);
 
   const rows: { key: string; icon: ReactNode; color: string; text: string; href: string }[] = [
-    ...(pendingReward > 0 ? [{ key: "reward", icon: <GiftOutlined />, color: "#16B98D", text: `${t("home.attnReward", "Thưởng báo lỗi chờ chi")}: ${vnd(pendingReward)}`, href: "/reports" }] : []),
-    ...(invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", text: `${invites} ${t("home.attnInvite", "lời mời kết bạn")}`, href: "/friends" }] : []),
+    ...(FEATURE_FRIENDS && invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", text: `${invites} ${t("home.attnInvite", "lời mời kết bạn")}`, href: "/friends" }] : []),
   ];
   if (!rows.length) return null;
 
@@ -219,20 +219,17 @@ function AttentionBand({ refreshTick }: { refreshTick: number }) {
 
 function RewardsStrip({ refreshTick }: { refreshTick: number }) {
   const { t } = useI18n();
-  const [fb, setFb] = useState<MyFeedbackResponse | null>(null);
   const [invites, setInvites] = useState(0);
   const [referrals, setReferrals] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [f, reqs, ref] = await Promise.allSettled([
-        api.myFeedback(),
-        api.friendRequests(),
+      const [reqs, ref] = await Promise.allSettled([
+        FEATURE_FRIENDS ? api.friendRequests() : Promise.resolve([]),
         api.getReferral(),
       ]);
       if (cancelled) return;
-      if (f.status === "fulfilled") setFb(f.value);
       if (reqs.status === "fulfilled") setInvites(reqs.value.length);
       if (ref.status === "fulfilled") setReferrals(ref.value.referrals);
     })();
@@ -241,10 +238,9 @@ function RewardsStrip({ refreshTick }: { refreshTick: number }) {
     };
   }, [refreshTick]);
 
-  const pendingReward = fb ? Math.max(0, fb.totalRewardVnd - fb.paidRewardVnd) : 0;
+  // Chương trình thưởng báo lỗi đã bỏ (07/10/2026) — thẻ "Báo lỗi hợp lệ / điểm / thưởng chờ" đi theo.
   const cards: { key: string; icon: ReactNode; color: string; bg: string; value: string; label: string; hint: string; href: string }[] = [
-    ...(fb ? [{ key: "reports", icon: <BugOutlined />, color: "#FF6B6B", bg: "rgba(255,107,107,0.14)", value: String(fb.totalReports), label: t("home.rwReports", "Báo lỗi hợp lệ"), hint: pendingReward > 0 ? `${t("home.rwRewardPending", "Thưởng chờ")}: ${vnd(pendingReward)}` : `${fb.totalPoints} ${t("home.rwPoints", "điểm")}`, href: "/reports" }] : []),
-    ...(invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", value: String(invites), label: t("home.rwInvites", "Lời mời kết bạn"), hint: t("home.rwInvitesHint", "Chờ phản hồi"), href: "/friends" }] : []),
+    ...(FEATURE_FRIENDS && invites > 0 ? [{ key: "invite", icon: <TeamOutlined />, color: "#4FB6FF", bg: "rgba(79,182,255,0.16)", value: String(invites), label: t("home.rwInvites", "Lời mời kết bạn"), hint: t("home.rwInvitesHint", "Chờ phản hồi"), href: "/friends" }] : []),
     ...(referrals > 0 ? [{ key: "ref", icon: <GiftOutlined />, color: "#16B98D", bg: "rgba(22,185,141,0.14)", value: String(referrals), label: t("home.rwReferrals", "Đã giới thiệu"), hint: t("home.rwReferralsHint", "Mời bạn → nhận thưởng"), href: "/profile" }] : []),
   ];
   if (!cards.length) return null;
@@ -321,7 +317,7 @@ function OnboardingCard({ refreshTick }: { refreshTick: number }) {
   const [friends, setFriends] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([api.meOverview(), api.friends()]).then(([o, f]) => {
+    Promise.allSettled([api.meOverview(), FEATURE_FRIENDS ? api.friends() : Promise.resolve([])]).then(([o, f]) => {
       if (cancelled) return;
       if (o.status === "fulfilled") setOv({ aiRuns: o.value.aiRuns, remoteTasks: o.value.remoteTasks, skills: o.value.skills });
       if (f.status === "fulfilled") setFriends(f.value.length);
@@ -332,7 +328,8 @@ function OnboardingCard({ refreshTick }: { refreshTick: number }) {
     { key: "chat", label: t("home.obChat", "Trò chuyện với Trợ lý AI"), done: (ov?.aiRuns ?? 0) > 0, href: "/agents-chat/new", icon: <ThunderboltOutlined /> },
     { key: "skill", label: t("home.obSkill", "Tạo kỹ năng đầu tiên"), done: (ov?.skills ?? 0) > 0, href: "/skills", icon: <ExperimentOutlined /> },
     { key: "desktop", label: t("home.obDesktop", "Cài app desktop (Lark × Agents)"), done: (ov?.remoteTasks ?? 0) > 0, href: "/download", icon: <CloudServerOutlined /> },
-    { key: "friend", label: t("home.obFriend", "Mời 1 người bạn"), done: friends > 0, href: "/friends", icon: <TeamOutlined /> },
+    // Bước "Mời 1 người bạn" chỉ có khi Bạn bè đang bật — để lại một bước không làm được thì vòng tiến độ kẹt mãi ở 3/4.
+    ...(FEATURE_FRIENDS ? [{ key: "friend", label: t("home.obFriend", "Mời 1 người bạn"), done: friends > 0, href: "/friends", icon: <TeamOutlined /> }] : []),
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const pct = Math.round((doneCount / steps.length) * 100);

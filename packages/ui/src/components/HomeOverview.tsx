@@ -1,12 +1,14 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { Card, Typography, Button, Tag, Tooltip } from 'antd';
-import { PlusOutlined, FieldTimeOutlined, CheckCircleFilled, RobotOutlined, ThunderboltOutlined, CoffeeOutlined, BulbOutlined, ExperimentOutlined, SyncOutlined, ArrowRightOutlined, RightOutlined, ReloadOutlined, DatabaseOutlined, MessageOutlined, PartitionOutlined, ApiOutlined, CloudServerOutlined, FireOutlined, ExclamationCircleFilled, WarningOutlined, TrophyOutlined, BugOutlined, TeamOutlined, GiftOutlined } from '@ant-design/icons';
+import { PlusOutlined, FieldTimeOutlined, CheckCircleFilled, RobotOutlined, ThunderboltOutlined, CoffeeOutlined, BulbOutlined, ExperimentOutlined, SyncOutlined, ArrowRightOutlined, RightOutlined, ReloadOutlined, DatabaseOutlined, MessageOutlined, PartitionOutlined, ApiOutlined, CloudServerOutlined, FireOutlined, ExclamationCircleFilled, WarningOutlined, TrophyOutlined, TeamOutlined, GiftOutlined } from '@ant-design/icons';
 import { useRuntime } from '../RuntimeProvider';
 import { V, BRAND, BRAND_GRADIENT, CARD_SHADOW, OK, WARN, ERR, BLUE } from '../theme';
 import { HubPeople } from './HubCommunity';
+import { FEATURE_FRIENDS } from '../features';
+import { PROFILE_PLAN_ANCHOR } from '../account/ProfileView';
 import { useAccountAuth } from '../account/auth';
-import { accountApi, formatDate, type MeSubscription, type MeActivity, type MeOverview, type MyFeedbackResponse, type Referral } from '../account/api';
+import { accountApi, formatDate, type MeSubscription, type MeActivity, type MeOverview, type Referral } from '../account/api';
 import type { View } from './HomeScreen';
 
 const { Title, Text } = Typography;
@@ -33,7 +35,6 @@ const OVERVIEW_CSS = `
 const NUM: CSSProperties = { fontVariantNumeric: 'tabular-nums', letterSpacing: -0.5, fontWeight: 800, color: V.text, lineHeight: 1.1 };
 const MICRO: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: V.textSub };
 
-function vnd(n: number): string { return n.toLocaleString('vi-VN') + 'đ'; }
 
 function IconTile({ icon, color, size = 26, radius = 9, fontSize = 14 }: { icon: ReactNode; color: string; size?: number; radius?: number; fontSize?: number }) {
   return (
@@ -144,7 +145,6 @@ export function HomeOverview({
   const [sub, setSub] = useState<MeSubscription | null>(null);
   const [act, setAct] = useState<MeActivity | null>(null);
   const [ov, setOv] = useState<MeOverview | null>(null);
-  const [fb, setFb] = useState<MyFeedbackResponse | null>(null);
   const [reqIn, setReqIn] = useState<number>(0);
   const [ref, setRef] = useState<Referral | null>(null);
   useEffect(() => {
@@ -153,8 +153,8 @@ export function HomeOverview({
     accountApi.subscription().then((v) => alive && setSub(v)).catch(() => {});
     accountApi.meActivity(365).then((v) => alive && setAct(v)).catch(() => {});
     accountApi.meOverview().then((v) => alive && setOv(v)).catch(() => {});
-    accountApi.myFeedback().then((v) => alive && setFb(v)).catch(() => {});
-    accountApi.friendRequests().then((v) => alive && setReqIn(v.filter((r) => r.direction === 'incoming').length)).catch(() => {});
+    // Bạn bè tạm ẩn (FEATURE_FRIENDS) → không có lời mời nào để nhắc.
+    if (FEATURE_FRIENDS) accountApi.friendRequests().then((v) => alive && setReqIn(v.filter((r) => r.direction === 'incoming').length)).catch(() => {});
     accountApi.getReferral().then((v) => alive && setRef(v)).catch(() => {});
     return () => { alive = false; };
     // key on user.id (not the object): useAccountAuth mints a new User on every window
@@ -166,7 +166,11 @@ export function HomeOverview({
   const greeting = hr < 11 ? 'Chào buổi sáng' : hr < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
   const greetIcon = hr < 11 ? <CoffeeOutlined /> : hr < 18 ? <ThunderboltOutlined /> : <BulbOutlined />;
   const nav = (v: View) => onNav?.(v);
-  const pendingReward = fb ? Math.max(0, fb.totalRewardVnd - fb.paidRewardVnd) : 0;
+  // Gói & hạn mức nằm trong Hồ sơ (không còn màn "Gói & Thanh toán" riêng): mở Hồ sơ rồi cuộn tới phần gói.
+  const goPlan = () => {
+    nav('profile');
+    setTimeout(() => document.getElementById(PROFILE_PLAN_ANCHOR)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+  };
 
   // real 7-day AI activity from the account API
   const bars: { count: number; label: string }[] = act
@@ -192,8 +196,7 @@ export function HomeOverview({
     ...(hasCms && cms && cms.errored > 0 ? [{ key: 'cmsjob', color: ERR, icon: <SyncOutlined />, text: `${cms.errored} job đồng bộ CMS lỗi`, cta: 'Mở', onClick: () => nav('cms-sync') } as Alert] : []),
     ...(hasCms && cms && cms.keeperOnline === false ? [{ key: 'keeper', color: WARN, icon: <CloudServerOutlined />, text: 'Máy VM giữ phiên đang ngoại tuyến', cta: 'Mở', onClick: () => nav('cms-sync') } as Alert] : []),
     ...(hasLark && lark && !lark.connected ? [{ key: 'lark', color: WARN, icon: <ApiOutlined />, text: 'Lark chưa kết nối', cta: 'Kết nối', onClick: () => nav('lark') } as Alert] : []),
-    ...(pendingReward > 0 ? [{ key: 'reward', color: OK, icon: <GiftOutlined />, text: `Thưởng báo lỗi chờ chi: ${vnd(pendingReward)}`, cta: 'Xem', onClick: () => nav('reports') } as Alert] : []),
-    ...(reqIn > 0 ? [{ key: 'invite', color: BLUE, icon: <TeamOutlined />, text: `${reqIn} lời mời kết bạn`, cta: 'Xem', onClick: () => nav('profile') } as Alert] : []),
+    ...(FEATURE_FRIENDS && reqIn > 0 ? [{ key: 'invite', color: BLUE, icon: <TeamOutlined />, text: `${reqIn} lời mời kết bạn`, cta: 'Xem', onClick: () => nav('profile') } as Alert] : []),
   ];
 
   // ── quick-launch chips ──────────────────────────────────────────────────────
@@ -204,14 +207,14 @@ export function HomeOverview({
     ...(hasLark ? [{ key: 'lark', icon: <RobotOutlined />, color: BLUE, title: 'Lark × Agents', onClick: () => nav('lark') } as QA] : []),
     ...(hasLark ? [{ key: 'spec', icon: <PartitionOutlined />, color: BRAND, title: 'Đặc tả', onClick: () => nav('spec') } as QA] : []),
     ...(hasCms ? [{ key: 'cms', icon: <SyncOutlined />, color: OK, title: 'Đồng bộ CMS', onClick: () => nav('cms-sync') } as QA] : []),
-    { key: 'friends', icon: <TeamOutlined />, color: BLUE, title: 'Bạn bè', onClick: () => nav('friends') },
+    ...(FEATURE_FRIENDS ? [{ key: 'friends', icon: <TeamOutlined />, color: BLUE, title: 'Bạn bè', onClick: () => nav('friends') } as QA] : []),
   ];
 
   // ── rewards & community tiles ────────────────────────────────────────────────
   type Reward = { key: string; icon: ReactNode; color: string; value: ReactNode; label: string; hint?: string; onClick: () => void };
   const rewards: Reward[] = [
-    ...(fb ? [{ key: 'tester', icon: <BugOutlined />, color: ERR, value: fb.totalReports, label: 'Báo lỗi hợp lệ', hint: pendingReward > 0 ? `Thưởng chờ: ${vnd(pendingReward)}` : `${fb.totalPoints} điểm`, onClick: () => nav('reports') } as Reward] : []),
-    ...(reqIn > 0 ? [{ key: 'invite', icon: <TeamOutlined />, color: BLUE, value: reqIn, label: 'Lời mời kết bạn', hint: 'Chờ phản hồi', onClick: () => nav('profile') } as Reward] : []),
+    // Thẻ "Báo lỗi hợp lệ / điểm / thưởng chờ" bỏ cùng chương trình thưởng báo lỗi (07/10/2026).
+    ...(FEATURE_FRIENDS && reqIn > 0 ? [{ key: 'invite', icon: <TeamOutlined />, color: BLUE, value: reqIn, label: 'Lời mời kết bạn', hint: 'Chờ phản hồi', onClick: () => nav('profile') } as Reward] : []),
     ...(ref ? [{ key: 'ref', icon: <GiftOutlined />, color: OK, value: ref.referrals, label: 'Đã giới thiệu', hint: 'Mời bạn → nhận thưởng', onClick: () => nav('profile') } as Reward] : []),
   ];
 
@@ -250,7 +253,7 @@ export function HomeOverview({
         <HeroStat v={runnersReady === null ? '—' : <>{runnersReady}<span style={{ fontSize: 14, opacity: .7, fontWeight: 600 }}>/{runnersTotal}</span></>} l="AI sẵn sàng" onClick={() => nav('settings')} />
         {sub ? (
           <Tooltip title={sub.resetAt ? `Ngân sách token làm mới ${formatDate(sub.resetAt)}` : 'Ngân sách token theo gói'}>
-          <div onClick={() => nav('profile')} style={{ flex: '1 1 150px', padding: '13px 20px', borderLeft: '1px solid rgba(255,255,255,.14)', cursor: 'pointer' }}>
+          <div onClick={goPlan} style={{ flex: '1 1 150px', padding: '13px 20px', borderLeft: '1px solid rgba(255,255,255,.14)', cursor: 'pointer' }}>
             <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center', gap: 8 }}>
               {sub.unlimited ? '∞' : `${Math.round(sub.percentUsed)}%`}
               {!sub.unlimited && (
@@ -443,8 +446,8 @@ export function HomeOverview({
           {activityEl}
         </div>
       )}
-      {/* Cộng đồng — gợi ý kết bạn + lời mời. */}
-      {user && <HubPeople />}
+      {/* Cộng đồng — gợi ý kết bạn + lời mời. Toàn bộ là Bạn bè → ẩn theo FEATURE_FRIENDS. */}
+      {user && FEATURE_FRIENDS && <HubPeople />}
     </div>
   );
 }

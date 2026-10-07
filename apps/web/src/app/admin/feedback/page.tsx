@@ -3,7 +3,6 @@
 import {
   CheckOutlined,
   CommentOutlined,
-  DollarOutlined,
   DownloadOutlined,
   ReloadOutlined,
   RobotOutlined,
@@ -16,13 +15,11 @@ import {
   Divider,
   Drawer,
   Input,
-  InputNumber,
   List,
   Row,
   Segmented,
   Select,
   Space,
-  Switch,
   Table,
   Tag,
   Typography,
@@ -36,11 +33,11 @@ import type {
   FeedbackSimilar,
   FeedbackStatus,
 } from "@larkwave/shared";
-import { SEVERITY_LABEL, SEVERITY_POINTS } from "@larkwave/shared";
+import { SEVERITY_LABEL } from "@larkwave/shared";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import FeedbackAttachments from "@/components/FeedbackAttachments";
-import { V, OK, BRAND } from "@larkwave/ui";
+import { V, BRAND } from "@larkwave/ui";
 
 const { Title, Text, Paragraph } = Typography;
 const PAGE_SIZE = 20;
@@ -57,24 +54,17 @@ const SEVERITY_COLOR: Record<FeedbackSeverity, string> = {
   high: "orange",
   critical: "red",
 };
-const vnd = (n: number) => `${(n || 0).toLocaleString("vi-VN")}đ`;
 
 /** Editable triage state for the open report. */
 interface Triage {
   status: FeedbackStatus;
   severity: FeedbackSeverity | null;
-  points: number;
-  rewardVnd: number;
-  rewardPaid: boolean;
   adminNote: string;
   duplicateOfId: string | null;
 }
 const triageOf = (f: Feedback): Triage => ({
   status: f.status,
   severity: f.severity,
-  points: f.points,
-  rewardVnd: f.rewardVnd,
-  rewardPaid: f.rewardPaid,
   adminNote: f.adminNote ?? "",
   duplicateOfId: f.duplicateOfId,
 });
@@ -144,13 +134,13 @@ export default function AdminFeedbackPage() {
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
       const header = [
-        "ID", "Email", "Tên", "Trạng thái", "Mức độ", "Điểm", "Thưởng(VND)",
-        "Đã trả", "Nội dung", "Trang", "Ngày tạo", "Ngày xử lý",
+        "ID", "Email", "Tên", "Trạng thái", "Mức độ",
+        "Nội dung", "Trang", "Ngày tạo", "Ngày xử lý",
       ];
       const body = rows.map((f) =>
         [
           f.id, f.user?.email ?? "", f.user?.name ?? "", f.status, f.severity ?? "",
-          f.points, f.rewardVnd, f.rewardPaid ? "1" : "0", f.message, f.url ?? "",
+          f.message, f.url ?? "",
           f.createdAt, f.resolvedAt ?? "",
         ]
           .map(esc)
@@ -187,9 +177,6 @@ export default function AdminFeedbackPage() {
       const body: AdminUpdateFeedbackRequest = {
         status: next.status,
         severity: next.severity,
-        points: next.points,
-        rewardVnd: next.rewardVnd,
-        rewardPaid: next.rewardPaid,
         adminNote: next.adminNote,
         duplicateOfId: next.duplicateOfId,
       };
@@ -260,31 +247,6 @@ export default function AdminFeedbackPage() {
         ),
     },
     {
-      title: "Điểm",
-      dataIndex: "points",
-      key: "points",
-      width: 70,
-      render: (p: number) => <Text strong>{p || 0}</Text>,
-    },
-    {
-      title: "Thưởng",
-      key: "reward",
-      width: 140,
-      render: (_, r) =>
-        r.rewardVnd > 0 ? (
-          <Space direction="vertical" size={0}>
-            <Text style={{ fontSize: 12.5 }}>{vnd(r.rewardVnd)}</Text>
-            <Tag color={r.rewardPaid ? "green" : "gold"} bordered={false} style={{ marginInlineEnd: 0 }}>
-              {r.rewardPaid ? "Đã trả" : "Chờ trả"}
-            </Tag>
-          </Space>
-        ) : (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            —
-          </Text>
-        ),
-    },
-    {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
@@ -317,7 +279,7 @@ export default function AdminFeedbackPage() {
             Báo lỗi từ người dùng
           </Title>
           <Text type="secondary">
-            Phân loại, tính điểm &amp; thưởng cho tester. Lỗi trùng ghi nhận cho người báo đầu tiên.
+            Phân loại, đánh dấu trùng và phản hồi cho người báo.
             ({total} bản ghi)
           </Text>
         </div>
@@ -361,7 +323,7 @@ export default function AdminFeedbackPage() {
       />
 
       <Drawer
-        title="Phân loại & thưởng"
+        title="Phân loại báo lỗi"
         width={Math.min(680, typeof window !== "undefined" ? window.innerWidth - 40 : 680)}
         open={!!active}
         onClose={() => setActive(null)}
@@ -444,57 +406,20 @@ export default function AdminFeedbackPage() {
               </Col>
               <Col span={12}>
                 <Text strong style={{ fontSize: 12.5, display: "block", marginBottom: 4 }}>
-                  Mức độ (tự gợi ý điểm)
+                  Mức độ
                 </Text>
                 <Select<FeedbackSeverity | "none">
                   value={form.severity ?? "none"}
                   style={{ width: "100%" }}
-                  onChange={(v) =>
-                    v === "none"
-                      ? patch({ severity: null })
-                      : patch({ severity: v, points: SEVERITY_POINTS[v] })
-                  }
+                  onChange={(v) => patch({ severity: v === "none" ? null : v })}
                   options={[
                     { value: "none", label: "— Chưa phân loại —" },
                     ...(Object.keys(SEVERITY_LABEL) as FeedbackSeverity[]).map((s) => ({
                       value: s,
-                      label: `${SEVERITY_LABEL[s]} (${SEVERITY_POINTS[s]}đ điểm)`,
+                      label: SEVERITY_LABEL[s],
                     })),
                   ]}
                 />
-              </Col>
-              <Col span={12}>
-                <Text strong style={{ fontSize: 12.5, display: "block", marginBottom: 4 }}>
-                  Điểm thưởng
-                </Text>
-                <InputNumber
-                  value={form.points}
-                  min={0}
-                  max={100000}
-                  style={{ width: "100%" }}
-                  onChange={(v) => patch({ points: Number(v) || 0 })}
-                />
-              </Col>
-              <Col span={12}>
-                <Text strong style={{ fontSize: 12.5, display: "block", marginBottom: 4 }}>
-                  Tiền thưởng (VND)
-                </Text>
-                <InputNumber
-                  value={form.rewardVnd}
-                  min={0}
-                  step={1000}
-                  style={{ width: "100%" }}
-                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                  parser={(v) => Number((v ?? "").replace(/[^\d]/g, "")) || 0}
-                  onChange={(v) => patch({ rewardVnd: Number(v) || 0 })}
-                  prefix={<DollarOutlined style={{ color: OK }} />}
-                />
-              </Col>
-              <Col span={24}>
-                <Space>
-                  <Switch checked={form.rewardPaid} onChange={(c) => patch({ rewardPaid: c })} />
-                  <Text>Đã thanh toán thưởng cho người dùng</Text>
-                </Space>
               </Col>
             </Row>
 
@@ -523,8 +448,7 @@ export default function AdminFeedbackPage() {
                 </Space>
               ) : (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Đánh dấu báo cáo NÀY là trùng với một báo cáo CŨ HƠN — điểm sẽ ghi nhận cho người
-                  báo đầu tiên, báo cáo này nhận 0 điểm.
+                  Đánh dấu báo cáo NÀY là trùng với một báo cáo CŨ HƠN.
                 </Text>
               )}
               {similar.length > 0 && (
@@ -539,7 +463,7 @@ export default function AdminFeedbackPage() {
                           key="dup"
                           size="small"
                           type="link"
-                          onClick={() => void save({ duplicateOfId: c.id, status: "duplicate", points: 0, rewardVnd: 0 })}
+                          onClick={() => void save({ duplicateOfId: c.id, status: "duplicate" })}
                         >
                           Đánh dấu trùng với cái này
                         </Button>,

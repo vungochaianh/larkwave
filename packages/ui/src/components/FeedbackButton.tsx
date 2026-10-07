@@ -9,7 +9,7 @@ import { getRecentLogs, installErrorCapture } from '../errorLog';
 import { onMessengerWindows } from '../account/messenger';
 import { APP_VERSION } from '../changelog';
 
-const { Paragraph, Text, Link } = Typography;
+const { Paragraph } = Typography;
 
 /**
  * Floating "report a bug / feedback" button for the desktop app — the same flow
@@ -20,7 +20,7 @@ const { Paragraph, Text, Link } = Typography;
  * Requires a signed-in Larkwave account (the /feedback endpoint is authed); when
  * signed out it points the user to the account login instead of a dead 401.
  */
-export function FeedbackButton({ onOpenReports, page, variant = 'fab', open: openProp, onOpenChange, defaultKind }: { onOpenReports?: () => void; page?: string; variant?: 'fab' | 'header' | 'controlled'; open?: boolean; onOpenChange?: (v: boolean) => void; defaultKind?: 'bug' | 'feature' }) {
+export function FeedbackButton({ page, variant = 'fab', open: openProp, onOpenChange, defaultKind }: { page?: string; variant?: 'fab' | 'header' | 'controlled'; open?: boolean; onOpenChange?: (v: boolean) => void; defaultKind?: 'bug' | 'feature' }) {
   const { message } = App.useApp();
   const { user } = useAccountAuth();
   // Controlled mode ('controlled' variant): parent owns open state → no built-in trigger, just the modal.
@@ -175,7 +175,7 @@ export function FeedbackButton({ onOpenReports, page, variant = 'fab', open: ope
             type="info"
             showIcon
             message="Cần đăng nhập tài khoản Larkwave"
-            description="Hãy đăng nhập ở mục Tài khoản để gửi báo lỗi / yêu cầu tính năng (và được tính điểm thưởng cho báo lỗi hợp lệ)."
+            description="Hãy đăng nhập ở mục Tài khoản để gửi báo lỗi / yêu cầu tính năng."
           />
         ) : (
           <>
@@ -197,25 +197,9 @@ export function FeedbackButton({ onOpenReports, page, variant = 'fab', open: ope
                 </>
               ) : (
                 <>
-                  Mô tả lỗi bạn gặp. Hệ thống tự đính kèm phiên bản app + log gần đây để admin dễ kiểm tra và sửa. Báo
-                  lỗi hợp lệ được <Text strong>tính điểm &amp; thưởng</Text>
+                  Mô tả lỗi bạn gặp. Hệ thống tự đính kèm phiên bản app + log gần đây để admin dễ kiểm tra và sửa. Bạn
+                  sẽ nhận thông báo khi admin phản hồi.
                 </>
-              )}
-              {onOpenReports ? (
-                <>
-                  {' '}— xem ở{' '}
-                  <Link
-                    onClick={() => {
-                      setOpen(false);
-                      onOpenReports();
-                    }}
-                  >
-                    Báo lỗi của tôi
-                  </Link>
-                  .
-                </>
-              ) : (
-                '.'
               )}
             </Paragraph>
             <Input.TextArea

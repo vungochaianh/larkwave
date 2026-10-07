@@ -1238,6 +1238,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "wcomp.fbSend": { vi: "Gửi", en: "Send" },
   "wcomp.fbClose": { vi: "Đóng", en: "Close" },
   "wcomp.fbIntro": { vi: "Mô tả lỗi bạn gặp. Hệ thống tự đính kèm trang hiện tại + log gần đây để admin dễ kiểm tra và sửa. Báo lỗi hợp lệ được", en: "Describe the bug you hit. The system auto-attaches the current page + recent logs so admins can check and fix it easily. Valid bug reports earn" },
+  "wcomp.fbIntroPlain": { vi: "Mô tả lỗi bạn gặp. Hệ thống tự đính kèm trang hiện tại + log gần đây để admin dễ kiểm tra và sửa. Bạn sẽ nhận thông báo khi admin phản hồi.", en: "Describe the bug you hit. The system auto-attaches the current page + recent logs so admins can check and fix it easily. You'll get a notification when an admin replies." },
   "wcomp.fbScoredRewarded": { vi: "tính điểm & thưởng", en: "points & rewards" },
   "wcomp.fbSeeAt": { vi: "— xem ở", en: "— see them at" },
   "wcomp.fbMyReports": { vi: "Báo lỗi của tôi", en: "My reports" },

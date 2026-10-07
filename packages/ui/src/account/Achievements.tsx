@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Card, Progress, Tag, Tooltip, Typography } from 'antd';
-import { AppstoreOutlined, BugOutlined, BuildOutlined, CheckCircleOutlined, ClockCircleOutlined, CloudUploadOutlined, CrownOutlined, ExperimentOutlined, EyeOutlined, FireFilled, FireOutlined, GlobalOutlined, HeartFilled, LockOutlined, RocketOutlined, SafetyCertificateOutlined, ShareAltOutlined, StarFilled, TeamOutlined, ThunderboltOutlined, ToolOutlined, TrophyOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, BuildOutlined, CheckCircleOutlined, ClockCircleOutlined, CloudUploadOutlined, CrownOutlined, FireFilled, FireOutlined, GlobalOutlined, HeartFilled, LockOutlined, RocketOutlined, ShareAltOutlined, StarFilled, TeamOutlined, ThunderboltOutlined, ToolOutlined, TrophyOutlined } from '@ant-design/icons';
 import { BRAND, CARD_SHADOW, V } from '../theme';
-import { TESTER_RANKS } from './gamification';
-import { accountApi, type MeActivity, type MeOverview } from './api';
+import { FEATURE_FRIENDS } from '../features';
+import type { MeActivity, MeOverview } from './api';
 
 const { Text } = Typography;
 
@@ -171,8 +171,6 @@ export interface AchievementInput {
   longestStreak: number;
   plan: string;
   joinedAt: string | null;
-  /** Valid (non-rejected) bug reports — drives the tester danh hiệu badges. */
-  bugReports: number;
 }
 
 interface AchievementDef {
@@ -196,25 +194,7 @@ const daysSince = (iso: string | null) =>
 /** Early-adopter cutoff: everyone who joined before this is a “Pioneer”. */
 const PIONEER_CUTOFF = new Date('2026-09-01T00:00:00Z').getTime();
 
-/** Tester "danh hiệu" badges — generated from the mirrored rank thresholds (by bug
- *  count). Uses AntD icons (consistent with the other achievement medals). */
-const TESTER_ICON: Record<string, ReactNode> = {
-  rookie: <BugOutlined />,
-  reporter: <ExperimentOutlined />,
-  hunter: <EyeOutlined />,
-  expert: <SafetyCertificateOutlined />,
-  master: <StarFilled />,
-  legend: <CrownOutlined />,
-};
-const TESTER_ACHIEVEMENTS: AchievementDef[] = TESTER_RANKS.map((r) => ({
-  id: `tester-${r.key}`,
-  name: r.title,
-  desc: `Báo ${r.minBugs} lỗi hợp lệ.`,
-  tier: r.tier,
-  icon: TESTER_ICON[r.key] ?? <BugOutlined />,
-  earned: (s: AchievementInput) => s.bugReports >= r.minBugs,
-  progress: (s: AchievementInput) => ({ cur: s.bugReports, target: r.minBugs }),
-}));
+/* Huy hiệu tester (theo số báo lỗi hợp lệ) đã bỏ cùng chương trình thưởng báo lỗi (07/10/2026). */
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
@@ -349,23 +329,27 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     earned: (s) => !!s.joinedAt && new Date(s.joinedAt).getTime() < PIONEER_CUTOFF,
   },
   // ── Upcoming (đợt sau) — shown locked so the collection feels complete ──
-  {
-    id: 'publisher',
-    name: 'Người chia sẻ',
-    desc: 'Chia sẻ trợ lý Lark/AI cho một người bạn.',
-    tier: 'rare',
-    icon: <ShareAltOutlined />,
-    upcoming: true,
-  },
-  ...TESTER_ACHIEVEMENTS,
-  {
-    id: 'connector',
-    name: 'Kết nối',
-    desc: 'Mời và kết bạn với người dùng khác.',
-    tier: 'common',
-    icon: <TeamOutlined />,
-    upcoming: true,
-  },
+  // Cả hai đều xoay quanh Bạn bè → ẩn theo cờ FEATURE_FRIENDS.
+  ...(FEATURE_FRIENDS
+    ? ([
+        {
+          id: 'publisher',
+          name: 'Người chia sẻ',
+          desc: 'Chia sẻ trợ lý Lark/AI cho một người bạn.',
+          tier: 'rare',
+          icon: <ShareAltOutlined />,
+          upcoming: true,
+        },
+        {
+          id: 'connector',
+          name: 'Kết nối',
+          desc: 'Mời và kết bạn với người dùng khác.',
+          tier: 'common',
+          icon: <TeamOutlined />,
+          upcoming: true,
+        },
+      ] satisfies AchievementDef[])
+    : []),
 ];
 
 /* ── Showcase card ───────────────────────────────────────────────────────── */
@@ -383,23 +367,6 @@ export function AchievementsCard({
   joinedAt: string | null;
   loading: boolean;
 }) {
-  // Bug-report count for the tester danh hiệu badges (fetched once).
-  const [bugReports, setBugReports] = useState(0);
-  useEffect(() => {
-    let on = true;
-    accountApi
-      .myFeedback()
-      .then((r) => {
-        // `totalReports` is newer than this screen's minimum API — undefined would make every
-        // tester badge render "Tiến độ: NaN/N" via Math.min below.
-        if (on) setBugReports(r.totalReports ?? 0);
-      })
-      .catch(() => {});
-    return () => {
-      on = false;
-    };
-  }, []);
-
   const input: AchievementInput = {
     aiRuns: overview?.aiRuns ?? 0,
     remoteTasks: overview?.remoteTasks ?? 0,
@@ -409,7 +376,6 @@ export function AchievementsCard({
     longestStreak: activity?.longestStreak ?? 0,
     plan: plan ?? 'free',
     joinedAt,
-    bugReports,
   };
 
   const evaluated = ACHIEVEMENTS.map((a) => ({

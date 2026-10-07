@@ -1,13 +1,14 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Tag, Badge } from 'antd';
-import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, BugOutlined, UserOutlined, SettingOutlined, ThunderboltOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, CrownOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, ThunderboltOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
 import { ThemeProvider, useThemeMode } from '../ThemeProvider';
 import { useI18n, type Locale } from '../i18n';
 import { useRuntime } from '../RuntimeProvider';
 import { MessengerWidget } from '../account/MessengerWidget';
+import { FEATURE_FRIENDS } from '../features';
 import { UpdateBanner } from './UpdateBanner';
 import { VersionFooter } from './VersionFooter';
 import { AgentGuideModal } from './AgentGuideModal';
@@ -21,13 +22,12 @@ const { Sider, Header, Content } = Layout;
 // "Tổng quan" is a STANDALONE top-level item (first) — it aggregates data from EVERYTHING
 // (Lark + Trợ lý AI + CMS).
 const OVERVIEW_ITEM = { key: 'tw-composer', label: 'Tổng quan', icon: <DashboardOutlined /> };
-// Standalone community item.
-const EXTRA_NAV = [{ key: 'tw-friends', label: 'Bạn bè', icon: <TeamOutlined /> }];
+// Standalone community item. Bạn bè tạm ẩn (FEATURE_FRIENDS) — logic giữ nguyên để bật lại.
+const EXTRA_NAV = FEATURE_FRIENDS ? [{ key: 'tw-friends', label: 'Bạn bè', icon: <TeamOutlined /> }] : [];
 // Top-level items outside any group.
+// KHÔNG còn "Báo lỗi" (trang "Báo lỗi của tôi" bỏ cùng chương trình thưởng, 07/10/2026 — nút gửi
+// báo lỗi trên header vẫn còn) và "Gói & Thanh toán" (gói + nâng cấp đã nằm trong Hồ sơ).
 const TOP_NAV = [
-  { key: 'tw-reports', label: 'Báo lỗi', icon: <BugOutlined /> },
-  { key: 'tw-pricing', label: 'Gói & Thanh toán', icon: <CrownOutlined /> },
-  // Đặt cạnh Gói & Thanh toán: dung lượng cũng là thứ tính theo gói và mua thêm được.
   { key: 'tw-storage', label: 'Dung lượng', icon: <CloudServerOutlined /> },
   { key: 'tw-profile', label: 'Hồ sơ', icon: <UserOutlined /> },
 ];
@@ -185,8 +185,6 @@ const NAV_TITLE: Record<string, string> = {
   'tw-skills': 'Kỹ năng (Skills)',
   'tw-skills-cross': 'Kỹ năng chéo (kiểm chéo liên tục)',
   'tw-friends': 'Bạn bè',
-  'tw-reports': 'Báo lỗi',
-  'tw-pricing': 'Gói & Thanh toán',
   'tw-storage': 'Dung lượng',
   'tw-profile': 'Hồ sơ & Gói',
   'tw-settings': 'Cài đặt',
@@ -205,7 +203,6 @@ const NAV_I18N: Record<string, string> = {
   'tw-cms-sync': 'app.nav.cmsSync',
   'tw-skills': 'app.nav.skills',
   'tw-skills-cross': 'app.nav.skillsCross',
-  'tw-reports': 'app.nav.reports',
   'tw-profile': 'app.nav.profile',
   'tw-settings': 'app.nav.settings',
 };
@@ -220,7 +217,6 @@ const NAV_TITLE_I18N: Record<string, string> = {
   'tw-cms-sync': 'app.title.cmsSync',
   'tw-skills': 'app.title.skills',
   'tw-skills-cross': 'app.title.skillsCross',
-  'tw-reports': 'app.nav.reports',
   'tw-profile': 'app.nav.profile',
   'tw-settings': 'app.nav.settings',
 };
@@ -456,7 +452,7 @@ function AppShellInner({
                   onClick={toggle}
                 />
               </Tooltip>
-              {isDesktop && (
+              {isDesktop && FEATURE_FRIENDS && (
                 <Tooltip title="Tin nhắn">
                   <Badge count={msgUnread} size="small" offset={[-2, 4]}>
                     <Button type="text" icon={<MessageOutlined />} onClick={() => setMsgOpen((o) => !o)} />
@@ -483,7 +479,7 @@ function AppShellInner({
                 <UpdateBanner />
                 {children}
               </div>
-              {isDesktop && <MessengerWidget listOpen={msgOpen} onCloseList={() => setMsgOpen(false)} onUnread={setMsgUnread} />}
+              {isDesktop && FEATURE_FRIENDS && <MessengerWidget listOpen={msgOpen} onCloseList={() => setMsgOpen(false)} onUnread={setMsgUnread} />}
             </Content>
           </Layout>
         </Layout>

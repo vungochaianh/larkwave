@@ -24,7 +24,6 @@ const selfServe = (t: TFn) => [
   { href: "/community", title: t("sup.ssCommunity.lw", "Cộng đồng"), desc: t("sup.ssCommunityD.lw", "Hỏi người dùng khác, xem mẹo dùng Lark Agents và Kỹ năng.") },
   { href: "/pricing", title: t("sup.ssPrice", "Gói & Giá"), desc: t("sup.ssPriceD.lw", "Hạn mức dùng AI mỗi tháng, và gói miễn phí gồm những gì.") },
   { href: "/download", title: t("sup.ssApp", "Tải app desktop"), desc: t("sup.ssAppD.lw", "Kết nối Lark bằng QR và chạy AI ngay trên máy bạn.") },
-  { href: "/reports", title: t("sup.ssReports.lw", "Thưởng báo lỗi"), desc: t("sup.ssReportsD.lw", "Báo lỗi được ghi nhận, lên hạng tester và nhận thưởng.") },
 ];
 
 /**
@@ -164,12 +163,11 @@ export default function SupportClient({ lang }: { lang?: Locale }) {
                 lần sau người ta không gửi nữa. */}
             <div style={{ marginTop: 28 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 10px" }}>{t("sup.yours", "Báo cáo của bạn")}</h3>
-              {/* Bảng điểm tester — API vốn trả về sẵn trong /feedback/mine. Không hiện thì người
-                  gửi không thấy báo cáo của mình dẫn tới đâu, và lần sau họ không gửi nữa. */}
+              {/* Tóm tắt báo cáo đã gửi. Không hiện thì người gửi không thấy báo cáo của mình dẫn
+                  tới đâu, và lần sau họ không gửi nữa. */}
               {mine && mine.totalReports > 0 && (
                 <p style={{ fontSize: 13.5, color: "var(--tw-text-sub, #6B7280)", margin: "0 0 12px" }}>
                   Bạn đã gửi <b>{mine.totalReports}</b> báo cáo · <b>{mine.resolvedCount}</b> đã xử lý
-                  {mine.totalPoints > 0 ? <> · <b>{mine.totalPoints}</b> điểm</> : null}
                 </p>
               )}
               {loadingMine ? (

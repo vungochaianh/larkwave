@@ -1,6 +1,6 @@
 "use client";
 
-import { BugOutlined, BulbOutlined, BulbFilled, CloudServerOutlined, DesktopOutlined, ExperimentOutlined, FacebookFilled, DashboardOutlined, IdcardOutlined, LoginOutlined, LogoutOutlined, MenuFoldOutlined, MessageOutlined, MenuOutlined, MenuUnfoldOutlined, MoreOutlined, PlusOutlined, RobotOutlined, SafetyOutlined, TeamOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { BulbOutlined, BulbFilled, CloudServerOutlined, DesktopOutlined, ExperimentOutlined, FacebookFilled, DashboardOutlined, IdcardOutlined, LoginOutlined, LogoutOutlined, MenuFoldOutlined, MessageOutlined, MenuOutlined, MenuUnfoldOutlined, MoreOutlined, PlusOutlined, RobotOutlined, SafetyOutlined, TeamOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { Badge, Button, Drawer, Dropdown, Grid, Layout, Menu, Tooltip } from "antd";
 import { V, BRAND_GRADIENT, useThemeMode, useI18n, type Locale } from "@larkwave/ui";
 import Link from "next/link";
@@ -19,6 +19,7 @@ import NotificationBell from "@/components/NotificationBell";
 import MessengerWidget from "@/components/MessengerWidget";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { SurfaceScope } from "@/components/surface";
+import { FEATURE_FRIENDS } from "@larkwave/ui/features";
 
 const { Sider, Header, Content } = Layout;
 const { useBreakpoint } = Grid;
@@ -62,14 +63,14 @@ const NAV: NavItem[] = [
     ],
   },
   { key: "/community", label: "Cộng đồng", icon: <MessageOutlined /> },
-  { key: "/friends", label: "Bạn bè", icon: <TeamOutlined /> },
+  // Bạn bè: tạm ẩn (07/10/2026) sau cờ FEATURE_FRIENDS — logic/API vẫn giữ.
+  ...(FEATURE_FRIENDS ? [{ key: "/friends", label: "Bạn bè", icon: <TeamOutlined /> }] : []),
   // KHÔNG còn mục "Gói & Thanh toán" ở đây (24/09/2026). Gói hiện tại đã hiện ngay trên trang Hồ
   // sơ, và /pricing nay là trang giới thiệu công khai chứ không phải màn hình trong app — để nó
   // trong thanh bên là dẫn người dùng ra khỏi bảng điều khiển mà không báo trước.
   // Cùng lý do với "Khám phá app" đã bỏ ở trên: một mục thanh bên dẫn tới trang công khai chỉ làm
   // thanh bên dài thêm. Trang /pricing VẪN CÒN và vẫn công khai.
   { key: "/storage", label: "Dung lượng", icon: <CloudServerOutlined /> },
-  { key: "/reports", label: "Báo lỗi của tôi", icon: <BugOutlined /> },
   { key: "/profile", label: "Hồ sơ", icon: <IdcardOutlined /> },
 ];
 
@@ -86,8 +87,6 @@ const NAV_I18N: Record<string, string> = {
   "/remote/lark": "nav.remote.larkCms",
   "/community": "nav.community",
   "/friends": "nav.friends",
-  "/pricing": "nav.pricing",
-  "/reports": "nav.reports",
   "/profile": "nav.profile",
 };
 
@@ -121,9 +120,6 @@ function selectedKey(pathname: string): string {
   if (pathname.startsWith("/agent")) return "/remote/agent";
   if (pathname.startsWith("/community")) return "/community";
   if (pathname.startsWith("/friends")) return "/friends";
-  if (pathname.startsWith("/pricing")) return "/pricing";
-  // /billing now redirects to the merged /pricing page — highlight the same item.
-  if (pathname.startsWith("/billing")) return "/pricing";
   if (pathname.startsWith("/profile")) return "/profile";
   return "";
 }
@@ -421,6 +417,8 @@ function SidebarInner({
   // Unread DM badge on the "Bạn bè" nav item — refreshed on navigation + every 25s.
   const [unread, setUnread] = useState(0);
   useEffect(() => {
+    // Bạn bè đang ẩn → không có chỗ hiện huy hiệu, khỏi gọi API mỗi 25 giây.
+    if (!FEATURE_FRIENDS) return;
     let alive = true;
     const fetchUnread = () =>
       api
@@ -714,7 +712,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {/* Chat cộng đồng sống trên HEADER chứ không phải FAB góc phải dưới (góc đó đã có nút báo lỗi).
               Ở đây nó mount trên MỌI trang — trước kia nằm trong nhóm FAB nên /remote/agent mất luôn
               openMessenger(). */}
-          <MessengerWidget variant="header" />
+          {FEATURE_FRIENDS && <MessengerWidget variant="header" />}
 
           <Link href="/agents-chat/new" style={{ flex: "0 0 auto" }}>
             <Button

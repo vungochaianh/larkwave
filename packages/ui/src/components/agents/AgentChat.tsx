@@ -53,6 +53,7 @@ import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPrev
 import { clockTime, humanDuration } from '../../time';
 import { parseAskedFields } from './askedForm';
 import { AgentGrantsPanel } from './AgentGrantsPanel';
+import { FEATURE_FRIENDS } from '../../features';
 import { UserAvatar } from '../../account/UserAvatar';
 import { useI18n } from '../../i18n';
 
@@ -561,6 +562,8 @@ export function AgentChat({
 
   // Received shared assistants (agentchat grants a friend claimed).
   const loadReceived = useCallback(async () => {
+    // Trợ lý được bạn bè chia sẻ chỉ có khi Bạn bè bật (FEATURE_FRIENDS) — tắt thì chỉ còn trợ lý của mình.
+    if (!FEATURE_FRIENDS) return;
     try {
       const b = await accountApi.larkGrantsReceived();
       setReceived(b.active.filter((g) => g.kind === 'agentchat' && g.status === 'active'));
@@ -1965,7 +1968,7 @@ export function AgentChat({
                   onChange={(id, m) => { setRunnerId(id); setRunnerModel(m || ''); }}
                 />
               )}
-              <Tooltip title={tr('chat.shareAssistantTip', 'Chia sẻ Trợ lý AI cho bạn bè / lời mời')}>
+              <Tooltip title={FEATURE_FRIENDS ? tr('chat.shareAssistantTip', 'Chia sẻ Trợ lý AI cho bạn bè / lời mời') : tr('chat.createPublicLink', 'Tạo link công khai')}>
                 <Button size="small" icon={<ShareAltOutlined />} onClick={() => setShareOpen(true)} style={{ flexShrink: 0 }}>{narrow ? undefined : tr('chat.share', 'Chia sẻ')}</Button>
               </Tooltip>
             </div>

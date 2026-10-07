@@ -11,6 +11,7 @@ import { AchievementsCard } from './Achievements';
 import { ContributionGraph } from './ActivityCards';
 import { openMessenger } from './messenger';
 import { PricingView } from './PricingView';
+import { FEATURE_FRIENDS } from '../features';
 import { UserAvatar } from './UserAvatar';
 import type { View } from '../components/HomeScreen';
 
@@ -27,6 +28,9 @@ function PlanBadge({ plan }: { plan?: string | null }) {
 }
 
 /** Native desktop port (core) of the website's /profile. */
+/** Mốc cuộn tới phần Gói & Thanh toán trong Hồ sơ. */
+export const PROFILE_PLAN_ANCHOR = 'tw-profile-plan';
+
 export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
   const { user } = useAccountAuth();
   const { message } = App.useApp();
@@ -82,12 +86,16 @@ export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
         <AchievementsCard overview={overview} activity={activity} plan={user?.plan ?? undefined} joinedAt={joinedAt} loading={loading} />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, alignItems: 'start' }}>
-          <FriendsCard />
+          {/* Bạn bè tạm ẩn (FEATURE_FRIENDS) — FriendsCard giữ nguyên để bật lại. */}
+          {FEATURE_FRIENDS && <FriendsCard />}
           <ReferralCard />
         </div>
 
-        {/* Gói & Thanh toán folded in as one page (UI-8) */}
-        <PricingView onNav={onNav} />
+        {/* Gói & Thanh toán folded in as one page (UI-8). Đây là chỗ DUY NHẤT xem/nâng gói trong
+            app (không còn mục "Gói & Thanh toán" riêng) — Tổng quan cuộn thẳng tới mốc này. */}
+        <div id={PROFILE_PLAN_ANCHOR} style={{ scrollMarginTop: 80 }}>
+          <PricingView onNav={onNav} />
+        </div>
       </Space>
     </>
   );
@@ -102,7 +110,7 @@ function StatBand({ overview, activity, loading, onNav }: { overview: MeOverview
     { key: 'skills', label: 'Kỹ năng', value: overview?.skills, icon: <AppstoreOutlined />, color: WARN, onClick: go('skills') },
     { key: 'artifacts', label: 'Artifacts', value: overview?.artifacts, icon: <DeploymentUnitOutlined />, color: OK },
     { key: 'scheduled', label: 'Tác vụ định kỳ', value: overview?.scheduledTasks, icon: <CheckCircleOutlined />, color: OK },
-    { key: 'reports', label: 'Báo lỗi', value: overview?.reports, icon: <CloseCircleOutlined />, color: ERR, onClick: go('reports') },
+    { key: 'reports', label: 'Báo lỗi', value: overview?.reports, icon: <CloseCircleOutlined />, color: ERR },
     { key: 'streak', label: 'Chuỗi hiện tại', value: activity?.currentStreak ?? 0, icon: <FireOutlined />, color: WARN },
     { key: 'longest', label: 'Chuỗi dài nhất', value: activity?.longestStreak ?? 0, icon: <TrophyOutlined />, color: BRAND },
     { key: 'contrib', label: 'Tổng đóng góp', value: activity?.total ?? 0, icon: <ThunderboltOutlined />, color: OK },

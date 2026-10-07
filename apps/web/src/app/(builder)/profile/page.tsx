@@ -65,8 +65,11 @@ export default function ProfilePage() {
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} />
       <ChangePasswordModal open={pwdOpen} onClose={() => setPwdOpen(false)} />
 
-      {/* Plan & monthly build quota */}
-      <UsageWidget variant="card" />
+      {/* Plan & monthly build quota. id="plan": Tổng quan trỏ thẳng tới đây (/profile#plan) — không còn
+          trang "Gói & Thanh toán" riêng trong app. */}
+      <div id="plan" style={{ scrollMarginTop: 80 }}>
+        <UsageWidget variant="card" />
+      </div>
 
       {/* Device manager — login sessions, max 3 per account */}
       <Card styles={{ body: { padding: 20 } }} style={{ boxShadow: CARD_SHADOW }}>

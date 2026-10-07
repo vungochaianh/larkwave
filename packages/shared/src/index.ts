@@ -56,14 +56,6 @@ export interface AssistantChatResponse {
 export type FeedbackSeverity = "low" | "medium" | "high" | "critical";
 export type FeedbackStatus = "open" | "resolved" | "duplicate" | "rejected";
 
-/** Suggested tester points per severity — admin can override per report. */
-export const SEVERITY_POINTS: Record<FeedbackSeverity, number> = {
-  low: 5,
-  medium: 15,
-  high: 40,
-  critical: 100,
-};
-
 export const SEVERITY_LABEL: Record<FeedbackSeverity, string> = {
   low: "Thấp",
   medium: "Trung bình",
@@ -88,15 +80,9 @@ export interface Feedback {
   /** Uploaded evidence (images/files). */
   attachments: FeedbackAttachment[];
   status: FeedbackStatus;
-  /** Bug-bounty triage. null until an admin classifies it. */
+  /** Triage severity. null until an admin classifies it. */
   severity: FeedbackSeverity | null;
-  /** Tester points awarded (0 for duplicates/rejected). */
-  points: number;
-  /** Monetary reward (VND) granted for this report. */
-  rewardVnd: number;
-  rewardPaid: boolean;
-  rewardPaidAt: string | null;
-  /** If a duplicate, the canonical (first) report id — its reporter keeps the credit. */
+  /** If a duplicate, the canonical (first) report id. */
   duplicateOfId: string | null;
   adminNote: string | null;
   resolvedAt: string | null;
@@ -117,22 +103,19 @@ export interface SubmitFeedbackRequest {
 export interface AdminUpdateFeedbackRequest {
   status?: FeedbackStatus;
   severity?: FeedbackSeverity | null;
-  points?: number;
-  rewardVnd?: number;
-  rewardPaid?: boolean;
   adminNote?: string;
-  /** Mark as duplicate of another report (its first reporter keeps the credit). */
+  /** Mark as duplicate of another report. */
   duplicateOfId?: string | null;
 }
 
-/** A user's own reports + their tester scoreboard (GET /feedback/mine). */
+/**
+ * A user's own reports (GET /feedback/mine, listed on /support). The bug-report REWARD program
+ * (points / VND reward / tester ranks) was removed 07/10/2026.
+ */
 export interface MyFeedbackResponse {
   items: Feedback[];
-  totalPoints: number;
-  totalRewardVnd: number;
-  paidRewardVnd: number;
   resolvedCount: number;
-  /** Count of valid (non-rejected) reports — drives the tester danh hiệu. */
+  /** Count of valid (non-rejected) reports. */
   totalReports: number;
 }
 
@@ -167,26 +150,6 @@ export interface NotificationsResponse {
   items: AppNotification[];
   unread: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tester "danh hiệu" — achievement badges earned by NUMBER of (valid) bug reports.
-// Rendered in the profile's "Huy hiệu thành tựu" collection. `tier` = medal rarity.
-export interface TesterRank {
-  key: string;
-  title: string;
-  emoji: string;
-  tier: "common" | "rare" | "epic" | "legendary" | "mythic";
-  /** Bug reports required to unlock this badge. */
-  minBugs: number;
-}
-export const TESTER_RANKS: TesterRank[] = [
-  { key: "rookie", title: "Tân binh Tester", emoji: "🌱", tier: "common", minBugs: 1 },
-  { key: "reporter", title: "Người báo lỗi", emoji: "🐛", tier: "rare", minBugs: 10 },
-  { key: "hunter", title: "Thợ săn Bug", emoji: "🔍", tier: "rare", minBugs: 25 },
-  { key: "expert", title: "Chuyên gia QA", emoji: "🛡️", tier: "epic", minBugs: 50 },
-  { key: "master", title: "Bậc thầy Tester", emoji: "⭐", tier: "legendary", minBugs: 100 },
-  { key: "legend", title: "Huyền thoại QA", emoji: "👑", tier: "mythic", minBugs: 250 },
-];
 
 /** A user as shown in friend lists / chats (public-safe profile fields). */
 export interface Friend {

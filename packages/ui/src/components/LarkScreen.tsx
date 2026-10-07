@@ -7,6 +7,7 @@ import { useRuntime } from '../RuntimeProvider';
 import { useAccountAuth } from '../account/auth';
 import { LarkConnectPanel } from './lark/LarkConnectPanel';
 import { LarkGrantsPanel } from './lark/LarkGrantsPanel';
+import { FEATURE_FRIENDS } from '../features';
 import { LarkChatShell } from './lark/LarkChatShell';
 import { BasesPanel } from './lark/BasesPanel';
 import { AutomationsPanel } from './lark/AutomationsPanel';
@@ -133,9 +134,13 @@ export function LarkScreen({
                     dừng, xem nhật ký lượt chạy), nhưng nó là panel thứ hai trong một modal cuộn
                     dọc chứa bảy panel — nên người dùng báo là "chưa làm". Một tính năng không
                     tìm thấy thì đúng bằng một tính năng không tồn tại. */}
-                <Button icon={<TeamOutlined />} onClick={() => setShareOpen(true)}>
-                  Chia sẻ
-                </Button>
+                {/* Chia sẻ kết nối Lark là cho BẠN BÈ (máy chủ chặn nếu không phải bạn) → ẩn theo
+                    FEATURE_FRIENDS. Link công khai của từng hội thoại vẫn ở trong khung chat. */}
+                {FEATURE_FRIENDS && (
+                  <Button icon={<TeamOutlined />} onClick={() => setShareOpen(true)}>
+                    Chia sẻ
+                  </Button>
+                )}
                 <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
                   Cài đặt
                 </Button>
@@ -149,7 +154,7 @@ export function LarkScreen({
       {/* Chia sẻ có modal RIÊNG: đây là việc người dùng đi tìm có chủ đích ("cho đồng nghiệp dùng
           cùng"), không phải một tuỳ chọn họ vô tình bắt gặp khi đang chỉnh cấu hình. */}
       <Modal
-        open={shareOpen}
+        open={FEATURE_FRIENDS && shareOpen}
         onCancel={() => setShareOpen(false)}
         footer={null}
         width={640}
@@ -171,7 +176,7 @@ export function LarkScreen({
               Lark lại nằm sau cổng đó. Nghĩa là người cần nhận nhất thì không bao giờ thấy nút —
               tính năng chia sẻ có đủ máy móc ở cả hai đầu mà trên thực tế không ai dùng được.
               Phần nhận chỉ gọi accountApi, không đụng kết nối Lark cục bộ, nên chạy tốt ở đây. */}
-          <LarkGrantsPanel runtime={runtime} mode="receive" />
+          {FEATURE_FRIENDS && <LarkGrantsPanel runtime={runtime} mode="receive" />}
           <LarkConnectPanel runtime={runtime} connection={conn} onChange={setConn} />
         </div>
       ) : (

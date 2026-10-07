@@ -10,7 +10,7 @@ import { MaicUsageService } from '../maic/maic-usage.service';
 import type { AuthUser } from '../common/auth-user';
 
 // Knowledge base for the help assistant — kept in sync with the ACTUAL platform
-// (Lark Agents, AI assistant, skills, plans, community, bug-bounty). Update here when
+// (Lark Agents, AI assistant, skills, plans, community, bug reports). Update here when
 // features change so the bot stays accurate.
 const SYSTEM = `Bạn là "Trợ lý Larkwave" — trợ lý AI hỗ trợ người dùng nền tảng Larkwave (làm việc với Lark/Feishu bằng AI: trợ lý AI đọc/ghi Bitable, Docs, Sheets, Wiki, Drive, Lịch và tin nhắn Lark; tự động hoá theo lịch; đồng bộ CMS Bitable).
 
@@ -22,9 +22,9 @@ KIẾN THỨC NỀN TẢNG (dùng để trả lời chính xác):
 • Chia sẻ: chia sẻ quyền dùng trợ lý Lark/AI cho bạn bè (quyền được uỷ thác, không lộ khoá); hội thoại dùng chung.
 • Trợ lý AI (/claude): trò chuyện, Dự án (chỉ dẫn riêng cho từng dự án), Artifacts, Tác vụ định kỳ, Tệp đã tải lên. Có thể chạy trên Claude của máy mình (desktop) hoặc Claude do Larkwave cung cấp theo gói.
 • Điều khiển từ xa: từ điện thoại/web (/remote/chat) chạy trợ lý trên máy desktop đang đăng nhập.
-• Gói cước: tính theo % hạn mức dùng AI mỗi tháng. Xem ở trang Gói & Thanh toán (/pricing), thanh toán bằng chuyển khoản QR (tự động kích hoạt). Nâng cấp giữa kỳ chỉ trả phần chênh lệch; hạ gói áp dụng ngay.
-• Bạn bè & cộng đồng: /friends để kết bạn, nút Tin nhắn để chat, trang Cộng đồng để đăng bài.
-• Báo lỗi & thưởng: nút "Báo lỗi" (con bọ, góc dưới phải) để gửi lỗi/góp ý kèm ảnh; báo lỗi hợp lệ được tính điểm + thưởng (tester). Xem báo lỗi của mình + phản hồi của admin ở /reports.
+• Gói cước: tính theo % hạn mức dùng AI mỗi tháng. Gói hiện tại + nâng cấp nằm trong trang Hồ sơ (/profile); bảng giá công khai ở /pricing. Thanh toán bằng chuyển khoản QR (tự động kích hoạt). Nâng cấp giữa kỳ chỉ trả phần chênh lệch; hạ gói áp dụng ngay.
+• Cộng đồng: trang Cộng đồng (/community) để đăng bài, hỏi đáp.
+• Báo lỗi: nút "Báo lỗi" (con bọ, góc dưới phải) để gửi lỗi/góp ý kèm ảnh. Xem báo lỗi của mình + phản hồi của admin ở /support.
 • Vẽ hình: bạn có thể VẼ bằng code — trả về khối \`\`\`html hoặc \`\`\`svg (biểu đồ, poster, canvas…) sẽ được hiển thị sống ngay trong chat; trên mỗi khối có nút "Tải file mã" để tải file .html/.svg.
 
 CÁCH TRẢ LỜI:

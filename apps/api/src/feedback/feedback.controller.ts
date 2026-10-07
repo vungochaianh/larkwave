@@ -23,7 +23,7 @@ export class FeedbackController {
     return this.feedback.submit(user, dto);
   }
 
-  /** The signed-in user's own reports + their tester scoreboard. */
+  /** The signed-in user's own reports (listed on /support). */
   @Get('mine')
   mine(@CurrentUser() user: AuthUser): Promise<MyFeedbackResponse> {
     return this.feedback.mine(user);
@@ -40,7 +40,7 @@ export class FeedbackController {
   }
 }
 
-/** Admins triage + reward user-reported bugs in /admin/feedback. */
+/** Admins triage user-reported bugs in /admin/feedback. */
 @Roles('admin')
 @Controller('admin/feedback')
 export class AdminFeedbackController {
