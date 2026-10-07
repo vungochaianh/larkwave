@@ -61,7 +61,7 @@ function LogoMark({ size = 30 }: { size?: number }) {
     <span
       style={{
         display: 'inline-flex', minWidth: size, width: size, height: size, borderRadius: size * 0.32,
-        alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.56), color: '#fff',
+        alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.6), color: '#fff',
         background: BRAND_GRADIENT, boxShadow: '0 6px 16px rgba(108,92,231,0.30)',
       }}
     >

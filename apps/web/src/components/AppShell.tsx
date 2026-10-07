@@ -158,7 +158,7 @@ function LogoMark({ size = 30 }: { size?: number }) {
         borderRadius: size * 0.32,
         alignItems: "center",
         justifyContent: "center",
-        fontSize: size * 0.56,
+        fontSize: size * 0.6,
         boxShadow: "0 6px 16px rgba(108,92,231,0.30)",
       }}
     >
