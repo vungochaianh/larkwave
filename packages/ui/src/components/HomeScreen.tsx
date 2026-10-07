@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { App, Spin, Card, Typography, Space, Button } from 'antd';
+import { App as AntApp, App, Spin, Card, Typography, Space, Button } from 'antd';
 import { ThunderboltOutlined, RocketOutlined, ExportOutlined } from '@ant-design/icons';
 import { AppShell } from './AppShell';
 import { LarkScreen } from './LarkScreen';
@@ -234,9 +234,13 @@ function HomeShell() {
       );
     if (!accountUser)
       return (
-        <div style={{ minHeight: '100vh', overflowY: 'auto', background: V.layer }}>
-          <LoginView />
-        </div>
+        // LoginView dùng App.useApp() cho thông báo; màn đăng nhập toàn trang này nằm NGOÀI AppShell
+        // (nơi đặt <AntApp>), nên thiếu lớp bọc thì đăng nhập xong vẫn ném "message.error is not a function".
+        <AntApp>
+          <div style={{ minHeight: '100vh', overflowY: 'auto', background: V.layer }}>
+            <LoginView />
+          </div>
+        </AntApp>
       );
   }
 
