@@ -1,7 +1,6 @@
 "use client";
 
-import { ThunderboltOutlined } from "@ant-design/icons";
-import type { Locale } from "@larkwave/ui";
+import { BrandGlyph, type Locale } from "@larkwave/ui";
 import { ConfigProvider, type ThemeConfig } from "antd";
 import type { CSSProperties, ReactNode } from "react";
 import { CursorGlow, HeroShader, TiltCard, FX_DARK_PALETTE as D } from "@/components/fx";
@@ -140,7 +139,7 @@ const AUTH_CSS = `
 @keyframes tw-auth-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 /* Logo nổi khỏi mặt kính (translateZ qua .tw-fx-z1 — chỉ có tác dụng khi thẻ giữ preserve-3d),
    kèm quầng sáng tím phía dưới như một vật phát sáng đặt trên kính. */
-.tw-auth-mark{display:inline-flex;width:56px;height:56px;border-radius:17px;align-items:center;justify-content:center;font-size:26px;color:#fff;background:${GRADIENT};box-shadow:0 10px 28px rgba(108,92,231,.55),0 0 0 1px rgba(255,255,255,.08) inset;}
+.tw-auth-mark{display:inline-flex;width:56px;height:56px;border-radius:17px;align-items:center;justify-content:center;font-size:30px;color:#fff;background:${GRADIENT};box-shadow:0 10px 28px rgba(108,92,231,.55),0 0 0 1px rgba(255,255,255,.08) inset;}
 .tw-auth-word{margin-top:14px;font-weight:800;letter-spacing:2px;font-size:13px;color:${D.textSub};}
 /* margin-bottom:0 vì thẻ này là <h1>: trình duyệt tự thêm lề dưới cho heading mà <div> không có. */
 .tw-auth-title{margin-top:10px;margin-bottom:0;font-size:clamp(22px,3vw,26px);font-weight:700;line-height:1.2;color:${D.text};letter-spacing:-.2px;}
@@ -237,7 +236,7 @@ export default function AuthCard({
           <TiltCard maxTilt={6} scale={1} magnet={0} reach={260} className="tw-fx-glass tw-auth-card">
             <div style={{ textAlign: "center", marginBottom: 24 }}>
               <div className="tw-auth-mark tw-fx-z1">
-                <ThunderboltOutlined />
+                <BrandGlyph />
               </div>
               <div className="tw-auth-word">LARKWAVE</div>
               {/* <h1>, KHÔNG phải <div>.

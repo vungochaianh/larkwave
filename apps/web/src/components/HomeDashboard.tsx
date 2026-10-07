@@ -12,7 +12,7 @@ import { Button, Card, Grid, Progress, Space, theme, Tooltip, Typography } from 
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { MeActivity, MeSubscription } from "@larkwave/shared";
-import { StreakRow, ContributionGraph, useI18n } from "@larkwave/ui";
+import { BrandGlyph, StreakRow, ContributionGraph, useI18n } from "@larkwave/ui";
 import { formatTokens, refPercent } from "@/lib/formatTokens";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -90,7 +90,7 @@ function HeroBanner({ isMobile, refreshTick, onRefresh }: { isMobile: boolean; r
     <div style={{ position: "relative", overflow: "hidden", borderRadius: 20, background: BRAND_GRADIENT, color: "#fff", boxShadow: CARD_SHADOW }}>
       <div aria-hidden style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 130% at 88% -10%, rgba(255,255,255,.26), transparent 55%)", pointerEvents: "none" }} />
       <div aria-hidden style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,.16) 1px, transparent 1.6px)", backgroundSize: "20px 20px", WebkitMaskImage: "linear-gradient(115deg,#000, transparent 62%)", maskImage: "linear-gradient(115deg,#000, transparent 62%)", pointerEvents: "none" }} />
-      <ThunderboltOutlined aria-hidden style={{ position: "absolute", right: -16, bottom: -64, fontSize: 200, color: "rgba(255,255,255,.10)", transform: "rotate(-12deg)", pointerEvents: "none" }} />
+      <BrandGlyph style={{ position: "absolute", right: -16, bottom: -64, fontSize: 200, color: "rgba(255,255,255,.10)", transform: "rotate(-12deg)", pointerEvents: "none" }} />
       <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, flexWrap: "wrap", padding: isMobile ? "20px 18px 14px" : "24px 28px 18px" }}>
         <div style={{ minWidth: 0, flex: "1 1 340px" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.3, textTransform: "uppercase", background: "rgba(255,255,255,.16)", padding: "4px 11px", borderRadius: 999 }}>

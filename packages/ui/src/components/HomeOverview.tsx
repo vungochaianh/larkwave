@@ -5,6 +5,7 @@ import { PlusOutlined, FieldTimeOutlined, CheckCircleFilled, RobotOutlined, Thun
 import { useRuntime } from '../RuntimeProvider';
 import { V, BRAND, BRAND_GRADIENT, CARD_SHADOW, OK, WARN, ERR, BLUE } from '../theme';
 import { HubPeople } from './HubCommunity';
+import { BrandGlyph } from './BrandMark';
 import { FEATURE_FRIENDS } from '../features';
 import { PROFILE_PLAN_ANCHOR } from '../account/ProfileView';
 import { useAccountAuth } from '../account/auth';
@@ -226,7 +227,8 @@ export function HomeOverview({
     <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: BRAND_GRADIENT, color: '#fff', boxShadow: CARD_SHADOW }}>
       <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 130% at 88% -10%, rgba(255,255,255,.26), transparent 55%)', pointerEvents: 'none' }} />
       <div aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,.16) 1px, transparent 1.6px)', backgroundSize: '20px 20px', WebkitMaskImage: 'linear-gradient(115deg,#000, transparent 62%)', maskImage: 'linear-gradient(115deg,#000, transparent 62%)', pointerEvents: 'none' }} />
-      <ThunderboltOutlined aria-hidden style={{ position: 'absolute', right: -16, bottom: -68, fontSize: 220, color: 'rgba(255,255,255,.10)', transform: 'rotate(-12deg)', pointerEvents: 'none' }} />
+      {/* Logo watermark (lark over wave) */}
+      <BrandGlyph style={{ position: 'absolute', right: -16, bottom: -68, fontSize: 220, color: 'rgba(255,255,255,.10)', transform: 'rotate(-12deg)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, flexWrap: 'wrap', padding: '24px 28px 18px' }}>
         <div style={{ minWidth: 0, flex: '1 1 340px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.3, textTransform: 'uppercase', background: 'rgba(255,255,255,.16)', padding: '4px 11px', borderRadius: 999 }}>

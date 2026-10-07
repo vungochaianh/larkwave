@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BRAND_GRADIENT, useI18n } from "@larkwave/ui";
+import { BRAND_GRADIENT, BrandGlyph, useI18n } from "@larkwave/ui";
 import { FxStyles } from "./FxStyles";
 
 const DEFAULT_KEY = "tw-fx-splash-seen";
@@ -123,10 +123,8 @@ export default function SplashScreen({
               boxShadow: "var(--tw-fx-splash-shadow)",
             }}
           >
-            {/* Cùng tia sét với LandingChrome — một nhận diện, không vẽ biến thể mới. */}
-            <svg width={32} height={32} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" />
-            </svg>
+            {/* Cùng logo (chim sơn ca trên sóng) với LandingChrome — một nhận diện, dùng chung BrandGlyph. */}
+            <BrandGlyph size={36} />
           </span>
         </div>
         <div className="tw-fx-splash-text">

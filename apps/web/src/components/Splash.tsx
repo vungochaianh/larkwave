@@ -1,4 +1,4 @@
-import { ThunderboltOutlined } from "@ant-design/icons";
+import { BrandGlyph } from "@larkwave/ui";
 import { BRAND_GRADIENT } from "@/lib/theme";
 
 /**
@@ -43,13 +43,13 @@ export default function Splash({
             borderRadius: 20,
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 32,
+            fontSize: 36,
             color: "#fff",
             background: BRAND_GRADIENT,
             boxShadow: "0 16px 40px rgba(108,92,231,0.34)",
           }}
         >
-          <ThunderboltOutlined />
+          <BrandGlyph />
         </span>
       </div>
 

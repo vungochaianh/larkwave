@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { App as AntApp, App, Spin, Card, Typography, Space, Button } from 'antd';
-import { ThunderboltOutlined, RocketOutlined, ExportOutlined } from '@ant-design/icons';
+import { RocketOutlined, ExportOutlined } from '@ant-design/icons';
 import { AppShell } from './AppShell';
 import { LarkScreen } from './LarkScreen';
 import { AutomationsPanel } from './lark/AutomationsPanel';
@@ -22,6 +22,7 @@ import { ProfileView } from '../account/ProfileView';
 import { FriendsView } from '../account/FriendsView';
 import { FEATURE_FRIENDS } from '../features';
 import { HomeOverview } from './HomeOverview';
+import { BrandGlyph } from './BrandMark';
 import { useI18n } from '../i18n';
 
 /**
@@ -220,7 +221,7 @@ function HomeShell() {
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: V.layer }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 56, height: 56, borderRadius: 16, background: BRAND_GRADIENT, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              <ThunderboltOutlined style={{ fontSize: 28 }} />
+              <BrandGlyph style={{ fontSize: 32 }} />
             </div>
             <div style={{ fontWeight: 700, fontSize: 18, color: V.text }}>Larkwave</div>
             <Spin size="large" style={{ marginTop: 16 }} />

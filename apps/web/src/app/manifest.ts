@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 /**
  * Web app manifest so Larkwave installs cleanly on a phone home screen
  * (the "Máy của tôi" agent flow is phone-first). Icons reuse existing assets:
- * the generated gradient bolt icon (`/icon`) and the static OG image — no new
+ * the generated gradient logo icon (`/icon`) and the static OG image — no new
  * image files are invented.
  */
 export default function manifest(): MetadataRoute.Manifest {

@@ -4,6 +4,7 @@ export { SkillsScreen } from './components/SkillsScreen';
 export { LarkChatShell } from './components/lark/LarkChatShell';
 export { LarkFilesScreen } from './components/lark/LarkFilesScreen';
 export { AppShell } from './components/AppShell';
+export { BrandGlyph, BrandMark, BRAND_GLYPH_BIRD, BRAND_GLYPH_WAVE } from './components/BrandMark';
 export { ActionTooltip } from './components/ActionTooltip';
 export { ClaudeConnect } from './components/ClaudeConnect';
 export { DeviceManager } from './components/DeviceManager';

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useI18n, type Locale } from "@larkwave/ui";
+import { BrandGlyph, useI18n, type Locale } from "@larkwave/ui";
 import { useLangT } from "@/lib/useLangT";
 import { useAuthOptional } from "@/lib/auth";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -21,14 +21,6 @@ const BRAND = "#6C5CE7";
 const GRADIENT =
   "linear-gradient(135deg, #6C5CE7 0%, #A66BFF 45%, #FF7AB6 75%, #4FB6FF 100%)";
 
-/** Inline lightning-bolt mark (lib-style SVG, not an emoji). */
-function Bolt({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" />
-    </svg>
-  );
-}
 
 const SECONDARY_LINKS: { href: string; key: string; vi: string }[] = [
   { href: "/pricing", key: "landing.nav.pricing", vi: "Gói & Giá" },
@@ -127,7 +119,7 @@ export function LandingHeader({ lang }: { lang?: Locale } = {}) {
               flexShrink: 0,
             }}
           >
-            <Bolt size={18} />
+            <BrandGlyph size={20} />
           </span>
           <strong className="tw-lh-wordmark" style={{ letterSpacing: 1, fontSize: 16 }}>LARKWAVE</strong>
         </Link>
@@ -361,7 +353,7 @@ export function LandingFooter({ lang }: { lang?: Locale } = {}) {
               color: "#fff",
             }}
           >
-            <Bolt size={14} />
+            <BrandGlyph size={16} />
           </span>
           <span style={{ fontWeight: 700, color: "var(--tw-text, #1E2230)" }}>Larkwave</span>
           <span style={{ fontSize: 13 }}>{t("landing.footer.tagline.lw", "· Trợ lý AI cho Lark")}</span>

@@ -70,7 +70,7 @@ export default function OpengraphImage() {
               boxShadow: "0 18px 50px rgba(0,0,0,0.22)",
             }}
           >
-            <BoltSvg size={56} color="#ffffff" />
+            <BrandGlyphSvg size={60} color="#ffffff" />
           </div>
           <div
             style={{
@@ -132,17 +132,12 @@ export default function OpengraphImage() {
   );
 }
 
-/** Lightning bolt drawn as SVG so it renders without an icon font. */
-function BoltSvg({ size, color }: { size: number; color: string }) {
+/** Larkwave glyph (lark over wave) drawn as SVG so it renders without an icon font. */
+function BrandGlyphSvg({ size, color }: { size: number; color: string }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 12.2C10.6 8.4 8.4 5.6 6 5.6C4.4 5.6 3.2 6.8 2.2 8.8C3.8 8 5.1 7.8 6.2 8.1C8 8.6 9.6 10.4 10.7 13Q12 15.2 13.3 13C14.4 10.4 16 8.6 17.8 8.1C18.9 7.8 20.2 8 21.8 8.8C20.8 6.8 19.6 5.6 18 5.6C15.6 5.6 13.4 8.4 12 12.2Z" fill={color} />
+      <path d="M3 19c1.5-2.2 3-2.2 4.5 0s3 2.2 4.5 0 3-2.2 4.5 0 3 2.2 4.5 0" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" />
     </svg>
   );
 }

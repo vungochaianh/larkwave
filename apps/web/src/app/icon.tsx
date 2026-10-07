@@ -4,8 +4,8 @@ export const size = { width: 64, height: 64 };
 export const contentType = "image/png";
 
 /**
- * Branded app icon / favicon: a gradient rounded-square mark with a bold white
- * lightning bolt (Larkwave = build apps in a flash). Replaces the Next.js
+ * Branded app icon / favicon: a gradient rounded-square mark with the white
+ * lark-over-wave glyph (same as apps/desktop/resources/icon.svg). Replaces the Next.js
  * default favicon.
  */
 export default function Icon() {
@@ -24,9 +24,10 @@ export default function Icon() {
           boxShadow: "inset 0 2px 7px rgba(255,255,255,0.28)",
         }}
       >
-        <svg width={40} height={40} viewBox="0 0 24 24" fill="#ffffff">
-          {/* Heroicons solid "bolt" — clean, bold, premium */}
-          <path d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" />
+        <svg width={44} height={44} viewBox="0 0 24 24">
+          {/* Larkwave glyph: lark in flight above a wave */}
+          <path d="M12 12.2C10.6 8.4 8.4 5.6 6 5.6C4.4 5.6 3.2 6.8 2.2 8.8C3.8 8 5.1 7.8 6.2 8.1C8 8.6 9.6 10.4 10.7 13Q12 15.2 13.3 13C14.4 10.4 16 8.6 17.8 8.1C18.9 7.8 20.2 8 21.8 8.8C20.8 6.8 19.6 5.6 18 5.6C15.6 5.6 13.4 8.4 12 12.2Z" fill="#ffffff" />
+          <path d="M3 19c1.5-2.2 3-2.2 4.5 0s3 2.2 4.5 0 3-2.2 4.5 0 3 2.2 4.5 0" fill="none" stroke="#ffffff" strokeWidth={2.4} strokeLinecap="round" />
         </svg>
       </div>
     ),

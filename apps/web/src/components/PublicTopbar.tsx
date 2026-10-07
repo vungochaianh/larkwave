@@ -3,7 +3,7 @@
 import { ThunderboltOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 import Link from "next/link";
-import { useI18n } from "@larkwave/ui";
+import { BrandGlyph, useI18n } from "@larkwave/ui";
 import { BRAND_GRADIENT } from "@/lib/theme";
 
 /** Lightweight header for PUBLIC (unauthenticated) share pages. */
@@ -38,10 +38,10 @@ export default function PublicTopbar() {
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 16,
+            fontSize: 18,
           }}
         >
-          <ThunderboltOutlined />
+          <BrandGlyph />
         </span>
         <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.3 }}>
           Larkwave

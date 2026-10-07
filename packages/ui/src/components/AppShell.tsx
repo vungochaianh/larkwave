@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Tag, Badge } from 'antd';
-import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, ThunderboltOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
+import { BrandGlyph } from './BrandMark';
 import { ThemeProvider, useThemeMode } from '../ThemeProvider';
 import { useI18n, type Locale } from '../i18n';
 import { useRuntime } from '../RuntimeProvider';
@@ -60,11 +61,11 @@ function LogoMark({ size = 30 }: { size?: number }) {
     <span
       style={{
         display: 'inline-flex', minWidth: size, width: size, height: size, borderRadius: size * 0.32,
-        alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.5), color: '#fff',
+        alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.56), color: '#fff',
         background: BRAND_GRADIENT, boxShadow: '0 6px 16px rgba(108,92,231,0.30)',
       }}
     >
-      <ThunderboltOutlined />
+      <BrandGlyph />
     </span>
   );
 }

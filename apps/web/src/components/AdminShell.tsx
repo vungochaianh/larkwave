@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTabTitle, nhanTheoDuongDan } from "@/lib/useTabTitle";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { V, useI18n, useThemeMode } from "@larkwave/ui";
+import { V, BrandGlyph, useI18n, useThemeMode } from "@larkwave/ui";
 import { useAuth } from "@/lib/auth";
 import { PlanBadge, UserAvatar } from "@/components/UserAvatar";
 import FeedbackButton from "@/components/FeedbackButton";
@@ -104,11 +104,11 @@ function AdminBrand({ collapsed }: { collapsed: boolean }) {
           borderRadius: 10,
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 15,
+          fontSize: 17,
           boxShadow: "0 6px 16px rgba(108,92,231,0.30)",
         }}
       >
-        <CloudServerOutlined />
+        <BrandGlyph />
       </span>
       {!collapsed && (
         <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>

@@ -18,6 +18,8 @@ export default function Document() {
     <Html>
       <Head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        {/* Larkwave logo (lark over wave) — same file as resources/icon.svg. */}
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </Head>
       <body>
         <Main />

@@ -1,8 +1,8 @@
 "use client";
 
-import { BulbOutlined, BulbFilled, CloudServerOutlined, DesktopOutlined, ExperimentOutlined, FacebookFilled, DashboardOutlined, IdcardOutlined, LoginOutlined, LogoutOutlined, MenuFoldOutlined, MessageOutlined, MenuOutlined, MenuUnfoldOutlined, MoreOutlined, PlusOutlined, RobotOutlined, SafetyOutlined, TeamOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { BulbOutlined, BulbFilled, CloudServerOutlined, DesktopOutlined, ExperimentOutlined, FacebookFilled, DashboardOutlined, IdcardOutlined, LoginOutlined, LogoutOutlined, MenuFoldOutlined, MessageOutlined, MenuOutlined, MenuUnfoldOutlined, MoreOutlined, PlusOutlined, RobotOutlined, SafetyOutlined, TeamOutlined } from "@ant-design/icons";
 import { Badge, Button, Drawer, Dropdown, Grid, Layout, Menu, Tooltip } from "antd";
-import { V, BRAND_GRADIENT, useThemeMode, useI18n, type Locale } from "@larkwave/ui";
+import { V, BRAND_GRADIENT, BrandGlyph, useThemeMode, useI18n, type Locale } from "@larkwave/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTabTitle } from "@/lib/useTabTitle";
@@ -158,11 +158,11 @@ function LogoMark({ size = 30 }: { size?: number }) {
         borderRadius: size * 0.32,
         alignItems: "center",
         justifyContent: "center",
-        fontSize: size * 0.5,
+        fontSize: size * 0.56,
         boxShadow: "0 6px 16px rgba(108,92,231,0.30)",
       }}
     >
-      <ThunderboltOutlined />
+      <BrandGlyph />
     </span>
   );
 }
