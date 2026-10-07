@@ -89,7 +89,7 @@ export function LandingHeader({ lang }: { lang?: Locale } = {}) {
              Hàng hai cao 59px mà chỉ chứa đúng một nút ☰; cộng hàng một là 122px chrome và H1 bị
              đẩy xuống 246px — gần một phần ba màn hình 812px trôi qua trước khi có chữ nào đáng
              đọc. Chỗ đổi lấy khoảng trống đó là CHỮ HIỆU: biểu tượng 32px vẫn nhận ra thương
-             hiệu, còn chữ "TOOLSWAVE" tốn 146px theo đúng phép đo ghi ở dưới. */
+             hiệu, còn chữ "LARKWAVE" tốn 146px theo đúng phép đo ghi ở dưới. */
           .tw-lh-row2 { display: none; }
           .tw-lh-row2-links { display: none; }
           .tw-lh-ham { display: flex; }
@@ -129,7 +129,7 @@ export function LandingHeader({ lang }: { lang?: Locale } = {}) {
           >
             <Bolt size={18} />
           </span>
-          <strong className="tw-lh-wordmark" style={{ letterSpacing: 1, fontSize: 16 }}>TOOLSWAVE</strong>
+          <strong className="tw-lh-wordmark" style={{ letterSpacing: 1, fontSize: 16 }}>LARKWAVE</strong>
         </Link>
 
         <nav className="tw-lh-inline" style={{ alignItems: "center", gap: 2, marginLeft: 14 }}>

@@ -239,7 +239,7 @@ export default function AuthCard({
               <div className="tw-auth-mark tw-fx-z1">
                 <ThunderboltOutlined />
               </div>
-              <div className="tw-auth-word">TOOLSWAVE</div>
+              <div className="tw-auth-word">LARKWAVE</div>
               {/* <h1>, KHÔNG phải <div>.
                   Bốn trang dùng AuthCard — /login, /register, /forgot, /reset — đều không có <h1>
                   nào vì tiêu đề ở đây là một div. Đo bằng trình duyệt: "không có H1" trên cả HTML

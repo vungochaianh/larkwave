@@ -1196,7 +1196,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "wcomp.tgBotToken": { vi: "Bot token", en: "Bot token" },
   "wcomp.tgTokenPlaceholder": { vi: "123456789:AA… (từ @BotFather; để trống = giữ nguyên)", en: "123456789:AA… (from @BotFather; leave empty = keep current)" },
   "wcomp.tgBotUsername": { vi: "Bot @username (tuỳ chọn — để làm link t.me)", en: "Bot @username (optional — used for the t.me link)" },
-  "wcomp.tgUsernamePlaceholder": { vi: "vd: toolswave_bot (không có @). Bỏ trống = tự lấy qua getMe.", en: "e.g. toolswave_bot (no @). Leave empty = auto-fetch via getMe." },
+  "wcomp.tgUsernamePlaceholder": { vi: "vd: larkwave_bot (không có @). Bỏ trống = tự lấy qua getMe.", en: "e.g. larkwave_bot (no @). Leave empty = auto-fetch via getMe." },
   "wcomp.tgSaveRegister": { vi: "Lưu + đăng ký webhook", en: "Save + register webhook" },
   "wcomp.tgRemoveToken": { vi: "Gỡ token", en: "Remove token" },
   "wcomp.tgHowTitle": { vi: "Cách hoạt động", en: "How it works" },

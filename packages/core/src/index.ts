@@ -26,7 +26,21 @@ export * from './chatTurn';
 const moiTruong = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
 const apiBaseTuMoiTruong = (moiTruong?.env?.LARKWAVE_API_BASE ?? '').trim().replace(/\/+$/, '');
 
-export const APIA_BASE = apiBaseTuMoiTruong || 'https://api.toolswave.net/v1';
+/**
+ * Trên WEB (Next.js) biến `LARKWAVE_API_BASE` không bao giờ xuống tới trình duyệt — Next chỉ nhúng
+ * `NEXT_PUBLIC_*`, và chỉ khi mã viết NGUYÊN VĂN `process.env.NEXT_PUBLIC_API_BASE` (nó thay chuỗi
+ * đó lúc dựng). Thiếu dòng này, mọi màn dùng chung từ packages/ui trên web lặng lẽ gọi về API của
+ * Toolswave gốc dù web đã đặt NEXT_PUBLIC_API_BASE. Bọc try vì ở desktop/Node có thể không có `process`.
+ */
+declare const process: { env: Record<string, string | undefined> };
+let apiBaseCuaWeb = '';
+try {
+  apiBaseCuaWeb = (process.env.NEXT_PUBLIC_API_BASE ?? '').trim().replace(/\/+$/, '');
+} catch {
+  /* không có process — không phải web */
+}
+
+export const APIA_BASE = apiBaseTuMoiTruong || apiBaseCuaWeb || 'https://api.toolswave.net/v1';
 
 /** IPC channel names shared between the Electron main process and renderer. */
 export const IPC = {

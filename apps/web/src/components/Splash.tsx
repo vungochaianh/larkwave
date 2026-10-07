@@ -4,7 +4,7 @@ import { BRAND_GRADIENT } from "@/lib/theme";
 /**
  * Premium full-screen branded splash used for auth/route loading states.
  *
- * Centered TOOLSWAVE logo mark + wordmark on a faint brand-gradient backdrop,
+ * Centered LARKWAVE logo mark + wordmark on a faint brand-gradient backdrop,
  * a short tagline, and a slim shimmering gradient loader bar. This replaces the
  * bare antd Spin for a more polished first impression.
  *
@@ -64,7 +64,7 @@ export default function Splash({
             lineHeight: 1.1,
           }}
         >
-          TOOLSWAVE
+          LARKWAVE
         </div>
         <div
           style={{

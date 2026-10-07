@@ -6,7 +6,7 @@ import { createToolBridge } from './larkApiAgent';
 import { allTools, readOnlyTools } from './tools';
 
 /**
- * Chạy một lượt Lark agent bằng GÓI TOOLSWAVE (MAIC), không cần CLI cài trên máy và không cần
+ * Chạy một lượt Lark agent bằng GÓI LARKWAVE (MAIC), không cần CLI cài trên máy và không cần
  * khoá API riêng của người dùng.
  *
  * Ba bên, mỗi bên giữ đúng một thứ:

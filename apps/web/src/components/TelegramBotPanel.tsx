@@ -121,7 +121,7 @@ export default function TelegramBotPanel() {
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={t("wcomp.tgUsernamePlaceholder", "vd: toolswave_bot (không có @). Bỏ trống = tự lấy qua getMe.")}
+                placeholder={t("wcomp.tgUsernamePlaceholder", "vd: larkwave_bot (không có @). Bỏ trống = tự lấy qua getMe.")}
                 autoComplete="off"
               />
             </div>

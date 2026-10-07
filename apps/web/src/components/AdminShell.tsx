@@ -76,7 +76,7 @@ function readCollapsed(): boolean {
 
 /**
  * Logo + tên ở đầu thanh bên. Cùng cấu trúc với `Brand` của AppShell (logo gradient 30px, chữ
- * TOOLSWAVE 800) — chỉ thêm dòng "ADMIN CONSOLE" tím để người dùng biết mình đang ở mặt quản trị.
+ * LARKWAVE 800) — chỉ thêm dòng "ADMIN CONSOLE" tím để người dùng biết mình đang ở mặt quản trị.
  */
 function AdminBrand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -113,7 +113,7 @@ function AdminBrand({ collapsed }: { collapsed: boolean }) {
       {!collapsed && (
         <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
           <span style={{ fontWeight: 800, letterSpacing: 1, fontSize: 15, color: V.text }}>
-            TOOLSWAVE
+            LARKWAVE
           </span>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: BRAND }}>
             ADMIN CONSOLE

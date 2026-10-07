@@ -195,7 +195,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
             color: V.text,
           }}
         >
-          TOOLSWAVE
+          LARKWAVE
         </span>
       )}
     </Link>

@@ -130,7 +130,7 @@ export default function SplashScreen({
           </span>
         </div>
         <div className="tw-fx-splash-text">
-          <div style={{ fontWeight: 800, letterSpacing: 4, fontSize: 24, lineHeight: 1.1 }}>TOOLSWAVE</div>
+          <div style={{ fontWeight: 800, letterSpacing: 4, fontSize: 24, lineHeight: 1.1 }}>LARKWAVE</div>
           <div style={{ marginTop: 8, fontSize: 14, color: "var(--tw-text-sub, #6B7280)", maxWidth: 320 }}>
             {tagline ?? t("landing.splash.tagline.lw", "Trợ lý AI cho Lark")}
           </div>
