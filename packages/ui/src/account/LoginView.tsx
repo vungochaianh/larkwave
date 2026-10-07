@@ -158,7 +158,7 @@ export function LoginView() {
             <UserOutlined />
           </div>
           <Title level={4} style={{ margin: 0 }}>{t('login2.title', 'Tài khoản Larkwave')}</Title>
-          <Text type="secondary">{t('login2.subtitle', 'Đăng nhập để dùng Khám phá, Bạn bè, Xếp hạng, Hồ sơ…')}</Text>
+          <Text type="secondary">{t('login2.subtitle', 'Đăng nhập để dùng Lark × Agents, Trợ lý AI, Kỹ năng, Hồ sơ…')}</Text>
         </div>
 
         <Segmented

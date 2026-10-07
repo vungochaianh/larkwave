@@ -2,8 +2,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, App, Badge, Button, Card, Form, Input, List, Modal, Popconfirm, Skeleton, Space, Switch, Tag, Typography, Upload } from 'antd';
 import type { UploadProps } from 'antd';
-import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckOutlined, CloseCircleOutlined, CloseOutlined, CloudServerOutlined, CopyOutlined, DeleteOutlined, DeploymentUnitOutlined, EditOutlined, FireOutlined, GiftOutlined, LockOutlined, MailOutlined, MessageOutlined, TeamOutlined, ThunderboltOutlined, TrophyOutlined, UploadOutlined } from '@ant-design/icons';
-import { BLUE, BRAND, CARD_SHADOW, ERR, OK, V, WARN } from '../theme';
+import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CheckOutlined, CloseOutlined, CloudServerOutlined, CopyOutlined, DeleteOutlined, DeploymentUnitOutlined, EditOutlined, FireOutlined, GiftOutlined, LockOutlined, MailOutlined, MessageOutlined, TeamOutlined, ThunderboltOutlined, TrophyOutlined, UploadOutlined } from '@ant-design/icons';
+import { BLUE, BRAND, CARD_SHADOW, OK, V, WARN } from '../theme';
 import { IconTile, StatCard } from '../kit';
 import { useAccountAuth } from './auth';
 import { accountApi, ApiError, formatDate, fromNow, type Friend, type FriendRequest, type MeActivity, type MeOverview, type Referral, type User } from './api';
@@ -110,7 +110,6 @@ function StatBand({ overview, activity, loading, onNav }: { overview: MeOverview
     { key: 'skills', label: 'Kỹ năng', value: overview?.skills, icon: <AppstoreOutlined />, color: WARN, onClick: go('skills') },
     { key: 'artifacts', label: 'Artifacts', value: overview?.artifacts, icon: <DeploymentUnitOutlined />, color: OK },
     { key: 'scheduled', label: 'Tác vụ định kỳ', value: overview?.scheduledTasks, icon: <CheckCircleOutlined />, color: OK },
-    { key: 'reports', label: 'Báo lỗi', value: overview?.reports, icon: <CloseCircleOutlined />, color: ERR },
     { key: 'streak', label: 'Chuỗi hiện tại', value: activity?.currentStreak ?? 0, icon: <FireOutlined />, color: WARN },
     { key: 'longest', label: 'Chuỗi dài nhất', value: activity?.longestStreak ?? 0, icon: <TrophyOutlined />, color: BRAND },
     { key: 'contrib', label: 'Tổng đóng góp', value: activity?.total ?? 0, icon: <ThunderboltOutlined />, color: OK },

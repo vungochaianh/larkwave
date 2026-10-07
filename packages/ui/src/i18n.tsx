@@ -1939,7 +1939,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "login2.accountCreated": { vi: "Đã tạo tài khoản", en: "Account created" },
   "login2.browserHint": { vi: "Hoàn tất đăng nhập trên trình duyệt — app sẽ tự đăng nhập khi xong.", en: "Finish signing in on the browser — the app will sign in automatically when it's done." },
   "login2.title": { vi: "Tài khoản Larkwave", en: "Larkwave account" },
-  "login2.subtitle": { vi: "Đăng nhập để dùng Khám phá, Bạn bè, Xếp hạng, Hồ sơ…", en: "Sign in to use Explore, Friends, Leaderboard, Profile…" },
+  "login2.subtitle": { vi: "Đăng nhập để dùng Lark × Agents, Trợ lý AI, Kỹ năng, Hồ sơ…", en: "Sign in to use Lark × Agents, the AI assistant, Skills, Profile…" },
   "login2.tabLogin": { vi: "Đăng nhập", en: "Sign in" },
   "login2.tabRegister": { vi: "Đăng ký", en: "Sign up" },
   "login2.nameLabel": { vi: "Tên hiển thị", en: "Display name" },
