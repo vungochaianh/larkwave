@@ -326,7 +326,9 @@ export async function resolveRenderer(localUrl: string): Promise<{ url: string; 
   const current = app.getVersion();
   const m = await fetchManifest();
   const info: UpdateInfo = { remote: false, reinstall: false, current };
-  if (!m) return { url: localUrl, info };
+  // Không có manifest (chưa có kênh phát hành / mất mạng) → khẳng định "không có bản vá lõi",
+  // để giao diện không tự đi hỏi một manifest nào khác thay cho main.
+  if (!m) return { url: localUrl, info: { ...info, mainFixPending: false } };
 
   info.notice = m.notice;
   info.latest = m.latestVersion;

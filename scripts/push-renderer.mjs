@@ -58,7 +58,7 @@ const opt = (n, d = undefined) => {
 };
 const DRY = flag('dry-run');
 const SKIP_BUILD = flag('skip-build');
-const PROJECT = opt('project', 'twd-desktop-renderer');
+const PROJECT = opt('project', 'larkwave-desktop-renderer'); // KHÔNG dùng twd-desktop-renderer — đó là project của Toolswave
 const BASE = `https://${PROJECT}.pages.dev`;
 
 const log = (m) => console.log(`\x1b[36m▸\x1b[0m ${m}`);
