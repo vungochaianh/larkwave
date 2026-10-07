@@ -24,6 +24,7 @@ import { FEATURE_FRIENDS } from '../features';
 import { HomeOverview } from './HomeOverview';
 import { BrandGlyph } from './BrandMark';
 import { useI18n } from '../i18n';
+import { PageHeader } from '../kit';
 
 /**
  * Account pages that require a logged-in Larkwave account (not just a local AI runner).
@@ -249,6 +250,7 @@ function HomeShell() {
       onSelect={onSelect}
       activeKey={selectedKey}
       cmsAllowed={cmsAllowed}
+      fullBleed={view === 'lark' || view === 'agents'}
       headerExtra={
         <FeedbackButton variant="header" page={String(view)} />
       }
@@ -283,12 +285,12 @@ function HomeShell() {
         <LarkFilesScreen key={accountUser?.id || '_local'} runtime={runtime} />
       )}
       {!isAccountView && phase === 'ready' && view === 'lark-auto' && (
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <Title level={4} style={{ margin: '4px 0 6px' }}>Tự động hoá Lark</Title>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 14 }}>
-            Lên lịch chạy tự động: gửi tin nhắn / cập nhật bản ghi / gọi webhook, hoặc <b>Chạy AI agent</b> (vd đối chiếu “PBTTCN” mỗi ngày). Mẹo: trong Lark × Agents chỉ cần nhắn “mỗi ngày 9h chạy …”, agent sẽ tự tạo lịch.
-          </Text>
-          <AutomationsPanel runtime={runtime} />
+        <div>
+          <PageHeader
+            title={t('app.title.larkAuto', 'Tự động hoá (lịch)')}
+            description={<>Lên lịch gửi tin nhắn, cập nhật bản ghi, gọi webhook hoặc <b>chạy AI agent</b>. Mẹo: trong Lark × Agents chỉ cần nhắn “mỗi ngày 9h chạy …”.</>}
+          />
+          <AutomationsPanel runtime={runtime} page />
         </div>
       )}
       {/* CMS sync runs over the Lark web session + backend, NOT the local AI runner — so it

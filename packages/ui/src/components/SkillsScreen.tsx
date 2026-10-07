@@ -12,7 +12,7 @@ import { useRuntime } from '../RuntimeProvider';
 import { useI18n } from '../i18n';
 import { BRAND, CARD_SHADOW, OK, WARN, V } from '../theme';
 import { SkillSetsCard } from './SkillSetsCard';
-import { IconTile, EmptyState } from '../kit';
+import { IconTile, EmptyState, HowItWorks } from '../kit';
 import type { View } from './HomeScreen';
 
 const { Text, Paragraph, Title } = Typography;
@@ -595,11 +595,23 @@ export function SkillsScreen({
 
   return (
     <div style={{ width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-        <IconTile icon={<ExperimentOutlined />} color={WARN} size={40} radius={11} fontSize={20} />
-        <Title level={3} style={{ margin: 0 }}>
-          {t('skills.title', 'Kỹ năng (Skills)')}
-        </Title>
+      {/* Đầu trang (quy tắc B/G): trên desktop tiêu đề đã ở thanh trên — đúng tên mục đang mở
+          ("Kỹ năng" hoặc "Kỹ năng chéo"). Trước đây cả hai chế độ đều in "Kỹ năng (Skills)" ở đây,
+          nên mở "Kỹ năng chéo" lại thấy tiêu đề "Skills". Bản web vẫn in tiêu đề — theo chế độ. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        {runtime.kind !== 'desktop' && (
+          <>
+            <IconTile icon={mode === 'cross' ? <NodeIndexOutlined /> : <ExperimentOutlined />} color={WARN} size={40} radius={11} fontSize={20} />
+            <Title level={3} style={{ margin: 0 }}>
+              {mode === 'cross' ? t('app.title.skillsCross', 'Kỹ năng chéo (kiểm chéo liên tục)') : t('skills.title', 'Kỹ năng (Skills)')}
+            </Title>
+          </>
+        )}
+        <Text type="secondary" style={{ fontSize: 13.5 }}>
+          {mode === 'cross'
+            ? t('skills.oneLine.cross', 'Nhiều kỹ năng nối nhau bằng khoá — tự suy ra thứ tự, kiểm chéo sau mỗi bước.')
+            : t('skills.oneLine.plain', 'Quy tắc dạy AI làm theo cách của bạn — bật lên là AI tự áp dụng khi yêu cầu khớp.')}
+        </Text>
         {skills && skills.length > 0 && (
           <span style={{ background: `${OK}1f`, color: OK, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999 }}>
             {t('skills.enabledCount', '{n}/{m} đang bật', { n: skills.filter((s) => s.enabled).length, m: skills.length })}
@@ -658,7 +670,7 @@ export function SkillsScreen({
       )}
 
       {!isEmpty && (
-        <Text type="secondary" style={{ fontSize: 13.5, display: 'block', marginBottom: 14, maxWidth: 760 }}>
+        <HowItWorks style={{ marginBottom: 14 }}>
           {mode === 'cross' ? (
             <>
               {t('skills.desc.crossP1', '“Kỹ năng chéo” là nhiều kỹ năng nối nhau bằng ')}<b>{t('skills.desc.crossKeys', 'khoá')}</b>
@@ -685,7 +697,7 @@ export function SkillsScreen({
           <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => setGuideOpen(true)}>
             {t('skills.desc.seeGuide', 'Xem hướng dẫn')}
           </Button>
-        </Text>
+        </HowItWorks>
       )}
 
       {mode === 'cross' && onNav ? (
@@ -793,14 +805,19 @@ export function SkillsScreen({
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
-              padding: '72px 20px 56px',
+              // Phần trên của vùng nội dung (quy tắc H), không lơ lửng giữa một khoảng trắng cao.
+              padding: '28px 20px 40px',
               gap: 16,
             }}
           >
-            <IconTile icon={<ExperimentOutlined />} color={WARN} size={88} radius={22} fontSize={44} />
-            <div style={{ fontSize: 24, fontWeight: 700, color: V.text }}>{t('skills.empty.title', 'Chưa có kỹ năng nào')}</div>
+            <IconTile icon={mode === 'cross' ? <NodeIndexOutlined /> : <ExperimentOutlined />} color={WARN} size={72} radius={20} fontSize={36} />
+            <div style={{ fontSize: 22, fontWeight: 700, color: V.text }}>
+              {mode === 'cross' ? t('skills.empty.titleCross', 'Chưa có kỹ năng chéo nào') : t('skills.empty.title', 'Chưa có kỹ năng nào')}
+            </div>
             <Text type="secondary" style={{ fontSize: 14.5, maxWidth: 560, lineHeight: 1.6 }}>
-              {t('skills.empty.desc', 'Kỹ năng là hướng dẫn ngắn dạy AI làm theo cách của bạn — ví dụ “Luôn dùng Tailwind + Ant Design”, “Viết commit theo Conventional Commits”. Bật lên là AI tự áp dụng mọi lúc.')}
+              {mode === 'cross'
+                ? t('skills.empty.descCross', 'Kỹ năng chéo là một bộ kỹ năng nối nhau: bước sau dùng kết quả của bước trước, và máy kiểm lại mọi ràng buộc sau mỗi bước. Mô tả các bước ở ô phía trên để trợ lý dựng giúp, hoặc tự tạo từng kỹ năng.')
+                : t('skills.empty.desc', 'Kỹ năng là hướng dẫn ngắn dạy AI làm theo cách của bạn — ví dụ “Luôn dùng Tailwind + Ant Design”, “Viết commit theo Conventional Commits”. Bật lên là AI tự áp dụng mọi lúc.')}
             </Text>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
               <Button type="primary" size="large" icon={<PlusOutlined />} onClick={openCreate}>

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Modal, Spin, Typography } from 'antd';
+import { Alert, Button, Card, Modal, Spin } from 'antd';
 import { SettingOutlined, ReadOutlined, TeamOutlined } from '@ant-design/icons';
 import type { LarkConnection } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
@@ -16,8 +16,8 @@ import { PluginPanelsCard } from './lark/PluginPanelsCard';
 import { BotPanel } from './lark/BotPanel';
 import { LarkGuideModal } from './lark/LarkGuideModal';
 import { LarkWebPanel } from './lark/LarkWebPanel';
+import { PageHeader } from '../kit';
 
-const { Title, Text } = Typography;
 
 /**
  * The "Lark × Agents" screen (desktop only). Gates on a Lark custom-app
@@ -113,42 +113,33 @@ export function LarkScreen({
     // Fill the content area (viewport − topbar − paddings) so the chat is full-height.
     // The negative margin reclaims most of the AppShell content's bottom padding.
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 108px)', minHeight: 460, marginBottom: -44 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
-            Lark × Agents
-          </Title>
-          <Text type="secondary">
-            Hỏi đáp & tuỳ chỉnh dữ liệu Lark (Base, tin nhắn, tài liệu, danh bạ) bằng AI (Claude / Grok / ...) trên máy bạn.
-          </Text>
-        </div>
-        {!loading && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Button icon={<ReadOutlined />} onClick={() => setGuideOpen(true)}>
-              Hướng dẫn
-            </Button>
-            {conn?.connected && (
-              <>
-                {/* "Chia sẻ" đứng RIÊNG ở đầu màn, không chôn trong modal Cài đặt.
-                    Tính năng chia sẻ đã chạy đầu-cuối từ lâu (tạo lời mời, nhận, thu hồi, tạm
-                    dừng, xem nhật ký lượt chạy), nhưng nó là panel thứ hai trong một modal cuộn
-                    dọc chứa bảy panel — nên người dùng báo là "chưa làm". Một tính năng không
-                    tìm thấy thì đúng bằng một tính năng không tồn tại. */}
-                {/* Chia sẻ kết nối Lark là cho BẠN BÈ (máy chủ chặn nếu không phải bạn) → ẩn theo
-                    FEATURE_FRIENDS. Link công khai của từng hội thoại vẫn ở trong khung chat. */}
-                {FEATURE_FRIENDS && (
-                  <Button icon={<TeamOutlined />} onClick={() => setShareOpen(true)}>
-                    Chia sẻ
-                  </Button>
-                )}
+      {/* Một đầu trang (quy tắc B): tiêu đề đã ở thanh trên — ở đây chỉ mô tả một dòng + nút. */}
+      <PageHeader
+        title="Lark × Agents"
+        description="Hỏi đáp & tuỳ chỉnh dữ liệu Lark (Base, tin nhắn, tài liệu, danh bạ) bằng AI trên máy bạn."
+        actions={
+          !loading && (
+            <>
+              <Button icon={<ReadOutlined />} onClick={() => setGuideOpen(true)}>
+                Hướng dẫn
+              </Button>
+              {/* "Chia sẻ" đứng RIÊNG ở đầu màn, không chôn trong modal Cài đặt — một tính năng
+                  không tìm thấy thì đúng bằng một tính năng không tồn tại. Chia sẻ kết nối Lark là
+                  cho BẠN BÈ (máy chủ chặn nếu không phải bạn) → ẩn theo FEATURE_FRIENDS. */}
+              {conn?.connected && FEATURE_FRIENDS && (
+                <Button icon={<TeamOutlined />} onClick={() => setShareOpen(true)}>
+                  Chia sẻ
+                </Button>
+              )}
+              {conn?.connected && (
                 <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
                   Cài đặt
                 </Button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+            </>
+          )
+        }
+      />
       <LarkGuideModal open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       {/* Chia sẻ có modal RIÊNG: đây là việc người dùng đi tìm có chủ đích ("cho đồng nghiệp dùng

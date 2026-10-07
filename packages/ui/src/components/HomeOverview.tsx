@@ -193,10 +193,11 @@ export function HomeOverview({
 
   // ── attention band (problems that need action, aggregated across pillars) ──
   type Alert = { key: string; color: string; icon: ReactNode; text: string; cta: string; onClick: () => void };
+  // CHỈ những gì "Sức khỏe hệ thống" KHÔNG có (quy tắc D, 07/10/2026). Trước đây "VM ngoại tuyến"
+  // và "Lark chưa kết nối" hiện ở CẢ hai chỗ — cùng một việc phải đọc hai lần. Giờ trạng thái kết
+  // nối chỉ nằm ở Sức khỏe; dải này chỉ còn sự cố thật (job lỗi, lời mời chờ).
   const alerts: Alert[] = [
     ...(hasCms && cms && cms.errored > 0 ? [{ key: 'cmsjob', color: ERR, icon: <SyncOutlined />, text: `${cms.errored} job đồng bộ CMS lỗi`, cta: 'Mở', onClick: () => nav('cms-sync') } as Alert] : []),
-    ...(hasCms && cms && cms.keeperOnline === false ? [{ key: 'keeper', color: WARN, icon: <CloudServerOutlined />, text: 'Máy VM giữ phiên đang ngoại tuyến', cta: 'Mở', onClick: () => nav('cms-sync') } as Alert] : []),
-    ...(hasLark && lark && !lark.connected ? [{ key: 'lark', color: WARN, icon: <ApiOutlined />, text: 'Lark chưa kết nối', cta: 'Kết nối', onClick: () => nav('lark') } as Alert] : []),
     ...(FEATURE_FRIENDS && reqIn > 0 ? [{ key: 'invite', color: BLUE, icon: <TeamOutlined />, text: `${reqIn} lời mời kết bạn`, cta: 'Xem', onClick: () => nav('profile') } as Alert] : []),
   ];
 
@@ -304,7 +305,8 @@ export function HomeOverview({
     </div>
   );
 
-  const rewardsEl = rewards.length ? (
+  // Chỉ hiện khi có số để xem — một thẻ "Đã giới thiệu: 0" đứng riêng một mục chỉ đẩy phần hữu ích xuống.
+  const rewardsEl = rewards.some((r) => Number(r.value) > 0) ? (
     <div>
       <SectionHeader icon={<TrophyOutlined />} color={WARN} title="Thưởng & cộng đồng" actionLabel="Hồ sơ" onAction={() => nav('profile')} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px,1fr))', gap: 12 }}>
@@ -354,7 +356,7 @@ export function HomeOverview({
   );
 
   const pillarEl = (hasLark || hasCms) ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
       {hasLark && (
         <Card hoverable size="small" onClick={() => nav('lark')} styles={{ body: { padding: 16 } }} style={{ borderRadius: 16, cursor: 'pointer' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -386,7 +388,9 @@ export function HomeOverview({
     </div>
   ) : null;
 
-  const activityEl = (
+  // Người mới chưa có hoạt động nào → ẩn hẳn thẻ (ba số 0 không nói gì).
+  const hasActivity = weekTotal > 0 || !!(ov && (ov.aiRuns || ov.remoteTasks || ov.artifacts));
+  const activityEl = !hasActivity ? null : (
     <Card styles={{ body: { padding: 16 } }} style={{ borderRadius: 16, border: `1px solid ${V.border}`, boxShadow: CARD_SHADOW }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <IconTile icon={<FireOutlined />} color={WARN} />
@@ -428,10 +432,10 @@ export function HomeOverview({
       <style>{OVERVIEW_CSS}</style>
       {heroEl}
       {attnEl}
-      {chipsEl}
       {wide ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 16, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `minmax(0,1fr) ${w >= 1300 ? 380 : 340}px`, gap: 16, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {chipsEl}
             {pillarEl}
             {rewardsEl}
             {activityEl}
@@ -442,6 +446,7 @@ export function HomeOverview({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {chipsEl}
           {healthEl}
           {pillarEl}
           {rewardsEl}

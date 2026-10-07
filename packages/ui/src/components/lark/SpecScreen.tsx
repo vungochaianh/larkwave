@@ -19,6 +19,7 @@ import type { LarkSpecDoc, SpecBase, SpecStatus, SpecSource, SpecInsight, SpecWo
 import { BRAND, BRAND_GRADIENT, V } from '../../theme';
 import { useRuntime } from '../../RuntimeProvider';
 import { ChatMarkdown } from '../ChatMarkdown';
+import { PageHeader } from '../../kit';
 import { useI18n } from '../../i18n';
 
 const { Title, Text, Paragraph } = Typography;
@@ -206,70 +207,41 @@ export function SpecScreen({ onOpenChat }: { onOpenChat?: () => void }) {
 
   return (
     <Space direction="vertical" size={18} style={{ width: '100%' }}>
-      {/* ── Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: 16,
-          rowGap: 12,
-          padding: '18px 20px',
-          borderRadius: 14,
-          background: V.surface,
-          border: `1px solid ${V.border}`,
-        }}
-      >
-        <span
-          style={{
-            width: 48,
-            height: 48,
-            minWidth: 48,
-            borderRadius: 13,
-            background: BRAND_GRADIENT,
-            color: '#fff',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22,
-          }}
-        >
-          <PartitionOutlined />
-        </span>
-        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <Title level={4} style={{ margin: 0, color: V.text }}>
-              {tr('chat.specTitle', 'Đặc tả hệ thống Lark')}
-            </Title>
-            {doc?.updatedAt && (
-              <Text style={{ fontSize: 12.5, color: V.textSub }}>· {tr('chat.updatedAgo', 'cập nhật')} {ago(doc.updatedAt)}</Text>
-            )}
+      {/* Một đầu trang (quy tắc B): tiêu đề đã ở thanh trên → mô tả + số liệu một dòng + nút. */}
+      <div>
+        <PageHeader
+          title={tr('chat.specTitle', 'Đặc tả hệ thống Lark')}
+          description={tr('chat.specOneLine', 'Cấu trúc Base + workflow đọc trực tiếp từ Lark — khớp theo ID, mỗi lần đồng bộ hiện rõ thêm/đổi/gỡ.')}
+          meta={
+            <>
+              {!isEmpty && (
+                <>
+                  <Tag style={{ margin: 0 }}><DatabaseOutlined /> {counts.bases} Base · {counts.tables} {tr('chat.tablesUnit', 'bảng')}</Tag>
+                  <Tag style={{ margin: 0 }}><NodeIndexOutlined /> {counts.workflows} workflow</Tag>
+                </>
+              )}
+              {doc?.updatedAt && (
+                <span style={{ fontSize: 12.5, color: V.textFaint }}>{tr('chat.updatedAgo', 'cập nhật')} {ago(doc.updatedAt)}</span>
+              )}
+            </>
+          }
+          actions={
+            <Button
+              type="primary"
+              icon={<SyncOutlined spin={syncing} />}
+              loading={syncing}
+              onClick={doSync}
+              style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600 }}
+            >
+              {syncing ? tr('chat.syncing', 'Đang đồng bộ…') : tr('chat.syncSpec', 'Đồng bộ đặc tả')}
+            </Button>
+          }
+        />
+        {logicMissing && (
+          <div style={{ marginTop: -8, fontSize: 12, color: '#d48806' }}>
+            <WarningOutlined /> {tr('chat.logicMissingWarn', 'Một số workflow chưa đọc được logic — vào Lark × Agents → Cài đặt → “Kết nối Lark web” để xem chi tiết trigger/điều kiện/hành động.')}
           </div>
-          {!isEmpty && (
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6 }}>
-              <Text style={{ fontSize: 12.5, color: V.textSub }}>
-                <DatabaseOutlined /> {counts.bases} Base · {counts.tables} {tr('chat.tablesUnit', 'bảng')}
-              </Text>
-              <Text style={{ fontSize: 12.5, color: V.textSub }}>
-                <NodeIndexOutlined /> {counts.workflows} workflow
-              </Text>
-            </div>
-          )}
-          {logicMissing && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#d48806' }}>
-              <WarningOutlined /> {tr('chat.logicMissingWarn', 'Một số workflow chưa đọc được logic — vào Lark × Agents → Cài đặt → “Kết nối Lark web” để xem chi tiết trigger/điều kiện/hành động.')}
-            </div>
-          )}
-        </div>
-        <Button
-          type="primary"
-          icon={<SyncOutlined spin={syncing} />}
-          loading={syncing}
-          onClick={doSync}
-          style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600 }}
-        >
-          {syncing ? tr('chat.syncing', 'Đang đồng bộ…') : tr('chat.syncSpec', 'Đồng bộ đặc tả')}
-        </Button>
+        )}
       </div>
 
       {isEmpty ? (

@@ -23,7 +23,8 @@ import {
 import type { CmsSyncJob, CmsSyncJobPatch, CmsKeeperStatus, LarkBaseRef, LarkReloginEntry, LarkTableRef } from '@larkwave/core';
 import { BRAND, BRAND_GRADIENT, V } from '../../theme';
 import { useRuntime } from '../../RuntimeProvider';
-import { LarkSessionsPanel } from './LarkSessionsPanel';
+import { LarkSessionsPanel, LarkSessionsHowItWorks } from './LarkSessionsPanel';
+import { PageHeader, HowItWorks } from '../../kit';
 import { useI18n } from '../../i18n';
 
 const { Title, Text, Paragraph } = Typography;
@@ -966,93 +967,107 @@ export function CmsSyncScreen({ onOpenChat }: { onOpenChat?: () => void }) {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 16,
-          padding: '18px 20px',
-          borderRadius: 14,
-          background: V.surface,
-          border: `1px solid ${V.border}`,
-        }}
-      >
-        <span
-          style={{
-            width: 48,
-            height: 48,
-            minWidth: 48,
-            borderRadius: 13,
-            background: BRAND_GRADIENT,
-            color: '#fff',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22,
-          }}
-        >
-          <CloudServerOutlined />
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Title level={4} style={{ margin: 0, color: V.text }}>
-            {tr('chat.cmsSyncTitle', 'Đồng bộ Bitable (CMS)')}
-          </Title>
-          <Paragraph style={{ margin: '6px 0 0', color: V.textSub, fontSize: 13, lineHeight: 1.6 }}>
-            {tr('chat.cmsIntro1', 'Giữ')} <b>{tr('chat.cmsIntro2', 'session connector luôn tươi')}</b> {tr('chat.cmsIntro3', 'từ phiên Lark web đã lưu.')} <b>{tr('chat.cmsIntro4', 'Session Lark hết hạn theo thời gian')}</b> {tr('chat.cmsIntro5', '— khi đó bấm')} <b>{tr('chat.reloginLarkWebQuoted', '“Đăng nhập lại Lark web”')}</b> {tr('chat.cmsIntro6', 'để mở cửa sổ Lark, đăng nhập lại (lấy session mới) → app tự bơm cookie mới cho tất cả job. “Chạy ngay” sẽ gọi Lark trực tiếp bằng session sống này.')}
-          </Paragraph>
-          <Paragraph style={{ margin: '4px 0 0', color: V.textFaint, fontSize: 12, lineHeight: 1.6 }}>
-            {tr('chat.cmsAuto1', 'Khi app mở, nó')} <b>{tr('chat.cmsAuto2', 'tự làm mới session mỗi 30 phút và ngay lúc mở app')}</b> {tr('chat.cmsAuto3', '— đồng thời')} <b>{tr('chat.cmsAuto4', 'tự BẬT LẠI')}</b> {tr('chat.cmsAuto5', 'các job bị máy chủ tắt do hết session (để lịch đồng bộ tự chạy lại). Job bạn tự tắt tay thì không bị đụng tới.')}
-          </Paragraph>
-          <div style={{ marginTop: 6, fontSize: 12 }}>
-            <Tag color={webConnected ? 'green' : 'red'}>{webConnected ? tr('chat.larkWebConnectedTag', 'Lark web: đã kết nối') : tr('chat.larkWebNotConnectedTag', 'Lark web: chưa kết nối')}</Tag>
-            {webHost && <span style={{ color: V.textFaint }}>{webHost.replace(/^https?:\/\//, '')}</span>}
-          </div>
+      {/* Một đầu trang (quy tắc B): mô tả MỘT dòng + trạng thái + ba nút. Bốn đoạn giải thích
+          trước đây đứng chắn trước mọi nút bấm → chuyển vào "Cách hoạt động" (đóng sẵn) ngay dưới. */}
+      <PageHeader
+        title={tr('chat.cmsSyncTitle', 'Đồng bộ Bitable (CMS)')}
+        description={tr('chat.cmsOneLine', 'Giữ session connector luôn tươi từ phiên Lark web — app tự bơm cookie mới cho mọi job.')}
+        meta={
+          <>
+            <Tag color={webConnected ? 'green' : 'red'} style={{ margin: 0 }}>{webConnected ? tr('chat.larkWebConnectedTag', 'Lark web: đã kết nối') : tr('chat.larkWebNotConnectedTag', 'Lark web: chưa kết nối')}</Tag>
+            {webHost && <span style={{ color: V.textFaint, fontSize: 12 }}>{webHost.replace(/^https?:\/\//, '')}</span>}
+          </>
+        }
+        actions={
+          <>
+              <Popover
+                trigger="click"
+                placement="bottomRight"
+                title={tr('chat.reloginFromPhone', 'Đăng nhập lại từ điện thoại')}
+                content={
+                  <div style={{ width: 220, textAlign: 'center' }}>
+                    <div style={{ background: '#fff', padding: 10, borderRadius: 12, display: 'inline-block', lineHeight: 0, boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}>
+                      <QRCode value="https://toolswave.net/remote/lark" size={150} bordered={false} />
+                    </div>
+                    <div style={{ fontSize: 12, color: V.textSub, margin: '10px 0 6px', lineHeight: 1.5 }}>
+                      {tr('chat.scanWith', 'Quét bằng')} <b>{tr('chat.phoneCamera', 'camera điện thoại')}</b> {tr('chat.toOpenReloginPage', 'để mở trang đăng nhập lại Lark cho máy (khi bạn không ở cạnh máy).')}
+                    </div>
+                    <Text copyable={{ text: 'https://toolswave.net/remote/lark' }} style={{ fontSize: 11, color: V.textSub }}>
+                      toolswave.net/remote/lark
+                    </Text>
+                    <Button
+                      size="small"
+                      block
+                      style={{ marginTop: 8 }}
+                      onClick={() => runtime.openExternal?.('https://toolswave.net/remote/lark')}
+                    >
+                      {tr('chat.openOnThisMachine', 'Mở trên máy này')}
+                    </Button>
+                  </div>
+                }
+              >
+                <Button icon={<QrcodeOutlined />}>{tr('chat.fromPhoneQr', 'Từ điện thoại (QR)')}</Button>
+              </Popover>
+            <Button icon={<ReloadOutlined spin={busy === 'refresh'} />} loading={busy === 'refresh'} onClick={refreshAll}>
+              {tr('chat.refreshSessionAll', 'Làm mới session (tất cả)')}
+            </Button>
+            <Button
+              icon={<LoginOutlined />}
+              loading={connecting}
+              onClick={connectWeb}
+              type="primary"
+              style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600 }}
+            >
+              {webConnected ? tr('chat.reloginLarkWeb', 'Đăng nhập lại Lark web') : tr('chat.loginLarkWeb', 'Đăng nhập Lark web')}
+            </Button>
+          </>
+        }
+      />
+
+      <HowItWorks>
+        <div>
+          {tr('chat.cmsIntro1', 'Giữ')} <b>{tr('chat.cmsIntro2', 'session connector luôn tươi')}</b> {tr('chat.cmsIntro3', 'từ phiên Lark web đã lưu.')} <b>{tr('chat.cmsIntro4', 'Session Lark hết hạn theo thời gian')}</b> {tr('chat.cmsIntro5', '— khi đó bấm')} <b>{tr('chat.reloginLarkWebQuoted', '“Đăng nhập lại Lark web”')}</b> {tr('chat.cmsIntro6', 'để mở cửa sổ Lark, đăng nhập lại (lấy session mới) → app tự bơm cookie mới cho tất cả job. “Chạy ngay” sẽ gọi Lark trực tiếp bằng session sống này.')}
         </div>
-        <Space direction="vertical" size={8} style={{ alignItems: 'stretch' }}>
-          <Button
-            icon={<LoginOutlined />}
-            loading={connecting}
-            onClick={connectWeb}
-            type="primary"
-            style={{ background: BRAND_GRADIENT, border: 'none', fontWeight: 600 }}
-          >
-            {webConnected ? tr('chat.reloginLarkWeb', 'Đăng nhập lại Lark web') : tr('chat.loginLarkWeb', 'Đăng nhập Lark web')}
-          </Button>
-          <Button icon={<ReloadOutlined spin={busy === 'refresh'} />} loading={busy === 'refresh'} onClick={refreshAll}>
-            {tr('chat.refreshSessionAll', 'Làm mới session (tất cả)')}
-          </Button>
-          <Popover
-            trigger="click"
-            placement="bottomRight"
-            title={tr('chat.reloginFromPhone', 'Đăng nhập lại từ điện thoại')}
-            content={
-              <div style={{ width: 220, textAlign: 'center' }}>
-                <div style={{ background: '#fff', padding: 10, borderRadius: 12, display: 'inline-block', lineHeight: 0, boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }}>
-                  <QRCode value="https://toolswave.net/remote/lark" size={150} bordered={false} />
-                </div>
-                <div style={{ fontSize: 12, color: V.textSub, margin: '10px 0 6px', lineHeight: 1.5 }}>
-                  {tr('chat.scanWith', 'Quét bằng')} <b>{tr('chat.phoneCamera', 'camera điện thoại')}</b> {tr('chat.toOpenReloginPage', 'để mở trang đăng nhập lại Lark cho máy (khi bạn không ở cạnh máy).')}
-                </div>
-                <Text copyable={{ text: 'https://toolswave.net/remote/lark' }} style={{ fontSize: 11, color: V.textSub }}>
-                  toolswave.net/remote/lark
-                </Text>
-                <Button
-                  size="small"
-                  block
-                  style={{ marginTop: 8 }}
-                  onClick={() => runtime.openExternal?.('https://toolswave.net/remote/lark')}
-                >
-                  {tr('chat.openOnThisMachine', 'Mở trên máy này')}
-                </Button>
-              </div>
-            }
-          >
-            <Button icon={<QrcodeOutlined />}>{tr('chat.fromPhoneQr', 'Từ điện thoại (QR)')}</Button>
-          </Popover>
-        </Space>
+        <div style={{ marginTop: 6 }}>
+          {tr('chat.cmsAuto1', 'Khi app mở, nó')} <b>{tr('chat.cmsAuto2', 'tự làm mới session mỗi 30 phút và ngay lúc mở app')}</b> {tr('chat.cmsAuto3', '— đồng thời')} <b>{tr('chat.cmsAuto4', 'tự BẬT LẠI')}</b> {tr('chat.cmsAuto5', 'các job bị máy chủ tắt do hết session (để lịch đồng bộ tự chạy lại). Job bạn tự tắt tay thì không bị đụng tới.')}
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <LarkSessionsHowItWorks />
+        </div>
+        {!keeper?.present && (
+          <div style={{ marginTop: 6 }}>
+            <b>Máy VM là TUỲ CHỌN — hiện chưa cài.</b> Ngay bây giờ chính <b>App này đang giữ phiên Lark</b> và bơm cho các job (mỗi khi App mở). Máy VM (<code>tw-cms-keeper</code>) chỉ cần khi bạn muốn đồng bộ <b>24/7 kể cả lúc TẮT App</b> — nó là một chương trình cài trên <b>máy chủ riêng</b>, không tự hiện ra khi bấm “Đăng nhập”.
+          </div>
+        )}
+      </HowItWorks>
+
+      {!webConnected && (
+        <Alert
+          type="warning"
+          showIcon
+          message={tr('chat.larkWebNotConnected2', 'Chưa kết nối Lark web')}
+          description={tr('chat.larkWebNotConnectedDesc', 'Cần đăng nhập Lark web để lấy session. Bấm “Đăng nhập Lark web” ở góc trên — cửa sổ Lark sẽ mở để bạn đăng nhập.')}
+        />
+      )}
+
+      {/* Stats overview — mirrors cmshoanam.toolswave.net/sync/bitable */}
+      <div className="lw-grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        {[
+          { label: tr('chat.jobConnector', 'Job connector'), value: stats.total, color: BRAND },
+          { label: tr('chat.enabledCount', 'Đang bật'), value: stats.enabled, color: '#16B98D' },
+          { label: tr('chat.totalTables', 'Tổng số bảng'), value: stats.tables, color: '#3B82F6' },
+          { label: tr('chat.recordsLast', 'Bản ghi (lần cuối)'), value: stats.records, color: '#8B5CF6' },
+          { label: tr('chat.erroredCount', 'Đang lỗi'), value: stats.errored, color: stats.errored ? '#EF4444' : V.textSub },
+        ].map((s) => (
+          <Card key={s.label} size="small" style={{ background: V.surface }} styles={{ body: { padding: '10px 14px' } }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
+            <div style={{ fontSize: 12, color: V.textSub, marginTop: 2 }}>{s.label}</div>
+          </Card>
+        ))}
       </div>
 
+      {/* Trạng thái phiên: thẻ phiên + thẻ máy VM đứng CẠNH nhau (lưới tự co về một cột khi hẹp). */}
+      <div className="lw-grid-sections">
       {/* Transparent VM session + per-host/account mapping + how-it-works + multi-account note. */}
       <LarkSessionsPanel
         jobs={jobs}
@@ -1064,89 +1079,8 @@ export function CmsSyncScreen({ onOpenChat }: { onOpenChat?: () => void }) {
         onRefresh={refreshAll}
         refreshing={busy === 'refresh'}
         openExternal={runtime.openExternal}
+        compact
       />
-
-      {/* Lịch sử đăng nhập lại Lark (local + remote QR) — collapsible */}
-      <Collapse
-        size="small"
-        style={{ background: V.surface }}
-        items={[
-          {
-            key: 'lichsu',
-            label: (
-              <span style={{ color: V.text, fontWeight: 600 }}>
-                <LoginOutlined /> {tr('chat.reloginHistory', 'Lịch sử đăng nhập lại Lark')}
-                {loginHistory.length > 0 && (
-                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>({loginHistory.length})</Text>
-                )}
-              </span>
-            ),
-            extra: (
-              <ReloadOutlined
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void loadLoginHistory();
-                }}
-                style={{ color: V.textSub }}
-              />
-            ),
-            children: (
-              <>
-                {loginHistory.length === 0 ? (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr('chat.noReloginYet', 'Chưa có lần đăng nhập lại nào.')} />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {loginHistory.map((h, i) => (
-                      <div
-                        key={`${h.at}-${i}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '7px 2px',
-                          borderTop: i === 0 ? 'none' : `1px solid ${V.border}`,
-                          fontSize: 12.5,
-                        }}
-                      >
-                        <Tag color={h.source === 'remote' ? 'blue' : 'default'} style={{ margin: 0 }}>
-                          {h.source === 'remote' ? tr('chat.remoteQr', '📱 Từ xa (QR)') : tr('chat.atMachine', '🖥 Tại máy')}
-                        </Tag>
-                        <Tag
-                          color={h.outcome === 'success' ? 'green' : h.outcome === 'timeout' ? 'orange' : 'red'}
-                          style={{ margin: 0 }}
-                        >
-                          {h.outcome === 'success' ? tr('chat.success', 'Thành công') : h.outcome === 'timeout' ? tr('chat.timedOut', 'Hết giờ') : tr('chat.failed', 'Thất bại')}
-                        </Tag>
-                        <span style={{ flex: 1 }} />
-                        <span style={{ color: V.textFaint, whiteSpace: 'nowrap' }}>
-                          {new Date(h.at).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-                  {tr('chat.reloginHistoryDesc', 'Ghi lại mỗi lần đăng nhập lại phiên Lark web — tại máy (nút trên) hoặc từ điện thoại (quét QR).')}
-                </Text>
-              </>
-            ),
-          },
-        ]}
-      />
-
-      {!webConnected && (
-        <Alert
-          type="warning"
-          showIcon
-          message={tr('chat.larkWebNotConnected2', 'Chưa kết nối Lark web')}
-          description={tr('chat.larkWebNotConnectedDesc', 'Cần đăng nhập Lark web để lấy session. Bấm “Đăng nhập Lark web” ở trên — cửa sổ Lark sẽ mở để bạn đăng nhập.')}
-          action={
-            <Button size="small" type="primary" icon={<LoginOutlined />} loading={connecting} onClick={connectWeb}>
-              {tr('chat.loginLarkWeb', 'Đăng nhập Lark web')}
-            </Button>
-          }
-        />
-      )}
 
       {/* VM session-keeper (tw-cms-keeper) — check the always-on VM without SSH */}
       {keeper && keeper.present !== false && (
@@ -1202,26 +1136,242 @@ export function CmsSyncScreen({ onOpenChat }: { onOpenChat?: () => void }) {
         </Card>
       )}
 
-      {/* Stats overview — mirrors cmshoanam.toolswave.net/sync/bitable */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: 10,
-        }}
+      </div>
+
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          closable
+          onClose={() => setError('')}
+          message={tr('chat.errorDetail', 'Chi tiết lỗi (copy gửi hỗ trợ nếu cần)')}
+          description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{error}</pre>}
+        />
+      )}
+      {runDetail && (
+        <Alert
+          type="info"
+          showIcon
+          closable
+          onClose={() => setRunDetail('')}
+          message={tr('chat.larkResponseMsg', 'Phản hồi Lark cho lần chạy (copy gửi hỗ trợ)')}
+          description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{runDetail}</pre>}
+        />
+      )}
+
+      {/* Jobs list */}
+      {connectorJobs.length === 0 ? (
+        <Card style={{ background: V.surface }}>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={tr('chat.noConnectorJobs', 'Chưa có job connector nào. Tạo ở trên, hoặc job đã tạo trên web sẽ hiện ở đây.')}
+          />
+        </Card>
+      ) : (
+        <Card size="small" style={{ background: V.surface }} styles={{ body: { padding: 12 } }}>
+          <Space wrap style={{ marginBottom: 12 }} size={8}>
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: V.textFaint }} />}
+              placeholder={tr('chat.searchByJobName', 'Tìm theo tên job…')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: 240 }}
+            />
+            <Select
+              allowClear
+              placeholder={tr('chat.filterByBase', 'Lọc theo Base')}
+              style={{ minWidth: 220 }}
+              value={baseFilter}
+              onChange={(v) => setBaseFilter(v)}
+              options={baseOptions}
+              notFoundContent={tr('chat.noBaseShort', 'Không có Base')}
+            />
+            <span style={{ color: V.textFaint, fontSize: 12 }}>
+              {filteredJobs.length}/{connectorJobs.length} job
+            </span>
+            <Tooltip title={tr('chat.runAllTip', 'Gọi đồng bộ lần lượt cho tất cả job đang hiển thị')}>
+              <Button
+                size="small"
+                icon={<PlayCircleOutlined />}
+                loading={bulkBusy}
+                disabled={!filteredJobs.length}
+                onClick={() => bulkRun(filteredJobs.map((j) => String(j._id || j.id)), true)}
+              >
+                {tr('chat.runTestAll', 'Chạy test tất cả')}
+              </Button>
+            </Tooltip>
+            {bulkRunProgress && (
+              <Text style={{ fontSize: 12, color: '#2F80ED' }}>
+                {tr('chat.runningWord', 'Đang chạy')} {bulkRunProgress.done + 1}/{bulkRunProgress.total}: {bulkRunProgress.name}…
+              </Text>
+            )}
+            {selectedKeys.length > 0 && (
+              <Space size={6} style={{ paddingLeft: 8, marginLeft: 4, borderLeft: `1px solid ${V.border}` }}>
+                <Text style={{ fontSize: 12, color: V.textSub }}>{tr('chat.selectedWord', 'Đã chọn')} {selectedKeys.length}</Text>
+                <Button size="small" type="primary" loading={bulkBusy} onClick={() => bulkSetEnabled(true)}>
+                  {tr('chat.enableWord', 'Bật')}
+                </Button>
+                <Button size="small" danger loading={bulkBusy} onClick={() => bulkSetEnabled(false)}>
+                  {tr('chat.disableWord', 'Tắt')}
+                </Button>
+                <Button size="small" icon={<EditOutlined />} disabled={bulkBusy} onClick={() => setBulkCfgOpen(true)}>
+                  {tr('chat.configWord', 'Cấu hình')}
+                </Button>
+                <Button size="small" icon={<PlayCircleOutlined />} loading={bulkBusy} onClick={() => bulkRun([...selectedKeys], false)}>
+                  {tr('chat.runTest', 'Chạy test')}
+                </Button>
+                <Button size="small" type="text" disabled={bulkBusy} onClick={() => setSelectedKeys([])}>
+                  {tr('chat.deselect', 'Bỏ chọn')}
+                </Button>
+              </Space>
+            )}
+          </Space>
+          <Table
+            rowKey={(job) => String(job._id || job.id)}
+            rowSelection={{
+              selectedRowKeys: selectedKeys,
+              onChange: (keys) => setSelectedKeys(keys.map(String)),
+              selections: [Table.SELECTION_ALL, Table.SELECTION_INVERT, Table.SELECTION_NONE],
+              getCheckboxProps: () => ({ disabled: bulkBusy }),
+            }}
+            columns={columns}
+            dataSource={filteredJobs}
+            size="small"
+            pagination={{ pageSize: 10, hideOnSinglePage: true, showSizeChanger: false, showTotal: (t) => `${t} job` }}
+            scroll={{ x: 'max-content' }}
+            locale={{ emptyText: tr('chat.noJobsMatchFilter', 'Không có job khớp bộ lọc.') }}
+          />
+        </Card>
+      )}
+
+      {/* Hai biểu mẫu cấu hình đứng cạnh nhau thay vì hai thẻ trải hết bề rộng nối đuôi. */}
+      <div className="lw-grid-sections">
+      {/* Create job */}
+      <Card
+        size="small"
+        style={{ background: V.surface }}
+        title={<span style={{ color: V.text }}>{tr('chat.createSyncJob', 'Tạo job đồng bộ (connector)')}</span>}
       >
-        {[
-          { label: tr('chat.jobConnector', 'Job connector'), value: stats.total, color: BRAND },
-          { label: tr('chat.enabledCount', 'Đang bật'), value: stats.enabled, color: '#16B98D' },
-          { label: tr('chat.totalTables', 'Tổng số bảng'), value: stats.tables, color: '#3B82F6' },
-          { label: tr('chat.recordsLast', 'Bản ghi (lần cuối)'), value: stats.records, color: '#8B5CF6' },
-          { label: tr('chat.erroredCount', 'Đang lỗi'), value: stats.errored, color: stats.errored ? '#EF4444' : V.textSub },
-        ].map((s) => (
-          <Card key={s.label} size="small" style={{ background: V.surface }} styles={{ body: { padding: '10px 14px' } }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: V.textSub, marginTop: 2 }}>{s.label}</div>
-          </Card>
-        ))}
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('chat.jobNameExPlaceholder', 'Tên job (ví dụ: Đồng bộ Khách hàng)')} />
+          <Space wrap>
+            <Select
+              placeholder={tr('chat.selectSourceBase', 'Chọn Base nguồn')}
+              style={{ minWidth: 220 }}
+              value={srcApp}
+              onChange={setSrcApp}
+              options={bases.map((b) => ({ label: b.name || b.appToken, value: b.appToken }))}
+              notFoundContent={tr('chat.noBaseAddInAgents', 'Chưa có Base — thêm ở Lark × Agents')}
+            />
+            <Select
+              mode="multiple"
+              placeholder={tr('chat.selectTablesMulti', 'Chọn bảng (nhiều)')}
+              style={{ minWidth: 280, maxWidth: 460 }}
+              value={srcTables}
+              onChange={setSrcTables}
+              disabled={!srcApp}
+              maxTagCount="responsive"
+              options={tables.map((t) => ({ label: t.name, value: t.tableId }))}
+              notFoundContent={srcApp ? tr('chat.loading', 'Đang tải…') : tr('chat.selectBaseFirst', 'Chọn Base trước')}
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              loading={busy === 'create'}
+              disabled={!webConnected}
+              onClick={createJob}
+            >
+              {tr('chat.createJob', 'Tạo job')}
+            </Button>
+          </Space>
+        </Space>
+      </Card>
+
+      {/* Aggregate error report — any job error → one Lark bot webhook (runs on the backend, 24/7) */}
+      <Card
+        size="small"
+        style={{ background: V.surface }}
+        title={<span style={{ color: V.text }}>{tr('chat.aggErrWebhook', 'Webhook báo lỗi tổng (Lark)')}</span>}
+      >
+        {!runtime.cmsSyncSetErrorReport ? (
+          <Alert
+            type="warning"
+            showIcon
+            message={tr('chat.reinstallForErr', 'Cần cài lại app để dùng báo lỗi')}
+            description={tr('chat.reinstallForErrDesc', 'Bản app đang cài chưa hỗ trợ lưu cấu hình báo lỗi (vì vậy bật lên rồi mở lại vẫn tắt). Hãy cài lại bản mới nhất — vào mục phiên bản để tải, hoặc bấm cập nhật.')}
+          />
+        ) : (
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <Switch
+              checked={errEnabled}
+              loading={errSaving}
+              onChange={(v) => {
+                setErrEnabled(v);
+                void persistError({ enabled: v, larkWebhookUrl: errUrl.trim(), chatId: errChat }, true);
+              }}
+              checkedChildren={tr('chat.enabledLower', 'bật')}
+              unCheckedChildren={tr('chat.off', 'tắt')}
+            />
+            <span style={{ fontSize: 12, color: V.textSub }}>
+              {tr('chat.errWebhookDesc1', 'Bất kỳ job nào LỖI → gửi card vào Lark. Chạy trên máy chủ (kể cả khi tắt app). Bật/chọn nhóm là')} <b>{tr('chat.autoSaves', 'tự lưu')}</b>.
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ flex: 1, minWidth: 220 }}
+              disabled={!errEnabled}
+              placeholder={larkChats.length ? tr('chat.selectLarkGroup', 'Chọn nhóm Lark (bot đang ở trong)') : tr('chat.noGroupCreate', 'Chưa có nhóm — bấm "Tạo nhóm"')}
+              value={errChat || undefined}
+              onChange={(v) => {
+                const c = v || '';
+                setErrChat(c);
+                void persistError({ enabled: errEnabled, larkWebhookUrl: errUrl.trim(), chatId: c }, true);
+              }}
+              options={chatOptionsWith(errChat)}
+              notFoundContent={tr('chat.botNoGroup', 'Bot chưa ở trong nhóm nào')}
+            />
+            <Button icon={<PlusOutlined />} disabled={!errEnabled} onClick={() => setCreateOpen(true)}>
+              {tr('chat.createGroup', 'Tạo nhóm')}
+            </Button>
+            <Tooltip title={tr('chat.reloadGroupsTip', 'Tải lại danh sách nhóm (sau khi thêm bot vào nhóm trong Lark)')}>
+              <Button icon={<ReloadOutlined />} disabled={!errEnabled} onClick={reloadChats} />
+            </Tooltip>
+          </div>
+          <Space.Compact style={{ width: '100%' }}>
+            <Input
+              value={errUrl}
+              onChange={(e) => setErrUrl(e.target.value)}
+              onBlur={() => void persistError({ enabled: errEnabled, larkWebhookUrl: errUrl.trim(), chatId: errChat }, true)}
+              disabled={!errEnabled}
+              placeholder={tr('chat.orWebhookUrl', 'hoặc Lark bot webhook URL (…/bot/v2/hook/…)')}
+              style={{ background: V.surfaceAlt }}
+            />
+            <Button type="primary" loading={errSaving} onClick={saveErrorReport}>
+              {tr('chat.save', 'Lưu')}
+            </Button>
+          </Space.Compact>
+          <div>
+            <Button
+              icon={<SendOutlined />}
+              loading={testingErr}
+              disabled={!errEnabled || (!errUrl.trim() && !errChat)}
+              onClick={() => testErr(errUrl, errChat)}
+            >
+              {tr('chat.sendTestMsg', 'Gửi tin test')}
+            </Button>
+            <span style={{ fontSize: 11, color: V.textFaint, marginLeft: 8 }}>
+              {tr('chat.sendTestDesc', 'Gửi 1 card test vào nhóm/webhook đang chọn để kiểm tra kết nối.')}
+            </span>
+          </div>
+        </Space>
+        )}
+      </Card>
+
       </div>
 
       {/* Nhật ký & báo cáo — last run per job + a focused error report */}
@@ -1341,237 +1491,73 @@ export function CmsSyncScreen({ onOpenChat }: { onOpenChat?: () => void }) {
         );
       })()}
 
-      {/* Create job */}
-      <Card
+      {/* Lịch sử đăng nhập lại Lark (local + remote QR) — collapsible */}
+      <Collapse
         size="small"
         style={{ background: V.surface }}
-        title={<span style={{ color: V.text }}>{tr('chat.createSyncJob', 'Tạo job đồng bộ (connector)')}</span>}
-      >
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('chat.jobNameExPlaceholder', 'Tên job (ví dụ: Đồng bộ Khách hàng)')} />
-          <Space wrap>
-            <Select
-              placeholder={tr('chat.selectSourceBase', 'Chọn Base nguồn')}
-              style={{ minWidth: 220 }}
-              value={srcApp}
-              onChange={setSrcApp}
-              options={bases.map((b) => ({ label: b.name || b.appToken, value: b.appToken }))}
-              notFoundContent={tr('chat.noBaseAddInAgents', 'Chưa có Base — thêm ở Lark × Agents')}
-            />
-            <Select
-              mode="multiple"
-              placeholder={tr('chat.selectTablesMulti', 'Chọn bảng (nhiều)')}
-              style={{ minWidth: 280, maxWidth: 460 }}
-              value={srcTables}
-              onChange={setSrcTables}
-              disabled={!srcApp}
-              maxTagCount="responsive"
-              options={tables.map((t) => ({ label: t.name, value: t.tableId }))}
-              notFoundContent={srcApp ? tr('chat.loading', 'Đang tải…') : tr('chat.selectBaseFirst', 'Chọn Base trước')}
-            />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              loading={busy === 'create'}
-              disabled={!webConnected}
-              onClick={createJob}
-            >
-              {tr('chat.createJob', 'Tạo job')}
-            </Button>
-          </Space>
-        </Space>
-      </Card>
-
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          closable
-          onClose={() => setError('')}
-          message={tr('chat.errorDetail', 'Chi tiết lỗi (copy gửi hỗ trợ nếu cần)')}
-          description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{error}</pre>}
-        />
-      )}
-      {runDetail && (
-        <Alert
-          type="info"
-          showIcon
-          closable
-          onClose={() => setRunDetail('')}
-          message={tr('chat.larkResponseMsg', 'Phản hồi Lark cho lần chạy (copy gửi hỗ trợ)')}
-          description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{runDetail}</pre>}
-        />
-      )}
-
-      {/* Aggregate error report — any job error → one Lark bot webhook (runs on the backend, 24/7) */}
-      <Card
-        size="small"
-        style={{ background: V.surface }}
-        title={<span style={{ color: V.text }}>{tr('chat.aggErrWebhook', 'Webhook báo lỗi tổng (Lark)')}</span>}
-      >
-        {!runtime.cmsSyncSetErrorReport ? (
-          <Alert
-            type="warning"
-            showIcon
-            message={tr('chat.reinstallForErr', 'Cần cài lại app để dùng báo lỗi')}
-            description={tr('chat.reinstallForErrDesc', 'Bản app đang cài chưa hỗ trợ lưu cấu hình báo lỗi (vì vậy bật lên rồi mở lại vẫn tắt). Hãy cài lại bản mới nhất — vào mục phiên bản để tải, hoặc bấm cập nhật.')}
-          />
-        ) : (
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <Switch
-              checked={errEnabled}
-              loading={errSaving}
-              onChange={(v) => {
-                setErrEnabled(v);
-                void persistError({ enabled: v, larkWebhookUrl: errUrl.trim(), chatId: errChat }, true);
-              }}
-              checkedChildren={tr('chat.enabledLower', 'bật')}
-              unCheckedChildren={tr('chat.off', 'tắt')}
-            />
-            <span style={{ fontSize: 12, color: V.textSub }}>
-              {tr('chat.errWebhookDesc1', 'Bất kỳ job nào LỖI → gửi card vào Lark. Chạy trên máy chủ (kể cả khi tắt app). Bật/chọn nhóm là')} <b>{tr('chat.autoSaves', 'tự lưu')}</b>.
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              style={{ flex: 1, minWidth: 220 }}
-              disabled={!errEnabled}
-              placeholder={larkChats.length ? tr('chat.selectLarkGroup', 'Chọn nhóm Lark (bot đang ở trong)') : tr('chat.noGroupCreate', 'Chưa có nhóm — bấm "Tạo nhóm"')}
-              value={errChat || undefined}
-              onChange={(v) => {
-                const c = v || '';
-                setErrChat(c);
-                void persistError({ enabled: errEnabled, larkWebhookUrl: errUrl.trim(), chatId: c }, true);
-              }}
-              options={chatOptionsWith(errChat)}
-              notFoundContent={tr('chat.botNoGroup', 'Bot chưa ở trong nhóm nào')}
-            />
-            <Button icon={<PlusOutlined />} disabled={!errEnabled} onClick={() => setCreateOpen(true)}>
-              {tr('chat.createGroup', 'Tạo nhóm')}
-            </Button>
-            <Tooltip title={tr('chat.reloadGroupsTip', 'Tải lại danh sách nhóm (sau khi thêm bot vào nhóm trong Lark)')}>
-              <Button icon={<ReloadOutlined />} disabled={!errEnabled} onClick={reloadChats} />
-            </Tooltip>
-          </div>
-          <Space.Compact style={{ width: '100%' }}>
-            <Input
-              value={errUrl}
-              onChange={(e) => setErrUrl(e.target.value)}
-              onBlur={() => void persistError({ enabled: errEnabled, larkWebhookUrl: errUrl.trim(), chatId: errChat }, true)}
-              disabled={!errEnabled}
-              placeholder={tr('chat.orWebhookUrl', 'hoặc Lark bot webhook URL (…/bot/v2/hook/…)')}
-              style={{ background: V.surfaceAlt }}
-            />
-            <Button type="primary" loading={errSaving} onClick={saveErrorReport}>
-              {tr('chat.save', 'Lưu')}
-            </Button>
-          </Space.Compact>
-          <div>
-            <Button
-              icon={<SendOutlined />}
-              loading={testingErr}
-              disabled={!errEnabled || (!errUrl.trim() && !errChat)}
-              onClick={() => testErr(errUrl, errChat)}
-            >
-              {tr('chat.sendTestMsg', 'Gửi tin test')}
-            </Button>
-            <span style={{ fontSize: 11, color: V.textFaint, marginLeft: 8 }}>
-              {tr('chat.sendTestDesc', 'Gửi 1 card test vào nhóm/webhook đang chọn để kiểm tra kết nối.')}
-            </span>
-          </div>
-        </Space>
-        )}
-      </Card>
-
-      {/* Jobs list */}
-      {connectorJobs.length === 0 ? (
-        <Card style={{ background: V.surface }}>
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={tr('chat.noConnectorJobs', 'Chưa có job connector nào. Tạo ở trên, hoặc job đã tạo trên web sẽ hiện ở đây.')}
-          />
-        </Card>
-      ) : (
-        <Card size="small" style={{ background: V.surface }} styles={{ body: { padding: 12 } }}>
-          <Space wrap style={{ marginBottom: 12 }} size={8}>
-            <Input
-              allowClear
-              prefix={<SearchOutlined style={{ color: V.textFaint }} />}
-              placeholder={tr('chat.searchByJobName', 'Tìm theo tên job…')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 240 }}
-            />
-            <Select
-              allowClear
-              placeholder={tr('chat.filterByBase', 'Lọc theo Base')}
-              style={{ minWidth: 220 }}
-              value={baseFilter}
-              onChange={(v) => setBaseFilter(v)}
-              options={baseOptions}
-              notFoundContent={tr('chat.noBaseShort', 'Không có Base')}
-            />
-            <span style={{ color: V.textFaint, fontSize: 12 }}>
-              {filteredJobs.length}/{connectorJobs.length} job
-            </span>
-            <Tooltip title={tr('chat.runAllTip', 'Gọi đồng bộ lần lượt cho tất cả job đang hiển thị')}>
-              <Button
-                size="small"
-                icon={<PlayCircleOutlined />}
-                loading={bulkBusy}
-                disabled={!filteredJobs.length}
-                onClick={() => bulkRun(filteredJobs.map((j) => String(j._id || j.id)), true)}
-              >
-                {tr('chat.runTestAll', 'Chạy test tất cả')}
-              </Button>
-            </Tooltip>
-            {bulkRunProgress && (
-              <Text style={{ fontSize: 12, color: '#2F80ED' }}>
-                {tr('chat.runningWord', 'Đang chạy')} {bulkRunProgress.done + 1}/{bulkRunProgress.total}: {bulkRunProgress.name}…
-              </Text>
-            )}
-            {selectedKeys.length > 0 && (
-              <Space size={6} style={{ paddingLeft: 8, marginLeft: 4, borderLeft: `1px solid ${V.border}` }}>
-                <Text style={{ fontSize: 12, color: V.textSub }}>{tr('chat.selectedWord', 'Đã chọn')} {selectedKeys.length}</Text>
-                <Button size="small" type="primary" loading={bulkBusy} onClick={() => bulkSetEnabled(true)}>
-                  {tr('chat.enableWord', 'Bật')}
-                </Button>
-                <Button size="small" danger loading={bulkBusy} onClick={() => bulkSetEnabled(false)}>
-                  {tr('chat.disableWord', 'Tắt')}
-                </Button>
-                <Button size="small" icon={<EditOutlined />} disabled={bulkBusy} onClick={() => setBulkCfgOpen(true)}>
-                  {tr('chat.configWord', 'Cấu hình')}
-                </Button>
-                <Button size="small" icon={<PlayCircleOutlined />} loading={bulkBusy} onClick={() => bulkRun([...selectedKeys], false)}>
-                  {tr('chat.runTest', 'Chạy test')}
-                </Button>
-                <Button size="small" type="text" disabled={bulkBusy} onClick={() => setSelectedKeys([])}>
-                  {tr('chat.deselect', 'Bỏ chọn')}
-                </Button>
-              </Space>
-            )}
-          </Space>
-          <Table
-            rowKey={(job) => String(job._id || job.id)}
-            rowSelection={{
-              selectedRowKeys: selectedKeys,
-              onChange: (keys) => setSelectedKeys(keys.map(String)),
-              selections: [Table.SELECTION_ALL, Table.SELECTION_INVERT, Table.SELECTION_NONE],
-              getCheckboxProps: () => ({ disabled: bulkBusy }),
-            }}
-            columns={columns}
-            dataSource={filteredJobs}
-            size="small"
-            pagination={{ pageSize: 10, hideOnSinglePage: true, showSizeChanger: false, showTotal: (t) => `${t} job` }}
-            scroll={{ x: 'max-content' }}
-            locale={{ emptyText: tr('chat.noJobsMatchFilter', 'Không có job khớp bộ lọc.') }}
-          />
-        </Card>
-      )}
+        items={[
+          {
+            key: 'lichsu',
+            label: (
+              <span style={{ color: V.text, fontWeight: 600 }}>
+                <LoginOutlined /> {tr('chat.reloginHistory', 'Lịch sử đăng nhập lại Lark')}
+                {loginHistory.length > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>({loginHistory.length})</Text>
+                )}
+              </span>
+            ),
+            extra: (
+              <ReloadOutlined
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void loadLoginHistory();
+                }}
+                style={{ color: V.textSub }}
+              />
+            ),
+            children: (
+              <>
+                {loginHistory.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr('chat.noReloginYet', 'Chưa có lần đăng nhập lại nào.')} />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {loginHistory.map((h, i) => (
+                      <div
+                        key={`${h.at}-${i}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '7px 2px',
+                          borderTop: i === 0 ? 'none' : `1px solid ${V.border}`,
+                          fontSize: 12.5,
+                        }}
+                      >
+                        <Tag color={h.source === 'remote' ? 'blue' : 'default'} style={{ margin: 0 }}>
+                          {h.source === 'remote' ? tr('chat.remoteQr', '📱 Từ xa (QR)') : tr('chat.atMachine', '🖥 Tại máy')}
+                        </Tag>
+                        <Tag
+                          color={h.outcome === 'success' ? 'green' : h.outcome === 'timeout' ? 'orange' : 'red'}
+                          style={{ margin: 0 }}
+                        >
+                          {h.outcome === 'success' ? tr('chat.success', 'Thành công') : h.outcome === 'timeout' ? tr('chat.timedOut', 'Hết giờ') : tr('chat.failed', 'Thất bại')}
+                        </Tag>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ color: V.textFaint, whiteSpace: 'nowrap' }}>
+                          {new Date(h.at).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+                  {tr('chat.reloginHistoryDesc', 'Ghi lại mỗi lần đăng nhập lại phiên Lark web — tại máy (nút trên) hoặc từ điện thoại (quét QR).')}
+                </Text>
+              </>
+            ),
+          },
+        ]}
+      />
 
       <Modal
         open={!!editJob}

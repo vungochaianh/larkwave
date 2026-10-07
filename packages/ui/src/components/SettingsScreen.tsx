@@ -9,7 +9,7 @@ import { ClaudeConnect } from './ClaudeConnect';
 import { ClaudeKeyManager } from './ClaudeKeyManager';
 import { DeviceManager } from './DeviceManager';
 import { BRAND, V, OK, WARN, BLUE, CARD_SHADOW } from '../theme';
-import { IconTile, MICRO } from '../kit';
+import { IconTile, MICRO, PageHeader } from '../kit';
 import type { View } from './HomeScreen';
 import { useI18n } from '../i18n';
 
@@ -783,70 +783,72 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
   }, []);
   const cols = narrow ? 1 : 2;
 
+  const apiKeysCard = (
+    <Card
+      title={<CardTitle icon={<ApiOutlined />} color={BRAND}>{t('ui.settings.apiKeysTitle', 'API Keys (Quản lý API)')}</CardTitle>}
+      style={CARD_STYLE}
+      extra={
+        <Button size="small" icon={<ReloadOutlined />} onClick={() => setKeyReload((n) => n + 1)}>
+          {t('ui.action.refresh', 'Làm mới')}
+        </Button>
+      }
+    >
+      <Paragraph type="secondary" style={{ marginTop: 0, fontSize: 12.5 }}>
+        {t('ui.settings.apiKeysDesc', 'API keys dùng chung cho nhóm (khác với token đăng nhập CLI cá nhân của bạn). Dùng cho Claude khi cần chia sẻ quota an toàn.')}
+      </Paragraph>
+      <ClaudeKeyManager key={keyReload} embedded />
+    </Card>
+  );
+  const devicesCard = (
+    <Card style={CARD_STYLE}>
+      <DeviceManager />
+    </Card>
+  );
+
+  /*
+   * Hai CỘT ĐỘC LẬP thay vì một lưới hàng-ngang (quy tắc C, 07/10/2026). Lưới cũ đặt API Keys một
+   * mình ở nửa trái hàng đầu (nửa phải bỏ trống), rồi ba thẻ còn lại mỗi thẻ trải hết bề rộng → hai
+   * cột lệch hẳn nhau. Giờ: trái = Trình AI (thẻ cao nhất, là việc chính của trang này), phải = API
+   * Keys + Thiết bị + Điều khiển từ xa — tổng chiều cao hai bên xấp xỉ nhau. Hẹp thì về một cột.
+   */
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', width: '100%' }}>
-      {/* Header stays full-width above the grid */}
-      <div style={{ marginBottom: 18 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          {t('ui.settings.title', 'Cài đặt')}
-        </Title>
-        <Text type="secondary" style={{ fontSize: 13.5 }}>
-          {t('ui.settings.subtitle', 'Kết nối các trình AI/CLI chạy trên máy bạn và bật điều khiển từ xa qua điện thoại.')}
-        </Text>
-      </div>
+    <div style={{ width: '100%' }}>
+      <PageHeader
+        title={t('ui.settings.title', 'Cài đặt')}
+        description={t('ui.settings.subtitle', 'Kết nối các trình AI/CLI chạy trên máy bạn và bật điều khiển từ xa qua điện thoại.')}
+      />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: cols === 2 ? 'repeat(2, minmax(0,1fr))' : '1fr',
-          gap: 18,
-          alignItems: 'start',
-        }}
-      >
-        {/* API section: team/shared API keys (Anthropic etc) — different from personal CLI login tokens */}
-        <Card
-          title={<CardTitle icon={<ApiOutlined />} color={BRAND}>{t('ui.settings.apiKeysTitle', 'API Keys (Quản lý API)')}</CardTitle>}
-          style={CARD_STYLE}
-          extra={
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => setKeyReload((n) => n + 1)}>
-              {t('ui.action.refresh', 'Làm mới')}
-            </Button>
-          }
-        >
-          <Paragraph type="secondary" style={{ marginTop: 0, fontSize: 12.5 }}>
-            {t('ui.settings.apiKeysDesc', 'API keys dùng chung cho nhóm (khác với token đăng nhập CLI cá nhân của bạn). Dùng cho Claude khi cần chia sẻ quota an toàn.')}
-          </Paragraph>
-          <ClaudeKeyManager key={keyReload} embedded />
-        </Card>
-
-        {/* Compact card paired with API Keys on the same 2-col row */}
-
-        {/* Device manager — login sessions, max 3 per account (phone + 2 computers) */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <Card style={CARD_STYLE}>
-            <DeviceManager />
-          </Card>
-        </div>
-
-        {/* Tall panels each get their own full-width row */}
-        <div style={{ gridColumn: '1 / -1' }}>
+      {cols === 1 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <RunnersPanel />
-        </div>
-        <div style={{ gridColumn: '1 / -1' }}>
+          {apiKeysCard}
+          {devicesCard}
           <RemoteControlPanel onNav={onNav} />
         </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            <RunnersPanel />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            {apiKeysCard}
+            {devicesCard}
+            <RemoteControlPanel onNav={onNav} />
+          </div>
+        </div>
+      )}
 
+      <div>
         {/* Interlink footer — jump to related screens (replaces the old decorative divider). */}
         {onNav && (
           <div
             style={{
-              gridColumn: '1 / -1',
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
               gap: 2,
               paddingTop: 10,
-              marginTop: 2,
+              marginTop: 18,
               borderTop: `1px solid ${V.borderSub}`,
             }}
           >

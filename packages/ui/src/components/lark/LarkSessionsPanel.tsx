@@ -38,6 +38,7 @@ export function LarkSessionsPanel({
   onRefresh,
   refreshing,
   openExternal,
+  compact = false,
 }: {
   jobs: CmsSyncJob[];
   keeper: CmsKeeperStatus | null;
@@ -48,6 +49,12 @@ export function LarkSessionsPanel({
   onRefresh?: () => void;
   refreshing?: boolean;
   openExternal?: (url: string) => void;
+  /**
+   * Màn Đồng bộ Bitable đã có nút Đăng nhập/Làm mới ở đầu trang và một "Cách hoạt động" chung →
+   * thẻ này bỏ các phần lặp: nút đăng nhập, nút làm mới (trừ khi có job lỗi — lúc đó nó là nút SỬA),
+   * ghi chú "VM là tuỳ chọn" và phần giải thích (đã nằm trong <LarkSessionsHowItWorks/>).
+   */
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -134,7 +141,7 @@ export function LarkSessionsPanel({
       )}
 
       {/* VM is OPTIONAL — clear up the "clicking login should make a VM appear" confusion. */}
-      {!keeper?.present && (
+      {!keeper?.present && !compact && (
         <div style={{ marginTop: 12, display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10, background: V.surfaceAlt, border: `1px solid ${V.border}` }}>
           <InfoCircleOutlined style={{ color: BRAND, fontSize: 15, flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: 12.5, color: V.textSub, lineHeight: 1.55 }}>
@@ -154,20 +161,19 @@ export function LarkSessionsPanel({
       )}
 
       {/* How it works (collapsible) */}
+      {!compact && (<>
       <button type="button" onClick={() => setOpen((o) => !o)} style={{ marginTop: 12, border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: BRAND, fontWeight: 600, fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <InfoCircleOutlined /> {t('chat.howItWorks', 'Cách hoạt động')} {open ? <DownOutlined style={{ fontSize: 10 }} /> : <RightOutlined style={{ fontSize: 10 }} />}
       </button>
       {open && (
         <div style={{ marginTop: 8, fontSize: 12.5, color: V.textSub, lineHeight: 1.6, background: V.surfaceAlt, borderRadius: 10, padding: '10px 12px' }}>
-          <div>1. App/máy VM giữ <b>một phiên Lark web</b> (cookies + csrf) của tài khoản đang đăng nhập, tự làm mới định kỳ.</div>
-          <div>2. Ai bơm phiên cho job? <b>Nếu đã cài máy VM (tw-cms-keeper)</b> → nó giữ phiên sống <b>24/7</b> và bơm cookies/csrf mới vào mọi job (mỗi 30 phút + khi lỗi), chạy cả khi bạn tắt App. <b>Chưa cài VM</b> (như hiện tại) → chính <b>App này</b> bơm, nhưng chỉ khi App đang mở.</div>
-          <div>3. Job lỗi vì hết phiên → bấm <b>“Làm mới session”</b> để bơm phiên hiện tại của App cho mọi job (tự bật lại job đã tắt). Nếu App chưa đăng nhập Lark → bấm <b>“Đăng nhập Lark web”</b> trước.</div>
-          <div>4. <b>Nhiều tài khoản Lark:</b> hiện chỉ 1 phiên/1 tài khoản. Bản đa-tài-khoản sẽ cho mỗi tài khoản một phiên riêng + gắn từng job vào đúng tài khoản.</div>
+          <LarkSessionsHowItWorks />
         </div>
       )}
+      </>)}
 
       <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {onRefresh && (
+        {onRefresh && (!compact || erroredCount > 0) && (
           <Button
             icon={<ReloadOutlined spin={refreshing} />}
             loading={refreshing}
@@ -178,6 +184,7 @@ export function LarkSessionsPanel({
             {erroredCount > 0 ? `${t('chat.refreshSession', 'Làm mới session')} (${t('chat.fixVerb', 'sửa')} ${erroredCount} ${t('chat.errorsUnit', 'lỗi')})` : `${t('chat.refreshSession', 'Làm mới session')} (${t('chat.all', 'tất cả')})`}
           </Button>
         )}
+        {!compact && (
         <Button
           icon={<LoginOutlined />}
           loading={connecting}
@@ -187,6 +194,7 @@ export function LarkSessionsPanel({
         >
           {webConnected ? t('chat.reloginLarkWeb', 'Đăng nhập lại Lark web') : t('chat.loginLarkWeb', 'Đăng nhập Lark web')}
         </Button>
+        )}
         {keeper?.online && !keeper.loggedIn && keeper.reloginUrl && (
           <Popover
             trigger="click"
@@ -206,5 +214,17 @@ export function LarkSessionsPanel({
         )}
       </div>
     </div>
+  );
+}
+
+/** Bốn bước "phiên Lark được giữ và bơm cho job thế nào" — dùng chung cho thẻ này và "Cách hoạt động" của màn. */
+export function LarkSessionsHowItWorks() {
+  return (
+    <>
+      <div>1. App/máy VM giữ <b>một phiên Lark web</b> (cookies + csrf) của tài khoản đang đăng nhập, tự làm mới định kỳ.</div>
+      <div>2. Ai bơm phiên cho job? <b>Nếu đã cài máy VM (tw-cms-keeper)</b> → nó giữ phiên sống <b>24/7</b> và bơm cookies/csrf mới vào mọi job (mỗi 30 phút + khi lỗi), chạy cả khi bạn tắt App. <b>Chưa cài VM</b> (như hiện tại) → chính <b>App này</b> bơm, nhưng chỉ khi App đang mở.</div>
+      <div>3. Job lỗi vì hết phiên → bấm <b>“Làm mới session”</b> để bơm phiên hiện tại của App cho mọi job (tự bật lại job đã tắt). Nếu App chưa đăng nhập Lark → bấm <b>“Đăng nhập Lark web”</b> trước.</div>
+      <div>4. <b>Nhiều tài khoản Lark:</b> hiện chỉ 1 phiên/1 tài khoản. Bản đa-tài-khoản sẽ cho mỗi tài khoản một phiên riêng + gắn từng job vào đúng tài khoản.</div>
+    </>
   );
 }

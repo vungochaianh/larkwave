@@ -115,10 +115,12 @@ function StatBand({ overview, activity, loading, onNav }: { overview: MeOverview
     { key: 'contrib', label: 'Tổng đóng góp', value: activity?.total ?? 0, icon: <ThunderboltOutlined />, color: OK },
   ];
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-      {tiles.map((t) => (
-        <StatCard key={t.key} icon={t.icon} color={t.color} value={t.value} label={t.label} loading={loading || t.value === undefined} onClick={t.onClick} />
-      ))}
+    <div className="lw-grid-8wrap">
+      <div className="lw-grid-8">
+        {tiles.map((t) => (
+          <StatCard key={t.key} icon={t.icon} color={t.color} value={t.value} label={t.label} loading={loading || t.value === undefined} onClick={t.onClick} />
+        ))}
+      </div>
     </div>
   );
 }

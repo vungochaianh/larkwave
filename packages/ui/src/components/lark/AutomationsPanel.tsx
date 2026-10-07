@@ -8,6 +8,7 @@ import type { SkillContract, SkillInfo } from '@larkwave/core';
 import { useI18n } from '../../i18n';
 import { V } from '../../theme';
 import { HostedRunnerCard } from './HostedRunnerCard';
+import { HowItWorks } from '../../kit';
 
 const { Text, Paragraph } = Typography;
 
@@ -139,7 +140,11 @@ function RunHistory({
   );
 }
 
-export function AutomationsPanel({ runtime }: { runtime: RuntimeAdapter }) {
+/**
+ * `page`: dùng làm thân của màn "Tự động hoá" (đầu trang đã có tiêu đề + mô tả) → thẻ không lặp lại
+ * tiêu đề, đoạn giới thiệu dài chuyển vào "Cách hoạt động". Trong modal Cài đặt Lark thì giữ nguyên.
+ */
+export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAdapter; page?: boolean }) {
   const { t: tr } = useI18n();
   const { message } = App.useApp();
   const dayOptsT = [
@@ -472,9 +477,15 @@ export function AutomationsPanel({ runtime }: { runtime: RuntimeAdapter }) {
     <Card
       size="small"
       title={
-        <span>
-          <ThunderboltOutlined /> {tr('chat.automationsTitle', 'Tự động hoá (Larkwave)')}
-        </span>
+        page ? (
+          <span style={{ fontWeight: 600 }}>
+            <ThunderboltOutlined /> {tr('chat.rulesCount', 'Quy tắc')} <span style={{ color: V.textFaint, fontWeight: 500 }}>({rules.length})</span>
+          </span>
+        ) : (
+          <span>
+            <ThunderboltOutlined /> {tr('chat.automationsTitle', 'Tự động hoá (Larkwave)')}
+          </span>
+        )
       }
       // KHÔNG khoá theo số Base: lịch theo giờ không cần Base nào cả. Khoá cả nút ở đây khiến
       // đường DUY NHẤT để có một lịch là nhắn cho agent trong khung trò chuyện — mà đó đúng là
@@ -486,9 +497,15 @@ export function AutomationsPanel({ runtime }: { runtime: RuntimeAdapter }) {
         </Button>
       }
     >
-      <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-        {tr('chat.automationsIntro', 'Lark không cho tạo automation bằng API — nên Larkwave tự chạy: định kỳ kiểm tra bảng, khi bản ghi khớp điều kiện thì gửi tin nhắn / cập nhật bản ghi / gọi webhook. Chạy khi app đang mở.')}
-      </Paragraph>
+      {page ? (
+        <HowItWorks style={{ marginBottom: 10 }}>
+          {tr('chat.automationsIntro', 'Lark không cho tạo automation bằng API — nên Larkwave tự chạy: định kỳ kiểm tra bảng, khi bản ghi khớp điều kiện thì gửi tin nhắn / cập nhật bản ghi / gọi webhook. Chạy khi app đang mở.')}
+        </HowItWorks>
+      ) : (
+        <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
+          {tr('chat.automationsIntro', 'Lark không cho tạo automation bằng API — nên Larkwave tự chạy: định kỳ kiểm tra bảng, khi bản ghi khớp điều kiện thì gửi tin nhắn / cập nhật bản ghi / gọi webhook. Chạy khi app đang mở.')}
+        </Paragraph>
+      )}
 
       {bases.length === 0 && (
         <Alert

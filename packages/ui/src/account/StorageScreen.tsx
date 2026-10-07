@@ -6,6 +6,7 @@ import { DeleteOutlined, ReloadOutlined, CloudServerOutlined } from '@ant-design
 import { accountApi, type StorageBucket, type StorageCategory, type StorageItem, type StorageOrder, type StorageUsage } from './api';
 import { BRAND, STORAGE_COLORS, STORAGE_COLOR_FALLBACK, V } from '../theme';
 import { useI18n } from '../i18n';
+import { PageHeader } from '../kit';
 
 /** Đổi byte sang chuỗi người đọc được. Dùng 1024 vì đây là dung lượng lưu trữ, không phải tốc độ. */
 export function formatBytes(n: number): string {
@@ -96,20 +97,17 @@ export function StorageScreen(): ReactElement {
   const over = !!usage && !usage.unlimited && usage.totalBytes > usage.quotaBytes;
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '4px 0 32px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <CloudServerOutlined style={{ color: BRAND, fontSize: 20 }} />
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
-          {t('storage.title', 'Dung lượng lưu trữ')}
-        </h2>
-        <Button size="small" type="text" icon={<ReloadOutlined />} onClick={() => void load()} />
-      </div>
-      <p style={{ color: V.textSub, fontSize: 13.5, margin: '0 0 18px' }}>
-        {t(
-          'storage.sub',
-          'Dữ liệu bạn đang lưu trên Larkwave — đo theo dung lượng dữ liệu, có thể chênh chút ít so với chỗ chiếm thực tế trên đĩa. Bấm vào từng nhóm để xem chi tiết và xoá thứ không còn cần.',
-        )}
-      </p>
+    // Khung trang chung đã lo bề rộng/lề (quy tắc A) — không còn cột 900px riêng.
+    <div style={{ width: '100%', paddingBottom: 32 }}>
+      <PageHeader
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <CloudServerOutlined style={{ color: BRAND }} /> {t('storage.title', 'Dung lượng lưu trữ')}
+          </span>
+        }
+        description={t('storage.subShort', 'Dữ liệu bạn đang lưu trên Larkwave. Bấm vào từng nhóm để xem chi tiết và xoá thứ không còn cần.')}
+        actions={<Button icon={<ReloadOutlined />} onClick={() => void load()}>{t('ui.action.refresh', 'Làm mới')}</Button>}
+      />
 
       {failed && !usage && (
         <div style={{ padding: 14, border: `1px solid ${V.border}`, borderRadius: 10, color: V.textSub }}>
@@ -246,7 +244,7 @@ export function StorageScreen(): ReactElement {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
             {usage.buckets.map((b) => (
               <div
                 key={b.category}

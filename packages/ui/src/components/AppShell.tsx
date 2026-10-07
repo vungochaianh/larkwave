@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
-import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Tag, Badge } from 'antd';
+import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Badge } from 'antd';
 import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
@@ -17,6 +17,7 @@ import { AgentActivity } from './AgentActivity';
 import { NetworkBanner } from './NetworkBanner';
 import { useAccountAuth } from '../account/auth';
 import { UserAvatar } from '../account/UserAvatar';
+import { PageContainer } from '../kit';
 
 const { Sider, Header, Content } = Layout;
 
@@ -28,10 +29,16 @@ const EXTRA_NAV = FEATURE_FRIENDS ? [{ key: 'tw-friends', label: 'Bạn bè', ic
 // Top-level items outside any group.
 // KHÔNG còn "Báo lỗi" (trang "Báo lỗi của tôi" bỏ cùng chương trình thưởng, 07/10/2026 — nút gửi
 // báo lỗi trên header vẫn còn) và "Gói & Thanh toán" (gói + nâng cấp đã nằm trong Hồ sơ).
+//
+// 07/10/2026 (quy tắc E): thanh bên chỉ còn TÍNH NĂNG. Ba mục tài khoản (Hồ sơ & Gói, Dung lượng,
+// Cài đặt) chuyển vào menu của thẻ người dùng ở đáy thanh bên (bấm avatar). Ở nơi không có thẻ
+// người dùng (không phải desktop) chúng vẫn nằm trong thanh bên như cũ, để không mất lối vào.
 const TOP_NAV = [
   { key: 'tw-storage', label: 'Dung lượng', icon: <CloudServerOutlined /> },
   { key: 'tw-profile', label: 'Hồ sơ', icon: <UserOutlined /> },
 ];
+/** Các khoá trang tài khoản — mở từ menu thẻ người dùng trên desktop. */
+const ACCOUNT_KEYS = ['tw-profile', 'tw-storage', 'tw-settings'];
 
 function scrollTo(id: string) {
   if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -71,9 +78,11 @@ function LogoMark({ size = 30 }: { size?: number }) {
 }
 
 /** Larkwave account (Google/email login) shown in sidebar for desktop. Primary identity. */
-function UserBlock({ collapsed }: { collapsed: boolean }) {
+function UserBlock({ collapsed, selected, onGo, hasSettings }: { collapsed: boolean; selected: string; onGo: (key: string) => void; hasSettings: boolean }) {
   const { user, logout } = useAccountAuth();
+  const { t } = useI18n();
   if (!user) return null;
+  const active = ACCOUNT_KEYS.includes(selected);
 
   const doLogout = () => {
     logout();
@@ -81,39 +90,52 @@ function UserBlock({ collapsed }: { collapsed: boolean }) {
   };
 
   const menu = {
+    selectedKeys: active ? [selected] : [],
     items: [
       { key: 'who', disabled: true, label: user.email },
       { type: 'divider' as const },
-      { key: 'logout', icon: <LogoutOutlined />, danger: true, label: 'Đăng xuất', onClick: doLogout },
+      { key: 'tw-profile', icon: <UserOutlined />, label: t('app.nav.profile', 'Hồ sơ & Gói'), onClick: () => onGo('tw-profile') },
+      { key: 'tw-storage', icon: <CloudServerOutlined />, label: t('app.nav.storage', 'Dung lượng'), onClick: () => onGo('tw-storage') },
+      ...(hasSettings ? [{ key: 'tw-settings', icon: <SettingOutlined />, label: t('app.nav.settings', 'Cài đặt'), onClick: () => onGo('tw-settings') }] : []),
+      { type: 'divider' as const },
+      { key: 'logout', icon: <LogoutOutlined />, danger: true, label: t('app.logout', 'Đăng xuất'), onClick: doLogout },
     ],
   };
 
   return (
     <div style={{ padding: collapsed ? 8 : 12, borderTop: `1px solid ${V.borderSub}` }}>
       <Dropdown menu={menu} placement="topLeft" trigger={['click']}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', borderRadius: 12, cursor: 'pointer', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+        <div
+          className="lw-user-card"
+          title={t('app.accountMenu', 'Tài khoản: Hồ sơ & Gói, Dung lượng, Cài đặt')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', borderRadius: 12, cursor: 'pointer', justifyContent: collapsed ? 'center' : 'flex-start', background: active ? `${BRAND}14` : undefined }}
+        >
           <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size={34} />
           {!collapsed && (
             <div style={{ minWidth: 0, lineHeight: 1.25, flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: V.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user.name || user.email?.split('@')[0] || 'Người dùng'}
               </div>
-              <div style={{ marginTop: 2, fontSize: 11, color: V.textSub }}>{user.email}</div>
+              <div style={{ marginTop: 2, fontSize: 11, color: V.textSub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
             </div>
           )}
+          {!collapsed && <SettingOutlined style={{ color: active ? BRAND : V.textFaint, fontSize: 14 }} />}
         </div>
       </Dropdown>
     </div>
   );
 }
 
-/** Multi-agents status in sidebar footer. Shows main user above, then list of connected agents (Claude/Grok/etc) so user knows what they have.
- *  Quick hint for settings/skills of agents.
+/**
+ * Trạng thái các trình AI ở đáy thanh bên — MỘT dòng (quy tắc E): "AI: 2/4 sẵn sàng" + chấm màu
+ * cho từng trình. Bấm dòng → Cài đặt (nơi có đầy đủ phần kết nối); bấm một chấm → hướng dẫn cài
+ * trình đó. Trước đây là một khối nhãn + hai dòng gợi ý chiếm ~90px của thanh bên.
  */
-function AgentsBlock({ collapsed }: { collapsed: boolean }) {
+function AgentsBlock({ collapsed, onOpenSettings }: { collapsed: boolean; onOpenSettings?: () => void }) {
   const runtime = useRuntime();
+  const { t } = useI18n();
   const [runners, setRunners] = useState<RunnerStatusInfo[]>([]);
-  /** The agent whose setup-guide modal is open (click a tag → guide). */
+  /** The agent whose setup-guide modal is open (click a dot → guide). */
   const [guide, setGuide] = useState<RunnerStatusInfo | null>(null);
 
   useEffect(() => {
@@ -126,42 +148,46 @@ function AgentsBlock({ collapsed }: { collapsed: boolean }) {
   if (!runtime.runners || runners.length === 0) return null;
 
   const readyCount = runners.filter(r => r.ready).length;
-  // Collapsed sidebar is ~72px — full labels ("Claude CLI") overflow/wrap ugly. Show a
-  // 2-char abbreviation instead; the tooltip still carries the full name + status.
-  const shortLabel = (id: string): string =>
-    (({ claude: 'Cl', grok: 'Gk', gemini: 'Gm', codex: 'Cx' } as Record<string, string>)[id] ?? id.slice(0, 2));
+  const dotColor = (r: RunnerStatusInfo) => (r.ready ? '#16B98D' : r.installed ? '#F59E0B' : V.textFaint);
+  const stateWord = (r: RunnerStatusInfo) =>
+    r.ready ? t('ui.runner.ready', 'Sẵn sàng') : r.installed ? (r.loggedIn ? t('app.agents.missingModel', 'Thiếu model/key') : t('app.agents.needKey', 'Cần key')) : t('app.agents.notInstalled', 'Chưa cài');
 
   return (
-    <div style={{ padding: collapsed ? 8 : 12, borderTop: `1px solid ${V.borderSub}` }}>
-      {!collapsed && (
-        <div style={{ fontSize: 11, fontWeight: 600, color: V.textSub, marginBottom: 6, paddingLeft: 4 }}>
-          Agents ({readyCount}/{runners.length} sẵn sàng)
+    <div style={{ padding: collapsed ? '6px 4px' : '6px 12px', borderTop: `1px solid ${V.borderSub}` }}>
+      <Tooltip
+        placement="right"
+        title={
+          <div style={{ fontSize: 12 }}>
+            {runners.map((r) => (
+              <div key={r.id}>{r.label} — {stateWord(r)}</div>
+            ))}
+            <div style={{ opacity: 0.75, marginTop: 4 }}>{t('app.agents.hint', 'Bấm để mở Cài đặt · bấm một chấm để xem hướng dẫn cài')}</div>
+          </div>
+        }
+      >
+        <div
+          onClick={onOpenSettings}
+          role="button"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: collapsed ? 'center' : 'flex-start', padding: '6px 8px', borderRadius: 10, cursor: onOpenSettings ? 'pointer' : 'default', flexDirection: collapsed ? 'column' : 'row' }}
+        >
+          <RobotOutlined style={{ color: readyCount ? BRAND : V.textFaint, fontSize: 13 }} />
+          {!collapsed && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: V.textSub, flex: 1, whiteSpace: 'nowrap' }}>
+              {t('app.agents.line', 'AI: {n}/{m} sẵn sàng', { n: readyCount, m: runners.length })}
+            </span>
+          )}
+          <span style={{ display: 'inline-flex', gap: 4 }}>
+            {runners.map((r) => (
+              <span
+                key={r.id}
+                aria-label={`${r.label} — ${stateWord(r)}`}
+                onClick={(e) => { e.stopPropagation(); setGuide(r); }}
+                style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor(r), cursor: 'pointer', boxShadow: `0 0 0 2px ${dotColor(r)}22` }}
+              />
+            ))}
+          </span>
         </div>
-      )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: collapsed ? 'center' : 'flex-start' }}>
-        {runners.map((r) => (
-          <Tooltip key={r.id} title={`${r.label} — ${r.ready ? 'Sẵn sàng' : r.installed ? (r.loggedIn ? 'Thiếu model/key' : 'Cần key') : 'Chưa cài'} · bấm để xem hướng dẫn`}>
-            <Tag
-              onClick={() => setGuide(r)}
-              style={{
-                margin: 0,
-                fontSize: collapsed ? 9 : 10,
-                cursor: 'pointer',
-                padding: collapsed ? '0 5px' : undefined,
-                lineHeight: collapsed ? '18px' : undefined,
-              }}
-              color={r.ready ? 'success' : r.installed ? (r.loggedIn ? 'warning' : 'default') : 'default'}
-            >
-              {collapsed ? shortLabel(r.id) : r.label}
-            </Tag>
-          </Tooltip>
-        ))}
-      </div>
-      {!collapsed && (
-        <div style={{ fontSize: 10, color: V.textFaint, marginTop: 6, paddingLeft: 4 }}>
-          Bấm một agent để xem <b>hướng dẫn cài đặt</b> · hoặc vào <b>Cài đặt</b> / <b>Kỹ năng</b>
-        </div>
-      )}
+      </Tooltip>
       <AgentGuideModal
         runtime={runtime}
         runner={guide}
@@ -205,6 +231,7 @@ const NAV_I18N: Record<string, string> = {
   'tw-skills': 'app.nav.skills',
   'tw-skills-cross': 'app.nav.skillsCross',
   'tw-profile': 'app.nav.profile',
+  'tw-storage': 'app.nav.storage',
   'tw-settings': 'app.nav.settings',
 };
 
@@ -218,7 +245,9 @@ const NAV_TITLE_I18N: Record<string, string> = {
   'tw-cms-sync': 'app.title.cmsSync',
   'tw-skills': 'app.title.skills',
   'tw-skills-cross': 'app.title.skillsCross',
+  'tw-lark-auto': 'app.title.larkAuto',
   'tw-profile': 'app.nav.profile',
+  'tw-storage': 'app.nav.storage',
   'tw-settings': 'app.nav.settings',
 };
 
@@ -278,6 +307,7 @@ function AppShellInner({
   cmsAllowed = false,
   activeKey,
   headerExtra,
+  fullBleed = false,
 }: {
   children: ReactNode;
   sectionTitle?: string;
@@ -289,6 +319,8 @@ function AppShellInner({
   activeKey?: string;
   /** Extra controls rendered in the header toolbar (right side) — e.g. the "Báo lỗi" button. */
   headerExtra?: ReactNode;
+  /** Màn chat (Lark × Agents, Trợ lý AI): trải hết bề rộng thay vì khung 1440px. */
+  fullBleed?: boolean;
 }) {
   const runtime = useRuntime();
   const { mode, toggle } = useThemeMode();
@@ -340,7 +372,6 @@ function AppShellInner({
           selectedKeys={[selected]}
           style={{ borderInlineEnd: 'none', background: 'transparent' }}
           onClick={({ key }) => go(key)}
-          defaultOpenKeys={['grp-lark']}
           items={(() => {
             type NavNode = { key: string; label: ReactNode; icon: ReactNode; children?: NavNode[] };
             // "Lark" GROUP: chat, living spec, CMS sync.
@@ -388,11 +419,16 @@ function AppShellInner({
               larkChildren.push({ key: 'tw-skills', label: 'Kỹ năng', icon: <BulbOutlined /> });
               larkChildren.push({ key: 'tw-skills-cross', label: 'Kỹ năng chéo', icon: <NodeIndexOutlined /> });
             }
-            if (larkChildren.length) list.push({ key: 'grp-lark', label: 'Lark', icon: <RobotOutlined />, children: larkChildren });
+            // PHẲNG, không còn nhóm "Lark" (07/10/2026): ở Larkwave mọi tính năng đều là Lark, nên
+            // một nhóm duy nhất chỉ thêm một tầng thụt lề + một cú bấm mở/đóng mà không phân loại
+            // được gì. Các mục giữ nguyên thứ tự cũ, đứng ngay dưới Tổng quan.
+            list.push(...larkChildren);
             list.push(...EXTRA_NAV);
-            list.push(...TOP_NAV);
-            // Desktop only: an "AI runners + remote control" settings entry at the end.
-            if (runtime.runners) list.push({ key: 'tw-settings', label: 'Cài đặt', icon: <SettingOutlined /> });
+            // Mục tài khoản: trên desktop nằm trong menu thẻ người dùng (UserBlock) ở đáy.
+            if (!isDesktop) {
+              list.push(...TOP_NAV);
+              if (runtime.runners) list.push({ key: 'tw-settings', label: 'Cài đặt', icon: <SettingOutlined /> });
+            }
             // Translate string labels via NAV_I18N (JSX labels — e.g. the "Trợ lý AI" badge item —
             // are already localized inline and pass through untouched). Raw label = the fallback.
             const navLabel = (node: NavNode): ReactNode =>
@@ -406,8 +442,8 @@ function AppShellInner({
           })()}
         />
       </div>
-      {isDesktop && <UserBlock collapsed={collapsed} />}
-      <AgentsBlock collapsed={collapsed} />
+      <AgentsBlock collapsed={collapsed} onOpenSettings={runtime.runners ? () => go('tw-settings') : undefined} />
+      {isDesktop && <UserBlock collapsed={collapsed} selected={selected} onGo={go} hasSettings={!!runtime.runners} />}
       <VersionFooter collapsed={collapsed} />
     </div>
   );
@@ -473,13 +509,12 @@ function AppShellInner({
               )}
             </Header>
             <Content className="tw-grid-bg" style={{ background: V.layer }}>
-              {/* Left-aligned, fills the frame (just padding) — no centered max-width
-                  cap that leaves big empty gutters on wide screens. Animated caro grid matches the web. */}
-              <div style={{ padding: '24px 32px 64px' }}>
+              {/* MỘT khung trang cho mọi màn (quy tắc A): căn giữa, tối đa 1440px; màn chat trải hết. */}
+              <PageContainer full={fullBleed}>
                 <NetworkBanner />
                 <UpdateBanner />
                 {children}
-              </div>
+              </PageContainer>
               {isDesktop && FEATURE_FRIENDS && <MessengerWidget listOpen={msgOpen} onCloseList={() => setMsgOpen(false)} onUnread={setMsgUnread} />}
             </Content>
           </Layout>

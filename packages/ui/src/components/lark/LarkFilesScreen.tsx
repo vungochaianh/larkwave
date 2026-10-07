@@ -4,6 +4,7 @@ import { App as AntApp, Button, Empty, Input, Popconfirm, Skeleton, Tag, Tooltip
 import { DeleteOutlined, FileOutlined, FolderOpenOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { RuntimeAdapter } from '@larkwave/core';
 import { V } from '../../theme';
+import { PageHeader } from '../../kit';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
 
 interface Group {
@@ -116,16 +117,12 @@ export function LarkFilesScreen({ runtime }: { runtime: RuntimeAdapter }) {
   };
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', padding: '4px 0 32px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <FolderOpenOutlined style={{ fontSize: 20, color: '#6C5CE7' }} />
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Tệp đã gửi cho Lark Agents</h2>
-        <Button size="small" type="text" icon={<ReloadOutlined />} onClick={() => void load()} />
-      </div>
-      <p style={{ color: V.textSub, fontSize: 13.5, margin: '0 0 16px' }}>
-        Tệp bạn đính kèm vào hội thoại được giữ lại trên MÁY NÀY để trợ lý còn đọc lại ở các lượt
-        sau. Xoá ở đây là xoá hẳn khỏi đĩa — trợ lý sẽ không đọc lại được nữa.
-      </p>
+    <div style={{ width: '100%', paddingBottom: 32 }}>
+      <PageHeader
+        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><FolderOpenOutlined style={{ color: '#6C5CE7' }} /> Tệp đã gửi cho Lark Agents</span>}
+        description="Tệp đính kèm được giữ trên MÁY NÀY để trợ lý đọc lại ở các lượt sau. Xoá ở đây là xoá hẳn khỏi đĩa."
+        actions={<Button icon={<ReloadOutlined />} onClick={() => void load()}>Làm mới</Button>}
+      />
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <Input.Search

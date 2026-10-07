@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-/** Supported UI languages. Default follows the browser/system locale (navigator.language). */
+/** Supported UI languages. Default is Vietnamese until the user picks one (see detectLocale). */
 export type Locale = 'vi' | 'en';
 
 const STORAGE_KEY = 'tw_locale';
@@ -1481,6 +1481,24 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "ui.settings.openCms": { vi: "Mở Đồng bộ CMS →", en: "Open CMS sync →" },
   "ui.settings.skills": { vi: "Kỹ năng →", en: "Skills →" },
   "app.nav.overview": { vi: "Tổng quan", en: "Overview" },
+  "app.nav.storage": { vi: "Dung lượng", en: "Storage" },
+  "app.title.larkAuto": { vi: "Tự động hoá (lịch)", en: "Automation (schedules)" },
+  "app.logout": { vi: "Đăng xuất", en: "Log out" },
+  "app.accountMenu": { vi: "Tài khoản: Hồ sơ & Gói, Dung lượng, Cài đặt", en: "Account: Profile & Plan, Storage, Settings" },
+  "app.agents.line": { vi: "AI: {n}/{m} sẵn sàng", en: "AI: {n}/{m} ready" },
+  "app.agents.hint": { vi: "Bấm để mở Cài đặt · bấm một chấm để xem hướng dẫn cài", en: "Click to open Settings · click a dot for its setup guide" },
+  "app.agents.missingModel": { vi: "Thiếu model/key", en: "Missing model/key" },
+  "app.agents.needKey": { vi: "Cần key", en: "Needs a key" },
+  "app.agents.notInstalled": { vi: "Chưa cài", en: "Not installed" },
+  "ui.howItWorks": { vi: "Cách hoạt động", en: "How it works" },
+  "chat.rulesCount": { vi: "Quy tắc", en: "Rules" },
+  "storage.subShort": { vi: "Dữ liệu bạn đang lưu trên Larkwave. Bấm vào từng nhóm để xem chi tiết và xoá thứ không còn cần.", en: "The data you store on Larkwave. Click a group to see details and delete what you no longer need." },
+  "chat.specOneLine": { vi: "Cấu trúc Base + workflow đọc trực tiếp từ Lark — khớp theo ID, mỗi lần đồng bộ hiện rõ thêm/đổi/gỡ.", en: "Base structure + workflows read straight from Lark — matched by ID, each sync shows what was added/changed/removed." },
+  "skills.oneLine.cross": { vi: "Nhiều kỹ năng nối nhau bằng khoá — tự suy ra thứ tự, kiểm chéo sau mỗi bước.", en: "Several skills chained by keys — order is inferred, everything is cross-checked after each step." },
+  "skills.oneLine.plain": { vi: "Quy tắc dạy AI làm theo cách của bạn — bật lên là AI tự áp dụng khi yêu cầu khớp.", en: "Rules that teach the AI your way of working — once on, the AI applies them when a request matches." },
+  "skills.empty.titleCross": { vi: "Chưa có kỹ năng chéo nào", en: "No cross-checked skills yet" },
+  "skills.empty.descCross": { vi: "Kỹ năng chéo là một bộ kỹ năng nối nhau: bước sau dùng kết quả của bước trước, và máy kiểm lại mọi ràng buộc sau mỗi bước. Mô tả các bước ở ô phía trên để trợ lý dựng giúp, hoặc tự tạo từng kỹ năng.", en: "Cross-checked skills are a chained set: each step uses the previous step's result, and every constraint is re-checked after each step. Describe the steps in the box above and let the assistant build them, or create each skill yourself." },
+  "chat.cmsOneLine": { vi: "Giữ session connector luôn tươi từ phiên Lark web — app tự bơm cookie mới cho mọi job.", en: "Keeps the connector session fresh from your Lark web session — the app pushes new cookies to every job." },
   "app.nav.assistant": { vi: "Trợ lý AI", en: "AI Assistant" },
   "app.nav.assistantBadge": { vi: "ĐA NĂNG", en: "ALL-IN-ONE" },
   "app.nav.lark": { vi: "Lark", en: "Lark" },
@@ -2295,20 +2313,30 @@ export function detectLocale(): Locale {
    * Hỏi cookie trước localStorage nghĩa là phía trình duyệt luôn trả lời đúng bằng thứ tiếng mà
    * máy chủ vừa dùng, nên không bao giờ có cảnh trang vẽ lại sang tiếng khác sau khi đã hiện.
    */
+  /**
+   * 07/10/2026: mặc định là TIẾNG VIỆT khi người dùng chưa từng tự chọn — không còn đoán theo
+   * ngôn ngữ máy. Máy cài macOS tiếng Anh (rất phổ biến ở VN) trước đây được phát hiện là 'en',
+   * mà bản dịch tiếng Anh mới phủ một phần → thanh bên/tiêu đề tiếng Anh, thân trang tiếng Việt.
+   *
+   * "Đã tự chọn" = có giá trị trong localStorage: chỉ `setLocale` (nút VI/EN) ghi vào đó. Cookie
+   * thì KHÔNG đủ làm bằng chứng: bản cũ tự ghi cookie ngay lần mở đầu tiên theo ngôn ngữ đoán được,
+   * nên một cookie 'en' không kèm localStorage là dấu vết của lần đoán, không phải một lựa chọn.
+   * Khi đã chọn thì vẫn hỏi cookie trước (lý do ở trên: khớp với thứ máy chủ vừa dùng).
+   */
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (saved !== 'vi' && saved !== 'en') return 'vi';
   try {
     const m = document.cookie.match(new RegExp('(?:^|; )' + STORAGE_KEY + '=(vi|en)(?:;|$)'));
     if (m) return m[1] as Locale;
   } catch {
     /* ignore */
   }
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'vi' || saved === 'en') return saved;
-  } catch {
-    /* ignore */
-  }
-  const nav = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
-  return nav.startsWith('vi') ? 'vi' : 'en';
+  return saved;
 }
 
 /**
