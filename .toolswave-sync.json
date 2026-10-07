@@ -49,6 +49,7 @@
     "apps/web/src/app/admin/builds/**",
     "apps/web/src/app/admin/apps/**",
     "apps/web/src/app/admin/deployments/**",
-    "apps/web/src/app/admin/store/**"
+    "apps/web/src/app/admin/store/**",
+    "packages/ui/src/changelog.ts"
   ]
 }
