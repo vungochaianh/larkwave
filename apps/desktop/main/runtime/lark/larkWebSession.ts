@@ -7,6 +7,7 @@ import { LarkCdpDriver } from './larkCdp';
 import { SENSITIVE_UI, isLarkHost } from './larkUiCore';
 import { extractTemplate, fillTemplate, loadTemplates, saveTemplates, templateSummary, SAFE_ID, type UiTemplate } from './larkTemplates';
 import { hiddenMode } from '../../hiddenMode';
+import { canProbeLogin, classifyLarkPage, classifyWhoami, WHOAMI_PATH, type LarkWhoami } from './larkLoginState';
 
 /**
  * EXPERIMENTAL — Lark WEB session (not the Open API).
@@ -474,6 +475,16 @@ export class LarkWebSession {
    */
   async probeHealth(): Promise<'alive' | 'dead' | 'unknown'> {
     if (!this.win || this.win.isDestroyed() || !this.host) return 'unknown';
+    // Real signal first: Lark's own "who am I". Anonymous = definitively logged out.
+    const w = await this.whoami();
+    if (w.loggedIn) {
+      this.lastHealth = 'alive';
+      return 'alive';
+    }
+    if (w.anonymous) {
+      this.markDead();
+      return 'dead';
+    }
     let res: RawResult;
     try {
       res = await this.rawCall('/', 'GET');
@@ -490,6 +501,29 @@ export class LarkWebSession {
     }
     this.lastHealth = 'alive';
     return 'alive';
+  }
+
+  /** Ask Lark "who am I" from inside the page (same-origin, the page's own cookies). */
+  private async whoami(): Promise<LarkWhoami & { asked: boolean }> {
+    if (!this.win || this.win.isDestroyed()) return { loggedIn: false, anonymous: false, asked: false };
+    try {
+      const j = await this.win.webContents.executeJavaScript(
+        `fetch(${JSON.stringify(WHOAMI_PATH)}, { credentials: 'include', headers: { accept: 'application/json' } }).then(function (r) { return r.json(); }).catch(function () { return null; })`,
+        true,
+      );
+      return { ...classifyWhoami(j), asked: j != null };
+    } catch {
+      return { loggedIn: false, anonymous: false, asked: false };
+    }
+  }
+
+  /** REAL login signal: Lark says a non-anonymous user is signed in (see larkLoginState.ts).
+   *  Returns the origin to remember (the tenant domain Lark reports, else the page's origin). */
+  private async isRealLogin(url: string): Promise<string | null> {
+    if (!canProbeLogin(url)) return null;
+    const w = await this.whoami();
+    if (!w.loggedIn) return null;
+    return w.domain ? `https://${w.domain}` : safeOrigin(url);
   }
 
   private partitionName(): string {
@@ -532,6 +566,8 @@ export class LarkWebSession {
     this.win = win;
     return new Promise<LarkWebInfo>((resolve) => {
       let settled = false;
+      let checking = false;
+      let misses = 0;
       const done = (info: LarkWebInfo) => {
         if (settled) return;
         settled = true;
@@ -547,14 +583,29 @@ export class LarkWebSession {
           return;
         }
         if (!url || !/larksuite\.com|feishu\.(cn|com)/i.test(url)) return;
-        if (LOGIN_MARKERS.test(url)) {
+        const kind = classifyLarkPage(url);
+        if (kind === 'login') {
           // Cookies expired → not logged in. Drop the window; stay disconnected silently.
           this.destroyWindow();
           return done({ connected: false });
         }
-        this.host = safeOrigin(url);
-        this.lastHealth = 'alive';
-        done({ connected: true, host: this.host ?? undefined });
+        if (checking) return;
+        checking = true;
+        void this.isRealLogin(url).then((origin) => {
+          checking = false;
+          if (settled) return;
+          if (!origin) {
+            // Public site / no session cookie → NOT a restored login (was a false "connected").
+            if (kind === 'public' || ++misses >= 3) {
+              this.destroyWindow();
+              done({ connected: false });
+            }
+            return;
+          }
+          this.host = origin;
+          this.lastHealth = 'alive';
+          done({ connected: true, host: this.host ?? undefined });
+        });
       }, 800);
       // Background restore: give up after 20s (vs 5min for an interactive login).
       const timer = setTimeout(() => {
@@ -797,6 +848,7 @@ export class LarkWebSession {
 
     return new Promise<LarkWebInfo>((resolve) => {
       let settled = false;
+      let checking = false;
       const done = (info: LarkWebInfo) => {
         if (settled) return;
         settled = true;
@@ -816,17 +868,23 @@ export class LarkWebSession {
           return;
         }
         if (!url || !/larksuite\.com|feishu\.(cn|com)/i.test(url)) return;
-        if (LOGIN_MARKERS.test(url)) return; // still on login/SSO
-        // Logged in on a Lark app page.
-        this.host = safeOrigin(url);
-        this.lastHealth = 'alive';
-        this.recordRelogin('local', 'success');
-        try {
-          win.hide();
-        } catch {
-          /* ignore */
-        }
-        done({ connected: true, host: this.host ?? undefined });
+        if (!canProbeLogin(url)) return; // login/SSO page → keep waiting
+        if (checking) return;
+        checking = true;
+        void this.isRealLogin(url).then((origin) => {
+          checking = false;
+          if (!origin || settled) return; // anonymous visitor (e.g. the public site) is not a login
+          // Lark confirms a real (non-anonymous) user.
+          this.host = origin;
+          this.lastHealth = 'alive';
+          this.recordRelogin('local', 'success');
+          try {
+            win.hide();
+          } catch {
+            /* ignore */
+          }
+          done({ connected: true, host: this.host ?? undefined });
+        });
       }, 1200);
 
       // 5 minutes to complete login (QR/SSO), then give up (keep the window for retry).
@@ -1451,17 +1509,17 @@ export class LarkWebSession {
         } catch {
           return;
         }
-        const onLarkApp = !!url && /larksuite\.com|feishu\.(cn|com)/i.test(url) && !LOGIN_MARKERS.test(url);
+        const onLarkApp = !!url && classifyLarkPage(url) === 'app';
         if (onLarkApp && !probing) {
-          // The URL LOOKS logged-in — but a STALE session (cookies present, expired server-side)
-          // also lands here. Verify with a real /space/api probe before declaring success; the old
-          // code trusted the URL alone → reported "đăng nhập thành công" while the session was dead.
+          // The URL LOOKS logged-in — but a STALE session also lands here. probeHealth asks Lark
+          // "who am I" (anonymous ⇒ dead) before declaring success; the old code trusted the URL.
           this.host = safeOrigin(url);
           probing = true;
           const health = await this.probeHealth().catch(() => 'unknown' as const);
           probing = false;
           if (health === 'alive') {
             this.lastHealth = 'alive';
+            this.host = (await this.isRealLogin(url).catch(() => null)) || this.host;
             try {
               win.hide();
             } catch {
