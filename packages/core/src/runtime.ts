@@ -414,6 +414,104 @@ export interface LarkWebRecording {
   ui: unknown[];
 }
 
+/** A rectangle in the renderer's CSS pixels (the "Trình duyệt Lark" view placeholder). */
+export interface LarkBrowserRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** One Lark automation/workflow WRITE request the CDP driver saw + what Lark answered. */
+export interface LarkUiSave {
+  at: number;
+  path: string;
+  method: string;
+  /** create | update | save | publish | enable | disable | delete | … (from the path). */
+  op: string;
+  /** Lark answered code 0. */
+  ok: boolean;
+  code?: number;
+  msg?: string;
+  workflowID?: string;
+  /** `status` the request carried (0 = draft/disabled, 1 = enabled). */
+  status?: number;
+  baseId?: string;
+  error?: string;
+}
+
+/** Live state of the "Trình duyệt Lark" screen (the embedded Lark web view + AI driver). */
+export interface LarkBrowserState {
+  connected: boolean;
+  /** From the session health probe: alive | dead (hết phiên) | unknown. */
+  health: 'alive' | 'dead' | 'unknown';
+  host?: string;
+  /** A Lark page exists (logged in or logging in). */
+  hasWindow: boolean;
+  /** A visible login (QR/SSO) is waiting for the user. */
+  loginPending: boolean;
+  /** The page is currently shown inside the app window. */
+  embedded: boolean;
+  url?: string;
+  title?: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loading: boolean;
+  driver: 'cdp' | 'legacy' | 'none';
+  /** LARKWAVE_HIDDEN=1 dev mode (no window is ever shown). */
+  hidden?: boolean;
+  ai: {
+    active: boolean;
+    stopped: boolean;
+    step?: string;
+    actions: number;
+    cap: number;
+    startedAt?: number;
+    lastAt?: number;
+    saves: LarkUiSave[];
+  };
+  /** The latest VALID automation save captured (can be saved as a template). */
+  capturedSave?: { endpoint: string; base: string; title?: string; fields: string[] };
+}
+
+export interface LarkUiTemplateVar {
+  key: string;
+  kind: 'table' | 'field' | 'view' | 'option' | 'user' | 'chat' | 'department';
+  original: string;
+  table?: string;
+  hint?: string;
+}
+
+/** "Làm mẫu một lần → dùng lại": a hand-made Lark automation/workflow turned into a template. */
+export interface LarkUiTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  kind: 'automation' | 'workflow';
+  createdAt: string;
+  sourceBase: string;
+  endpoint: string;
+  vars: LarkUiTemplateVar[];
+  fields: string[];
+  triggerName?: string;
+  source?: string;
+  bizType?: string;
+  title?: string;
+}
+
+export interface LarkUiTemplateApplyResult {
+  ok: boolean;
+  workflowID?: string;
+  baseId: string;
+  /** Always 0 — a template only ever creates a DISABLED draft. */
+  status?: number;
+  code?: number;
+  title?: string;
+  /** Variables that must be given (target base differs from the recorded one). */
+  missing?: string[];
+  error?: string;
+}
+
 /** One Lark web re-login attempt — shown as an audit "lịch sử đăng nhập lại" in the CMS screen. */
 export interface LarkReloginEntry {
   /** ISO timestamp. */
@@ -1621,6 +1719,21 @@ export interface RuntimeAdapter {
   larkWebGetRecording?(): Promise<LarkWebRecording | null>;
   /** Create a REAL workflow by replaying the captured valid request (Lark's own bytes). */
   larkWebReplayWorkflow?(opts?: { enable?: boolean }): Promise<{ workflowID: string; baseId: string; title: string }>;
+
+  /** "Trình duyệt Lark": show the SAME Lark web page (session) inside the app at `rect` (CSS px).
+   *  A zero-size rect keeps it attached but hidden (e.g. while an app modal is open). */
+  larkBrowserAttach?(rect: LarkBrowserRect): Promise<LarkBrowserState>;
+  /** Leave the screen — the page goes back to the hidden window (session stays warm). */
+  larkBrowserDetach?(): Promise<void>;
+  larkBrowserState?(): Promise<LarkBrowserState>;
+  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState>;
+  /** "Dừng" — abort the running AI UI automation. */
+  larkBrowserStopAi?(): Promise<LarkBrowserState>;
+  larkBrowserResumeAi?(): Promise<LarkBrowserState>;
+  larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
+  larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
+  larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;
+  larkUiTemplateApply?(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult>;
 
   /** List the Bitable Bases registered for Claude to operate on. */
   larkListBases?(): Promise<LarkBaseRef[]>;

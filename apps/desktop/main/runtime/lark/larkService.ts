@@ -25,6 +25,10 @@ export interface ExtractRunResult {
   base: string;
 }
 import type {
+  LarkBrowserRect,
+  LarkBrowserState,
+  LarkUiTemplate,
+  LarkUiTemplateApplyResult,
   LarkReloginEntry,
   LarkGrantPolicy,
   LarkNoteDoc,
@@ -3199,6 +3203,37 @@ export class LarkService {
   }
   webReplayWorkflow(opts?: { enable?: boolean }): Promise<{ workflowID: string; baseId: string; title: string }> {
     return getLarkWebSession().replayCapturedWorkflow(opts);
+  }
+  // "Trình duyệt Lark" screen + "Làm mẫu một lần → dùng lại" templates (same Lark web session).
+  browserAttach(win: import('electron').BrowserWindow, rect: LarkBrowserRect): LarkBrowserState {
+    return getLarkWebSession().browserAttach(win, rect);
+  }
+  browserDetach(): void {
+    getLarkWebSession().browserDetach();
+  }
+  browserState(): LarkBrowserState {
+    return getLarkWebSession().browserState();
+  }
+  browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+    return getLarkWebSession().browserNavigate(input);
+  }
+  browserStopAi(): LarkBrowserState {
+    return getLarkWebSession().browserStopAi();
+  }
+  browserResumeAi(): LarkBrowserState {
+    return getLarkWebSession().browserResumeAi();
+  }
+  uiTemplateList(): LarkUiTemplate[] {
+    return getLarkWebSession().templateList();
+  }
+  uiTemplateSave(input: { name: string; description?: string }): Promise<LarkUiTemplate> {
+    return getLarkWebSession().templateSave(input);
+  }
+  uiTemplateDelete(id: string): LarkUiTemplate[] {
+    return getLarkWebSession().templateDelete(id);
+  }
+  uiTemplateApply(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult> {
+    return getLarkWebSession().templateApply(input);
   }
 
   async status(): Promise<LarkConnection> {

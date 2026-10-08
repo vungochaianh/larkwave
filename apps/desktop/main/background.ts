@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import serve from 'electron-serve';
 import { APIA_BASE, IPC } from '@larkwave/core';
-import type { CmsSyncErrorReport, CmsSyncJobPatch, LarkBaseRef, LarkChatInput, LarkGrantPolicy, LarkNoteDoc, LarkSpecDoc, SkillContractFields, SpecPromoteInput, UpdateTokenNotifyInput } from '@larkwave/core';
+import type { CmsSyncErrorReport, CmsSyncJobPatch, LarkBaseRef, LarkBrowserRect, LarkChatInput, LarkGrantPolicy, LarkNoteDoc, LarkSpecDoc, SkillContractFields, SpecPromoteInput, UpdateTokenNotifyInput } from '@larkwave/core';
 import { LocalRuntimeAdapter } from './runtime/localAdapter';
 import { onLockChange, currentOwner, owners, forceRelease, forceReleaseAll } from './runtime/agentLock';
 import { getRunner, invalidateRunnerStatus, listRunnerStatus } from './runtime/runners/registry';
@@ -15,6 +15,8 @@ import { openLarkAuthWindow } from './runtime/lark/larkOAuth';
 import { resolveRenderer, downloadAndOpenInstaller, type UpdateInfo } from './codePush';
 import { AccountCache } from './accountCache';
 import { AccountTokenStore } from './accountTokenStore';
+import { hiddenMode } from './hiddenMode';
+import { getLarkWebSession } from './runtime/lark/larkWebSession';
 
 /** Larkwave API base (overridable for staging). */
 // `APIA_BASE` tự đọc `LARKWAVE_API_BASE` từ 24/09/2026 (xem packages/core/src/index.ts), nên
@@ -377,6 +379,21 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkWebStartRecorder, (_e, url?: string) => runtime.larkWebStartRecorder!(url));
   ipcMain.handle(IPC.larkWebGetRecording, () => runtime.larkWebGetRecording!());
   ipcMain.handle(IPC.larkWebReplayWorkflow, (_e, opts?: { enable?: boolean }) => runtime.larkWebReplayWorkflow!(opts));
+  // "Trình duyệt Lark": the SAME Lark web page embedded in the window that asked for it.
+  ipcMain.handle(IPC.larkBrowserAttach, (e, rect: LarkBrowserRect) => {
+    const r = rect || { x: 0, y: 0, width: 0, height: 0 };
+    const safe = { x: Number(r.x) || 0, y: Number(r.y) || 0, width: Number(r.width) || 0, height: Number(r.height) || 0 };
+    return runtime.larkBrowserAttach(safe, BrowserWindow.fromWebContents(e.sender) ?? undefined);
+  });
+  ipcMain.handle(IPC.larkBrowserDetach, () => runtime.larkBrowserDetach());
+  ipcMain.handle(IPC.larkBrowserState, () => runtime.larkBrowserState());
+  ipcMain.handle(IPC.larkBrowserNavigate, (_e, input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }) => runtime.larkBrowserNavigate(input || {}));
+  ipcMain.handle(IPC.larkBrowserStopAi, () => runtime.larkBrowserStopAi());
+  ipcMain.handle(IPC.larkBrowserResumeAi, () => runtime.larkBrowserResumeAi());
+  ipcMain.handle(IPC.larkUiTemplateList, () => runtime.larkUiTemplateList());
+  ipcMain.handle(IPC.larkUiTemplateSave, (_e, input: { name: string; description?: string }) => runtime.larkUiTemplateSave(input));
+  ipcMain.handle(IPC.larkUiTemplateDelete, (_e, id: string) => runtime.larkUiTemplateDelete(String(id || '')));
+  ipcMain.handle(IPC.larkUiTemplateApply, (_e, input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }) => runtime.larkUiTemplateApply(input));
   ipcMain.handle(IPC.larkListBases, () => runtime.larkListBases());
   ipcMain.handle(IPC.larkDiscoverBases, () => runtime.larkDiscoverBases());
   ipcMain.handle(IPC.larkBaseSnapshot, (_e, appToken: string) => runtime.larkBaseSnapshot(appToken));
@@ -564,14 +581,46 @@ if (!gotInstanceLock) {
 
   (async () => {
     await app.whenReady();
+    // Hidden dev mode: not even a Dock icon (nothing appears on the user's screen).
+    if (hiddenMode() && process.platform === 'darwin') {
+      try {
+        app.dock?.hide();
+      } catch {
+        /* ignore */
+      }
+    }
     const win = new BrowserWindow({
       width: 1280,
       height: 860,
       // Show immediately so user sees the app (with internal loading states/skeleton) instead of blank + spinner.
-      show: true,
+      // LARKWAVE_HIDDEN=1 (dev only): never shown, still painted → drive/screenshot it over CDP.
+      show: !hiddenMode(),
+      paintWhenInitiallyHidden: true,
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
     });
     mainWin = win;
+    // The Lark web page parks off-screen inside the main window so it keeps painting while hidden.
+    try {
+      getLarkWebSession().setParkingWindow(win);
+    } catch (e) {
+      console.error('[boot] setParkingWindow failed:', e);
+    }
+    if (hiddenMode()) {
+      // Hidden dev mode: a window that is never shown has no display surface for its child views
+      // (the Lark page would not paint / capture). So the window IS shown — fully transparent,
+      // click-through, unfocusable, off every display, no taskbar/Dock entry. Nothing on screen.
+      try {
+        win.setOpacity(0);
+        win.setIgnoreMouseEvents(true);
+        win.setFocusable(false);
+        win.setSkipTaskbar(true);
+        win.setPosition(-30000, -30000);
+        win.showInactive();
+        win.setPosition(-30000, -30000);
+      } catch (e) {
+        console.error('[boot] hidden mode setup failed:', e);
+      }
+    }
     // Auto-recover from a renderer crash (a "black screen") instead of leaving a dead window —
     // reload the current URL so the app comes back on its own.
     win.webContents.on('render-process-gone', (_e, details) => {
@@ -627,7 +676,8 @@ if (!gotInstanceLock) {
       const port = process.argv[2] || '8888';
       localHomeUrl = `http://localhost:${port}/home`;
       await win.loadURL(localHomeUrl);
-      win.webContents.openDevTools({ mode: 'detach', activate: false });
+      // DevTools is a window too — not in hidden mode.
+      if (!hiddenMode()) win.webContents.openDevTools({ mode: 'detach', activate: false });
     }
 
     // Cold-start (Win/Linux argv) or an open-url that arrived before the window.

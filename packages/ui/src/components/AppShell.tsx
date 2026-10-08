@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Badge } from 'antd';
-import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined, GlobalOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
 import { BrandGlyph } from './BrandMark';
@@ -209,6 +209,7 @@ const NAV_TITLE: Record<string, string> = {
   'tw-lark-files': 'Tệp đã gửi cho Lark Agents',
   'tw-lark-auto': 'Tự động hoá (lịch)',
   'tw-cms-sync': 'Đồng bộ Bitable (CMS)',
+  'tw-lark-browser': 'Trình duyệt Lark',
   'tw-skills': 'Kỹ năng (Skills)',
   'tw-skills-cross': 'Kỹ năng chéo (kiểm chéo liên tục)',
   'tw-friends': 'Bạn bè',
@@ -228,6 +229,7 @@ const NAV_I18N: Record<string, string> = {
   'tw-lark-spec': 'app.nav.larkSpec',
   'tw-lark-files': 'app.nav.larkFiles',
   'tw-cms-sync': 'app.nav.cmsSync',
+  'tw-lark-browser': 'app.nav.larkBrowser',
   'tw-skills': 'app.nav.skills',
   'tw-skills-cross': 'app.nav.skillsCross',
   'tw-profile': 'app.nav.profile',
@@ -243,6 +245,7 @@ const NAV_TITLE_I18N: Record<string, string> = {
   'tw-lark': 'app.nav.larkAgents',
   'tw-lark-spec': 'app.title.larkSpec',
   'tw-cms-sync': 'app.title.cmsSync',
+  'tw-lark-browser': 'app.title.larkBrowser',
   'tw-skills': 'app.title.skills',
   'tw-skills-cross': 'app.title.skillsCross',
   'tw-lark-auto': 'app.title.larkAuto',
@@ -387,6 +390,8 @@ function AppShellInner({
             // The CMS sync jobs live on a shared backend with no per-user scoping. Visible to admins
             // + a specific email allowlist — they all see the SAME global jobs.
             if (cmsAllowed && runtime.cmsSyncListJobs) larkChildren.push({ key: 'tw-cms-sync', label: 'Đồng bộ Bitable', icon: <CloudServerOutlined /> });
+            // The embedded Lark web view (login + watch the AI drive Automation/Workflow + templates).
+            if (runtime.larkBrowserAttach) larkChildren.push({ key: 'tw-lark-browser', label: 'Trình duyệt Lark', icon: <GlobalOutlined /> });
             const list: NavNode[] = [OVERVIEW_ITEM];
             // General "Agents chat" — a capable assistant (desktop CLI). Standalone, top-level.
             //

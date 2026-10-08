@@ -174,6 +174,8 @@ const TIER_BY_CODE: Record<string, FailureTier> = {
   'sensitive-action': 'blocked',
   'no-window': 'blocked',
   'budget-exhausted': 'blocked', // hint của nó: "dừng và báo người dùng"
+  'stopped-by-user': 'blocked', // người dùng bấm Dừng ở "Trình duyệt Lark"
+  'not-lark-host': 'blocked', // chốt chỉ-Lark: trang/khung ngoài Lark
   // Nhiễu nội bộ — agent tự thử lại được.
   'stale-ref': 'noise',
   // Quy tắc chọn tầng: đọc `hint` của chính payload — hint nói với AGENT ("dùng lark_ui_open
@@ -184,6 +186,10 @@ const TIER_BY_CODE: Record<string, FailureTier> = {
   'disabled': 'noise',
   'nav-failed': 'noise',
   'collect-failed': 'noise',
+  'obscured': 'noise', // lớp khác che điểm bấm — snapshot lại
+  'missing-target': 'noise',
+  'unknown-action': 'noise',
+  'drag-unsupported': 'noise',
 };
 
 /**
@@ -202,7 +208,7 @@ const BLOCKED_PHRASES = ['Kết nối Lark web', 'từ chối thao tác'];
  * `executeJavaScript` trả về nguyên văn thông báo exception, không khớp mã nào — nên nếu không xét
  * theo tên tool thì mỗi vòng lặp lại thắp thêm một vạch đỏ trên huy hiệu.
  */
-const INNER_LOOP_TOOLS = new Set(['lark_ui_snapshot', 'lark_ui_act', 'lark_ui_wait', 'lark_ui_open']);
+const INNER_LOOP_TOOLS = new Set(['lark_ui_snapshot', 'lark_ui_act', 'lark_ui_wait', 'lark_ui_open', 'lark_ui_drag']);
 
 /** Xếp tầng cho một payload `{ok:false}`. `name` là tên tool đã chạy (nếu biết). */
 export function tierForPayload(data: unknown, name?: string): FailureTier {

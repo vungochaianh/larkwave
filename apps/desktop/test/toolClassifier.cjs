@@ -87,6 +87,11 @@ const TIERS = [
   ['lỗi JS thô trong vòng lái giao diện', { ok: false, error: 'Script failed to execute' }, 'noise', 'pay', 'lark_ui_act'],
   ['lỗi JS thô ngoài vòng đó vẫn là lỗi thật', { ok: false, error: 'Script failed to execute' }, 'error', 'pay', 'bitable_search_records'],
   ['mở trang hỏng', { ok: false, status: 'nav-failed', error: 'timeout' }, 'noise', 'pay'],
+  // Trình duyệt Lark / driver CDP.
+  ['người dùng bấm Dừng', { ok: false, error: 'stopped-by-user', blocked: 'user-stop' }, 'blocked', 'pay'],
+  ['khung ngoài Lark (chốt chỉ-Lark)', { ok: false, error: 'not-lark-host', blocked: 'host-guard' }, 'blocked', 'pay'],
+  ['điểm bấm bị che (snapshot lại)', { ok: false, error: 'obscured' }, 'noise', 'pay'],
+  ['lỗi JS thô khi kéo-thả', { ok: false, error: 'Protocol error' }, 'noise', 'pay', 'lark_ui_drag'],
 ];
 for (const [name, v, want, kind, toolName] of TIERS) {
   const got = kind === 'err' ? tierForError(v) : tierForPayload(v, toolName);

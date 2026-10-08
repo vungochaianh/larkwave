@@ -53,6 +53,10 @@ import type {
   CmsSyncRefreshResult,
   CmsKeeperStatus,
   LarkReloginEntry,
+  LarkBrowserRect,
+  LarkBrowserState,
+  LarkUiTemplate,
+  LarkUiTemplateApplyResult,
 } from '@larkwave/core';
 
 /** Shape of the bridge exposed by preload.ts via contextBridge. */
@@ -144,6 +148,16 @@ interface Bridge {
   larkWebStartRecorder?(url?: string): Promise<{ ok: boolean; error?: string }>;
   larkWebGetRecording?(): Promise<LarkWebRecording | null>;
   larkWebReplayWorkflow?(opts?: { enable?: boolean }): Promise<{ workflowID: string; baseId: string; title: string }>;
+  larkBrowserAttach?(rect: LarkBrowserRect): Promise<LarkBrowserState>;
+  larkBrowserDetach?(): Promise<void>;
+  larkBrowserState?(): Promise<LarkBrowserState>;
+  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState>;
+  larkBrowserStopAi?(): Promise<LarkBrowserState>;
+  larkBrowserResumeAi?(): Promise<LarkBrowserState>;
+  larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
+  larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
+  larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;
+  larkUiTemplateApply?(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult>;
   larkListBases(): Promise<LarkBaseRef[]>;
   larkDiscoverBases(): Promise<LarkBaseRef[]>;
   larkBaseSnapshot(appToken: string): Promise<LarkBaseSnapshot>;
@@ -253,6 +267,9 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
       if (!b.skillCommandsSupported) this.supportsSkillCommands = false;
       if (!b.skillContractsSupported) this.supportsSkillContracts = false;
       if (!b.suggestSkillContract) (this as Record<string, unknown>).suggestSkillContract = undefined;
+      // "Trình duyệt Lark" (nav item is feature-detected on larkBrowserAttach).
+      if (!b.larkBrowserAttach) (this as Record<string, unknown>).larkBrowserAttach = undefined;
+      if (!b.larkUiTemplateList) (this as Record<string, unknown>).larkUiTemplateList = undefined;
     }
   }
 
@@ -483,6 +500,44 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   larkWebReveal(): Promise<void> {
     return this.bridge.larkWebReveal ? this.bridge.larkWebReveal() : Promise.resolve();
+  }
+  larkBrowserAttach(rect: LarkBrowserRect): Promise<LarkBrowserState> {
+    if (!this.bridge.larkBrowserAttach) return Promise.reject(new Error('"Trình duyệt Lark" cần bản cài mới (.dmg).'));
+    return this.bridge.larkBrowserAttach(rect);
+  }
+  larkBrowserDetach(): Promise<void> {
+    return this.bridge.larkBrowserDetach ? this.bridge.larkBrowserDetach() : Promise.resolve();
+  }
+  larkBrowserState(): Promise<LarkBrowserState> {
+    if (!this.bridge.larkBrowserState) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkBrowserState();
+  }
+  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+    if (!this.bridge.larkBrowserNavigate) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkBrowserNavigate(input);
+  }
+  larkBrowserStopAi(): Promise<LarkBrowserState> {
+    if (!this.bridge.larkBrowserStopAi) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkBrowserStopAi();
+  }
+  larkBrowserResumeAi(): Promise<LarkBrowserState> {
+    if (!this.bridge.larkBrowserResumeAi) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkBrowserResumeAi();
+  }
+  larkUiTemplateList(): Promise<LarkUiTemplate[]> {
+    return this.bridge.larkUiTemplateList ? this.bridge.larkUiTemplateList() : Promise.resolve([]);
+  }
+  larkUiTemplateSave(input: { name: string; description?: string }): Promise<LarkUiTemplate> {
+    if (!this.bridge.larkUiTemplateSave) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkUiTemplateSave(input);
+  }
+  larkUiTemplateDelete(id: string): Promise<LarkUiTemplate[]> {
+    if (!this.bridge.larkUiTemplateDelete) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkUiTemplateDelete(id);
+  }
+  larkUiTemplateApply(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult> {
+    if (!this.bridge.larkUiTemplateApply) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
+    return this.bridge.larkUiTemplateApply(input);
   }
   larkWebSetWorkflowUrl(url: string): Promise<LarkWebInfo> {
     if (!this.bridge.larkWebSetWorkflowUrl) return Promise.reject(new Error('Cần bản cài mới.'));

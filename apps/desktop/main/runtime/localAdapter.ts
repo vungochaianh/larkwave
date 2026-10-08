@@ -4,7 +4,7 @@ import { app, dialog, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
 import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillLister } from './lark/skillBridge';
 import type { SkillContractFields, LarkPendingPrompts } from '@larkwave/core';
-import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry } from '@larkwave/core';
+import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
@@ -352,6 +352,38 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   }
   larkWebReplayWorkflow(opts?: { enable?: boolean }): Promise<{ workflowID: string; baseId: string; title: string }> {
     return this.lark.webReplayWorkflow(opts);
+  }
+  /** `win` = the window the request came from (background passes BrowserWindow.fromWebContents). */
+  async larkBrowserAttach(rect: LarkBrowserRect, win?: BrowserWindow): Promise<LarkBrowserState> {
+    if (!win) return this.lark.browserState();
+    return this.lark.browserAttach(win, rect);
+  }
+  async larkBrowserDetach(): Promise<void> {
+    this.lark.browserDetach();
+  }
+  async larkBrowserState(): Promise<LarkBrowserState> {
+    return this.lark.browserState();
+  }
+  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+    return this.lark.browserNavigate(input);
+  }
+  async larkBrowserStopAi(): Promise<LarkBrowserState> {
+    return this.lark.browserStopAi();
+  }
+  async larkBrowserResumeAi(): Promise<LarkBrowserState> {
+    return this.lark.browserResumeAi();
+  }
+  async larkUiTemplateList(): Promise<LarkUiTemplate[]> {
+    return this.lark.uiTemplateList();
+  }
+  larkUiTemplateSave(input: { name: string; description?: string }): Promise<LarkUiTemplate> {
+    return this.lark.uiTemplateSave(input);
+  }
+  async larkUiTemplateDelete(id: string): Promise<LarkUiTemplate[]> {
+    return this.lark.uiTemplateDelete(id);
+  }
+  larkUiTemplateApply(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult> {
+    return this.lark.uiTemplateApply(input);
   }
   async larkListBases(): Promise<LarkBaseRef[]> {
     return this.lark.listBases();

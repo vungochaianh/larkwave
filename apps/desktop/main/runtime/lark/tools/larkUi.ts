@@ -2,13 +2,18 @@ import { type LarkToolDef, str } from './types';
 import { getLarkWebSession } from '../larkWebSession';
 
 /**
- * UI-AUTOMATION tools — the agent READS the live Lark web DOM (snapshot) and ACTS on it (click/fill/
- * select) to build an Automation INSIDE Lark's own panel, so Lark itself produces the valid internal
- * schema (no 800004006 guessing). Runs in the hidden logged-in Lark window via executeJavaScript.
+ * UI-AUTOMATION tools — the agent READS the live Lark web page (snapshot) and ACTS on it (click/fill/
+ * select/drag) to build an Automation / Workflow INSIDE Lark's own editor, so Lark itself produces
+ * the valid internal schema (no 800004006 guessing). Driven over CDP (`webContents.debugger`:
+ * accessibility tree incl. cross-origin iframes, real mouse/keyboard input, network capture) on the
+ * SAME logged-in page the user sees in "Trình duyệt Lark"; the old executeJavaScript driver is
+ * only a fallback. Templates ("làm mẫu một lần → dùng lại") replay a hand-made automation.
  *
- * SAFETY: these build a DISABLED draft only. lark_ui_act refuses clicks on enable/publish/delete
- * controls (SENSITIVE_UI → requires-confirm) — a human enables in Lark. Only work when Lark web is
- * connected; capped per drive session; Lark-host-only. See toolswave-lark-workflow-800004006 memory.
+ * SAFETY: these build a DISABLED draft only. Clicks on enable/publish/delete/test-run controls and
+ * on "OK" inside a delete/enable dialog are refused (requires-confirm) — a human enables in Lark.
+ * Lark-host-only; capped per run (80); the user's "Dừng" aborts; fail-closed (covered point,
+ * unknown ref → refuse). Truth = the captured network save, not "I clicked".
+ * See docs/lark-browser.md + toolswave-lark-workflow-800004006 memory.
  */
 const NEED_WEB = 'Cần "Kết nối Lark web" (Cài đặt → Lark × Agents). Chưa kết nối thì không điều khiển được cửa sổ Lark.';
 
@@ -41,11 +46,11 @@ export const larkUiTools: LarkToolDef[] = [
     name: 'lark_ui_snapshot',
     gated: false,
     description:
-      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) Chụp giao diện Lark hiện tại → danh sách nút/ô/menu ĐÁNH SỐ (#ref · vai trò · tên · trạng thái). Đây là thứ bạn ĐỌC để quyết định bấm/điền. Menu/dropdown/portal đều nằm trong danh sách. Gọi LẠI sau mỗi hành động làm đổi giao diện (domChanged/urlChanged).',
+      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) Chụp giao diện Lark hiện tại → cây aria gọn: mỗi dòng "- vai_trò \"tên\" [trạng thái] [ref=N]" (dialog/menu/listbox là tiêu đề nhóm, `text "…" [ref]` = chữ bấm được — dùng cho nút/ô trên trình vẽ workflow không có vai trò). Đọc XUYÊN iframe khác origin (Base nhúng). ref ỔN ĐỊNH giữa các snapshot khi phần tử còn đó. Gọi LẠI sau mỗi hành động làm đổi giao diện (domChanged/urlChanged). `saves` = những lần Lark vừa LƯU.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: { max: { type: 'number', description: 'Số phần tử tối đa (mặc định 200)' } },
+      properties: { max: { type: 'number', description: 'Số dòng tối đa (mặc định 220)' } },
       required: [],
     },
     exec: async (i) => {
@@ -85,15 +90,20 @@ export const larkUiTools: LarkToolDef[] = [
     name: 'lark_ui_wait',
     gated: false,
     description:
-      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) Chờ trước khi snapshot lại: `text` (tới khi text hiện ra), `selector`+`stableMs` (tới khi số phần tử khớp ổn định — hợp cho danh sách tải bất đồng bộ/ảo hoá), hoặc `ms` (ngủ cố định). Dùng sau khi bấm mở panel/nạp dữ liệu.',
+      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) Chờ trước khi snapshot lại: `text` (tới khi chữ hiện ra — kể cả trong iframe), `role`/`name` (tới khi có phần tử đó, vd role="dialog"), `network_idle` (tới khi mạng yên — sau khi bấm Lưu/chọn bảng), hoặc `ms` (ngủ cố định). Kết hợp được; `timeout_ms` mặc định 8000. resolved=false nghĩa là hết giờ — snapshot lại xem trang đang ở đâu.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
         ms: { type: 'number', description: 'ngủ cố định (ms)' },
         text: str('chờ tới khi thấy text này'),
-        selector: str('CSS selector để đếm số phần tử'),
-        stableMs: { type: 'number', description: 'coi là ổn định khi số đếm không đổi trong ngần này ms (mặc định 400)' },
+        role: str('chờ tới khi có phần tử vai trò này (vd dialog, menu, option, button)'),
+        name: str('… và/hoặc tên này (vd "Thêm hành động")'),
+        network_idle: { type: 'boolean', description: 'chờ tới khi mạng YÊN (không còn request) — dùng sau khi bấm Lưu / chọn bảng' },
+        idle_ms: { type: 'number', description: 'mạng phải yên trong ngần này ms (mặc định 600)' },
+        timeout_ms: { type: 'number', description: 'tối đa chờ (mặc định 8000, tối đa 30000)' },
+        selector: str('(cũ) CSS selector để đếm số phần tử — chỉ khung chính'),
+        stableMs: { type: 'number', description: '(cũ) coi là ổn định khi số đếm không đổi trong ngần này ms (mặc định 400)' },
       },
       required: [],
     },
@@ -101,6 +111,77 @@ export const larkUiTools: LarkToolDef[] = [
       const web = getLarkWebSession();
       if (!web.status().connected) return { ok: false, error: NEED_WEB };
       return web.uiWait(i);
+    },
+  },
+  {
+    name: 'lark_ui_drag',
+    gated: false,
+    description:
+      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) KÉO-THẢ THẬT bằng chuột (nhấn → di nhiều bước → thả) — để NỐI 2 nút trên trình vẽ Quy trình (kéo từ chấm/cổng ra của nút này sang nút kia), di chuyển thẻ, sắp xếp. `from_ref` = phần tử bắt đầu kéo; `to_ref` = phần tử đích, HOẶC `dx`/`dy` (px) để kéo một đoạn. `steps` = số bước di (mặc định 12). Sau khi kéo: snapshot lại để kiểm đường nối đã có chưa. Kéo vào vùng tên "Xoá/Delete" bị chặn.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        from_ref: { type: 'number', description: '#ref phần tử bắt đầu kéo' },
+        to_ref: { type: 'number', description: '#ref phần tử đích' },
+        dx: { type: 'number', description: 'kéo ngang (px) nếu không có to_ref' },
+        dy: { type: 'number', description: 'kéo dọc (px) nếu không có to_ref' },
+        steps: { type: 'number', description: 'số bước di chuột (2–60, mặc định 12)' },
+      },
+      required: ['from_ref'],
+    },
+    exec: async (i) => {
+      const web = getLarkWebSession();
+      if (!web.status().connected) return { ok: false, error: NEED_WEB };
+      return web.uiDrag(i);
+    },
+  },
+  {
+    name: 'lark_ui_saved',
+    gated: false,
+    description:
+      '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) SỰ THẬT từ mạng: liệt kê những lần Lark THỰC SỰ lưu automation/workflow trong lượt này (đường dẫn, op, code Lark trả về, workflowID, status 0=nháp/1=bật). Gọi sau khi bấm "Lưu" trong Lark để LẤY workflowID THẬT báo cho người dùng — đừng nói "đã tạo" nếu ở đây không có lần lưu ok=true.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
+    exec: async () => {
+      const web = getLarkWebSession();
+      if (!web.status().connected) return { ok: false, error: NEED_WEB };
+      return web.uiSaved();
+    },
+  },
+  {
+    name: 'lark_ui_template_list',
+    gated: false,
+    description:
+      '(MẪU "LÀM MẪU MỘT LẦN → DÙNG LẠI") Liệt kê các MẪU automation/workflow người dùng đã dựng tay một lần trong "Trình duyệt Lark" rồi lưu lại. Mỗi mẫu có `vars` (biến: bảng/cột/view/option/người/nhóm — `key`, `kind`, `original`, `table` = biến bảng chứa cột, `hint` = tên gợi ý). GỌI TRƯỚC khi tự lái giao diện: nếu có mẫu khớp yêu cầu thì dùng `lark_ui_template_apply` (nhanh + chắc chắn hợp lệ).',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
+    exec: async () => {
+      const web = getLarkWebSession();
+      const list = web.templateList();
+      return { ok: true, count: list.length, templates: list };
+    },
+  },
+  {
+    name: 'lark_ui_template_apply',
+    gated: true,
+    description:
+      '(MẪU "LÀM MẪU MỘT LẦN → DÙNG LẠI") Tạo một automation/workflow MỚI dạng BẢN NHÁP (TẮT) từ một mẫu — gửi lại đúng khuôn Lark đã lưu khi người dùng làm tay, chỉ thay id. `template_id`; `app_token` = Base đích (bỏ trống = Base gốc của mẫu → nhân bản); `vars` = { "<key>": "<id mới>" } — BẮT BUỘC đủ mọi biến bảng/cột/view/option khi Base đích KHÁC Base gốc (lấy id thật qua bitable_list_tables / bitable_list_fields, khớp theo `hint`/tên); người/nhóm mặc định giữ nguyên. `title` = tên mới (tuỳ chọn). KHÔNG bao giờ bật — báo người dùng workflowID và bảo họ mở Lark xem lại rồi tự BẬT.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        template_id: str('id mẫu (từ lark_ui_template_list)'),
+        app_token: str('Base đích (bỏ trống = Base gốc của mẫu)'),
+        vars: { type: 'object', description: '{ "tbl_1": "tblXXXX", "fld_1": "fldYYYY", … }', additionalProperties: { type: 'string' } },
+        title: str('tên cho bản nháp mới (tuỳ chọn)'),
+      },
+      required: ['template_id'],
+    },
+    exec: async (i) => {
+      const web = getLarkWebSession();
+      if (!web.status().connected) return { ok: false, error: NEED_WEB };
+      const vars: Record<string, string> = {};
+      if (i.vars && typeof i.vars === 'object') for (const [k, v] of Object.entries(i.vars as Record<string, unknown>)) if (v != null) vars[k] = String(v);
+      return web.templateApply({ id: String(i.template_id || ''), baseId: (i.app_token as string) || undefined, vars, title: (i.title as string) || undefined });
     },
   },
   {

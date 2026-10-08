@@ -1,7 +1,12 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, session, type BrowserWindow } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { LarkReloginEntry, LarkWebInfo } from '@larkwave/core';
+import type { LarkBrowserState, LarkReloginEntry, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebInfo } from '@larkwave/core';
+import { LarkHost } from './larkHost';
+import { LarkCdpDriver } from './larkCdp';
+import { SENSITIVE_UI, isLarkHost } from './larkUiCore';
+import { extractTemplate, fillTemplate, loadTemplates, saveTemplates, templateSummary, SAFE_ID, type UiTemplate } from './larkTemplates';
+import { hiddenMode } from '../../hiddenMode';
 
 /**
  * EXPERIMENTAL — Lark WEB session (not the Open API).
@@ -116,10 +121,11 @@ const RECORDER_JS = `(() => {
   } catch (e) { return 'ERR:' + String((e && e.message) || e); }
 })()`;
 
-// Names whose CLICK is treated as an irreversible "make it live / destroy" action → the driver
-// refuses it (requiresConfirm) so an agent can never enable/publish/delete on the user's LIVE Lark
-// account without a human. Building a DISABLED draft never needs these. (Safety guardrail #1.)
-const SENSITIVE_UI = /(bật|kích hoạt|enable|turn on|activate|publish|xuất bản|xoá workflow|xóa workflow|xoá tự động|xóa tự động|delete workflow|delete automation)/i;
+// Strict in-page Lark host test for the legacy driver (mirrors larkUiCore.isLarkHost).
+const LARK_HOST_JS = '/(^|\\.)(larksuite\\.com|larkoffice\\.com|feishu\\.cn|feishu\\.com)$/i';
+
+// SENSITIVE_UI (enable / publish / delete / test-run … in VI/EN/ZH) now lives in larkUiCore.ts and
+// is shared by the CDP driver and this legacy in-page driver. (Safety guardrail #1.)
 
 // In-page UI-automation LIBRARY, injected via executeJavaScript in the logged-in Lark window. Pure
 // generic DOM tech (Playwright-a11y style) — independent of Lark's markup. Returns an object `L`
@@ -354,7 +360,17 @@ const APP_HEALTH_COLLECT = `
 `;
 
 export class LarkWebSession {
-  private win: BrowserWindow | null = null;
+  private win: LarkHost | null = null;
+  /** CDP driver bound to the current Lark webContents (falls back to the legacy JS driver). */
+  readonly cdp = new LarkCdpDriver();
+  /** Which driver produced the LAST snapshot (its refs are only valid for that driver). */
+  private uiMode: 'cdp' | 'legacy' = 'cdp';
+  /** "Trình duyệt Lark" screen: the main window + rect the page is embedded at (null = detached). */
+  private embedTarget: { win: BrowserWindow; rect: { x: number; y: number; width: number; height: number } } | null = null;
+  /** A visible-login connect() is waiting for the user (so a detach must re-show the popup). */
+  private loginPending = false;
+  /** The main window: the Lark page PARKS there off-screen so it keeps painting (see larkHost.ts). */
+  private parkingWin: BrowserWindow | null = null;
   private host: string | null = null; // e.g. https://lsgav2gopb4m.sg.larksuite.com
   /** Active account scope (sanitized userId | '_local'); drives the partition name. */
   private scope = '_local';
@@ -688,19 +704,11 @@ export class LarkWebSession {
     return { connected: alive, host: this.host ?? undefined };
   }
 
-  private makeWindow(show: boolean): BrowserWindow {
-    const win = new BrowserWindow({
-      // Always create HIDDEN: a window shown before its first frame paints renders a BLACK empty
-      // frame (esp. macOS dark mode) — that was the "màn tối đen" users saw on "Đăng nhập lại Lark
-      // web". We reveal below only once content is painted.
-      show: false,
-      width: 1180,
-      height: 820,
-      title: 'Đăng nhập Lark (Larkwave)',
-      // White ground so any pre-paint / slow-load frame is white, never black.
-      backgroundColor: '#ffffff',
-      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, partition: this.partitionName() },
-    });
+  private makeWindow(show: boolean): LarkHost {
+    const win = new LarkHost(this.partitionName(), 'Đăng nhập Lark (Larkwave)', this.parkingWin);
+    this.cdp.bind(win.webContents);
+    // The "Trình duyệt Lark" screen is open → the (new) page appears inside the app, not as a popup.
+    if (this.embedTarget) win.embed(this.embedTarget.win, this.embedTarget.rect);
     if (show) {
       // Reveal once the first frame is painted; if Lark is slow/blocked, a fallback timer still
       // surfaces the (now white) window so the user is never left staring at nothing.
@@ -736,6 +744,7 @@ export class LarkWebSession {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
+          show: !hiddenMode(),
           webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, partition: this.partitionName() },
         },
       };
@@ -784,12 +793,14 @@ export class LarkWebSession {
     this.destroyWindow();
     const win = this.makeWindow(true);
     this.win = win;
+    this.loginPending = true;
 
     return new Promise<LarkWebInfo>((resolve) => {
       let settled = false;
       const done = (info: LarkWebInfo) => {
         if (settled) return;
         settled = true;
+        this.loginPending = false;
         this.clearTimers();
         resolve(info);
       };
@@ -946,24 +957,33 @@ export class LarkWebSession {
   //    reading + building a DISABLED draft only — it NEVER enables/deletes (SENSITIVE_UI + the
   //    system-prompt recipe hand those to the human). Truth = the network sniffer, not "I clicked". ──
 
-  /** Reveal + (optionally) navigate the Lark window, and RESET the per-drive action budget. */
+  /** Start a drive run: (optionally) navigate the Lark page — LARK HOSTS ONLY — and RESET the
+   *  per-run action budget. Does NOT pop a window: the user watches live in "Trình duyệt Lark". */
   async uiOpen(
     url?: string,
-  ): Promise<{ ok: boolean; url?: string; title?: string; error?: string; detail?: string }> {
+  ): Promise<{ ok: boolean; url?: string; title?: string; error?: string; detail?: string; hint?: string; blocked?: string; driver?: string }> {
     if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
+    if (url && !isLarkHost(url)) return { ok: false, error: 'not-lark-host', blocked: 'host-guard', hint: 'Chỉ mở được trang thuộc Lark/Feishu.' };
+    if (!this.cdp.startRun()) return { ok: false, error: 'stopped-by-user', blocked: 'user-stop', hint: 'Người dùng vừa bấm DỪNG — không mở lại, báo người dùng đã dừng ở đâu.' };
     this.uiActs = 0;
-    this.reveal();
     if (url && /^https?:\/\//i.test(url)) {
       try {
         await this.win.webContents.loadURL(url, { userAgent: CHROME_UA });
       } catch (e) {
         // Mã máy phải SẠCH (xem larkToolExec.TIER_BY_CODE khớp chính xác) — chi tiết đi trường riêng.
-      return { ok: false, error: 'nav-failed', detail: String((e as Error)?.message || e) };
+        return { ok: false, error: 'nav-failed', detail: String((e as Error)?.message || e) };
       }
     }
+    const driver = (await this.cdp.ensure()) ? 'cdp' : 'legacy';
     try {
       const r = (await this.win.webContents.executeJavaScript('({ url: location.href, title: document.title })', true)) as J;
-      return { ok: true, url: r?.url, title: r?.title };
+      return {
+        ok: true,
+        url: r?.url,
+        title: r?.title,
+        driver,
+        hint: this.win.isEmbedded ? 'Người dùng đang xem trực tiếp trong "Trình duyệt Lark".' : 'Người dùng có thể mở "Trình duyệt Lark" để xem bạn thao tác trực tiếp.',
+      };
     } catch (e) {
       return { ok: false, error: String((e as Error)?.message || e) };
     }
@@ -980,21 +1000,32 @@ export class LarkWebSession {
     }
   }
 
-  /** Numbered, agent-readable list of visible interactive elements on the current Lark page. */
+  /** Agent-readable aria snapshot. CDP (AX tree, all frames incl. cross-origin) first; the legacy
+   *  in-page walker only when the debugger can't attach. */
   async uiSnapshot(opts?: { max?: number }): Promise<J> {
+    if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
+    if (this.cdp.isStopped) return this.cdp.snapshot(opts); // → stopped-by-user
+    if (await this.cdp.ensure()) {
+      this.uiMode = 'cdp';
+      return this.cdp.snapshot(opts);
+    }
+    this.uiMode = 'legacy';
     const max = Math.min(Math.max(Number(opts?.max) || 200, 20), 400);
-    return this.runUi(
-      "if(!/larksuite\\.com|feishu\\.(cn|com)/i.test(location.host)) return { ok:false, error:'not-on-lark', url:location.href, hint:'Cửa sổ Lark chưa ở trang Base — dùng lark_ui_open trước.' }; return L.walk(" +
+    const r = await this.runUi(
+      "if(!" + LARK_HOST_JS + ".test(location.hostname)) return { ok:false, error:'not-on-lark', url:location.href, hint:'Cửa sổ Lark chưa ở trang Base — dùng lark_ui_open trước.' }; return L.walk(" +
         max +
         ');',
     );
+    return { ...r, driver: 'legacy' };
   }
 
-  /** Perform ONE action on a ref from the latest snapshot. Refuses sensitive clicks (enable/delete)
-   *  unless `force` (which only a human-confirmed path sets); hard-capped per drive session. */
+  /** Perform ONE action on a ref from the latest snapshot. Refuses sensitive clicks (enable/delete/
+   *  test-run/destructive confirm) — there is NO override from the agent side; capped per run. */
   async uiAct(input: J): Promise<J> {
     if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
-    if (this.uiActs >= 80) return { ok: false, error: 'budget-exhausted', hint: 'Đã tới giới hạn thao tác phiên này — dừng và báo người dùng.' };
+    if (this.uiMode === 'cdp' && (await this.cdp.ensure())) return this.cdp.act(input);
+    if (this.cdp.isStopped) return { ok: false, error: 'stopped-by-user', blocked: 'user-stop' };
+    if (!this.cdp.budget.take()) return { ok: false, error: 'budget-exhausted', hint: 'Đã tới giới hạn thao tác phiên này — dừng và báo người dùng.' };
     this.uiActs++;
     const a = {
       ref: Number(input?.ref),
@@ -1004,20 +1035,42 @@ export class LarkWebSession {
       dx: Number(input?.dx) || 0,
       dy: Number(input?.dy) || 0,
       submit: !!input?.submit,
-      force: !!input?.force,
+      force: false, // never: a human enables/deletes in Lark
     };
+    this.cdp.noteStep(`${a.action} #${a.ref} (legacy)`);
     const body =
-      "if(!/larksuite\\.com|feishu\\.(cn|com)/i.test(location.host)) return { ok:false, error:'not-on-lark' };\n" +
+      "if(!" + LARK_HOST_JS + ".test(location.hostname)) return { ok:false, error:'not-on-lark' };\n" +
       'var a = ' + JSON.stringify(a) + ';\n' +
       'var SENS = ' + SENSITIVE_UI.toString() + ';\n' +
       UI_ACT_BODY;
-    return this.runUi(body);
+    return { ...(await this.runUi(body)), driver: 'legacy' };
   }
 
-  /** Wait: fixed sleep, until `text` appears, or until a `selector`'s match-count is stable. */
-  async uiWait(input?: { ms?: number; text?: string; selector?: string; stableMs?: number }): Promise<J> {
+  /** Real drag (CDP only) — connect workflow nodes / move cards. */
+  async uiDrag(input: J): Promise<J> {
+    if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
+    if (!(await this.cdp.ensure())) return { ok: false, error: 'drag-unsupported', hint: 'Không gắn được trình điều khiển CDP — dùng "Làm mẫu một lần" (ghi tay rồi dùng lại).' };
+    return this.cdp.drag(input);
+  }
+
+  /** What Lark ACTUALLY saved during this run (automation/workflow write requests + responses). */
+  uiSaved(): J {
+    const st = this.cdp.status();
+    const valid = this.cdp.lastValidSave();
+    return {
+      ok: true,
+      saves: st.saves,
+      lastValidSave: valid ? { endpoint: valid.endpoint, at: new Date(valid.at).toISOString(), workflowID: String(valid.body.workflowID || ''), status: valid.body.status, base: String(valid.body.token || '') } : null,
+      hint: st.saves.length ? 'Báo người dùng workflowID + code Lark trả về (ok=true khi code=0). Bản nháp đang TẮT — họ tự mở Lark xem lại và bật.' : 'Chưa thấy Lark lưu gì trong lượt này — chưa có bản nháp nào được tạo.',
+    };
+  }
+
+  /** Wait: text / role+name / network-idle (CDP), or the legacy fixed sleep / selector-stable. */
+  async uiWait(input?: { ms?: number; text?: string; selector?: string; stableMs?: number; role?: string; name?: string; network_idle?: boolean; idle_ms?: number; timeout_ms?: number }): Promise<J> {
+    if (!input?.selector && (await this.cdp.ensure())) return this.cdp.wait(input || {});
+    if (this.cdp.isStopped) return { ok: false, error: 'stopped-by-user', blocked: 'user-stop' };
     const a = {
-      ms: Math.min(Math.max(Number(input?.ms) || 800, 0), 20000),
+      ms: Math.min(Math.max(Number(input?.ms ?? input?.timeout_ms) || 800, 0), 20000),
       text: input?.text ? String(input.text) : undefined,
       selector: input?.selector ? String(input.selector) : undefined,
       stableMs: Math.min(Math.max(Number(input?.stableMs) || 400, 100), 5000),
@@ -1029,6 +1082,175 @@ export class LarkWebSession {
       "if(a.selector){ return await new Promise(function(res){ var last=-1, since=Date.now(); function chk(){ var n=0; try{ n=document.querySelectorAll(a.selector).length; }catch(e){} if(n!==last){ last=n; since=Date.now(); } if((Date.now()-since)>=a.stableMs) return res({ ok:true, resolved:true, reason:'stable', count:n }); if(Date.now()>_end) return res({ ok:true, resolved:false, reason:'timeout', count:n }); setTimeout(chk,120); } chk(); }); }\n" +
       "return await new Promise(function(res){ setTimeout(function(){ res({ ok:true, resolved:true, reason:'slept', waitedMs:a.ms }); }, a.ms); });";
     return this.runUi(body);
+  }
+
+  // ── "Trình duyệt Lark" screen: embed the SAME page inside the main window ───────────────────
+
+  /** Register the main window as the place the Lark page parks (off-screen, still painting). */
+  setParkingWindow(win: BrowserWindow | null): void {
+    this.parkingWin = win;
+    if (this.win && !this.win.isDestroyed()) this.win.setParking(win);
+    win?.once('closed', () => {
+      if (this.parkingWin === win) this.parkingWin = null;
+    });
+  }
+
+  /** Attach (or re-position) the Lark page inside `win`. Zero-size rect = attached but hidden. */
+  browserAttach(win: BrowserWindow, rect: { x: number; y: number; width: number; height: number }): LarkBrowserState {
+    this.embedTarget = { win, rect };
+    if (this.win && !this.win.isDestroyed()) {
+      this.win.embed(win, rect);
+      void this.cdp.ensure(); // network capture on → a hand-made automation becomes a template
+    }
+    return this.browserState();
+  }
+
+  /** Leave the screen: the page goes back to the hidden host (session + automation keep running). */
+  browserDetach(): void {
+    this.embedTarget = null;
+    if (this.win && !this.win.isDestroyed()) {
+      this.win.unembed();
+      // A login was in progress inside the app → keep it reachable as the classic popup.
+      if (this.loginPending) this.win.show();
+    }
+  }
+
+  browserState(): LarkBrowserState {
+    const w = this.win && !this.win.isDestroyed() ? this.win : null;
+    const wc = w?.webContents;
+    let url = '';
+    let title = '';
+    let canGoBack = false;
+    let canGoForward = false;
+    let loading = false;
+    try {
+      if (wc) {
+        url = wc.getURL();
+        title = wc.getTitle();
+        canGoBack = wc.navigationHistory?.canGoBack?.() ?? false;
+        canGoForward = wc.navigationHistory?.canGoForward?.() ?? false;
+        loading = wc.isLoading();
+      }
+    } catch {
+      /* destroyed mid-read */
+    }
+    const st = this.status();
+    const ai = this.cdp.status();
+    const valid = this.cdp.lastValidSave() || (this.capturedWfPayload ? { endpoint: '/space/api/bitable/automation/update', body: this.capturedWfPayload.rawBody as Record<string, unknown>, at: 0 } : null);
+    let capturedTitle = '';
+    try {
+      capturedTitle = valid ? String(JSON.parse(String(valid.body.draft || '{}'))?.title || '') : '';
+    } catch {
+      /* best-effort */
+    }
+    return {
+      connected: st.connected,
+      health: this.lastHealth,
+      host: st.host,
+      hasWindow: !!w,
+      loginPending: this.loginPending,
+      embedded: !!w?.isEmbedded,
+      url,
+      title,
+      canGoBack,
+      canGoForward,
+      loading,
+      driver: this.cdp.attached ? 'cdp' : w ? 'legacy' : 'none',
+      hidden: hiddenMode(),
+      ai: { active: ai.active, stopped: ai.stopped, step: ai.step, actions: ai.actions, cap: ai.cap, startedAt: ai.startedAt, lastAt: ai.lastAt, saves: ai.saves },
+      capturedSave: valid ? { endpoint: valid.endpoint, base: String(valid.body.token || ''), title: capturedTitle || undefined, fields: Object.keys(valid.body) } : undefined,
+    };
+  }
+
+  /** Toolbar navigation. Pasted URLs must be Lark hosts (this page holds the user's Lark login). */
+  async browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+    const w = this.win && !this.win.isDestroyed() ? this.win : null;
+    if (!w) throw new Error('Chưa có phiên Lark web — bấm "Đăng nhập Lark" trước.');
+    const wc = w.webContents;
+    if (input.url) {
+      const u = /^https?:\/\//i.test(input.url) ? input.url : 'https://' + input.url;
+      if (!isLarkHost(u)) throw new Error('Chỉ mở được địa chỉ thuộc Lark/Feishu (…larksuite.com, …feishu.cn).');
+      await wc.loadURL(u, { userAgent: CHROME_UA }).catch(() => undefined);
+    } else if (input.action === 'back') wc.navigationHistory?.goBack?.();
+    else if (input.action === 'forward') wc.navigationHistory?.goForward?.();
+    else if (input.action === 'reload') wc.reload();
+    else if (input.action === 'stop') wc.stop();
+    else if (input.action === 'home') await wc.loadURL((this.host || 'https://www.larksuite.com') + '/', { userAgent: CHROME_UA }).catch(() => undefined);
+    return this.browserState();
+  }
+
+  /** "Dừng" — abort the running UI automation (every lark_ui_* call refuses until it's lifted). */
+  browserStopAi(): LarkBrowserState {
+    this.cdp.stop();
+    return this.browserState();
+  }
+  browserResumeAi(): LarkBrowserState {
+    this.cdp.resume();
+    return this.browserState();
+  }
+
+  // ── Templates: "Làm mẫu một lần → dùng lại" ──────────────────────────────────────────────────
+
+  private templatesFile(): string {
+    return join(app.getPath('userData'), `lark-ui-templates-${this.scope}.json`);
+  }
+
+  templateList(): LarkUiTemplate[] {
+    return loadTemplates(this.templatesFile()).map(templateSummary) as LarkUiTemplate[];
+  }
+
+  /** Save the latest VALID automation save the user made by hand (CDP capture, else the legacy
+   *  in-page recorder) as a named template. */
+  async templateSave(input: { name: string; description?: string }): Promise<LarkUiTemplate> {
+    await this.pullRecording().catch(() => null);
+    const valid = this.cdp.lastValidSave() || (this.capturedWfPayload ? { endpoint: '/space/api/bitable/automation/update', body: this.capturedWfPayload.rawBody as Record<string, unknown>, at: 0 } : null);
+    if (!valid) throw new Error('Chưa bắt được lần LƯU automation/workflow nào. Hãy dựng 1 cái bằng tay trong "Trình duyệt Lark" (bấm Lưu trong Lark), rồi thử lại.');
+    const tpl = extractTemplate(valid.body, { name: input.name, description: input.description, endpoint: valid.endpoint });
+    const list = loadTemplates(this.templatesFile());
+    list.unshift(tpl);
+    saveTemplates(this.templatesFile(), list);
+    return templateSummary(tpl) as LarkUiTemplate;
+  }
+
+  templateDelete(id: string): LarkUiTemplate[] {
+    const list = loadTemplates(this.templatesFile()).filter((t) => t.id !== id);
+    saveTemplates(this.templatesFile(), list);
+    return list.map(templateSummary) as LarkUiTemplate[];
+  }
+
+  /**
+   * Replay a template as a NEW DISABLED draft: fill variables → create a fresh shell → POST Lark's
+   * own captured body shape with status 0. Never enables (the human reviews + enables in Lark).
+   */
+  async templateApply(input: { id: string; baseId?: string; vars?: Record<string, string>; title?: string }): Promise<LarkUiTemplateApplyResult> {
+    const tpl = loadTemplates(this.templatesFile()).find((t) => t.id === input.id) as UiTemplate | undefined;
+    if (!tpl) throw new Error('Không tìm thấy mẫu.');
+    const baseId = String(input.baseId || tpl.sourceBase || '').trim();
+    if (!baseId || !SAFE_ID.test(baseId)) throw new Error('Thiếu base đích (app_token).');
+    const { body, missing } = fillTemplate(tpl, input.vars || {}, baseId);
+    if (missing.length) {
+      return { ok: false, missing, baseId, error: 'Base khác base gốc — phải điền id bảng/cột/view/option mới cho: ' + missing.join(', ') };
+    }
+    const endpoint = /^\/(space\/api|base\/api)\//.test(tpl.endpoint) ? tpl.endpoint : '/space/api/bitable/automation/update';
+    if (input.title && typeof body.draft === 'string') {
+      try {
+        const d = JSON.parse(body.draft);
+        d.title = String(input.title).slice(0, 120);
+        body.draft = JSON.stringify(d);
+      } catch {
+        /* keep Lark's draft as-is */
+      }
+    }
+    const created = await this.createWorkflow(baseId, { triggerName: tpl.triggerName, source: tpl.source, bizType: tpl.bizType });
+    const final = Object.assign({}, body, { token: baseId, workflowID: created.workflowID, status: 0 });
+    await this.fetchApi(endpoint, 'POST', final); // throws on Lark code ≠ 0
+    let title = '';
+    try {
+      title = String(JSON.parse(String(final.draft || '{}'))?.title || '');
+    } catch {
+      /* best-effort */
+    }
+    return { ok: true, workflowID: created.workflowID, baseId, status: 0, code: 0, title: title || undefined };
   }
 
   /**
@@ -1295,6 +1517,8 @@ export class LarkWebSession {
     this.clearTimers(); // stop any in-flight connect() poll/timeout so it can't leak
     this.recorderArmed = false; // a fresh window has no in-page recorder until re-armed
     this.inspectArmed = false;
+    this.loginPending = false;
+    this.cdp.bind(null);
     if (this.win && !this.win.isDestroyed()) {
       try {
         this.win.destroy();

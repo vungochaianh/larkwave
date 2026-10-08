@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron';
+import { hiddenMode } from '../../hiddenMode';
 
 /**
  * Lark user OAuth 2.0 (v2) — log in with a PERSONAL Lark account (QR scan or
@@ -115,6 +116,8 @@ export function openLarkAuthWindow(
       width: 480,
       height: 720,
       autoHideMenuBar: true,
+      // LARKWAVE_HIDDEN=1 (dev): render but never put a window on screen.
+      show: !hiddenMode(),
       title: 'Đăng nhập Lark',
       webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, partition: 'persist:tw-lark-oauth' },
     });

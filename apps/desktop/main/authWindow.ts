@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { IPC } from '@larkwave/core';
+import { hiddenMode } from './hiddenMode';
 
 export interface AuthWindowResult {
   ok: boolean;
@@ -39,6 +40,7 @@ export function openAuthWindow(mainWin: BrowserWindow, startUrl: string): Promis
       width: 480,
       height: 720,
       autoHideMenuBar: true,
+      show: !hiddenMode(), // LARKWAVE_HIDDEN=1 (dev): never on screen
       title: 'Đăng nhập',
       webPreferences: {
         nodeIntegration: false,

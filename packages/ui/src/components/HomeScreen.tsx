@@ -10,6 +10,7 @@ import { useGrantGateway } from './lark/useGrantGateway';
 import { LarkFilesScreen } from './lark/LarkFilesScreen';
 import { SpecScreen } from './lark/SpecScreen';
 import { CmsSyncScreen } from './lark/CmsSyncScreen';
+import { LarkBrowserScreen } from './lark/LarkBrowserScreen';
 import { SkillsScreen } from './SkillsScreen';
 import { StorageScreen } from '../account/StorageScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -41,6 +42,7 @@ const VIEW_BY_KEY: Record<string, View> = {
   'tw-lark-files': 'lark-files',
   'tw-lark-auto': 'lark-auto',
   'tw-cms-sync': 'cms-sync',
+  'tw-lark-browser': 'lark-browser',
   'tw-skills': 'skills',
   'tw-skills-cross': 'skills-cross',
   'tw-settings': 'settings',
@@ -55,7 +57,7 @@ const WEB_URL: Record<string, string> = {
   storage: 'https://toolswave.net/storage',
 };
 
-export type View = 'home' | 'agents' | 'lark' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'skills' | 'skills-cross' | 'settings' | AccountView;
+export type View = 'home' | 'agents' | 'lark' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'lark-browser' | 'skills' | 'skills-cross' | 'settings' | AccountView;
 
 /** Reverse of VIEW_BY_KEY — lets the parent drive the sidebar selection when
  *  navigating programmatically (e.g. clicking a KPI tile). */
@@ -66,6 +68,7 @@ const KEY_BY_VIEW: Record<View, string> = {
   spec: 'tw-lark-spec',
   'lark-files': 'tw-lark-files',
   'cms-sync': 'tw-cms-sync',
+  'lark-browser': 'tw-lark-browser',
   'lark-auto': 'tw-lark-auto',
   skills: 'tw-skills',
   'skills-cross': 'tw-skills-cross',
@@ -250,7 +253,7 @@ function HomeShell() {
       onSelect={onSelect}
       activeKey={selectedKey}
       cmsAllowed={cmsAllowed}
-      fullBleed={view === 'lark' || view === 'agents'}
+      fullBleed={view === 'lark' || view === 'agents' || view === 'lark-browser'}
       headerExtra={
         <FeedbackButton variant="header" page={String(view)} />
       }
@@ -299,6 +302,9 @@ function HomeShell() {
       {!isAccountView && view === 'cms-sync' && cmsAllowed && (
         <CmsSyncScreen key={accountUser?.id || '_local'} onOpenChat={() => navigate('lark')} />
       )}
+      {/* "Trình duyệt Lark" runs on the Lark web session, not the AI runner → no phase gate. Keyed by
+          account: each account has its own Lark web partition. */}
+      {!isAccountView && view === 'lark-browser' && <LarkBrowserScreen key={accountUser?.id || '_local'} />}
       {/* MỘT màn hình, hai chế độ. Không tách thành hai component vì hai bên dùng chung toàn bộ
           đường tạo/sửa/bật-tắt kỹ năng — tách ra là chép đôi những thứ đó, rồi chúng trôi lệch. */}
       {!isAccountView && phase === 'ready' && (view === 'skills' || view === 'skills-cross') && (
