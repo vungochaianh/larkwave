@@ -1,4 +1,5 @@
 'use client';
+import type { LarkFrameCtl } from './larkLayout';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Drawer, Empty, Input, Tooltip } from 'antd';
 import { DeleteOutlined, EditOutlined, HistoryOutlined, PlusOutlined } from '@ant-design/icons';
@@ -7,6 +8,7 @@ import { BRAND_GRADIENT, V } from '../../theme';
 import { WorkspaceTabStrip, type TabItem } from '../WorkspaceTabStrip';
 import { LarkChat } from './LarkChat';
 import { unifySessions } from './larkConversations';
+import { ACTIVE_CONV_KEY } from './larkLayout';
 import type { LarkBaseRef } from '@larkwave/core';
 import type { MenuProps } from 'antd';
 
@@ -42,7 +44,7 @@ export function LarkChatShell({
   onBasesChange,
 }: {
   layout?: 'chat' | 'frame';
-  frame?: { open: boolean; toggle: () => void };
+  frame?: LarkFrameCtl;
   extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
   onBasesChange?: (bases: LarkBaseRef[], added?: { appToken: string; name: string; url?: string }) => void;
   runtime: RuntimeAdapter;
@@ -92,13 +94,29 @@ export function LarkChatShell({
     booted.current = true;
     void (async () => {
       const list = await refreshTitles();
-      const first = list?.find((s) => s.active) || list?.[0];
+      let remembered: string | null = null;
+      try {
+        remembered = window.localStorage.getItem(ACTIVE_CONV_KEY);
+      } catch {
+        /* */
+      }
+      // Hội thoại đang mở ở cách xếp kia (khung-trước) — đổi cách xếp vẫn ở đúng hội thoại.
+      const first = (remembered && list?.find((s) => s.id === remembered)) || list?.find((s) => s.active) || list?.[0];
       if (first?.id) {
         setOpenIds([first.id]);
         setActiveId(first.id);
       }
     })();
   }, [refreshTitles]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    try {
+      window.localStorage.setItem(ACTIVE_CONV_KEY, activeId);
+    } catch {
+      /* tiện ích riêng máy */
+    }
+  }, [activeId]);
 
   // Tab nào đang chạy lượt AI — chấm dấu lên thanh tab. Đọc từ danh sách khoá của tiến trình chính.
   useEffect(() => {

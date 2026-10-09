@@ -7,6 +7,8 @@ import {
   DownOutlined,
   EllipsisOutlined,
   LayoutOutlined,
+  ExpandOutlined,
+  CompressOutlined,
   PlusOutlined,
   SearchOutlined,
   SyncOutlined,
@@ -16,6 +18,7 @@ import type { LarkBaseRef, RunnerStatusInfo, RuntimeAdapter } from '@larkwave/co
 import { BRAND, ERR, WARN, V, tint } from '../../theme';
 import { useI18n } from '../../i18n';
 import { autoTip, engineModel, SOURCE_LABEL, type RunSource } from './engineChip';
+import type { LarkFrameCtl } from './larkLayout';
 import { filterBaseOptions, mergeBaseOptions, toggleBase, type BaseOption } from './larkConversations';
 
 const { Text } = Typography;
@@ -174,7 +177,7 @@ export function LarkChatToolbar({
   autoMode: boolean | null;
   onAuto: (on: boolean) => void;
   /** Bố cục chat: nút mở/đóng khung Lark bên phải. */
-  frame?: { open: boolean; toggle: () => void };
+  frame?: LarkFrameCtl;
   menuItems: MenuProps['items'];
   onMenu: (key: string) => void;
   badges?: ReactNode;
@@ -379,6 +382,11 @@ export function LarkChatToolbar({
             <Switch size="small" checked={autoMode} onChange={onAuto} />
             {!tight && <Text style={{ fontSize: 12.5, color: V.textSub }}>{t('wf.auto', 'Tự động')}</Text>}
           </span>
+        </Tooltip>
+      )}
+      {frame?.expand && (
+        <Tooltip title={frame.frameFirst ? t('wf.chatFirst', 'Ưu tiên hội thoại — khung Lark về ngăn phụ bên phải') : t('wf.frameFirst', 'Mở rộng khung Lark — khung lớn, hội thoại gắn trái (thu nhỏ được)')}>
+          <Button data-testid="lark-layout-switch" size="small" type="text" icon={frame.frameFirst ? <CompressOutlined /> : <ExpandOutlined />} onClick={frame.expand} />
         </Tooltip>
       )}
       {frame && (

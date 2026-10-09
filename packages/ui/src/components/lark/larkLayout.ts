@@ -20,6 +20,11 @@ export type LarkLayout = 'chat' | 'frame';
 
 export interface LayoutPrefs {
   v: 1;
+  /**
+   * MỘT màn "Lark × Agents", hai cách xếp (nhớ riêng máy): 'chat' = hội thoại trước (khung Lark là
+   * ngăn phụ bên phải), 'frame' = khung Lark lớn trước (hội thoại gắn trái, thu/mở được).
+   */
+  mode: LarkLayout;
   /** Bố cục 'frame': nấc của hội thoại bên trái. */
   dock: DockState;
   /** Bề rộng khi expanded (px). */
@@ -43,6 +48,7 @@ export const CHAT_MIN = 460;
 
 export const DEFAULT_PREFS: LayoutPrefs = {
   v: 1,
+  mode: 'chat',
   dock: 'expanded',
   expandedW: DOCK_W.expandedDef,
   historyOpen: false,
@@ -64,6 +70,7 @@ export function parseLayoutPrefs(raw: string | null | undefined): LayoutPrefs {
   const dock = o.dock === 'collapsed' || o.dock === 'rail' || o.dock === 'expanded' ? o.dock : DEFAULT_PREFS.dock;
   return {
     v: 1,
+    mode: o.mode === 'frame' ? 'frame' : 'chat',
     dock,
     expandedW: clamp(num(o.expandedW, DOCK_W.expandedDef), DOCK_W.expandedMin, DOCK_W.expandedMax),
     historyOpen: o.historyOpen === true,
@@ -129,4 +136,29 @@ export function sidePaneWidth(w: number, total: number): number {
 /** Bố cục mặc định khi mở một hội thoại cũ (trước hợp nhất, hội thoại có kind 'workflow'). */
 export function preferredLayout(meta: { kind?: string } | null | undefined): LarkLayout {
   return meta?.kind === 'workflow' ? 'frame' : 'chat';
+}
+
+/** Khoá hội thoại đang mở — CHUNG cho cả hai cách xếp, để đổi cách xếp vẫn ở đúng hội thoại. */
+export const ACTIVE_CONV_KEY = 'larkwave.wf.activeConv';
+
+/**
+ * Chuyển cách xếp. Sang 'frame': khung lớn, hội thoại về nấc mở rộng nếu đang là dải. Về 'chat' từ nút
+ * ĐÓNG khung (closeFrame) → ngăn khung phụ cũng đóng; về 'chat' bằng nút "ưu tiên hội thoại" → giữ
+ * khung Lark mở ở ngăn phụ để người dùng vẫn thấy canvas.
+ */
+export function switchMode(p: LayoutPrefs, to: LarkLayout, how: 'toggle' | 'closeFrame' = 'toggle'): LayoutPrefs {
+  if (to === 'frame') return { ...p, mode: 'frame', dock: p.dock === 'rail' ? 'collapsed' : p.dock };
+  return { ...p, mode: 'chat', sidePaneOpen: how === 'closeFrame' ? false : true };
+}
+
+/** Điều khiển khung Lark mà thanh đầu hội thoại nhận (cả hai cách xếp). */
+export interface LarkFrameCtl {
+  /** Khung Lark đang hiện. */
+  open: boolean;
+  /** Mở/đóng khung (cách xếp 'frame': đóng = về hội thoại trước, khung đóng). */
+  toggle: () => void;
+  /** Đổi cách xếp chat-trước ↔ khung-trước. */
+  expand?: () => void;
+  /** Đang ở cách xếp khung-trước. */
+  frameFirst?: boolean;
 }

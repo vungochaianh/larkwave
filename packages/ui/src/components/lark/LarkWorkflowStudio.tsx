@@ -16,11 +16,11 @@ import { BRAND, V, tint } from '../../theme';
 import { useI18n } from '../../i18n';
 import { LarkChat } from './LarkChat';
 import { LarkFramePane, useAutoOpen, useLarkBrowserState } from './LarkFramePane';
-import { dockWidth, dragDock, LAYOUT_KEY, nextDock, parseLayoutPrefs, serializeLayoutPrefs, type DockAction, type LayoutPrefs } from './larkLayout';
+import { ACTIVE_CONV_KEY, dockWidth, dragDock, LAYOUT_KEY, nextDock, parseLayoutPrefs, serializeLayoutPrefs, type DockAction, type LayoutPrefs } from './larkLayout';
 import { unifySessions } from './larkConversations';
 
 const { Text } = Typography;
-const ACTIVE_KEY = 'larkwave.wf.activeConv';
+const ACTIVE_KEY = ACTIVE_CONV_KEY;
 
 const readPrefs = (): LayoutPrefs => {
   try {
@@ -52,9 +52,12 @@ export function LarkWorkflowStudio({
   runtime,
   onOpenSkills,
   extraMenu,
+  onToChat,
 }: {
   runtime: RuntimeAdapter;
   onOpenSkills?: () => void;
+  /** Về cách xếp hội thoại-trước: 'toggle' = khung về ngăn phụ, 'closeFrame' = đóng khung. */
+  onToChat?: (how: 'toggle' | 'closeFrame') => void;
   extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
 }) {
   const { t } = useI18n();
@@ -264,6 +267,7 @@ export function LarkWorkflowStudio({
             density={collapsed ? 'compact' : 'normal'}
             leading={leading}
             onTitle={setTitle}
+            frame={onToChat ? { open: true, frameFirst: true, toggle: () => onToChat('closeFrame'), expand: () => onToChat('toggle') } : undefined}
             extraMenu={{
               items: [{ key: '__rail', icon: <VerticalRightOutlined />, label: t('wf.toRail', 'Thu thành dải') }, ...(extraMenu?.items || [])],
               onClick: (k) => (k === '__rail' ? act('rail') : extraMenu?.onClick(k)),
@@ -292,7 +296,7 @@ export function LarkWorkflowStudio({
       </div>
 
       {/* Phải: KHUNG LARK lớn */}
-      <LarkFramePane runtime={runtime} st={st} setSt={setSt} refresh={refresh} homeUrl={homeUrl} style={{ flex: 1, paddingTop: 6 }} />
+      <LarkFramePane runtime={runtime} st={st} setSt={setSt} refresh={refresh} homeUrl={homeUrl} onClose={onToChat ? () => onToChat('closeFrame') : undefined} style={{ flex: 1, paddingTop: 6 }} />
     </div>
   );
 }

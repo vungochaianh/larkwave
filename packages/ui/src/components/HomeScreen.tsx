@@ -4,6 +4,7 @@ import { App as AntApp, App, Spin, Card, Typography, Space, Button } from 'antd'
 import { RocketOutlined, ExportOutlined } from '@ant-design/icons';
 import { AppShell } from './AppShell';
 import { LarkScreen } from './LarkScreen';
+import { LarkBotScreen } from './lark/LarkBotScreen';
 import { AutomationsPanel } from './lark/AutomationsPanel';
 import { AgentChat } from './agents/AgentChat';
 import { useGrantGateway } from './lark/useGrantGateway';
@@ -37,7 +38,9 @@ const ACCOUNT_VIEWS: AccountView[] = ['profile', 'friends', 'storage'];
 const VIEW_BY_KEY: Record<string, View> = {
   'tw-agents': 'agents',
   'tw-lark': 'lark',
+  // Mục "Tạo workflow" cũ đã gộp vào Lark × Agents: liên kết cũ mở thẳng cách xếp khung-Lark-trước.
   'tw-lark-wf': 'lark-wf',
+  'tw-lark-bot': 'lark-bot',
   'tw-lark-spec': 'spec',
   'tw-lark-files': 'lark-files',
   'tw-lark-auto': 'lark-auto',
@@ -58,7 +61,7 @@ const WEB_URL: Record<string, string> = {
   storage: 'https://toolswave.net/storage',
 };
 
-export type View = 'home' | 'agents' | 'lark' | 'lark-wf' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'skills' | 'skills-cross' | 'settings' | AccountView;
+export type View = 'home' | 'agents' | 'lark' | 'lark-wf' | 'lark-bot' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'skills' | 'skills-cross' | 'settings' | AccountView;
 
 /** Reverse of VIEW_BY_KEY — lets the parent drive the sidebar selection when
  *  navigating programmatically (e.g. clicking a KPI tile). */
@@ -66,7 +69,8 @@ const KEY_BY_VIEW: Record<View, string> = {
   home: 'tw-composer',
   agents: 'tw-agents',
   lark: 'tw-lark',
-  'lark-wf': 'tw-lark-wf',
+  'lark-wf': 'tw-lark',
+  'lark-bot': 'tw-lark-bot',
   spec: 'tw-lark-spec',
   'lark-files': 'tw-lark-files',
   'cms-sync': 'tw-cms-sync',
@@ -278,12 +282,13 @@ function HomeShell() {
       {!isAccountView && phase === 'ready' && view === 'lark' && (
         // Key by account so switching users fully REMOUNTS the Lark screen — connection,
         // config panels and chat all re-fetch under the new account's per-account scope.
-        <LarkScreen key={accountUser?.id || '_local'} onOpenSkills={() => navigate('skills')} />
+        <LarkScreen key={accountUser?.id || '_local'} onOpenSkills={() => navigate('skills')} onOpenBot={() => navigate('lark-bot')} />
       )}
       {!isAccountView && phase === 'ready' && view === 'lark-wf' && (
-        // CÙNG agent + hội thoại với Lark × Agents — bố cục khung-Lark-trước.
-        <LarkScreen key={`wf-${accountUser?.id || '_local'}`} layout="frame" onOpenSkills={() => navigate('skills')} />
+        // Liên kết cũ "Tạo workflow" → CÙNG màn Lark × Agents, mở ở cách xếp khung-Lark-trước.
+        <LarkScreen key={`wf-${accountUser?.id || '_local'}`} layout="frame" onOpenSkills={() => navigate('skills')} onOpenBot={() => navigate('lark-bot')} />
       )}
+      {!isAccountView && phase === 'ready' && view === 'lark-bot' && <LarkBotScreen key={accountUser?.id || '_local'} onOpenChat={() => navigate('lark')} />}
       {!isAccountView && phase === 'ready' && view === 'spec' && (
         <SpecScreen key={accountUser?.id || '_local'} onOpenChat={() => navigate('lark')} />
       )}

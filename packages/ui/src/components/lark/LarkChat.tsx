@@ -1,4 +1,5 @@
 'use client';
+import type { LarkFrameCtl } from './larkLayout';
 import { buildQuickAsks, CUSTOM_ASKS_KEY, emptyExamples, mergeChips, parseCustomAsks, type QuickAsk } from './quickAsks';
 import { LarkChatToolbar } from './LarkChatToolbar';
 import type { MenuProps } from 'antd';
@@ -191,7 +192,7 @@ export function LarkChat({
   /** 'compact' = hội thoại thu nhỏ (~300px) ở màn Tạo workflow: thanh đầu tối giản, bong bóng gọn. */
   density?: 'normal' | 'compact';
   /** Bố cục chat: nút "Khung Lark" trên thanh đầu (mở/đóng ngăn khung Lark bên phải). */
-  frame?: { open: boolean; toggle: () => void };
+  frame?: LarkFrameCtl;
   /** Mục thêm vào menu ⋯ (Hướng dẫn, Chia sẻ Lark × Agents, Cài đặt…) — do màn cha xử lý. */
   extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
   /** Phần tử đứng đầu thanh (vd nút danh sách hội thoại / thu gọn). */

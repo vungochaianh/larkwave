@@ -18,7 +18,7 @@ import { LarkGuideModal } from './lark/LarkGuideModal';
 import { LarkWebPanel } from './lark/LarkWebPanel';
 import { LarkWorkflowStudio } from './lark/LarkWorkflowStudio';
 import { LarkFramePane, useAutoOpen, useLarkBrowserState } from './lark/LarkFramePane';
-import { LAYOUT_KEY, parseLayoutPrefs, serializeLayoutPrefs, sidePaneWidth, type LayoutPrefs } from './lark/larkLayout';
+import { LAYOUT_KEY, parseLayoutPrefs, serializeLayoutPrefs, sidePaneWidth, switchMode, type LayoutPrefs } from './lark/larkLayout';
 import { migrateCustomAsks } from './lark/larkConversations';
 import { CUSTOM_ASKS_KEYS } from './lark/quickAsks';
 import { V } from '../theme';
@@ -46,19 +46,22 @@ const readPrefs = (): LayoutPrefs => {
 };
 
 /**
- * "Lark × Agents" và "Tạo workflow" (desktop) — HAI BỐ CỤC của CÙNG một agent và CÙNG danh sách hội
- * thoại:
- *   - layout 'chat'  (Lark × Agents): hội thoại là chính; khung Lark là ngăn phụ bên phải, mặc định
- *     ĐÓNG (nút "Khung Lark" trên thanh đầu hội thoại), tự mở khi AI thao tác / cần đăng nhập.
- *   - layout 'frame' (Tạo workflow): khung Lark lớn, hội thoại gắn bên trái (LarkWorkflowStudio).
+ * "Lark × Agents" (desktop) — MỘT màn, MỘT agent, MỘT danh sách hội thoại, hai cách xếp đổi qua lại
+ * ngay trong màn (nút ⤢ trên thanh đầu hội thoại, nhớ riêng máy — larkLayout `mode`):
+ *   - 'chat'  : hội thoại là chính; khung Lark là ngăn phụ bên phải, mặc định ĐÓNG (nút "Khung Lark"),
+ *     tự mở khi AI thao tác / cần đăng nhập.
+ *   - 'frame' : khung Lark lớn, hội thoại gắn trái thu/mở được (LarkWorkflowStudio). Đóng khung (×) là
+ *     về cách xếp hội thoại-trước. Mục "Tạo workflow" cũ ở thanh bên đã gộp vào đây.
+ * Phần cần App ID/App Secret (bot, webhook, Open API…) nằm ở màn "Lark Bot (App ID)" riêng.
  * Không còn cổng "phải kết nối custom app": agent chạy bằng phiên Lark web khi chưa có App ID.
  * Không còn dòng mô tả / nút chuyển chế độ ở đầu màn — Hướng dẫn, Chia sẻ, Cài đặt nằm trong ⋯ của
  * thanh đầu hội thoại. Trên web (không có `runtime.larkChat`) chỉ hiện thông báo "chỉ có ở desktop".
  */
 export function LarkScreen({
   onOpenSkills,
-  layout = 'chat',
-}: { onOpenSkills?: () => void; layout?: 'chat' | 'frame' } = {}) {
+  onOpenBot,
+  layout,
+}: { onOpenSkills?: () => void; onOpenBot?: () => void; /** Liên kết cũ "Tạo workflow" → mở thẳng cách xếp khung-trước. */ layout?: 'chat' | 'frame' } = {}) {
   const runtime = useRuntime();
   const { user } = useAccountAuth();
   const supported = !!runtime.larkChat;
@@ -130,11 +133,14 @@ export function LarkScreen({
   }, [runtime, supported, user?.id]);
 
   // ── Bố cục chat: ngăn khung Lark bên phải (mặc định đóng, nhớ riêng máy) ──
-  const [prefs, setPrefsState] = useState<LayoutPrefs>(() => (typeof window === 'undefined' ? parseLayoutPrefs(null) : readPrefs()));
+  const [prefs, setPrefsState] = useState<LayoutPrefs>(() => {
+    const p = typeof window === 'undefined' ? parseLayoutPrefs(null) : readPrefs();
+    return layout ? { ...p, mode: layout } : p;
+  });
   const setPrefs = (fn: (p: LayoutPrefs) => LayoutPrefs) =>
     setPrefsState((p) => {
-      // Đọc lại bản đang lưu để không đè nấc của màn Tạo workflow (chung một khoá).
-      const n = fn({ ...readPrefs(), sidePaneOpen: p.sidePaneOpen, sidePaneW: p.sidePaneW });
+      // Đọc lại bản đang lưu để không đè nấc/bề rộng mà cách xếp khung-trước vừa lưu (chung một khoá).
+      const n = fn({ ...readPrefs(), mode: p.mode, sidePaneOpen: p.sidePaneOpen, sidePaneW: p.sidePaneW });
       try {
         window.localStorage.setItem(LAYOUT_KEY, serializeLayoutPrefs(n));
       } catch {
@@ -142,7 +148,8 @@ export function LarkScreen({
       }
       return n;
     });
-  const chatLayout = layout === 'chat' && webSupported;
+  const frameFirst = prefs.mode === 'frame' && webSupported;
+  const chatLayout = !frameFirst && webSupported;
   const [st, refresh, setSt] = useLarkBrowserState(runtime);
   useAutoOpen(chatLayout ? st : null, () => setPrefs((p) => ({ ...p, sidePaneOpen: true })));
   useEffect(() => () => void runtime.larkBrowserDetach?.().catch(() => undefined), [runtime]);
@@ -186,12 +193,15 @@ export function LarkScreen({
     items: [
       { key: 'x-guide', icon: <ReadOutlined />, label: 'Hướng dẫn' },
       ...(conn?.connected && FEATURE_FRIENDS ? [{ key: 'x-share', icon: <TeamOutlined />, label: 'Chia sẻ Lark × Agents' }] : []),
-      { key: 'x-settings', icon: <SettingOutlined />, label: conn?.connected ? 'Cài đặt' : 'Kết nối custom app & cài đặt' },
+      { key: 'x-settings', icon: <SettingOutlined />, label: onOpenBot ? 'Lark Bot (App ID) & cài đặt' : conn?.connected ? 'Cài đặt' : 'Kết nối custom app & cài đặt' },
     ],
     onClick: (k) => {
       if (k === 'x-guide') setGuideOpen(true);
       else if (k === 'x-share') setShareOpen(true);
-      else if (k === 'x-settings') setSettingsOpen(true);
+      else if (k === 'x-settings') {
+        if (onOpenBot) onOpenBot();
+        else setSettingsOpen(true);
+      }
     },
   };
   const webConnected = !!st?.connected && st?.health !== 'dead';
@@ -257,7 +267,7 @@ export function LarkScreen({
               <Button size="small" type="primary" icon={<LoginOutlined />} onClick={() => void runtime.larkWebConnect?.().finally(() => void refresh())}>
                 Đăng nhập Lark
               </Button>
-              <Button size="small" icon={<ApiOutlined />} onClick={() => setSettingsOpen(true)}>
+              <Button size="small" icon={<ApiOutlined />} onClick={() => (onOpenBot ? onOpenBot() : setSettingsOpen(true))}>
                 Kết nối custom app
               </Button>
             </div>
@@ -269,9 +279,15 @@ export function LarkScreen({
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Spin size="large" />
         </div>
-      ) : layout === 'frame' && webSupported ? (
+      ) : frameFirst ? (
         <Card size="small" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
-          <LarkWorkflowStudio key={user?.id || '_local'} runtime={runtime} onOpenSkills={onOpenSkills} extraMenu={extraMenu} />
+          <LarkWorkflowStudio
+            key={user?.id || '_local'}
+            runtime={runtime}
+            onOpenSkills={onOpenSkills}
+            extraMenu={extraMenu}
+            onToChat={(how) => setPrefs((p) => switchMode(p, 'chat', how))}
+          />
         </Card>
       ) : !conn?.connected && !webSupported ? (
         <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -289,7 +305,15 @@ export function LarkScreen({
               onOpenSkills={onOpenSkills}
               layout="chat"
               extraMenu={extraMenu}
-              frame={chatLayout ? { open: prefs.sidePaneOpen, toggle: () => setPrefs((p) => ({ ...p, sidePaneOpen: !p.sidePaneOpen })) } : undefined}
+              frame={
+                chatLayout
+                  ? {
+                      open: prefs.sidePaneOpen,
+                      toggle: () => setPrefs((p) => ({ ...p, sidePaneOpen: !p.sidePaneOpen })),
+                      expand: () => setPrefs((p) => switchMode(p, 'frame')),
+                    }
+                  : undefined
+              }
               onBasesChange={(bases, added) => {
                 const b = added || bases[0];
                 const url = b ? (b as { url?: string }).url || (st?.host ? `${st.host}/base/${b.appToken}` : undefined) : undefined;

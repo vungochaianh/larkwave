@@ -303,4 +303,31 @@ t('larkService: mọi lượt Lark không đòi custom app; bộ công cụ = ag
   assert.ok(/onApi = !!\(apiMode && apiKey && !general && client/.test(src), 'đường API chỉ khi có client');
 });
 
+// ── Một màn Lark × Agents + mục Lark Bot (App ID) ────────────────────────────────────────────
+t('cách xếp: mặc định hội thoại-trước; đổi sang khung-trước rồi về (×) → ngăn khung đóng; nút ưu tiên hội thoại → khung về ngăn phụ', () => {
+  assert.strictEqual(lay.DEFAULT_PREFS.mode, 'chat');
+  assert.strictEqual(lay.parseLayoutPrefs('{"mode":"frame"}').mode, 'frame');
+  assert.strictEqual(lay.parseLayoutPrefs('{"mode":"lạ"}').mode, 'chat');
+  const f = lay.switchMode({ ...lay.DEFAULT_PREFS, dock: 'rail' }, 'frame');
+  assert.deepStrictEqual([f.mode, f.dock], ['frame', 'collapsed']);
+  assert.deepStrictEqual([lay.switchMode(f, 'chat', 'closeFrame').mode, lay.switchMode(f, 'chat', 'closeFrame').sidePaneOpen], ['chat', false]);
+  assert.strictEqual(lay.switchMode(f, 'chat', 'toggle').sidePaneOpen, true);
+  assert.strictEqual(lay.parseLayoutPrefs(lay.serializeLayoutPrefs(f)).mode, 'frame', 'nhớ cách xếp');
+  assert.strictEqual(lay.ACTIVE_CONV_KEY, 'larkwave.wf.activeConv', 'một khoá hội thoại cho cả hai cách xếp');
+});
+t('thanh bên: không còn mục "Tạo workflow"; có "Lark Bot (App ID)"; liên kết cũ tw-lark-wf vẫn mở Lark × Agents (khung-trước)', () => {
+  const UIC = join(__dirname, '..', '..', '..', 'packages', 'ui', 'src', 'components');
+  const shell = readFileSync(join(UIC, 'AppShell.tsx'), 'utf8');
+  const home = readFileSync(join(UIC, 'HomeScreen.tsx'), 'utf8');
+  assert.ok(!/key: 'tw-lark-wf'/.test(shell), 'không còn mục Tạo workflow');
+  assert.ok(/key: 'tw-lark-bot', label: 'Lark Bot \(App ID\)'/.test(shell));
+  assert.ok(/'tw-lark-wf': 'lark-wf'/.test(home) && /'lark-wf': 'tw-lark'/.test(home), 'liên kết cũ → chọn mục Lark × Agents');
+  assert.ok(/view === 'lark-bot' && <LarkBotScreen/.test(home));
+  const bot = readFileSync(join(UIC, 'lark', 'LarkBotScreen.tsx'), 'utf8');
+  for (const p of ['LarkConnectPanel', 'BotPanel', 'PluginsPanel', 'BasesPanel']) assert.ok(bot.includes(`<${p}`), p);
+  assert.ok(!/<LarkChat\b|<LarkChatShell\b/.test(bot), 'Lark Bot không có ô chat riêng — dùng chung agent');
+  const screen = readFileSync(join(UIC, 'LarkScreen.tsx'), 'utf8');
+  assert.ok(/switchMode\(p, 'frame'\)/.test(screen) && /onToChat=/.test(screen));
+});
+
 console.log(`  larkMerge: ${pass} kiểm qua`);
