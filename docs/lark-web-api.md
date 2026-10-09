@@ -101,8 +101,8 @@ manager). Chưa bắt được request thật vì Base "Larkwave Test" chưa có
   ChangeRecord → `changeRecord`; Timer → `cron`; Button → `button`/`buttonField`;
   Reminder → `datetimeField`; LarkMessage → `larkMessage`.
 - `source`: trình soạn Automation không gửi trường này (server tự gán 1001). Khối Workflow gửi
-  `workflow_block` tới `/space/api/bitable/:token/workflow/create`. Muốn tạo khối Workflow mới thì phải
-  thêm block qua changeset cộng tác, nên Larkwave **không** tạo khối Workflow qua API.
+  `workflow_block` tới `/space/api/bitable/:token/workflow/create` — xem mục 11 (Larkwave tạo được khối
+  Workflow thật từ 10/2026).
 - Response trả về `data.workflowID`. Sau khi tạo, đọc lại bằng `automation/list` để kiểm.
 
 Larkwave chỉ gọi `automation/create` với `status: 0`. Không có đường nào gửi `status: 1`, và có test
@@ -119,7 +119,12 @@ Kết luận: Open API v3 chỉ dùng được khi người dùng đã kết n�
 
 ## 6. Ba đường tạo, theo thứ tự ưu tiên
 
-1. **Tạo thẳng qua phiên web**, tool `lark_web_create_automation`. Agent dựng `steps` theo chuẩn v3 và
+> **Quy ước tên gọi (10/2026):** "workflow"/"quy trình" = **khối Workflow** (canvas ở thanh bên Base,
+> mục 11) → `lark_web_create_workflows`, là MẶC ĐỊNH. "Tự động hoá"/"automation" = Automation cổ điển
+> (danh sách quy tắc) → `lark_web_create_automation(s)`, chỉ khi người dùng nói rõ. Cả hai dùng chung
+> thiết kế `steps` v3 + bộ kiểm + bộ chuyển `v3ToInternal`.
+
+1. **Tạo thẳng qua phiên web**, tool `lark_web_create_workflows` (khối) hoặc `lark_web_create_automation`. Agent dựng `steps` theo chuẩn v3 và
    được kiểm bằng `validateWorkflowBody` với hồ sơ Base quét từ web. Sau đó `v3ToInternal` chuyển sang
    draft/extra nội bộ, rồi gửi `automation/create` với status 0 và đọc lại.
    - Chỉ hỗ trợ những khuôn đã thấy trong dữ liệu thật: `AddRecordTrigger`, `SetRecordTrigger` (lọc theo
@@ -204,9 +209,10 @@ và đọc lại bằng clientvars):
 
 ## 9. Duyệt thao tác ghi và hạn chờ của Claude CLI
 
-- Màn Tạo workflow có công tắc **"Tự động (không hỏi lại)"** (mặc định BẬT, lưu riêng máy này ở
-  `machine-prefs.json`). Khi BẬT, tool có cờ `additive` (tạo automation TẮT, thêm bảng/cột/lựa chọn, áp mẫu
-  thành nháp) chạy không hỏi. Xoá / ghi đè / sửa cái đang có không bao giờ có cờ đó nên vẫn hỏi. Luật nằm
+- MỌI hội thoại Lark × Agents (cả hai bố cục) có MỘT công tắc **"Tự động"** trên thanh đầu (mặc định BẬT,
+  lưu riêng máy này ở `machine-prefs.json`; nút "Hỏi đáp/Thực thi" và "Tự động duyệt" chung cũ đã gỡ). Khi
+  BẬT, tool có cờ `additive` (tạo workflow/automation TẮT, thêm bảng/cột/lựa chọn, áp mẫu thành nháp, và
+  với custom app: tạo bản ghi/bảng/cột/view mới, `bitable_workflow_create`) chạy không hỏi. Xoá / ghi đè / sửa cái đang có không bao giờ có cờ đó nên vẫn hỏi. Luật nằm
   ở một chỗ: `needsConfirmation` (larkToolExec.ts).
 - Claude CLI 2.1.286, server MCP kiểu HTTP: mỗi POST bọc hạn **60 giây** (`AbortSignal`, lỗi "The operation
   timed out."), sau đó CLI gỡ luôn server ("MCP server "lark" is not connected"). Hạn đọc từ trường
@@ -226,3 +232,41 @@ và đọc lại bằng clientvars):
 - `lark_ui_dismiss`: Escape trước; còn thì bấm nút có tên an toàn (Exit/Thoát/Cancel/Huỷ/Close/Đóng/取消…),
   không bao giờ Xoá/Bật/Lưu/Gửi/Xác nhận. Đo thật: form đã gõ → Escape → hiện hộp "chưa gửi" → Exit → sạch.
 - `lark_ui_health`: URL, lớp chặn, số thao tác còn lại. Trần thao tác mỗi lượt: 200.
+
+## 11. Khối Workflow (Quy trình làm việc — canvas) — đo 09/10/2026
+
+Base có HAI thứ: **Tự động hoá** (Automation — danh sách quy tắc trong "Automations") và **Workflow** — một
+KHỐI ở thanh bên Base (`blockType: 86`, `blockToken` = `workflowID`), mở ra là canvas sơ đồ bước. Người dùng
+nói "workflow" là muốn cái sau.
+
+Đọc từ mã trình soạn (bundle `__viewpack__default_bundle` → `handleAddWorkFlow` của thanh bên;
+`vb_31004…`/`vb_base-workflow-service…` → `createBlockWorkflow`, `createWorkflowInstance`), rồi làm thật trên
+Base Test. Bấm "+ New → Workflow" ở thanh bên làm đúng hai bước:
+
+1. **HTTP** `POST /space/api/bitable/:token/workflow/create`
+   `{ token, draft, extra, triggerName, source: "workflow_block", bizType: "2" }` → `{ code: 0, data: { workflowID } }`.
+   - `bizType: "2"` do hàm `yL` của Lark gắn vào MỌI request của Workflow builder (GET thì thêm `?bizType=2`).
+   - Không gửi `status` → máy chủ để **TẮT** (`status: 0`). Đọc lại: `source: 2001` (`WorkflowFromDefault`).
+   - `draft` có CÙNG khuôn bước với Automation (`steps` + bí danh `ref_<tbl>`/`ref_<tbl>_<fld>`), KHÔNG có
+     `title` (tên = tên khối), thêm `extensionI18nMap: {}` và `tabldFieldMap: { <tbl>: { <fld>: { type } } }`
+     (Lark viết sai "tabld" — giữ nguyên). `extra` y như Automation (`TableMap/BlockMap/BtnTrigger`).
+     Không phải `nodeSchema` nội bộ — `nodeSchema` chỉ tính khi bật (đọc lại thấy `{}`).
+2. **Lớp lệnh trong trang** (không có HTTP — đi changeset như thêm bảng, mục 8):
+   `ctx.operate.baseOperate.addBlock({ type: "WORKFLOW", parentId: null, token: workflowID, name }, {})`
+   → `{ result: 2, data: { id: "wkf…", index } }`. Khối hiện ngay ở thanh bên.
+
+Sửa bước sau này: `POST /space/api/bitable/automation/update` + `bizType: "2"` (cùng request manager, `yL`
+gắn bizType). Đọc: `GET …/workflow/detail?workflowID=…&bizType=2`. Xoá (Lark làm khi xoá khối):
+`baseOperate.delBlock({ id })` (khối vào `trashBlockMap`) + `POST …/workflow/disable { workflowID, bizType }`.
+
+Larkwave (`workflowBlock.ts`, `larkWebSession.createWorkflowBlock`, tool `lark_web_create_workflows`):
+thiết kế `steps` v3 → `validateWorkflowBody` → `v3ToInternal` → `toWorkflowBlockDraft` → create → addBlock
+(hỏng thì `workflow/disable` workflow mồ côi) → đọc lại (clientvars: khối có ở thanh bên; detail: đúng bước,
+`status 0`) → mở canvas `/base/<token>?table=<wkf…>` trong khung Lark. Mở ngay sau khi tạo đôi khi trang
+chưa thấy khối và rơi về bảng gần nhất → thử lại tới khi URL giữ đúng khối. Không có đường nào bật.
+
+Đã làm thật trên Base Test: (1) tay qua CDP — workflowID `7694589897620917982`, khối `wkfKkSfmJh8gJvj8`
+(AddRecordTrigger «Khách hàng» → LarkMessageAction gửi cột «Người phụ trách»), canvas hiện 2 bước, công tắc
+tắt; (2) qua agent thật (Claude CLI, bố cục Tạo workflow, 31 giây, 4 tool) — workflowID
+`7694595822633438941`, khối `wkfzQ8qEWCbjpeKz`. Cả hai đã xoá (vào thùng rác của Base) + disable.
+Fixture: `apps/desktop/test/fixtures/lark-web/workflow-block.json`; kiểm: `test/larkMerge.cjs`.
