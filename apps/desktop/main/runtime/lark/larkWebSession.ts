@@ -9,6 +9,11 @@ import { extractTemplate, fillTemplate, loadTemplates, saveTemplates, templateSu
 import { hiddenMode } from '../../hiddenMode';
 import { canProbeLogin, classifyLarkPage, classifyWhoami, WHOAMI_PATH, type LarkWhoami } from './larkLoginState';
 
+/** Hạn giờ cho một lần hỏi "tôi là ai" (xem whoami()). */
+const WHOAMI_TIMEOUT_MS = 6000;
+/** Khoảng cách tối thiểu giữa hai lần tự hỏi khi người dùng đăng nhập thẳng trong Trình duyệt Lark. */
+const VIEW_LOGIN_PROBE_MS = 3000;
+
 /**
  * EXPERIMENTAL — Lark WEB session (not the Open API).
  *
@@ -507,10 +512,14 @@ export class LarkWebSession {
   private async whoami(): Promise<LarkWhoami & { asked: boolean }> {
     if (!this.win || this.win.isDestroyed()) return { loggedIn: false, anonymous: false, asked: false };
     try {
-      const j = await this.win.webContents.executeJavaScript(
+      // Có hạn giờ: executeJavaScript có thể KHÔNG BAO GIỜ trả lời khi trang đang chuyển hướng (đúng
+      // lúc vừa đăng nhập xong Lark nhảy trang). Không có hạn giờ thì vòng chờ ở connect() — vốn bỏ
+      // qua lượt khi lượt trước chưa xong — đứng im mãi ở "Đang chờ đăng nhập" dù đã đăng nhập.
+      const ask = this.win.webContents.executeJavaScript(
         `fetch(${JSON.stringify(WHOAMI_PATH)}, { credentials: 'include', headers: { accept: 'application/json' } }).then(function (r) { return r.json(); }).catch(function () { return null; })`,
         true,
-      );
+      ).catch(() => null);
+      const j = await Promise.race([ask, new Promise<null>((r) => setTimeout(() => r(null), WHOAMI_TIMEOUT_MS))]);
       return { ...classifyWhoami(j), asked: j != null };
     } catch {
       return { loggedIn: false, anonymous: false, asked: false };
@@ -1173,9 +1182,42 @@ export class LarkWebSession {
     }
   }
 
+  private viewLoginProbing = false;
+  private viewLoginProbeAt = 0;
+
+  /**
+   * Người dùng có thể đăng nhập Lark ngay trong khung Trình duyệt Lark mà không bấm "Đăng nhập Lark"
+   * — khi đó không có vòng chờ connect() nào đang chạy để nhận ra. Màn hình hỏi trạng thái định kỳ,
+   * nên mỗi lần hỏi (thưa, có hạn giờ) cũng kiểm luôn: Lark đã xác nhận người dùng thật chưa.
+   */
+  private maybeDetectViewLogin(wc: Electron.WebContents | undefined): void {
+    if (this.host || !wc || this.viewLoginProbing) return;
+    if (Date.now() - this.viewLoginProbeAt < VIEW_LOGIN_PROBE_MS) return;
+    let url = '';
+    try {
+      url = wc.getURL();
+    } catch {
+      return;
+    }
+    if (!canProbeLogin(url)) return;
+    this.viewLoginProbing = true;
+    this.viewLoginProbeAt = Date.now();
+    void this.isRealLogin(url)
+      .then((origin) => {
+        if (!origin || this.host) return;
+        this.host = origin;
+        this.lastHealth = 'alive';
+        this.recordRelogin('local', 'success');
+      })
+      .finally(() => {
+        this.viewLoginProbing = false;
+      });
+  }
+
   browserState(): LarkBrowserState {
     const w = this.win && !this.win.isDestroyed() ? this.win : null;
     const wc = w?.webContents;
+    this.maybeDetectViewLogin(wc);
     let url = '';
     let title = '';
     let canGoBack = false;
