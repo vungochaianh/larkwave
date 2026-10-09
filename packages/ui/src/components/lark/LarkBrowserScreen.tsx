@@ -25,6 +25,8 @@ import { useI18n } from '../../i18n';
 
 const { Text } = Typography;
 
+const ADV_KEY = 'larkwave.larkBrowser.advanced';
+
 const KIND_LABEL: Record<string, string> = { table: 'Bảng', field: 'Cột', view: 'View', option: 'Lựa chọn', user: 'Người', chat: 'Nhóm chat', department: 'Phòng ban' };
 
 /**
@@ -40,7 +42,25 @@ export function LarkBrowserScreen() {
   const { t } = useI18n();
   const [st, setSt] = useState<LarkBrowserState | null>(null);
   const [tpls, setTpls] = useState<LarkUiTemplate[]>([]);
-  const [showTpl, setShowTpl] = useState(true);
+  // Mẫu "làm một lần, dùng lại" giờ là đường DỰ PHÒNG (workflow tạo qua Open API v3 trong Lark ×
+  // Agents) — ẩn khỏi khung mặc định, mở bằng nút "Nâng cao". Nhớ lựa chọn theo máy (tiện ích riêng).
+  const [showTpl, setShowTplState] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(ADV_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setShowTpl = (fn: (v: boolean) => boolean) =>
+    setShowTplState((v) => {
+      const next = fn(v);
+      try {
+        window.localStorage.setItem(ADV_KEY, next ? '1' : '0');
+      } catch {
+        /* không có storage — chỉ nhớ trong phiên */
+      }
+      return next;
+    });
   const [addr, setAddr] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -194,9 +214,11 @@ export function LarkBrowserScreen() {
           disabled={!st?.hasWindow}
           style={{ flex: '1 1 260px', minWidth: 200 }}
         />
-        <Button size="small" icon={<AppstoreOutlined />} type={showTpl ? 'primary' : 'default'} ghost={showTpl} onClick={() => setShowTpl((v) => !v)}>
-          {t('larkBrowser.templates', 'Mẫu')} ({tpls.length})
-        </Button>
+        <Tooltip title={t('larkBrowser.advancedHint', 'Mẫu automation làm tay (đường dự phòng). Tạo workflow mặc định: nhờ AI ở Lark × Agents.')}>
+          <Button size="small" type={showTpl ? 'primary' : 'text'} ghost={showTpl} icon={<AppstoreOutlined />} onClick={() => setShowTpl((v) => !v)}>
+            {t('larkBrowser.advanced', 'Nâng cao')}{tpls.length ? ` (${tpls.length})` : ''}
+          </Button>
+        </Tooltip>
       </div>
 
       {/* AI live strip */}
@@ -226,7 +248,7 @@ export function LarkBrowserScreen() {
       )}
 
       {/* Captured hand-made save → template */}
-      {capturedIsNew && st?.capturedSave && (
+      {showTpl && capturedIsNew && st?.capturedSave && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderRadius: 12, padding: '6px 10px', background: tint(OK, '12'), border: `1px solid ${tint(OK, '55')}` }}>
           <CheckCircleFilled style={{ color: OK }} />
           <Text style={{ fontSize: 13, flex: '1 1 240px', minWidth: 0 }}>

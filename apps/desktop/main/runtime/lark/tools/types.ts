@@ -15,6 +15,13 @@ export interface LarkToolDef {
   inputSchema: Record<string, unknown>;
   /** Destructive write → confirmation required. */
   gated: boolean;
+  /**
+   * Kiểm TRƯỚC hộp xác nhận (chỉ có nghĩa với tool gated). Trả một payload `{ok:false,…}` thì
+   * KHÔNG hỏi người dùng và KHÔNG chạy exec — kết quả đó đi thẳng về model như kết quả của tool.
+   * Trả null = hợp lệ, hỏi xác nhận như thường. Lý do: không bắt người dùng duyệt một thiết kế mà
+   * máy chủ chắc chắn sẽ từ chối (workflow sai schema).
+   */
+  preflight?(input: Record<string, any>, client: LarkClient): Promise<Record<string, unknown> | null>;
   exec(input: Record<string, any>, client: LarkClient): Promise<unknown>;
 }
 

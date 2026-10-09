@@ -1436,10 +1436,10 @@ export function LarkChat({
         ...c,
         prompt:
           `Dựa trên các bảng/cột hiện có của base ${convBases[0].name} (app_token=${convBases[0].appToken}) và các workflow đang có ` +
-          '(đọc bằng bitable_read_workflows + bitable_base_overview), đề xuất những automation/workflow NÊN THÊM để base hoàn thiện & tự động hơn. ' +
+          '(quét bằng bitable_scan_base — đã kèm danh sách workflow đang có), đề xuất những automation/workflow NÊN THÊM để base hoàn thiện & tự động hơn. ' +
           'Gợi ý theo các nhóm: nhắc hạn/quá hạn, tự điền & tính toán, thông báo khi đổi trạng thái, kiểm tra tồn kho/ngưỡng, chống trùng, tổng hợp/rollup, đồng bộ giữa bảng. ' +
           'Với mỗi đề xuất nêu: mục đích, TRIGGER (bảng + điều kiện), HÀNH ĐỘNG, và mức ưu tiên (tên bảng/cột để trong «…»). ' +
-          'Sau khi tôi chọn, bạn có thể TẠO trực tiếp bằng bitable_create_workflow (mặc định để TẮT cho tôi xem lại trước).',
+          'Sau khi tôi chọn, bạn TẠO trực tiếp bằng bitable_workflow_create (Open API chính thức — luôn tạo ở trạng thái TẮT cho tôi xem lại rồi tự bật).',
       };
     }
     // Debug chip: dump the sniffed internal endpoints VERBATIM so we can locate the base's

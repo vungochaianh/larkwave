@@ -13,6 +13,7 @@ npx tsc main/runtime/versionHint.ts main/runtime/apiRunner.ts main/runtime/lark/
   main/runtime/lark/ooxml.ts main/runtime/lark/automationEngine.ts main/runtime/lark/skillRun.ts \
   main/runtime/lark/fileBuild.ts main/runtime/lark/filePaths.ts \
   main/runtime/lark/larkUiCore.ts main/runtime/lark/larkCdp.ts main/runtime/lark/larkTemplates.ts main/runtime/lark/larkLoginState.ts \
+  main/runtime/lark/workflowV3.ts main/runtime/lark/tools/workflowsV3.ts \
   --outDir .test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck
 # Bộ gánh nhiều tenant của tw-lark-runner. Nằm ngoài apps/desktop nên outDir sinh ra đường dẫn
 # .test-build/tw-lark-runner/src/hosted.js — test dựa vào đúng đường đó. Nuốt lỗi KIỂU vì cây
@@ -37,7 +38,7 @@ npx tsc main/runtime/agentLock.ts main/runtime/lark/larkService.ts \
   --outDir .test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck >/dev/null 2>&1 || true
 test -f .test-build/runtime/lark/larkService.js || { echo "✗ không biên dịch được larkService"; exit 1; }
 fail=0
-for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs; do
+for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/workflowV3.cjs; do
   echo "── $t"
   node "$t" || fail=1
 done

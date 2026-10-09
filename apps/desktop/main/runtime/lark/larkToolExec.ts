@@ -68,7 +68,9 @@ export async function executeLarkTool(
   }
 
   const callId = `lt_${randomUUID()}`;
-  const needsConfirm = tool.gated && !ctx.autoApprove;
+  // Kiểm trước: thiết kế chắc chắn bị từ chối thì đừng bắt người dùng duyệt (xem LarkToolDef.preflight).
+  const pre = await runPreflight(tool, input, ctx.client);
+  const needsConfirm = tool.gated && !ctx.autoApprove && !pre;
   ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm });
 
   if (needsConfirm) {
@@ -88,7 +90,7 @@ export async function executeLarkTool(
   }
 
   try {
-    const data = await tool.exec(input as Record<string, any>, ctx.client);
+    const data = pre ?? (await tool.exec(input as Record<string, any>, ctx.client));
     // Tool báo hỏng bằng DỮ LIỆU (`{ok:false, reason}`) vẫn là hỏng: phát ok:false để chip trong
     // chat có màu đúng và hộp "Lỗi công cụ" liệt kê được. Trước đây mọi lượt exec không ném đều
     // báo thành công, nên loại thất bại này vô hình với người dùng.
@@ -117,6 +119,25 @@ export async function executeLarkTool(
     const suspect = suspectAppBugError(e);
     ctx.emit({ type: 'tool_result', callId, ok: false, error: message, suspectAppBug: suspect, tier: tierForError(e) });
     return { ok: false, text: message + (suspect ? await versionNote(ctx.allowVersionHint) : '') };
+  }
+}
+
+/**
+ * Chạy `preflight` của một tool (nếu có). Trả payload `{ok:false}` khi phải dừng trước hộp xác nhận,
+ * null khi được đi tiếp. Preflight NÉM lỗi thì coi như không có preflight — chốt kiểm trong exec vẫn
+ * còn, và một lỗi mạng lúc kiểm trước không được phép chặn mất thao tác người dùng muốn duyệt.
+ */
+export async function runPreflight(
+  tool: Pick<LarkToolDef, 'preflight'>,
+  input: unknown,
+  client: unknown,
+): Promise<Record<string, unknown> | null> {
+  if (!tool.preflight) return null;
+  try {
+    const r = await tool.preflight((input ?? {}) as Record<string, any>, client as never);
+    return r && typeof r === 'object' && (r as { ok?: unknown }).ok === false ? r : null;
+  } catch {
+    return null;
   }
 }
 
@@ -309,6 +330,8 @@ function summarizeTool(name: string, data: unknown): string {
     const rec = d.record as { record_id?: string } | undefined;
     if (rec?.record_id) return `record ${rec.record_id}`;
     if (d.message_id) return `đã gửi (${d.message_id})`;
+    if (typeof d.workflow_id === 'string' && d.workflow_id) return `workflow ${d.workflow_id}${d.status_text ? ` · ${String(d.status_text)}` : ''}`;
+    if (typeof d.valid === 'boolean') return d.valid ? 'thiết kế hợp lệ' : `thiết kế còn ${Array.isArray(d.errors) ? d.errors.length : ''} lỗi`;
   }
   return name;
 }

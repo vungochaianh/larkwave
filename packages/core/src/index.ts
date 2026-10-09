@@ -2,6 +2,7 @@ export * from './runtime';
 export * from './skillCommand';
 export * from './skillContract';
 export * from './chatTurn';
+export * from './larkWorkflowDesign';
 
 /**
  * Địa chỉ API của Larkwave (NestJS, tiền tố `/v1`).

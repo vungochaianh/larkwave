@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Checkbox, Modal, Radio, Typography } from 'antd';
+import { Alert, Checkbox, Modal, Radio, Typography } from 'antd';
 import { WarningFilled } from '@ant-design/icons';
-import { V } from '../../theme';
+import { describeWorkflowSteps, type WorkflowDesignLine } from '@larkwave/core';
+import { V, WARN } from '../../theme';
 import { useI18n } from '../../i18n';
 import type { RememberScope } from './agentPrefs';
 
@@ -42,9 +43,12 @@ export function ConfirmToolModal({
     setScope('conversation');
   }, [pending?.callId]);
 
+  const wf = pending && WORKFLOW_TOOLS.has(pending.name) ? workflowView(pending.input) : null;
+
   return (
     <Modal
       open={!!pending}
+      width={wf ? 640 : undefined}
       title={
         <span>
           <WarningFilled style={{ color: '#F59E0B', marginRight: 8 }} />
@@ -64,23 +68,13 @@ export function ConfirmToolModal({
           <Paragraph style={{ marginBottom: 8 }}>
             {t('chat.claudeWantsToRun', 'Claude muốn chạy:')} <Text code>{pending.name}</Text>
           </Paragraph>
-          <pre
-            style={{
-              margin: 0,
-              padding: '8px 10px',
-              background: V.surfaceAlt,
-              border: `1px solid ${V.border}`,
-              borderRadius: 8,
-              maxHeight: 240,
-              overflow: 'auto',
-              fontSize: 12,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {safeJson(pending.input)}
-          </pre>
-          <div style={{ marginTop: 12 }}>
+          {wf ? (
+            <WorkflowDesign view={wf} raw={safeJson(pending.input)} />
+          ) : (
+            <pre style={preStyle}>{safeJson(pending.input)}</pre>
+          )}
+          {/* Thiết kế workflow nào cũng phải được duyệt tận mắt — không cho "lần sau khỏi hỏi". */}
+          {!wf && <div style={{ marginTop: 12 }}>
             <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)}>
               {t('chat.rememberAllow', 'Lần sau tự chạy, đừng hỏi lại công cụ này')}
             </Checkbox>
@@ -94,10 +88,125 @@ export function ConfirmToolModal({
                 </Radio.Group>
               </div>
             )}
-          </div>
+          </div>}
         </>
       )}
     </Modal>
+  );
+}
+
+const preStyle: React.CSSProperties = {
+  margin: 0,
+  padding: '8px 10px',
+  background: V.surfaceAlt,
+  border: `1px solid ${V.border}`,
+  borderRadius: 8,
+  maxHeight: 240,
+  overflow: 'auto',
+  fontSize: 12,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+};
+
+/** Tool tạo/sửa workflow Lark (Open API v3) — hộp xác nhận vẽ THIẾT KẾ thay vì JSON. */
+const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update']);
+
+interface WorkflowView {
+  update: boolean;
+  title: string;
+  workflowId?: string;
+  lines: WorkflowDesignLine[];
+  stepCount: number;
+}
+
+function workflowView(input: unknown): WorkflowView | null {
+  const i = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  let steps: unknown = i.steps;
+  if (typeof steps === 'string') {
+    try {
+      steps = JSON.parse(steps);
+    } catch {
+      return null;
+    }
+  }
+  if (steps && typeof steps === 'object' && !Array.isArray(steps) && Array.isArray((steps as { steps?: unknown }).steps))
+    steps = (steps as { steps: unknown[] }).steps;
+  if (!Array.isArray(steps)) return null;
+  return {
+    update: i.workflow_id !== undefined,
+    title: typeof i.title === 'string' ? i.title : '',
+    workflowId: typeof i.workflow_id === 'string' ? i.workflow_id : undefined,
+    lines: describeWorkflowSteps(steps),
+    stepCount: steps.length,
+  };
+}
+
+const KIND_ICON: Record<WorkflowDesignLine['kind'], string> = {
+  trigger: '⚡',
+  action: '▸',
+  branch: '◆',
+  loop: '↻',
+  edge: '',
+  note: '',
+};
+
+function WorkflowDesign({ view, raw }: { view: WorkflowView; raw: string }) {
+  const { t } = useI18n();
+  const [showRaw, setShowRaw] = useState(false);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div>
+        <Text strong style={{ fontSize: 15 }}>{view.title || t('chat.wfUntitled', '(chưa đặt tên)')}</Text>
+        <Text style={{ color: V.textSub, fontSize: 12, marginLeft: 8 }}>
+          {view.stepCount} {t('chat.wfSteps', 'bước')}
+          {view.update && view.workflowId ? ` · ${view.workflowId}` : ''}
+        </Text>
+      </div>
+      <Alert
+        type={view.update ? 'warning' : 'info'}
+        showIcon
+        style={{ padding: '6px 10px' }}
+        message={
+          view.update
+            ? t('chat.wfUpdateNote', 'Thay TOÀN BỘ các bước của workflow này bằng thiết kế dưới đây. Trạng thái bật/tắt giữ nguyên (TẮT).')
+            : t('chat.wfCreateNote', 'Workflow được tạo ở trạng thái TẮT. Bạn mở Lark kiểm tra rồi tự bật.')
+        }
+      />
+      <div
+        style={{
+          padding: '8px 10px',
+          background: V.surfaceAlt,
+          border: `1px solid ${V.border}`,
+          borderRadius: 8,
+          maxHeight: 300,
+          overflow: 'auto',
+          fontSize: 13,
+          lineHeight: 1.55,
+        }}
+      >
+        {view.lines.map((l, k) => (
+          <div
+            key={k}
+            style={{
+              paddingLeft: l.depth * 16,
+              color: l.kind === 'edge' ? V.textSub : l.kind === 'note' ? WARN : V.text,
+              fontWeight: l.kind === 'trigger' ? 600 : l.kind === 'edge' ? 500 : 400,
+              fontSize: l.kind === 'edge' ? 12 : 13,
+              wordBreak: 'break-word',
+            }}
+          >
+            {KIND_ICON[l.kind] ? <span style={{ marginRight: 6 }}>{KIND_ICON[l.kind]}</span> : null}
+            {l.text}
+          </div>
+        ))}
+      </div>
+      <div>
+        <a onClick={() => setShowRaw((v) => !v)} style={{ fontSize: 12 }}>
+          {showRaw ? t('chat.wfHideJson', 'Ẩn JSON gốc') : t('chat.wfShowJson', 'Xem JSON gốc')}
+        </a>
+        {showRaw && <pre style={{ ...preStyle, marginTop: 6 }}>{raw}</pre>}
+      </div>
+    </div>
   );
 }
 

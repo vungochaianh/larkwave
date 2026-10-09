@@ -1,6 +1,7 @@
 import { type LarkToolDef, enc, uuid, str } from './types';
 import { noteBitableContext } from './attachments';
 import type { LarkClient } from '../larkClient';
+import { resolveBaseInput } from './workflowsV3';
 
 const apps = (appToken: string) => `/open-apis/bitable/v1/apps/${enc(appToken)}`;
 
@@ -292,23 +293,10 @@ export const bitableTools: LarkToolDef[] = [
       required: ['url'],
     },
     gated: false,
+    // Một resolver chung với các tool workflow/quét Base (workflowsV3.ts) để hai nơi không lệch nhau.
     exec: async (i, c) => {
-      const url = String(i.url ?? '');
-      const direct = url.match(/\/(?:base|bitable)\/([A-Za-z0-9]{10,})/);
-      if (direct) return { app_token: direct[1], kind: 'base' };
-      const wiki = url.match(/\/wiki\/([A-Za-z0-9]{10,})/);
-      if (!wiki) throw new Error('URL không phải link Base/Bitable/Wiki hợp lệ (cần …/base/…, …/bitable/… hoặc …/wiki/…).');
-      const r = await c.request<{ node?: { obj_token?: string; obj_type?: string; title?: string } }>(
-        'GET',
-        '/open-apis/wiki/v2/spaces/get_node',
-        { params: { token: wiki[1], obj_type: 'wiki' } },
-      );
-      const node = r?.node;
-      if (!node?.obj_token)
-        throw new Error('Không lấy được app_token từ link Wiki — có thể bạn chưa có quyền xem trang này, hoặc app/tài khoản thiếu scope wiki:wiki. Cách khác: mở Base → ••• → Development Tool để copy app_token.');
-      if (node.obj_type && node.obj_type !== 'bitable')
-        throw new Error(`Trang Wiki này là "${node.obj_type}", không phải Bitable Base.`);
-      return { app_token: node.obj_token, name: node.title, kind: 'wiki' };
+      const r = await resolveBaseInput(c, { url: i.url });
+      return { app_token: r.token, ...(r.name ? { name: r.name } : {}), kind: r.kind, ...(r.tableId ? { table_id: r.tableId } : {}) };
     },
   },
   {

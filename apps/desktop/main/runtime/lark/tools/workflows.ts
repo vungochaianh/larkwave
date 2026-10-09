@@ -611,7 +611,8 @@ export const workflowTools: LarkToolDef[] = [
   {
     name: 'bitable_read_workflows',
     description:
-      'Đọc + GIẢI THÍCH các Automation/Workflow (tự động hoá) của một Lark Base — thứ mà Open API KHÔNG đọc được logic. ' +
+      'ƯU TIÊN bitable_workflow_list / bitable_workflow_get (Open API chính thức v3, đọc được đủ steps). Tool này là DỰ PHÒNG khi v3 báo thiếu quyền/không hỗ trợ, hoặc khi cần định dạng `logic` cây đọc sẵn. ' +
+      'Đọc + GIẢI THÍCH các Automation/Workflow (tự động hoá) của một Lark Base qua phiên Lark web. ' +
       '(Thử nghiệm, dùng phiên "Lark web" — người dùng phải Kết nối Lark web trong Cài đặt trước.) ' +
       'Trả về từng workflow đã dịch sang tiếng Việt: trigger → điều kiện (Nếu/nhánh) → hành động (kể cả vòng lặp, rẽ nhánh). ' +
       'CÁCH DỄ NHẤT: truyền `app_token` của Base ĐÃ ĐĂNG KÝ (base_id nội bộ thường TRÙNG app_token; cũng để dịch id cột/tuỳ chọn/bảng → tên) — hoặc `url` của Base. ' +
@@ -757,6 +758,7 @@ export const workflowTools: LarkToolDef[] = [
   {
     name: 'bitable_create_workflow',
     description:
+      'DỰ PHÒNG — KHÔNG dùng mặc định: tạo workflow dùng bitable_workflow_create (Open API chính thức v3). Chỉ dùng tool này khi bitable_workflow_create trả kind "unsupported", hoặc thiếu quyền mà người dùng xác nhận KHÔNG cấp được. ' +
       '(THỬ NGHIỆM — GHI) TẠO một Automation/Workflow MỚI trong Lark Base qua API nội bộ (cần Kết nối Lark web). ' +
       'Mặc định tạo ở trạng thái TẮT (enable=false) để người dùng xem lại trong Lark trước khi bật — LUÔN khuyên test trên bảng nháp. ' +
       'Truyền `steps` (mảng bước) + `title`; tool tự dựng extra.TableMap từ các ref và lo phần tạo/lưu/CSRF. ' +

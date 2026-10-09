@@ -2,6 +2,7 @@ import type { LarkToolDef } from './types';
 import { bitableTools } from './bitable';
 import { bitablePermissionTools } from './bitablePermissions';
 import { workflowTools } from './workflows';
+import { workflowV3Tools } from './workflowsV3';
 import { larkUiTools } from './larkUi';
 import { messagingTools } from './messaging';
 import { docsTools } from './docs';
@@ -23,6 +24,7 @@ const ALL: LarkToolDef[] = [
   ...fileTools,
   ...bitableTools,
   ...bitablePermissionTools,
+  ...workflowV3Tools,
   ...workflowTools,
   ...larkUiTools,
   ...cmsSyncTools,

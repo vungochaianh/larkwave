@@ -152,7 +152,7 @@ export const larkUiTools: LarkToolDef[] = [
     name: 'lark_ui_template_list',
     gated: false,
     description:
-      '(MẪU "LÀM MẪU MỘT LẦN → DÙNG LẠI") Liệt kê các MẪU automation/workflow người dùng đã dựng tay một lần trong "Trình duyệt Lark" rồi lưu lại. Mỗi mẫu có `vars` (biến: bảng/cột/view/option/người/nhóm — `key`, `kind`, `original`, `table` = biến bảng chứa cột, `hint` = tên gợi ý). GỌI TRƯỚC khi tự lái giao diện: nếu có mẫu khớp yêu cầu thì dùng `lark_ui_template_apply` (nhanh + chắc chắn hợp lệ).',
+      '(MẪU "LÀM MẪU MỘT LẦN → DÙNG LẠI") Liệt kê các MẪU automation/workflow người dùng đã dựng tay một lần trong "Trình duyệt Lark" rồi lưu lại. Mỗi mẫu có `vars` (biến: bảng/cột/view/option/người/nhóm — `key`, `kind`, `original`, `table` = biến bảng chứa cột, `hint` = tên gợi ý). Đây là đường DỰ PHÒNG: tạo workflow mặc định bằng bitable_workflow_create (Open API v3). Chỉ khi v3 không dùng được mới tới bước này — và GỌI TRƯỚC khi tự lái giao diện: nếu có mẫu khớp yêu cầu thì dùng `lark_ui_template_apply` (nhanh + chắc chắn hợp lệ).',
     inputSchema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
     exec: async () => {
       const web = getLarkWebSession();

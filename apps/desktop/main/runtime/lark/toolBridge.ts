@@ -8,7 +8,7 @@ import {
   isSelfDeclaredFailure,
   suspectAppBugError,
   tierForError,
-  tierForPayload, fileEventFor } from './larkToolExec';
+  tierForPayload, fileEventFor, runPreflight } from './larkToolExec';
 
 /** Tóm tắt ngắn gọn kết quả một công cụ, cho thẻ hiển thị ở giao diện. */
 function summarize(data: unknown): string {
@@ -78,7 +78,9 @@ export function createToolBridge(
       throw new Error(`Không tìm thấy tool ${name}.` + (await noteFn(deps.allowVersionHint)));
     }
     const callId = randomUUID();
-    const gated = !!tool.gated && !deps.autoApprove;
+    // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
+    const pre = await runPreflight(tool, input, deps.client);
+    const gated = !!tool.gated && !deps.autoApprove && !pre;
     push({ type: 'tool_call', callId, name, input, gated });
     if (gated) {
       const ok = await deps.awaitConfirm(callId, name, input);
@@ -88,7 +90,7 @@ export function createToolBridge(
       }
     }
     try {
-      const data = await tool.exec(input, deps.client);
+      const data = pre ?? (await tool.exec(input, deps.client));
       const failed = isSelfDeclaredFailure(data);
       // Xem larkToolExec: thất bại tự khai báo cũng phải hiện ra là lỗi.
       push(

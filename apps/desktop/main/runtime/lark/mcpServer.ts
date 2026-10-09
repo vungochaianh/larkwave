@@ -11,7 +11,7 @@ import {
   tierForError,
   tierForPayload,
   versionNote,
-  withVersionNote, fileEventFor } from './larkToolExec';
+  withVersionNote, fileEventFor, runPreflight } from './larkToolExec';
 
 /**
  * A minimal in-process MCP server (Streamable HTTP, JSON responses) that exposes
@@ -181,7 +181,9 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
     // Auto-approve ⇒ the write needs NO confirmation: mark the event non-gated so the
     // UI shows no modal, and run it straight through (the gated flag is the single
     // source of truth the renderer keys off).
-    const needsConfirm = tool.gated && !ctx.autoApprove;
+    // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
+    const pre = await runPreflight(tool, input, ctx.client);
+    const needsConfirm = tool.gated && !ctx.autoApprove && !pre;
     ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm });
 
     if (needsConfirm) {
@@ -202,7 +204,7 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       }
     }
     try {
-      const data = await tool.exec(input, ctx.client);
+      const data = pre ?? (await tool.exec(input, ctx.client));
       // Xem larkToolExec: thất bại tự khai báo cũng phải hiện ra là lỗi.
       ctx.emit(
         isSelfDeclaredFailure(data)
