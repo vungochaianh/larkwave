@@ -1,5 +1,7 @@
 'use client';
-import { buildQuickAsks, CUSTOM_ASKS_KEYS, mergeChips, parseCustomAsks, workflowEmptyExamples, type QuickAsk } from './quickAsks';
+import { buildQuickAsks, CUSTOM_ASKS_KEY, emptyExamples, mergeChips, parseCustomAsks, type QuickAsk } from './quickAsks';
+import { LarkChatToolbar } from './LarkChatToolbar';
+import type { MenuProps } from 'antd';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, App, Badge, Button, Checkbox, Drawer, Dropdown, Grid, Input, Modal, Popover, Segmented, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
@@ -19,7 +21,6 @@ import { UpdateHintCard } from '../UpdateHintCard';
 import { CollapsedAnswer } from './CollapsedAnswer';
 import { NotesPanel } from './NotesPanel';
 import { loadFold, saveFold, onFoldChange, isLongAnswer, type FoldStore } from '../../larkFold';
-import { RunnerModelPicker } from '../RunnerModelPicker';
 import { clockTime, humanDuration } from '../../time';
 import { useSlashCommands, skillsToCommandItems, type SlashCommandItem } from '../SlashCommandMenu';
 import { ToolCallGroup, type ToolCallState } from './ToolCallCard';
@@ -163,7 +164,13 @@ export function LarkChat({
   onOpenSkills,
   pinnedSessionId,
   hideSessionList = false,
-  workflow,
+  layout = 'chat',
+  density = 'normal',
+  frame,
+  extraMenu,
+  leading,
+  onBasesChange,
+  onTitle,
 }: {
   runtime: RuntimeAdapter;
   basesRev?: number;
@@ -176,11 +183,23 @@ export function LarkChat({
   /** Ẩn danh sách hội thoại bên trong: ở chế độ nhiều tab thanh tab đã thay vai trò đó. */
   hideSessionList?: boolean;
   /**
-   * Chế độ "Tạo workflow": hội thoại chạy bằng phiên Lark web trên MỘT Base đã chọn (`base`).
-   * Thanh "Base áp dụng" thay bằng `header` (bộ chọn Base của màn Tạo workflow), không có nút
-   * Hỏi đáp/Thực thi, không có Tự động duyệt (ghi luôn hỏi xác nhận).
+   * Bố cục đang hiển thị hội thoại (CÙNG agent, CÙNG công cụ, CÙNG danh sách hội thoại):
+   * 'chat' = màn Lark × Agents; 'frame' = màn Tạo workflow (khung Lark lớn, hội thoại gắn bên trái).
+   * Chỉ đổi thứ tự nút Hỏi nhanh, ô gợi ý và lời dặn "khung Lark ở đâu" gửi kèm lượt.
    */
-  workflow?: { base: LarkBaseRef | null; header?: ReactNode; examples?: { label: string; prompt: string }[] };
+  layout?: 'chat' | 'frame';
+  /** 'compact' = hội thoại thu nhỏ (~300px) ở màn Tạo workflow: thanh đầu tối giản, bong bóng gọn. */
+  density?: 'normal' | 'compact';
+  /** Bố cục chat: nút "Khung Lark" trên thanh đầu (mở/đóng ngăn khung Lark bên phải). */
+  frame?: { open: boolean; toggle: () => void };
+  /** Mục thêm vào menu ⋯ (Hướng dẫn, Chia sẻ Lark × Agents, Cài đặt…) — do màn cha xử lý. */
+  extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
+  /** Phần tử đứng đầu thanh (vd nút danh sách hội thoại / thu gọn). */
+  leading?: ReactNode;
+  /** Base của hội thoại vừa đổi (màn cha: đưa khung Lark tới Base vừa thêm). */
+  onBasesChange?: (bases: LarkBaseRef[], added?: { appToken: string; name: string; url?: string }) => void;
+  /** Báo tiêu đề hội thoại cho màn cha (dải thu gọn). */
+  onTitle?: (title: string) => void;
   /** Open the Skills screen — the "/" menu's "Tạo lệnh mới" row. Absent = the row is hidden. */
   onOpenSkills?: () => void;
   /** Hand the synthesized app brief to the builder (fills the Composer + navigates). */
@@ -191,7 +210,8 @@ export function LarkChat({
   const { message, modal } = App.useApp();
   /** Translate a built-in chip label (by its stable key); custom user asks pass through untranslated. */
   const chipLabel = (c: { label: string; k?: string }) => (c.k ? tr(`chat.util_${c.k}`, c.label) : c.label);
-  const [mode, setMode] = useState<LarkChatMode>('ask');
+  // Hợp nhất: không còn nút Hỏi đáp/Thực thi — đọc tự do, ghi do công tắc "Tự động" + hộp xác nhận quyết.
+  const mode: LarkChatMode = 'build';
   /** File đính kèm đang mở xem trước (null = đóng). */
   const [previewAtt, setPreviewAtt] = useState<PreviewableAttachment | null>(null);
   /** Skill đang mở để đọc, khi bấm chip "/lệnh" trong tin nhắn. */
@@ -618,8 +638,8 @@ export function LarkChat({
       .catch(() => undefined);
   };
 
-  /** Hội thoại thường và hội thoại "Tạo workflow" là hai danh sách riêng. */
-  const ofThisKind = (s: LarkSessionMeta) => (s.kind === 'workflow') === !!workflow;
+  /** Hợp nhất: MỘT danh sách hội thoại (kể cả hội thoại `kind: 'workflow'` cũ). */
+  const ofThisKind = (s: LarkSessionMeta) => !!s;
   const refreshSessions = () => {
     runtime.larkSessions?.().then((s) => setSessions((s || []).filter(ofThisKind))).catch(() => undefined);
   };
@@ -696,18 +716,6 @@ export function LarkChat({
     prevOwnerKind.current = agentOwner?.kind ?? null;
     if (prev === 'relay' && !agentOwner && !busy) void syncFromActive();
   }, [agentOwner, busy, syncFromActive]);
-
-  // Tạo workflow: Base của hội thoại do bộ chọn ở màn ngoài quyết định — giữ convBases khớp và lưu
-  // ngay (để mở lại hội thoại vẫn nhớ Base đã chọn).
-  const wfBaseTok = workflow?.base?.appToken || '';
-  useEffect(() => {
-    if (!workflow || !wfBaseTok || !sessionId) return;
-    if (convBases.length === 1 && convBases[0].appToken === wfBaseTok) return;
-    const next = [workflow.base as LarkBaseRef];
-    setConvBases(next);
-    if (runtime.larkSaveSession) void runtime.larkSaveSession(sessionId, items as unknown[], next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wfBaseTok, sessionId]);
 
   /** Persist the conversation's Bases immediately (so add/remove survives reopen). */
   const persistBases = (next: LarkBaseRef[]) => {
@@ -978,9 +986,9 @@ export function LarkChat({
       lastAgentRef.current = `${runnerId}${runnerModel ? ` · ${runnerModel}` : ''}`;
       for await (const ev of runtime.larkChat({
         prompt: effective,
-        mode: workflow ? 'build' : mode,
-        activeBases: workflow ? (workflow.base ? [workflow.base] : []) : convBases,
-        ...(workflow ? { workflow: { base: workflow.base ?? undefined } } : {}),
+        mode,
+        activeBases: convBases,
+        layout,
         attachments: atts.length ? atts : undefined,
         runner: runnerId,
         model: runnerModel || undefined,
@@ -1364,11 +1372,95 @@ export function LarkChat({
   const shareBaseline = shareUrl && sessionId ? sharedCounts[sessionId] : undefined;
   const pendingShareN = shareBaseline != null && items.length > shareBaseline ? items.length - shareBaseline : 0;
 
+  // ── Thanh đầu: tiêu đề, công tắc "Tự động", menu ⋯ ──
+  const convTitle = (sessions.find((s) => s.id === sessionId)?.title || '').trim() || tr('chat.newConversation', 'Cuộc trò chuyện mới');
+  useEffect(() => {
+    onTitle?.(convTitle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convTitle]);
+  /** Công tắc "Tự động (không hỏi lại)" — riêng máy này, lưu ở main, mặc định BẬT. Một công tắc cho mọi hội thoại. */
+  const [autoMode, setAutoMode] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!runtime.larkGetWorkflowAuto) return;
+    runtime
+      .larkGetWorkflowAuto()
+      .then((r) => setAutoMode(!!r?.workflowAuto))
+      .catch(() => setAutoMode(null));
+  }, [runtime]);
+  const changeAuto = async (on: boolean) => {
+    setAutoMode(on);
+    try {
+      const r = await runtime.larkSetWorkflowAuto?.(on);
+      if (r) setAutoMode(!!r.workflowAuto);
+    } catch {
+      message.error(tr('wf.autoSaveErr', 'Không lưu được lựa chọn.'));
+    }
+  };
+  const exportPdf = () => {
+    const msgs = items
+      .filter((it) => it.kind === 'msg')
+      .map((it) => {
+        const m = it as Extract<ChatItem, { kind: 'msg' }>;
+        return { role: m.role, text: m.text, agent: m.agent };
+      });
+    exportTranscriptPdf({ title: `${convTitle} · Lark × Agents`, messages: msgs, subtitle: 'Lark × Agents' });
+  };
+  const menuItems: NonNullable<MenuProps['items']> = [
+    ...(notesReady && sessionId ? [{ key: 'notes', icon: <FileTextOutlined />, label: `${tr('chat.notes', 'Ghi chú')}${openTodoN ? ` (${openTodoN})` : ''}` }] : []),
+    ...(canShare && sessionId
+      ? shareUrl
+        ? [
+            {
+              key: 'share',
+              icon: <GlobalOutlined />,
+              label: tr('chat.sharedMenu', 'Đã chia sẻ'),
+              children: [
+                { key: 'share-refresh', icon: <ReloadOutlined />, label: `${tr('chat.updateLatest', 'Cập nhật nội dung mới nhất')}${pendingShareN ? ` (${pendingShareN} ${tr('chat.newTurns', 'lượt mới')})` : ''}` },
+                { key: 'share-copy', icon: <LinkOutlined />, label: tr('chat.copyLink', 'Copy link') },
+                { key: 'share-open', icon: <GlobalOutlined />, label: tr('chat.openSharePage', 'Mở trang chia sẻ') },
+                { type: 'divider' as const },
+                { key: 'share-stop', icon: <StopOutlined />, danger: true, label: tr('chat.unshareLabel', 'Bỏ chia sẻ') },
+              ],
+            },
+          ]
+        : [{ key: 'share-new', icon: <ShareAltOutlined />, label: tr('chat.shareConv', 'Chia sẻ hội thoại (link công khai)') }]
+      : []),
+    ...(sessionId && answerIds().length > 0
+      ? [
+          {
+            key: 'display',
+            icon: <ShrinkOutlined />,
+            label: tr('chat.displayMenu', 'Hiển thị'),
+            children: [
+              { key: 'foldAll', label: tr('chat.collapseAllAnswers', 'Thu gọn tất cả câu trả lời') },
+              { key: 'expandAll', label: tr('chat.expandAll', 'Mở tất cả') },
+              { key: 'autoFold', label: `${fold.auto ? '✓ ' : ''}${tr('chat.autoCollapse', 'Tự thu gọn câu trả lời dài khi mở hội thoại')}` },
+            ],
+          },
+        ]
+      : []),
+    ...(sessionId && items.some((it) => it.kind === 'msg') ? [{ key: 'pdf', icon: <FilePdfOutlined />, label: tr('chat.exportPdf', 'Xuất PDF') }] : []),
+    ...(extraMenu?.items?.length ? [{ type: 'divider' as const }, ...extraMenu.items] : []),
+  ];
+  const onMenuClick = (key: string) => {
+    if (key === 'notes') setNotesOpen((o) => !o);
+    else if (key === 'share-new') void doShare();
+    else if (key === 'share-refresh') void doShare({ announce: true });
+    else if (key === 'share-copy' && shareUrl) void copyLink(shareUrl);
+    else if (key === 'share-open' && shareUrl) openExternal(shareUrl);
+    else if (key === 'share-stop') void doUnshare();
+    else if (key === 'foldAll') setSessionFold(answerIds());
+    else if (key === 'expandAll') setSessionFold([]);
+    else if (key === 'autoFold') updateFold((s) => ({ ...s, auto: !s.auto }));
+    else if (key === 'pdf') exportPdf();
+    else extraMenu?.onClick(key);
+  };
+
   // User-defined "Hỏi nhanh" (quick-asks) — one-click prompts the user adds, persisted
   // per-device in localStorage (these are lightweight prompt shortcuts, distinct from the
   // heavier Skills system). They append to the built-in chips.
-  // Mỗi chế độ (hội thoại thường / Tạo workflow) một danh sách riêng.
-  const asksKey = CUSTOM_ASKS_KEYS[workflow ? 'workflow' : 'chat'];
+  // MỘT danh sách cho mọi hội thoại (danh sách "Tạo workflow" cũ đã gộp vào lúc mở màn — migrateCustomAsks).
+  const asksKey = CUSTOM_ASKS_KEY;
   const [customAsks, setCustomAsks] = useState<QuickAsk[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -1404,12 +1496,8 @@ export function LarkChat({
       return false;
     }
   })();
-  const baseChips = buildQuickAsks({
-    mode: workflow ? 'workflow' : 'chat',
-    bases: workflow ? (workflow.base ? [workflow.base] : []) : convBases,
-    appConnected,
-    dev: quickDev,
-  });
+  const baseChips = buildQuickAsks({ layout, bases: convBases, appConnected, dev: quickDev });
+  const emptyChips = emptyExamples({ layout, bases: convBases, appConnected, dev: quickDev });
   const { chips, isCustom } = mergeChips(baseChips, customAsks);
 
   // Show the toggle only when the chips actually overflow one line (re-measure on
@@ -1545,265 +1633,75 @@ export function LarkChat({
       )}
 
       {/* RIGHT: the active conversation. */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', paddingLeft: narrow ? 0 : 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-          {narrow && (
-            <Tooltip title={tr('chat.conversation', 'Cuộc trò chuyện')}>
-              <Button icon={<MenuOutlined />} onClick={() => setNavOpen(true)} style={{ flex: '0 0 auto' }} />
-            </Tooltip>
-          )}
-          <RunnerModelPicker
-            storageKeyRunner="tw_lark_runner"
-            storageKeyModel="tw_lark_runner_model"
-            onChange={(id, m) => {
-              if (id !== runnerId || m !== runnerModel) runnerSwitchedRef.current = true;
-              setRunnerId(id);
-              setRunnerModel(m || '');
-              void runtime.larkSetAgentPrefs?.({ runner: id, model: m });
-            }}
-          />
-          {/* Info: switching agents mid-conversation is safe (moved out of the row to keep it one line). */}
-          <Tooltip title={tr('chat.switchAgentTip', 'Đổi agent giữa chừng: lịch sử chat giữ nguyên; ngữ cảnh CLI được nối lại từ transcript.')}>
-            <InfoCircleOutlined style={{ color: V.textFaint, fontSize: 13, cursor: 'help', flex: '0 0 auto' }} />
-          </Tooltip>
-          {/* Nguồn chạy AI: CLI trên máy · khoá API riêng · gói Larkwave.
-              Trước đây là một công tắc hai trạng thái, nên không có chỗ nào đặt lựa chọn thứ ba —
-              mà lựa chọn thứ ba mới là cái không đòi hỏi người dùng cài gì hay dán khoá gì. */}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
-            <Segmented
-              size="small"
-              value={runSource}
-              onChange={(v) => pickRunSource(v as 'cli' | 'api' | 'maic')}
-              options={[
-                { value: 'cli', label: tr('chat.srcCli', 'CLI trên máy') },
-                {
-                  value: 'api',
-                  label: apiKeyReady
-                    ? tr('chat.srcApi', 'API riêng')
-                    : tr('chat.srcApiNoKey', 'API riêng (thiếu key)'),
-                },
-                {
-                  value: 'maic',
-                  label: tr('chat.srcMaic', 'Gói Larkwave'),
-                  // Máy chủ chưa có MAIC hoặc chưa đăng nhập ⇒ khoá, đừng bày ra rồi báo lỗi khi bấm.
-                  disabled: !maicAvailable,
-                },
-              ]}
-            />
-            <Tooltip
-              title={
-                runSource === 'api' && !apiKeyReady
-                  ? tr('chat.apiNoKeyTip', 'Đã chọn API riêng nhưng CHƯA có API key cho agent đang chọn — dán key ở phần cài đặt agent (bấm agent ở sidebar trái).')
-                  : runSource === 'maic'
-                    ? tr('chat.srcMaicTip', 'Chạy bằng gói token bạn đã mua trên website — KHÔNG cần cài CLI, KHÔNG cần khoá API riêng. Công cụ Lark vẫn chạy trên máy này bằng kết nối của bạn, nên App Secret không rời máy.')
-                    : !maicAvailable
-                      ? tr('chat.srcMaicOff', 'CLI trên máy = dùng Claude/Grok/… đã cài. API riêng = dán khoá của bạn. Gói Larkwave cần đăng nhập tài khoản mới dùng được.')
-                      : tr('chat.runModeTip3', 'CLI trên máy = dùng bản CLI đã cài. API riêng = gọi thẳng nhà cung cấp bằng khoá của bạn. Gói Larkwave = chạy bằng token đã mua, không cần cài gì.')
-              }
-            >
-              <InfoCircleOutlined style={{ color: V.textFaint, fontSize: 13, cursor: 'help' }} />
-            </Tooltip>
-          </span>
-          {/* Right-aligned toolbar cluster. ONE auto-margin anchor for every control here —
-              the share block used to own it, so anything added beside it drifted left
-              whenever sharing was unavailable or no session was open. */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, rowGap: 6 }}>
-          {/* View controls — collapse/expand every answer at once. */}
-          {sessionId && answerIds().length > 0 && (
-            <Dropdown
-              trigger={['click']}
-              menu={{
-                items: [
-                  { key: 'foldAll', icon: <ShrinkOutlined />, label: tr('chat.collapseAllAnswers', 'Thu gọn tất cả câu trả lời') },
-                  { key: 'expandAll', icon: <ArrowsAltOutlined />, label: tr('chat.expandAll', 'Mở tất cả') },
-                  { type: 'divider' },
-                  {
-                    key: 'auto',
-                    label: `${fold.auto ? '✓ ' : ''}${tr('chat.autoCollapse', 'Tự thu gọn câu trả lời dài khi mở hội thoại')}`,
-                  },
-                ],
-                onClick: ({ key }) => {
-                  if (key === 'foldAll') setSessionFold(answerIds());
-                  else if (key === 'expandAll') setSessionFold([]);
-                  else if (key === 'auto') updateFold((s) => ({ ...s, auto: !s.auto }));
-                },
-              }}
-            >
-              <Tooltip title={tr('chat.collapseExpand', 'Thu gọn / mở rộng câu trả lời')}>
-                <Button size="small" icon={<ShrinkOutlined />}>
-                  {tr('chat.display', 'Hiển thị ▾')}
-                </Button>
-              </Tooltip>
-            </Dropdown>
-          )}
-          {/* Export the whole conversation to PDF (renderer print → "Save as PDF"). */}
-          {sessionId && items.some((it) => it.kind === 'msg') && (
-            <Tooltip title={tr('chat.exportPdfTip', 'Xuất hội thoại này ra file PDF')}>
-              <Button
-                size="small"
-                icon={<FilePdfOutlined />}
-                onClick={() => {
-                  const meta = sessions.find((s) => s.id === sessionId);
-                  const msgs = items
-                    .filter((it) => it.kind === 'msg')
-                    .map((it) => {
-                      const m = it as Extract<ChatItem, { kind: 'msg' }>;
-                      return { role: m.role, text: m.text, agent: m.agent };
-                    });
-                  exportTranscriptPdf({
-                    title: meta?.title || `${tr('chat.conversation', 'Cuộc trò chuyện')} · Lark × Agents`,
-                    messages: msgs,
-                    subtitle: 'Lark × Agents',
-                  });
-                }}
-              >
-                {tr('chat.exportPdf', 'Xuất PDF')}
-              </Button>
-            </Tooltip>
-          )}
-          {/* Notes rail toggle — only when the installed main process has the notes RPCs,
-              so an older build shows no half-working button instead of an empty panel. */}
-          {notesReady && sessionId && (
-            <Tooltip title={tr('chat.notesTip', 'Ghi chú & việc cần làm của hội thoại này')}>
-              <Badge count={openTodoN} size="small" offset={[-4, 2]}>
-                <Button
-                  size="small"
-                  icon={<FileTextOutlined />}
-                  type={notesOpen ? 'primary' : 'default'}
-                  ghost={notesOpen}
-                  onClick={() => setNotesOpen((o) => !o)}
-                >
-                  {tr('chat.notes', 'Ghi chú')}
-                </Button>
-              </Badge>
-            </Tooltip>
-          )}
-          {errorItems.length > 0 && (
-            <Tooltip title={tr('chat.errToolsTip', 'Các công cụ chạy lỗi trong hội thoại này')}>
-              <Badge count={unresolvedErrN} size="small" offset={[-4, 2]}>
-                <Button
-                  size="small"
-                  danger={unresolvedErrN > 0}
-                  icon={<WarningOutlined />}
-                  onClick={() => setErrModalOpen(true)}
-                >
-                  {tr('chat.errors', 'Lỗi')}
-                </Button>
-              </Badge>
-            </Tooltip>
-          )}
-          {canShare && sessionId && (
-            <div>
-              {shareUrl ? (
-                <Dropdown
-                  trigger={['click']}
-                  menu={{
-                    items: [
-                      { key: 'refresh', icon: <ReloadOutlined />, label: `${tr('chat.updateLatest', 'Cập nhật nội dung mới nhất')}${pendingShareN ? ` (${pendingShareN} ${tr('chat.newTurns', 'lượt mới')})` : ''}` },
-                      { key: 'copy', icon: <LinkOutlined />, label: tr('chat.copyLink', 'Copy link') },
-                      { key: 'open', icon: <GlobalOutlined />, label: tr('chat.openSharePage', 'Mở trang chia sẻ') },
-                      { type: 'divider' },
-                      { key: 'unshare', icon: <StopOutlined />, danger: true, label: tr('chat.unshareLabel', 'Bỏ chia sẻ') },
-                    ],
-                    onClick: ({ key }) => {
-                      if (key === 'refresh') void doShare({ announce: true });
-                      else if (key === 'copy') void copyLink(shareUrl);
-                      else if (key === 'open') openExternal(shareUrl);
-                      else if (key === 'unshare') void doUnshare();
-                    },
-                  }}
-                >
-                  <Tooltip title={pendingShareN ? `${pendingShareN} ${tr('chat.newTurnsUnsynced', 'lượt mới chưa đồng bộ — bấm "Cập nhật nội dung mới nhất"')}` : tr('chat.syncedWithLink', 'Đã đồng bộ với link chia sẻ')}>
-                    <Badge count={pendingShareN} size="small" offset={[-4, 2]}>
-                      <Button size="small" icon={<GlobalOutlined />} loading={shareBusy} type={pendingShareN ? 'primary' : 'default'} ghost={pendingShareN > 0}>
-                        {tr('chat.sharedBtn', 'Đã chia sẻ ▾')}
-                      </Button>
-                    </Badge>
-                  </Tooltip>
-                </Dropdown>
-              ) : (
-                <Tooltip title={tr('chat.createPublicLink', 'Tạo link công khai để xem hội thoại này trên web')}>
-                  <Button size="small" icon={<ShareAltOutlined />} loading={shareBusy} onClick={() => void doShare()}>
-                    {tr('chat.share', 'Chia sẻ')}
-                  </Button>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', paddingLeft: narrow || hideSessionList ? 0 : 10 }}>
+        <LarkChatToolbar
+          runtime={runtime}
+          title={convTitle}
+          density={density}
+          leading={
+            <>
+              {narrow && !hideSessionList && (
+                <Tooltip title={tr('chat.conversation', 'Cuộc trò chuyện')}>
+                  <Button size="small" type="text" icon={<MenuOutlined />} onClick={() => setNavOpen(true)} />
                 </Tooltip>
               )}
-            </div>
-          )}
-          </div>
-        </div>
-        {workflow && workflow.header}
-        {/* Applied-Bases bar — the conversation works across these Bases. */}
-        {!workflow && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8, marginBottom: 4, borderBottom: `1px solid ${V.borderSub}`, flexWrap: 'wrap' }}>
-          <DatabaseOutlined style={{ color: BRAND }} />
-          <Text style={{ fontSize: 13, fontWeight: 600, color: V.textSub }}>{tr('chat.appliedBases', 'Base áp dụng:')}</Text>
-          {convBases.length === 0 && (
-            <Text type="secondary" style={{ fontSize: 12 }}>{tr('chat.noBaseWillAsk', 'chưa gắn — bot sẽ hỏi mỗi lần')}</Text>
-          )}
-          {convBases.map((b) => (
-            <Tag
-              key={b.appToken}
-              color="purple"
-              closable
-              onClose={(e) => {
-                e.preventDefault();
-                removeBase(b.appToken);
-              }}
-              style={{ marginInlineEnd: 0 }}
-            >
-              {b.name}
-            </Tag>
-          ))}
-          {addable.length > 0 && (
-            <Dropdown
-              trigger={['click']}
-              menu={{ items: addable.map((b) => ({ key: b.appToken, label: b.name })), onClick: ({ key }) => addBase(key) }}
-            >
-              <Button size="small" type="dashed" icon={<PlusOutlined />}>
-                {tr('chat.addBase', 'Thêm base')}
-              </Button>
-            </Dropdown>
-          )}
-          {/* Quick-add a brand-new Base (app_token/URL) without leaving the chat. */}
-          {runtime.larkAddBase && (
-            <Popover
-              trigger="click"
-              placement="bottomLeft"
-              title={tr('chat.addNewBase', 'Thêm Base mới')}
-              content={
-                <div style={{ width: 260 }}>
-                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
-                    {tr('chat.pasteBaseAutoApply', 'Dán app_token hoặc URL Base — sẽ tự áp dụng cho cuộc trò chuyện này.')}
-                  </Text>
-                  {quickAddInput(quickAddToConversation)}
-                </div>
-              }
-            >
-              <Tooltip title={tr('chat.quickAddBaseTip', 'Thêm nhanh Base mới bằng app_token/URL')}>
-                <Button size="small" type="text" icon={<PlusOutlined />} style={{ color: BRAND }}>
-                  {tr('chat.newBase', 'Base mới')}
-                </Button>
+              {leading}
+            </>
+          }
+          convBases={convBases}
+          onBasesChange={(next, added) => {
+            setConvBases(next);
+            persistBases(next);
+            onBasesChange?.(next, added ? { appToken: added.appToken, name: added.name, url: added.url } : undefined);
+          }}
+          runnerId={runnerId}
+          model={runnerModel}
+          onRunnerChange={(id, m) => {
+            if (id !== runnerId || (m || '') !== runnerModel) runnerSwitchedRef.current = true;
+            setRunnerId(id);
+            setRunnerModel(m || '');
+            try {
+              localStorage.setItem('tw_lark_runner', id);
+              if (m) localStorage.setItem('tw_lark_runner_model', m);
+            } catch {
+              /* tiện ích riêng máy */
+            }
+            void runtime.larkSetAgentPrefs?.({ runner: id, model: m });
+          }}
+          runSource={runSource}
+          onRunSource={pickRunSource}
+          apiKeyReady={apiKeyReady}
+          maicAvailable={maicAvailable}
+          autoMode={autoMode}
+          onAuto={(on) => void changeAuto(on)}
+          frame={frame}
+          menuItems={menuItems}
+          onMenu={onMenuClick}
+          badges={
+            errorItems.length > 0 ? (
+              <Tooltip title={tr('chat.errToolsTip', 'Các công cụ chạy lỗi trong hội thoại này')}>
+                <Badge count={unresolvedErrN} size="small" offset={[-2, 2]}>
+                  <Button size="small" type="text" danger={unresolvedErrN > 0} icon={<WarningOutlined />} onClick={() => setErrModalOpen(true)} />
+                </Badge>
               </Tooltip>
-            </Popover>
-          )}
-        </div>
-        )}
+            ) : null
+          }
+        />
         <div style={{ flex: 1, overflowY: 'auto', padding: '2px 2px 6px' }}>
           {items.length === 0 && (
             <div style={{ textAlign: 'center', color: V.textFaint, marginTop: 36 }}>
               <RobotOutlined style={{ fontSize: 28, color: BRAND }} />
               <div style={{ marginTop: 10, fontWeight: 600, color: V.textSub }}>
-                {workflow
-                  ? workflow.base
-                    ? `${tr('wf.emptyFor', 'Mô tả automation bạn muốn cho')} «${workflow.base.name}»`
-                    : tr('wf.pickBaseFirst', 'Chọn một Base ở trên, rồi mô tả automation bạn muốn')
+                {layout === 'frame'
+                  ? convBases.length
+                    ? `${tr('wf.emptyFor', 'Mô tả workflow bạn muốn cho')} «${convBases[0].name}»`
+                    : tr('wf.pickBaseFirst', 'Chọn Base ở nút Base phía trên, rồi mô tả workflow bạn muốn')
                   : convBases.length
                   ? `${tr('chat.quickAskFor', 'Hỏi nhanh cho')} ${convBases.length} ${tr('chat.basesApplied', 'base đang áp dụng')}`
                   : tr('chat.larkQaIntro', 'Hỏi đáp & tuỳ chỉnh dữ liệu Lark bằng AI (Claude / Grok / …)')}
               </div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 460, margin: '12px auto 0' }}>
-                {(workflow ? (workflow.base ? (workflow.examples ?? workflowEmptyExamples(workflow.base)) : []) : chips).map((c) => (
+                {(density === 'compact' ? emptyChips.slice(0, 3) : emptyChips).map((c) => (
                   <div
                     key={c.label}
                     onClick={() => send(c.prompt, chipLabel(c))}
@@ -1842,11 +1740,11 @@ export function LarkChat({
                   <div
                     style={{
                       maxWidth: '100%',
-                      padding: '8px 12px',
+                      padding: density === 'compact' ? '6px 9px' : '8px 12px',
                       borderRadius: 12,
                       whiteSpace: it.role === 'user' ? 'pre-wrap' : 'normal',
                       wordBreak: 'break-word',
-                      fontSize: 13.5,
+                      fontSize: density === 'compact' ? 12.5 : 13.5,
                       lineHeight: 1.5,
                       background: it.role === 'user' ? BRAND : V.surface,
                       color: it.role === 'user' ? '#fff' : V.text,
@@ -1896,7 +1794,7 @@ export function LarkChat({
                           mode={mode}
                           tr={tr}
                           onPick={(t) => void send(t)}
-                          onSwitchExecute={() => setMode('build')}
+                          onSwitchExecute={() => undefined}
                         />
                       </>
                     ) : it.label ? (
@@ -2018,7 +1916,33 @@ export function LarkChat({
           {/* Skills / quick utils — base-scoped when a Base is active. Wraps to multiple
               lines (no horizontal scroll); collapsed to one line with a Xem thêm / Thu gọn
               toggle when it overflows. */}
-          <div data-testid="lark-quickasks" style={{ display: workflow && !workflow.base ? 'none' : 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
+          {density === 'compact' && chips.length > 0 && (
+            <div style={{ paddingBottom: 6 }}>
+              <Dropdown
+                trigger={['click']}
+                placement="topLeft"
+                menu={{
+                  items: [
+                    { key: '__sum', label: tr('chat.summaryChip', '📝 Tóm tắt hội thoại'), disabled: busy || items.length === 0 },
+                    ...chips.map((c) => ({ key: c.label, label: chipLabel(c), disabled: busy })),
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === '__sum') void send(SUMMARY_PROMPT, tr('chat.summaryLabel', '📊 Tóm tắt hội thoại'));
+                    else {
+                      const c = chips.find((x) => x.label === key);
+                      if (c) void send(c.prompt, chipLabel(c));
+                    }
+                  },
+                  style: { maxHeight: 360, overflowY: 'auto' },
+                }}
+              >
+                <Button size="small" data-testid="lark-quickasks-compact" style={{ borderRadius: 999, fontSize: 12 }}>
+                  {tr('chat.quickAskLabel', '⚡ Hỏi nhanh')} ▾
+                </Button>
+              </Dropdown>
+            </div>
+          )}
+          <div data-testid="lark-quickasks" style={{ display: density === 'compact' || (layout === 'frame' && !convBases.length) ? 'none' : 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
           <div
             ref={chipsRef}
             style={{
@@ -2216,48 +2140,7 @@ export function LarkChat({
           </Modal>
           {/* Không còn băng cảnh báo ngữ cảnh: giống Claude Code, app TỰ NÉN âm thầm sau lượt khi gần đầy
               và chỉ để lại một dòng nhỏ "🗜️ … đã nén lại" trong hội thoại (xem nhánh nén chủ động ở trên). */}
-          {/* Settings row: mode + auto-approve. (Tạo workflow: không có — màn ngoài có công tắc Tự động / Hỏi trước khi ghi.) */}
-          {!workflow && (
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, rowGap: 8, marginBottom: 8 }}>
-            <Segmented
-              value={mode}
-              onChange={(v) => setMode(v as LarkChatMode)}
-              options={[
-                { label: tr('chat.qa', 'Hỏi đáp'), value: 'ask' },
-                { label: tr('chat.execute', 'Thực thi'), value: 'build' },
-              ]}
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {mode === 'ask'
-                ? tr('chat.readOnlyData', 'Chỉ đọc dữ liệu')
-                : autoApprove
-                  ? tr('chat.writeAuto', 'Cho phép ghi — tự động, không hỏi')
-                  : tr('chat.writeConfirm', 'Cho phép ghi (xác nhận từng thao tác)')}
-            </Text>
-            <span style={{ flex: 1 }} />
-            {runtime.larkSetAutoApprove && (
-              <Tooltip title={tr('chat.autoApproveTip', 'Bật: thao tác ghi trong chế độ Thực thi chạy luôn, KHÔNG hỏi xác nhận từng cái. Tắt: xác nhận từng thao tác (an toàn hơn).')}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Switch
-                    size="small"
-                    checked={autoApprove}
-                    onChange={async (on) => {
-                      setAutoApprove(on); // optimistic
-                      try {
-                        const s = await runtime.larkSetAutoApprove!(on);
-                        setAutoApprove(!!s.autoApprove);
-                      } catch {
-                        setAutoApprove(!on);
-                        message.error(tr('chat.savePrefFailed', 'Không lưu được tuỳ chọn.'));
-                      }
-                    }}
-                  />
-                  <Text type="secondary" style={{ fontSize: 12 }}>{tr('chat.autoApprove', 'Tự động duyệt')}</Text>
-                </span>
-              </Tooltip>
-            )}
-          </div>
-          )}
+          {/* Hợp nhất: không còn hàng Hỏi đáp/Thực thi + Tự động duyệt — công tắc "Tự động" nằm trên thanh đầu. */}
           {attachments.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {attachments.map((a, i) => (
@@ -2348,7 +2231,7 @@ export function LarkChat({
                 // A skill created since mount should show up without a reload.
                 if (!slashRefreshed.current) { slashRefreshed.current = true; void loadSlashCmds(); }
               }}
-              placeholder={blocked ? tr('chat.computerOffline', 'Máy tính chưa online…') : tr('chat.larkComposerPlaceholder', 'Hỏi, hoặc đính kèm/dán ảnh + tài liệu để Claude phân tích… (tối đa 12 file)')}
+              placeholder={blocked ? tr('chat.computerOffline', 'Máy tính chưa online…') : density === 'compact' ? tr('chat.composerShort', 'Nhắn cho trợ lý…') : layout === 'frame' ? tr('chat.composerFrame', 'Mô tả workflow, hoặc hỏi về Base…') : tr('chat.larkComposerPlaceholder', 'Hỏi, hoặc đính kèm/dán ảnh + tài liệu để Claude phân tích… (tối đa 12 file)')}
               autoSize={{ minRows: 1, maxRows: 4 }}
               onKeyDown={(e) => {
                 if (slash.handleKeyDown(e)) return; // the "/" menu owns ↑↓ / Enter / Tab / Esc while open
@@ -2373,8 +2256,8 @@ export function LarkChat({
                 </Button>
               </Tooltip>
             ) : (
-              <Button type="primary" icon={<SendOutlined />} disabled={blockedByOther || !!blocked} onClick={() => send()}>
-                {tr('chat.send', 'Gửi')}
+              <Button type="primary" icon={<SendOutlined />} disabled={blockedByOther || !!blocked} onClick={() => send()} aria-label={tr('chat.send', 'Gửi')}>
+                {density === 'compact' ? null : tr('chat.send', 'Gửi')}
               </Button>
             )}
           </div>
@@ -2455,7 +2338,7 @@ export function LarkChat({
         </Modal>
         {/* Notes rail — third flex child of the chat row. minHeight:0 is required: the
             chat sits in a constrained flex chain and the note list scrolls itself. */}
-        {notesOpen && notesReady && !narrow && (
+        {notesOpen && notesReady && !narrow && density !== 'compact' && (
           <div
             style={{
               flex: '0 0 300px',
@@ -2479,7 +2362,7 @@ export function LarkChat({
         )}
       </div>
       {/* Notes as a right Drawer on a phone / narrow web view (the inline rail would break the layout). */}
-      {notesOpen && notesReady && narrow && (
+      {notesOpen && notesReady && (narrow || density === 'compact') && (
         <Drawer
           open
           placement="right"

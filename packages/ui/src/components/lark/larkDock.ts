@@ -50,3 +50,18 @@ export function clampPaneWidth(w: number, total: number, minW = 360, minChat = 4
   const max = Math.max(minW, total - minChat);
   return Math.max(minW, Math.min(max, Math.round(w)));
 }
+
+type R = { x: number; y: number; width: number; height: number };
+/**
+ * Lớp nổi của app (popover, dropdown, menu) có ĐÈ lên ô giữ chỗ của khung Lark không. Chỉ khi đè mới
+ * cần giấu native view — popover nằm gọn trong cột hội thoại thì khung Lark vẫn hiện, không nháy.
+ * Hộp thoại (modal) phủ cả màn nên luôn đè.
+ */
+export function overlayHitsPane(overlays: R[], pane: R | null): boolean {
+  if (!pane || pane.width < 2 || pane.height < 2) return false;
+  return overlays.some((o) => o.width > 0 && o.height > 0 && o.x < pane.x + pane.width && o.x + o.width > pane.x && o.y < pane.y + pane.height && o.y + o.height > pane.y);
+}
+
+/** Selector các lớp nổi đang HIỆN của antd (dùng ở renderer để lấy toạ độ). */
+export const OVERLAY_SELECTOR =
+  '.ant-modal-wrap:not([style*="display: none"]) .ant-modal, .ant-drawer-open .ant-drawer-content-wrapper, .ant-popover:not(.ant-popover-hidden), .ant-dropdown:not(.ant-dropdown-hidden), .ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)';

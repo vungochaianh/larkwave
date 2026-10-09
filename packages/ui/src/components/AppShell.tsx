@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Badge } from 'antd';
-import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined, ApartmentOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
 import { BrandGlyph } from './BrandMark';
@@ -205,6 +205,7 @@ const NAV_TITLE: Record<string, string> = {
   'tw-composer': 'Tổng quan',
   'tw-agents': 'Trợ lý AI',
   'tw-lark': 'Lark × Agents',
+  'tw-lark-wf': 'Tạo workflow',
   'tw-lark-spec': 'Đặc tả hệ thống',
   'tw-lark-files': 'Tệp đã gửi cho Lark Agents',
   'tw-lark-auto': 'Tự động hoá (lịch)',
@@ -225,6 +226,7 @@ const NAV_I18N: Record<string, string> = {
   'tw-agents': 'app.nav.assistant',
   'grp-lark': 'app.nav.lark',
   'tw-lark': 'app.nav.larkAgents',
+  'tw-lark-wf': 'app.nav.larkWorkflow',
   'tw-lark-spec': 'app.nav.larkSpec',
   'tw-lark-files': 'app.nav.larkFiles',
   'tw-cms-sync': 'app.nav.cmsSync',
@@ -241,6 +243,7 @@ const NAV_TITLE_I18N: Record<string, string> = {
   'tw-composer': 'app.nav.overview',
   'tw-agents': 'app.nav.assistant',
   'tw-lark': 'app.nav.larkAgents',
+  'tw-lark-wf': 'app.nav.larkWorkflow',
   'tw-lark-spec': 'app.title.larkSpec',
   'tw-cms-sync': 'app.title.cmsSync',
   'tw-skills': 'app.title.skills',
@@ -378,6 +381,9 @@ function AppShellInner({
             const larkChildren: NavNode[] = [];
             if (runtime.larkChat) {
               larkChildren.push({ key: 'tw-lark', label: 'Lark × Agents', icon: <MessageOutlined /> });
+              // "Tạo workflow" = CÙNG agent + hội thoại, bố cục khung-Lark-trước (khung lớn, chat gắn trái).
+              if (runtime.larkBrowserAttach && runtime.larkWebListBases)
+                larkChildren.push({ key: 'tw-lark-wf', label: 'Tạo workflow', icon: <ApartmentOutlined /> });
               larkChildren.push({ key: 'tw-lark-spec', label: 'Đặc tả', icon: <PartitionOutlined /> });
               // Kho tệp đính kèm — chỉ hiện khi lõi có hỗ trợ (bản cài cũ chưa có kênh này).
               if (runtime.larkListFiles)
@@ -387,7 +393,7 @@ function AppShellInner({
             // The CMS sync jobs live on a shared backend with no per-user scoping. Visible to admins
             // + a specific email allowlist — they all see the SAME global jobs.
             if (cmsAllowed && runtime.cmsSyncListJobs) larkChildren.push({ key: 'tw-cms-sync', label: 'Đồng bộ Bitable', icon: <CloudServerOutlined /> });
-            // "Trình duyệt Lark" đã gộp vào Lark × Agents → "Tạo workflow" (khung Lark gắn cạnh hội thoại).
+            // "Trình duyệt Lark" đã gộp vào khung Lark của Lark × Agents / Tạo workflow.
             const list: NavNode[] = [OVERVIEW_ITEM];
             // General "Agents chat" — a capable assistant (desktop CLI). Standalone, top-level.
             //

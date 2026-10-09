@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Modal, Segmented, Spin } from 'antd';
-import { SettingOutlined, ReadOutlined, TeamOutlined, MessageOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Button, Card, Modal, Spin, type MenuProps } from 'antd';
+import { SettingOutlined, ReadOutlined, TeamOutlined, LoginOutlined, ApiOutlined } from '@ant-design/icons';
 import type { LarkConnection } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { useAccountAuth } from '../account/auth';
@@ -17,19 +17,48 @@ import { BotPanel } from './lark/BotPanel';
 import { LarkGuideModal } from './lark/LarkGuideModal';
 import { LarkWebPanel } from './lark/LarkWebPanel';
 import { LarkWorkflowStudio } from './lark/LarkWorkflowStudio';
-import { PageHeader } from '../kit';
+import { LarkFramePane, useAutoOpen, useLarkBrowserState } from './lark/LarkFramePane';
+import { LAYOUT_KEY, parseLayoutPrefs, serializeLayoutPrefs, sidePaneWidth, type LayoutPrefs } from './lark/larkLayout';
+import { migrateCustomAsks } from './lark/larkConversations';
+import { CUSTOM_ASKS_KEYS } from './lark/quickAsks';
+import { V } from '../theme';
 
-const SCREEN_MODE_KEY = 'larkwave.lark.screenMode';
+/** Gộp "Hỏi nhanh của tôi" của màn Tạo workflow cũ vào danh sách chung — một lần, không mất mục nào. */
+function migrateAsksOnce() {
+  try {
+    const merged = migrateCustomAsks(localStorage.getItem(CUSTOM_ASKS_KEYS.chat), localStorage.getItem(CUSTOM_ASKS_KEYS.workflow));
+    if (merged !== null) {
+      localStorage.setItem(CUSTOM_ASKS_KEYS.chat, merged);
+      localStorage.removeItem(CUSTOM_ASKS_KEYS.workflow);
+    }
+    localStorage.removeItem('larkwave.lark.screenMode'); // nút "Trò chuyện | Tạo workflow" cũ đã gỡ
+  } catch {
+    /* không có storage */
+  }
+}
+
+const readPrefs = (): LayoutPrefs => {
+  try {
+    return parseLayoutPrefs(window.localStorage.getItem(LAYOUT_KEY));
+  } catch {
+    return parseLayoutPrefs(null);
+  }
+};
 
 /**
- * The "Lark × Agents" screen (desktop only). Gates on a Lark custom-app
- * connection; once connected, shows the chat agent on the left and the
- * connection + Bases panels on the right. On web (no `runtime.larkChat`) it shows
- * a "desktop only" notice.
+ * "Lark × Agents" và "Tạo workflow" (desktop) — HAI BỐ CỤC của CÙNG một agent và CÙNG danh sách hội
+ * thoại:
+ *   - layout 'chat'  (Lark × Agents): hội thoại là chính; khung Lark là ngăn phụ bên phải, mặc định
+ *     ĐÓNG (nút "Khung Lark" trên thanh đầu hội thoại), tự mở khi AI thao tác / cần đăng nhập.
+ *   - layout 'frame' (Tạo workflow): khung Lark lớn, hội thoại gắn bên trái (LarkWorkflowStudio).
+ * Không còn cổng "phải kết nối custom app": agent chạy bằng phiên Lark web khi chưa có App ID.
+ * Không còn dòng mô tả / nút chuyển chế độ ở đầu màn — Hướng dẫn, Chia sẻ, Cài đặt nằm trong ⋯ của
+ * thanh đầu hội thoại. Trên web (không có `runtime.larkChat`) chỉ hiện thông báo "chỉ có ở desktop".
  */
 export function LarkScreen({
   onOpenSkills,
-}: { onOpenSkills?: () => void } = {}) {
+  layout = 'chat',
+}: { onOpenSkills?: () => void; layout?: 'chat' | 'frame' } = {}) {
   const runtime = useRuntime();
   const { user } = useAccountAuth();
   const supported = !!runtime.larkChat;
@@ -43,34 +72,18 @@ export function LarkScreen({
   const [guideOpen, setGuideOpen] = useState(false);
   /** Bumped when Bases change so the chat re-loads its Base list immediately. */
   const [basesRev, setBasesRev] = useState(0);
-  /**
-   * "Trò chuyện" (custom app, Open API) | "Tạo workflow" (phiên Lark web — KHÔNG cần App ID).
-   * Nhớ theo máy (tiện ích riêng của người xem; storage hỏng thì về mặc định).
-   */
-  const [screenMode, setScreenModeState] = useState<'chat' | 'workflow'>(() => {
-    try {
-      return typeof window !== 'undefined' && window.localStorage.getItem(SCREEN_MODE_KEY) === 'workflow' ? 'workflow' : 'chat';
-    } catch {
-      return 'chat';
-    }
-  });
-  const setScreenMode = (m: 'chat' | 'workflow') => {
-    setScreenModeState(m);
-    try {
-      window.localStorage.setItem(SCREEN_MODE_KEY, m);
-    } catch {
-      /* không có storage */
-    }
-  };
-  const workflowSupported = !!runtime.larkWebListBases && !!runtime.larkBrowserAttach;
+  const webSupported = !!runtime.larkWebListBases && !!runtime.larkBrowserAttach;
+  const migrated = useRef(false);
+  if (!migrated.current && typeof window !== 'undefined') {
+    migrated.current = true;
+    migrateAsksOnce();
+  }
 
   useEffect(() => {
     if (!supported) {
       setLoading(false);
       return;
     }
-    // Wait until the account scope is set in the main process (below), so status() reports
-    // THIS account's connection — not the previous one — right after a login/switch.
     if (!accountReady) return;
     let alive = true;
     setLoading(true);
@@ -79,9 +92,6 @@ export function LarkScreen({
       .then((c) => {
         if (!alive) return;
         setConn(c);
-        // If connected, actively re-validate in the background: an idle-too-long / rotated
-        // token is DETECTED here and surfaced (reconnect banner) instead of only blowing up
-        // on the next chat turn. Non-blocking — the screen already rendered from `status()`.
         if (c.connected && runtime.larkCheckConnection) {
           runtime
             .larkCheckConnection()
@@ -97,8 +107,7 @@ export function LarkScreen({
   }, [runtime, supported, accountReady]);
 
   // 1. Set the per-account scope (AWAITED) whenever the signed-in account changes, then
-  //    2. back up + pull-merge that account's Lark data. LarkChat is not rendered until
-  //    the scope is set, so it can never read/save under a stale account during a switch.
+  //    2. back up + pull-merge that account's Lark data.
   useEffect(() => {
     if (!supported) return;
     let alive = true;
@@ -120,6 +129,47 @@ export function LarkScreen({
     };
   }, [runtime, supported, user?.id]);
 
+  // ── Bố cục chat: ngăn khung Lark bên phải (mặc định đóng, nhớ riêng máy) ──
+  const [prefs, setPrefsState] = useState<LayoutPrefs>(() => (typeof window === 'undefined' ? parseLayoutPrefs(null) : readPrefs()));
+  const setPrefs = (fn: (p: LayoutPrefs) => LayoutPrefs) =>
+    setPrefsState((p) => {
+      // Đọc lại bản đang lưu để không đè nấc của màn Tạo workflow (chung một khoá).
+      const n = fn({ ...readPrefs(), sidePaneOpen: p.sidePaneOpen, sidePaneW: p.sidePaneW });
+      try {
+        window.localStorage.setItem(LAYOUT_KEY, serializeLayoutPrefs(n));
+      } catch {
+        /* */
+      }
+      return n;
+    });
+  const chatLayout = layout === 'chat' && webSupported;
+  const [st, refresh, setSt] = useLarkBrowserState(runtime);
+  useAutoOpen(chatLayout ? st : null, () => setPrefs((p) => ({ ...p, sidePaneOpen: true })));
+  useEffect(() => () => void runtime.larkBrowserDetach?.().catch(() => undefined), [runtime]);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const [rowW, setRowW] = useState(1200);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setRowW(el.getBoundingClientRect().width || 1200));
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  const paneW = sidePaneWidth(prefs.sidePaneW, rowW);
+  const startDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const r = rowRef.current?.getBoundingClientRect();
+    const move = (ev: MouseEvent) => setPrefsState((p) => ({ ...p, sidePaneW: sidePaneWidth((r?.right ?? 1200) - ev.clientX, r?.width ?? 1200) }));
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      setPrefs((p) => p);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+  const [homeUrl, setHomeUrl] = useState<string | undefined>(undefined);
+
   if (!supported) {
     return (
       <Alert
@@ -131,52 +181,27 @@ export function LarkScreen({
     );
   }
 
+  /** Mục của màn trong menu ⋯ của thanh đầu hội thoại. */
+  const extraMenu: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void } = {
+    items: [
+      { key: 'x-guide', icon: <ReadOutlined />, label: 'Hướng dẫn' },
+      ...(conn?.connected && FEATURE_FRIENDS ? [{ key: 'x-share', icon: <TeamOutlined />, label: 'Chia sẻ Lark × Agents' }] : []),
+      { key: 'x-settings', icon: <SettingOutlined />, label: conn?.connected ? 'Cài đặt' : 'Kết nối custom app & cài đặt' },
+    ],
+    onClick: (k) => {
+      if (k === 'x-guide') setGuideOpen(true);
+      else if (k === 'x-share') setShareOpen(true);
+      else if (k === 'x-settings') setSettingsOpen(true);
+    },
+  };
+  const webConnected = !!st?.connected && st?.health !== 'dead';
+  const needLogin = !loading && !conn?.connected && !webConnected && !st?.loginPending;
+
+  const ready = accountReady && !loading;
   return (
     // Fill the content area (viewport − topbar − paddings) so the chat is full-height.
-    // The negative margin reclaims most of the AppShell content's bottom padding.
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 108px)', minHeight: 460, marginBottom: -44 }}>
-      {/* Một đầu trang (quy tắc B): tiêu đề đã ở thanh trên — ở đây chỉ mô tả một dòng + nút. */}
-      <PageHeader
-        title="Lark × Agents"
-        description="Hỏi đáp & tuỳ chỉnh dữ liệu Lark (Base, tin nhắn, tài liệu, danh bạ) bằng AI trên máy bạn."
-        actions={
-          !loading && (
-            <>
-              {workflowSupported && (
-                <Segmented
-                  data-testid="lark-screen-mode"
-                  value={screenMode}
-                  onChange={(v) => setScreenMode(v as 'chat' | 'workflow')}
-                  options={[
-                    { value: 'chat', label: 'Trò chuyện', icon: <MessageOutlined /> },
-                    { value: 'workflow', label: 'Tạo workflow', icon: <ApartmentOutlined /> },
-                  ]}
-                />
-              )}
-              <Button icon={<ReadOutlined />} onClick={() => setGuideOpen(true)}>
-                Hướng dẫn
-              </Button>
-              {/* "Chia sẻ" đứng RIÊNG ở đầu màn, không chôn trong modal Cài đặt — một tính năng
-                  không tìm thấy thì đúng bằng một tính năng không tồn tại. Chia sẻ kết nối Lark là
-                  cho BẠN BÈ (máy chủ chặn nếu không phải bạn) → ẩn theo FEATURE_FRIENDS. */}
-              {conn?.connected && FEATURE_FRIENDS && (
-                <Button icon={<TeamOutlined />} onClick={() => setShareOpen(true)}>
-                  Chia sẻ
-                </Button>
-              )}
-              {conn?.connected && (
-                <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
-                  Cài đặt
-                </Button>
-              )}
-            </>
-          )
-        }
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 108px)', minHeight: 460, marginBottom: -44, gap: 8 }}>
       <LarkGuideModal open={guideOpen} onClose={() => setGuideOpen(false)} />
-
-      {/* Chia sẻ có modal RIÊNG: đây là việc người dùng đi tìm có chủ đích ("cho đồng nghiệp dùng
-          cùng"), không phải một tuỳ chọn họ vô tình bắt gặp khi đang chỉnh cấu hình. */}
       <Modal
         open={FEATURE_FRIENDS && shareOpen}
         onCancel={() => setShareOpen(false)}
@@ -187,94 +212,109 @@ export function LarkScreen({
       >
         <LarkGrantsPanel runtime={runtime} mode="all" />
       </Modal>
-
-      {workflowSupported && screenMode === 'workflow' ? (
-        // Không qua cổng "đã kết nối custom app": chế độ này chạy hoàn toàn bằng phiên Lark web.
-        <Card
-          size="small"
-          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-          styles={{ body: { padding: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
-        >
-          {accountReady ? (
-            <LarkWorkflowStudio key={user?.id || '_local'} runtime={runtime} onOpenSkills={onOpenSkills} />
-          ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Spin />
-            </div>
-          )}
-        </Card>
-      ) : loading ? (
-        <div style={{ textAlign: 'center', marginTop: 60 }}>
-          <Spin size="large" />
-        </div>
-      ) : !conn?.connected ? (
-        <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* LỜI MỜI phải hiện Ở ĐÂY — trước cổng "đã kết nối".
-              Người được mời thường CHƯA có app Lark của riêng họ; đó chính là lý do họ cần được
-              chia sẻ. Nhưng trước đây nơi DUY NHẤT trong cả app bấm được "Kết nối" cho một lời mời
-              Lark lại nằm sau cổng đó. Nghĩa là người cần nhận nhất thì không bao giờ thấy nút —
-              tính năng chia sẻ có đủ máy móc ở cả hai đầu mà trên thực tế không ai dùng được.
-              Phần nhận chỉ gọi accountApi, không đụng kết nối Lark cục bộ, nên chạy tốt ở đây. */}
-          {FEATURE_FRIENDS && <LarkGrantsPanel runtime={runtime} mode="receive" />}
+      <Modal
+        open={settingsOpen}
+        onCancel={() => setSettingsOpen(false)}
+        footer={null}
+        width={580}
+        title="Cài đặt Lark × Agents"
+        styles={{ body: { maxHeight: '74vh', overflowY: 'auto' } }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {!conn?.connected && FEATURE_FRIENDS && <LarkGrantsPanel runtime={runtime} mode="receive" />}
           <LarkConnectPanel runtime={runtime} connection={conn} onChange={setConn} />
-        </div>
-      ) : (
-        <>
-          {/* Logged in but the personal token lacks Bitable permission → every Base read/write
-              comes back empty with no error. Warn proactively (not just after a confusing 0-result). */}
-          {conn.userBitableScopeMissing && (
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginBottom: 10 }}
-              message="Tài khoản Lark đang đăng nhập THIẾU quyền Bitable"
-              description={
-                'Token của bạn chưa có scope "bitable:app" nên đọc/ghi Base sẽ trả về rỗng (không báo lỗi). Cách sửa: mở Lark Developer Console → app của bạn → Permissions & Scopes → bật "bitable:app" (và các scope cần) → tạo version mới & PHÁT HÀNH (publish); rồi trong Cài đặt Lark × Agents, đăng xuất tài khoản và đăng nhập lại (QR) để token mới nhận quyền.'
-              }
-            />
-          )}
-          {/* Full-width, full-height chat — connection/Bases/Bot/Plugins live in the Settings modal. */}
-          <Card
-            size="small"
-            style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-            styles={{ body: { padding: 12, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
-          >
-            {accountReady ? (
-              // key by account so switching users REMOUNTS the chat under the new scope
-              // (fresh session list, no carried-over state).
-              <LarkChatShell
-                key={user?.id || '_local'}
-                userName={(user?.name || '').trim().split(/\s+/).pop() || undefined}
-                runtime={runtime}
-                basesRev={basesRev}
-                onOpenSkills={onOpenSkills}
-              />
-            ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Spin />
-              </div>
-            )}
-          </Card>
-
-          <Modal
-            open={settingsOpen}
-            onCancel={() => setSettingsOpen(false)}
-            footer={null}
-            width={580}
-            title="Cài đặt Lark × Agents"
-            styles={{ body: { maxHeight: '74vh', overflowY: 'auto' } }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <LarkConnectPanel runtime={runtime} connection={conn} onChange={setConn} />
+          {conn?.connected && (
+            <>
               <BasesPanel runtime={runtime} onChanged={() => setBasesRev((k) => k + 1)} />
               <AutomationsPanel runtime={runtime} />
               <LarkWebPanel runtime={runtime} />
               <BotPanel runtime={runtime} />
               <PluginsPanel runtime={runtime} />
               <PluginPanelsCard runtime={runtime} />
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {conn?.userBitableScopeMissing && (
+        <Alert
+          type="warning"
+          showIcon
+          closable
+          message="Tài khoản Lark đang đăng nhập THIẾU quyền Bitable"
+          description='Token của bạn chưa có scope "bitable:app" nên đọc/ghi Base qua Open API sẽ trả về rỗng. Bật "bitable:app" trong Lark Developer Console → phát hành lại app → đăng xuất và đăng nhập lại tài khoản Lark trong Cài đặt.'
+        />
+      )}
+      {needLogin && webSupported && (
+        <Alert
+          type="info"
+          showIcon
+          data-testid="lark-login-hint"
+          message="Đăng nhập Lark để bắt đầu — không cần App ID"
+          description="Agent chạy bằng phiên Lark web của bạn (quét Base, hỏi đáp, tạo workflow). Muốn thêm tin nhắn/lịch/ghi bản ghi qua Open API thì kết nối custom app."
+          action={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Button size="small" type="primary" icon={<LoginOutlined />} onClick={() => void runtime.larkWebConnect?.().finally(() => void refresh())}>
+                Đăng nhập Lark
+              </Button>
+              <Button size="small" icon={<ApiOutlined />} onClick={() => setSettingsOpen(true)}>
+                Kết nối custom app
+              </Button>
             </div>
-          </Modal>
-        </>
+          }
+        />
+      )}
+
+      {!ready ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Spin size="large" />
+        </div>
+      ) : layout === 'frame' && webSupported ? (
+        <Card size="small" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
+          <LarkWorkflowStudio key={user?.id || '_local'} runtime={runtime} onOpenSkills={onOpenSkills} extraMenu={extraMenu} />
+        </Card>
+      ) : !conn?.connected && !webSupported ? (
+        <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {FEATURE_FRIENDS && <LarkGrantsPanel runtime={runtime} mode="receive" />}
+          <LarkConnectPanel runtime={runtime} connection={conn} onChange={setConn} />
+        </div>
+      ) : (
+        <div ref={rowRef} data-testid="lark-chat-row" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <Card size="small" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: '4px 12px 12px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}>
+            <LarkChatShell
+              key={user?.id || '_local'}
+              userName={(user?.name || '').trim().split(/\s+/).pop() || undefined}
+              runtime={runtime}
+              basesRev={basesRev}
+              onOpenSkills={onOpenSkills}
+              layout="chat"
+              extraMenu={extraMenu}
+              frame={chatLayout ? { open: prefs.sidePaneOpen, toggle: () => setPrefs((p) => ({ ...p, sidePaneOpen: !p.sidePaneOpen })) } : undefined}
+              onBasesChange={(bases, added) => {
+                const b = added || bases[0];
+                const url = b ? (b as { url?: string }).url || (st?.host ? `${st.host}/base/${b.appToken}` : undefined) : undefined;
+                setHomeUrl(url);
+                if (url && prefs.sidePaneOpen) void runtime.larkBrowserNavigate?.({ url }).catch(() => undefined);
+              }}
+            />
+          </Card>
+          {chatLayout && prefs.sidePaneOpen && (
+            <>
+              <div onMouseDown={startDrag} title="Kéo để đổi bề rộng" style={{ width: 8, flex: '0 0 8px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: 2, height: 36, borderRadius: 2, background: V.border }} />
+              </div>
+              <LarkFramePane
+                runtime={runtime}
+                st={st}
+                setSt={setSt}
+                refresh={refresh}
+                homeUrl={homeUrl}
+                onClose={() => setPrefs((p) => ({ ...p, sidePaneOpen: false }))}
+                style={{ width: paneW, flex: `0 0 ${paneW}px` }}
+              />
+            </>
+          )}
+        </div>
       )}
     </div>
   );

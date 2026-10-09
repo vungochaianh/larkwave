@@ -37,6 +37,7 @@ const ACCOUNT_VIEWS: AccountView[] = ['profile', 'friends', 'storage'];
 const VIEW_BY_KEY: Record<string, View> = {
   'tw-agents': 'agents',
   'tw-lark': 'lark',
+  'tw-lark-wf': 'lark-wf',
   'tw-lark-spec': 'spec',
   'tw-lark-files': 'lark-files',
   'tw-lark-auto': 'lark-auto',
@@ -57,7 +58,7 @@ const WEB_URL: Record<string, string> = {
   storage: 'https://toolswave.net/storage',
 };
 
-export type View = 'home' | 'agents' | 'lark' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'skills' | 'skills-cross' | 'settings' | AccountView;
+export type View = 'home' | 'agents' | 'lark' | 'lark-wf' | 'spec' | 'lark-files' | 'lark-auto' | 'cms-sync' | 'skills' | 'skills-cross' | 'settings' | AccountView;
 
 /** Reverse of VIEW_BY_KEY — lets the parent drive the sidebar selection when
  *  navigating programmatically (e.g. clicking a KPI tile). */
@@ -65,6 +66,7 @@ const KEY_BY_VIEW: Record<View, string> = {
   home: 'tw-composer',
   agents: 'tw-agents',
   lark: 'tw-lark',
+  'lark-wf': 'tw-lark-wf',
   spec: 'tw-lark-spec',
   'lark-files': 'tw-lark-files',
   'cms-sync': 'tw-cms-sync',
@@ -252,7 +254,7 @@ function HomeShell() {
       onSelect={onSelect}
       activeKey={selectedKey}
       cmsAllowed={cmsAllowed}
-      fullBleed={view === 'lark' || view === 'agents'}
+      fullBleed={view === 'lark' || view === 'lark-wf' || view === 'agents'}
       headerExtra={
         <FeedbackButton variant="header" page={String(view)} />
       }
@@ -277,6 +279,10 @@ function HomeShell() {
         // Key by account so switching users fully REMOUNTS the Lark screen — connection,
         // config panels and chat all re-fetch under the new account's per-account scope.
         <LarkScreen key={accountUser?.id || '_local'} onOpenSkills={() => navigate('skills')} />
+      )}
+      {!isAccountView && phase === 'ready' && view === 'lark-wf' && (
+        // CÙNG agent + hội thoại với Lark × Agents — bố cục khung-Lark-trước.
+        <LarkScreen key={`wf-${accountUser?.id || '_local'}`} layout="frame" onOpenSkills={() => navigate('skills')} />
       )}
       {!isAccountView && phase === 'ready' && view === 'spec' && (
         <SpecScreen key={accountUser?.id || '_local'} onOpenChat={() => navigate('lark')} />

@@ -6,6 +6,9 @@ import type { RuntimeAdapter } from '@larkwave/core';
 import { BRAND_GRADIENT, V } from '../../theme';
 import { WorkspaceTabStrip, type TabItem } from '../WorkspaceTabStrip';
 import { LarkChat } from './LarkChat';
+import { unifySessions } from './larkConversations';
+import type { LarkBaseRef } from '@larkwave/core';
+import type { MenuProps } from 'antd';
 
 /**
  * Nhiều hội thoại Lark mở cùng lúc, kiểu tab trình duyệt.
@@ -33,7 +36,15 @@ export function LarkChatShell({
   onOpenSkills,
   blocked,
   userName,
+  layout = 'chat',
+  frame,
+  extraMenu,
+  onBasesChange,
 }: {
+  layout?: 'chat' | 'frame';
+  frame?: { open: boolean; toggle: () => void };
+  extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
+  onBasesChange?: (bases: LarkBaseRef[], added?: { appToken: string; name: string; url?: string }) => void;
   runtime: RuntimeAdapter;
   /** Tên người dùng để chào. Bỏ trống thì chỉ chào theo buổi, không bịa tên. */
   userName?: string;
@@ -64,8 +75,8 @@ export function LarkChatShell({
   const refreshTitles = useCallback(async () => {
     const all = await runtime.larkSessions?.().catch(() => []);
     if (!Array.isArray(all)) return;
-    // Hội thoại "Tạo workflow" có danh sách riêng ở màn đó — không trộn vào đây.
-    const list = all.filter((s) => s?.kind !== 'workflow');
+    // HỢP NHẤT: một danh sách cho cả hai màn — hội thoại "Tạo workflow" cũ cũng hiện ở đây.
+    const list = unifySessions(all as { id: string; title?: string; kind?: string; updatedAt?: string }[]);
     const next: Record<string, string> = {};
     for (const s of list as { id: string; title?: string }[]) {
       if (s?.id) next[s.id] = (s.title || '').trim() || 'Cuộc trò chuyện';
@@ -395,6 +406,10 @@ export function LarkChatShell({
               blocked={blocked}
               pinnedSessionId={id}
               hideSessionList
+              layout={layout}
+              frame={frame}
+              extraMenu={extraMenu}
+              onBasesChange={id === activeId ? onBasesChange : undefined}
             />
           </div>
         ))}
