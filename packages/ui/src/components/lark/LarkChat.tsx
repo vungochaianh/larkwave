@@ -2287,27 +2287,8 @@ export function LarkChat({
               </div>
             </div>
           </Modal>
-          {/* Context-limit warning — fires as the resumed conversation nears the model window. */}
-          {ctx && ctx.percentUsed >= 0.8 && (
-            <Alert
-              type="warning"
-              showIcon
-              closable
-              onClose={() => setCtx(null)}
-              style={{ marginBottom: 8 }}
-              message={`${tr('chat.convUsed', 'Cuộc trò chuyện đã dùng')} ~${Math.round(ctx.percentUsed * 100)}% ${tr('chat.agentContext', 'ngữ cảnh agent')}`}
-              description={tr(
-                'chat.contextWarnDesc',
-                'Khi gần đầy, agent có thể quên phần đầu. App sẽ TỰ NÉN ngữ cảnh ngay trong cuộc trò chuyện này ' +
-                  '(giữ nguyên lịch sử và Base) rồi làm tiếp — bạn không phải làm gì.',
-              )}
-              action={
-                <Button size="small" type="primary" loading={handoffBusy} disabled={busy || handoffBusy} onClick={handoffSession}>
-                  {tr('chat.newSessionKeepSummary', 'Tạo phiên mới (giữ tóm tắt)')}
-                </Button>
-              }
-            />
-          )}
+          {/* Không còn băng cảnh báo ngữ cảnh: giống Claude Code, app TỰ NÉN âm thầm sau lượt khi gần đầy
+              và chỉ để lại một dòng nhỏ "🗜️ … đã nén lại" trong hội thoại (xem nhánh nén chủ động ở trên). */}
           {/* Settings row: mode + auto-approve. (Tạo workflow: không có — màn ngoài có công tắc Tự động / Hỏi trước khi ghi.) */}
           {!workflow && (
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, rowGap: 8, marginBottom: 8 }}>

@@ -342,6 +342,10 @@ export async function* runLarkChat(
 
   let streamedChars = 0; // text already streamed for the in-flight message (dedup)
   let cliModel: string | undefined; // model id from the stream-json init event → context window
+  // Usage của LẦN GỌI MODEL CUỐI — đó mới là cỡ ngữ cảnh thật. `result.usage` là TỔNG CỘNG DỒN mọi
+  // lần gọi trong lượt (mỗi bước công cụ đọc lại cả ngữ cảnh), nên một lượt nhiều bước công cụ báo
+  // ~86% dù ngữ cảnh thật nhỏ hơn nhiều (gặp thật 09/10/2026). claudeRunner đã sửa y hệt từ trước.
+  let lastAssistantUsage: any = null;
   // Ref object (not a bare `let`): TS won't narrow a property to its initializer, so the
   // in-closure assignment below is still visible to the finally-block cleanup.
   const childRef: { current: ChildProcess | null } = { current: null };
@@ -421,6 +425,9 @@ export async function* runLarkChat(
           }
           // The final assembled assistant message usually DUPLICATES the streamed text
           // → skip it, unless streaming somehow didn't cover it (defensive fallback).
+          if (obj?.type === 'assistant' && obj.message?.usage && typeof obj.message.usage === 'object') {
+            lastAssistantUsage = obj.message.usage;
+          }
           if (obj?.type === 'assistant' && obj.message?.content) {
             const full = obj.message.content
               .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
@@ -434,7 +441,7 @@ export async function* runLarkChat(
           if (obj?.type === 'result') {
             // Context telemetry — how full the resumed conversation is. The renderer warns
             // + offers a fresh session as this approaches the model window.
-            const usage = contextUsageFromResult(obj, cliModel);
+            const usage = contextUsageFromResult(lastAssistantUsage ? { usage: lastAssistantUsage } : obj, cliModel);
             if (usage) {
               push({
                 type: 'usage',
