@@ -1,6 +1,7 @@
 import { type LarkToolDef, enc, str } from './types';
 import type { LarkClient } from '../larkClient';
 import { getLarkWebSession } from '../larkWebSession';
+import type { WebTable } from '../larkWebApi';
 
 /**
  * bitable_read_workflows — READ + TRANSLATE a Base's Automations/Workflows.
@@ -46,8 +47,65 @@ async function resolveBase(i: J, client: LarkClient): Promise<string> {
   return id;
 }
 
+/** Bộ dịch id → tên mà phần dịch workflow cần (Open API hoặc phiên Lark web). */
+interface Resolver {
+  loadTables(): Promise<void>;
+  load(tableId: string): Promise<void>;
+  tableName(tableId: string): string;
+  field(tableId: string, fieldId: string): string;
+  option(tableId: string, fieldId: string, optId: string): string;
+  fieldType(tableId: string, fieldId: string): number | undefined;
+  optionId(tableId: string, fieldId: string, name: string): string | undefined;
+}
+
+/**
+ * Bộ dịch id → tên dựng từ cấu trúc Base quét qua PHIÊN LARK WEB (lark_web_scan_base) — để đọc
+ * logic automation khi KHÔNG có custom app (không gọi Open API nào).
+ */
+export class WebNameResolver implements Resolver {
+  private tables = new Map<string, WebTable>();
+  constructor(list: WebTable[]) {
+    for (const t of list) this.tables.set(t.id, t);
+  }
+  async loadTables(): Promise<void> {}
+  async load(): Promise<void> {}
+  private f(tableId: string, fieldId: string) {
+    return this.tables.get(tableId)?.fields.find((x) => x.id === fieldId);
+  }
+  tableName(tableId: string): string {
+    return this.tables.get(tableId)?.name || tableId;
+  }
+  field(tableId: string, fieldId: string): string {
+    return this.f(tableId, fieldId)?.name || fieldId;
+  }
+  option(tableId: string, fieldId: string, optId: string): string {
+    return this.f(tableId, fieldId)?.options?.find((o) => o.id === optId)?.name || optId;
+  }
+  fieldType(tableId: string, fieldId: string): number | undefined {
+    return this.f(tableId, fieldId)?.type;
+  }
+  optionId(tableId: string, fieldId: string, name: string): string | undefined {
+    return this.f(tableId, fieldId)?.options?.find((o) => o.name === name)?.id;
+  }
+}
+
+/**
+ * Dịch các automation/quy trình đọc THÔ qua phiên Lark web (automation/list, workflow/detail) ra
+ * cùng dạng `logic` cây với bitable_read_workflows — không cần App ID.
+ */
+export async function translateWebWorkflows(items: { raw: J; fallbackTitle?: string }[], tables: WebTable[], users: Record<string, J> = {}): Promise<J[]> {
+  const res = new WebNameResolver(tables);
+  const out: J[] = [];
+  for (const it of items) {
+    const t = await translateItem(it.raw || {}, res, users);
+    if ((!t.name || t.name === '(không tên)') && it.fallbackTitle) t.name = it.fallbackTitle;
+    out.push(t);
+  }
+  return out;
+}
+
 // ── ID → name resolver (Open API — RAW so option ids + table names survive) ──
-class NameResolver {
+class NameResolver implements Resolver {
   private cache = new Map<
     string,
     {
@@ -143,7 +201,7 @@ interface RawField {
 interface Ctx {
   byId: Map<string, J>;
   tableMap: Record<string, { TableID?: string; FieldMap?: Record<string, string> }>;
-  res: NameResolver;
+  res: Resolver;
   users: Record<string, J>;
 }
 
@@ -398,7 +456,7 @@ function jparse(s: unknown): J {
 }
 
 /** Translate one workflow object (a list item OR detail.workflow) into a readable summary. */
-async function translateItem(wf: J, res: NameResolver, users: Record<string, J>): Promise<J> {
+async function translateItem(wf: J, res: Resolver, users: Record<string, J>): Promise<J> {
   const draft = jparse(wf?.draft);
   const extra = jparse(wf?.extra);
   const steps: J[] = Array.isArray(draft?.steps) ? draft.steps : [];
@@ -522,7 +580,7 @@ function randSuffix(): string {
  * not names → resolve via Open API; (3) repair REFOBJ ids to Lark's `<stepId>-<tbl>-<fld>-<rand>`
  * form. Then validate the graph. (Constant text/number formatting is left as-is — still unverified.)
  */
-async function normalizeDraft(draftObj: J, res: NameResolver): Promise<void> {
+async function normalizeDraft(draftObj: J, res: Resolver): Promise<void> {
   const steps: J[] = Array.isArray(draftObj?.steps) ? draftObj.steps : [];
   if (!steps.length) throw new Error('Draft không có bước nào.');
 
@@ -599,7 +657,7 @@ async function normalizeDraft(draftObj: J, res: NameResolver): Promise<void> {
 }
 
 /** Turn select-field option NAMES into option IDs; leave non-selects + already-opt values alone. */
-function mapSelect(res: NameResolver, ref: string, arr: J[]): J[] {
+function mapSelect(res: Resolver, ref: string, arr: J[]): J[] {
   const p = toRealRef(ref);
   if (!p) return arr;
   const ft = res.fieldType(p.tableId, p.fieldId);

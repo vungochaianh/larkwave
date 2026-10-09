@@ -652,5 +652,22 @@ const test = async (name, fn) => {
     assert.strictEqual(dock.clampPaneWidth(500, 600), 360);
   });
 
+  // ── Đọc chi tiết automation qua phiên web (không App ID) ────────────────────────────────────
+  await test('lark_web_read_automations: có trong bộ Tạo workflow, CHỈ ĐỌC; dịch cây logic bằng tên quét từ web (không Open API)', async () => {
+    const tools = require(join(B, 'tools', 'index.js'));
+    assert.ok(tools.workflowModeTools(false).map((t) => t.name).includes('lark_web_read_automations'));
+    assert.strictEqual(tools.isWriteTool('lark_web_read_automations'), false);
+    const wf = require(join(B, 'tools', 'workflows.js'));
+    const raw = fx('automation-list.json').data.workflowList[0];
+    const tbl = api.parseTableSchema(fx('clientvars.table.json'), 'Tương tác', 0);
+    const [t] = await wf.translateWebWorkflows([{ raw }], [tbl]);
+    assert.strictEqual(t.workflow_id, '7672057879164554974');
+    assert.strictEqual(t.status_text, 'đang tắt');
+    assert.ok(t.logic.includes('«Tương tác»'), t.logic);
+    assert.ok(!/«tbl/.test(t.logic), 'không để lộ id bảng thô');
+    const sp = require(join(B, 'systemPrompt.js'));
+    assert.ok(sp.buildWorkflowSystemPrompt({ base: { appToken: 'X', name: 'Y' } }).includes('lark_web_read_automations'));
+  });
+
   console.log(`  larkWeb: ${passed} kiểm qua`);
 })();

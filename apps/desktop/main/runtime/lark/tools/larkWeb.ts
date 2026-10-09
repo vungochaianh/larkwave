@@ -6,12 +6,14 @@ import { formatIssues, normalizeWorkflowInput, validateWorkflowBody } from '../w
 import { profileFromWebTables, v3ToInternal, verifyReadBack, WEB_SUPPORTED_TYPES } from '../webAutomation';
 import { FIELD_KINDS, planFields, structureScript, verifyStructure, type FieldSpec } from '../baseStructure';
 import { clientVarsPath, decodeLarkGz, parseTableSchema } from '../larkWebApi';
+import { translateWebWorkflows } from './workflows';
 
 /**
  * Công cụ "Tạo workflow" chạy bằng PHIÊN LARK WEB đang đăng nhập — KHÔNG cần App ID/App Secret.
  *
  *   lark_web_list_bases  → mọi Base người dùng thấy (Drive + Wiki, + ô tìm kiếm của Drive)
  *   lark_web_scan_base   → bảng/cột/kiểu/lựa chọn/view/bản ghi mẫu + automation & workflow đã có
+ *   lark_web_read_automations → cây logic đầy đủ của automation/quy trình đang có (chỉ đọc)
  *   lark_web_create_automation (GHI, hỏi xác nhận) → thiết kế `steps` chính thức (cùng bộ kiểm
  *       bitable_workflow_validate) → bản nháp NỘI BỘ → POST automation/create status 0 → đọc lại.
  *
@@ -220,6 +222,41 @@ export const larkWebTools: LarkToolDef[] = [
         next:
           'Thiếu bảng/cột → lark_web_add_table / lark_web_add_fields (không bấm giao diện). Thiết kế theo `steps` chính thức (bitable_workflow_schema để tra) → viết thiết kế ra chat bằng tiếng Việt → tạo ngay bằng lark_web_create_automations (một lần cho cả bộ). ' +
           `Tạo thẳng được: ${WEB_SUPPORTED_TYPES.join(', ')}; loại khác dựng trong trình soạn Lark bằng lark_ui_*.`,
+      };
+    },
+  },
+  {
+    name: 'lark_web_read_automations',
+    gated: false,
+    description:
+      'ĐỌC CHI TIẾT (CHỈ ĐỌC) mọi Automation + Quy trình của một Base qua phiên Lark web — KHÔNG cần App ID. ' +
+      'Khác lark_web_scan_base (chỉ tóm tắt tên bước): mỗi mục có `logic` là cây đã dịch sang tiếng Việt — trigger (bảng/cột/điều kiện) → nhánh Nếu/Nếu không → hành động, kể cả NGƯỜI NHẬN và nội dung tin nhắn; tên bảng/cột/lựa chọn để trong «…». ' +
+      'Dùng khi cần giải thích, soát lỗi, hoặc sửa automation đang có. Truyền `workflow_id` để đọc một cái.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token Base (đã chọn ở đầu hội thoại)'),
+        url: str('Hoặc link …/base/<token>'),
+        workflow_id: str('Chỉ đọc một automation/quy trình (bỏ trống = tất cả)'),
+      },
+      required: [],
+    },
+    exec: async (i) => {
+      const token = tokenOf(i);
+      const { tables } = await tablesFor(token);
+      const r = await getLarkWebSession().readWebAutomationsRaw(token);
+      const want = i.workflow_id ? String(i.workflow_id) : '';
+      const items = [
+        ...r.automations.map((raw) => ({ raw, kind: 'Automation', fallbackTitle: '' })),
+        ...r.blocks.map((b) => ({ raw: { ...b.raw, workflowID: b.raw?.workflowID || b.workflowId }, kind: 'Quy trình', fallbackTitle: b.name })),
+      ].filter((x) => !want || String(x.raw?.workflowID || x.raw?.workflowId || '') === want);
+      const translated = await translateWebWorkflows(items, tables, r.users);
+      return {
+        count: translated.length,
+        workflows: translated.map((t, n) => ({ kind: items[n].kind, ...t })),
+        ...(r.errors.length ? { errors: r.errors } : {}),
+        ...(translated.length ? {} : { note: want ? `Không thấy automation ${want} trong Base này.` : 'Base này chưa có automation/quy trình nào.' }),
       };
     },
   },

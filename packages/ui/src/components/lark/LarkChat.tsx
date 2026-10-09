@@ -1,4 +1,5 @@
 'use client';
+import { buildQuickAsks, CUSTOM_ASKS_KEYS, mergeChips, parseCustomAsks, workflowEmptyExamples, type QuickAsk } from './quickAsks';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, App, Badge, Button, Checkbox, Drawer, Dropdown, Grid, Input, Modal, Popover, Segmented, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
@@ -133,32 +134,6 @@ function FileCard({ item, runtime }: { item: Extract<ChatItem, { kind: 'file' }>
 
 const rid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
-
-const EXAMPLES: { k: string; text: string }[] = [
-  { k: 'ex1', text: 'Liệt kê tất cả các bảng trong Base đã đăng ký' },
-  { k: 'ex2', text: 'Bảng đầu tiên có những trường (cột) nào?' },
-  { k: 'ex3', text: 'Có bao nhiêu bản ghi trong bảng "Khách hàng"?' },
-  { k: 'ex4', text: 'Tìm các bản ghi có Trạng thái = "ON" trong bảng Đơn' },
-  { k: 'ex5', text: 'Tóm tắt dữ liệu trong Base này giúp tôi' },
-  { k: 'ex6', text: 'Thêm một dòng mới vào bảng Công việc: Tên = "Demo", Trạng thái = "Mới"' },
-  { k: 'ex7', text: 'Cập nhật bản ghi … thành …' },
-  { k: 'ex8', text: 'Gửi tin nhắn vào nhóm chat … nội dung …' },
-];
-
-/** Quick "utils" shown when a Base is active — the agent works on that Base. */
-const BASE_UTILS: { k: string; label: string; prompt: string }[] = [
-  { k: 'tablesCols', label: '🔍 Bảng & cột', prompt: 'Liệt kê ĐẦY ĐỦ TẤT CẢ bảng trong base đang chọn (kể cả bảng chưa có bản ghi nào), kèm các cột (tên + kiểu) của từng bảng. Làm cho HẾT trong một lượt, KHÔNG hỏi lại "xem tiếp không" dù nhiều bảng.' },
-  { k: 'summaryBase', label: '📋 Tóm tắt base', prompt: 'Dùng bitable_base_overview để tóm tắt base đang chọn: liệt kê ĐẦY ĐỦ các bảng (kể cả bảng rỗng), mỗi bảng nêu số bản ghi (record_count), các cột chính, và vài bản ghi mẫu để minh hoạ ý nghĩa. Làm gọn, không hỏi lại.' },
-  { k: 'evalBase', label: '📊 Đánh giá base', prompt: 'Đánh giá thiết kế của base đang chọn: điểm mạnh, điểm yếu, các cột/bảng còn thiếu, gợi ý cải thiện cụ thể.' },
-  { k: 'permissions', label: '🔐 Phân quyền', prompt: 'Xem cấu hình phân quyền của base đang chọn: gọi bitable_list_roles để liệt kê các vai trò + quyền theo từng bảng/bản ghi/cột, và (nếu cần) bitable_list_role_members để xem thành viên mỗi vai trò. Trình bày gọn thành bảng dễ đọc.' },
-  { k: 'readWf', label: '🔧 Đọc workflow', prompt: 'Đọc và giải thích các workflow/automation (tự động hoá) của base đang áp dụng — gọi bitable_read_workflows với app_token của base này. Trình bày mỗi workflow: trigger → điều kiện (Nếu/Nếu không) → hành động. Nếu chưa kết nối Lark web hoặc thiếu quyền, nhắc tôi bật ở Cài đặt → "Kết nối Lark web".' },
-  { k: 'auditWf', label: '🔎 Soát lỗi workflow', prompt: 'workflow-audit' },
-  { k: 'suggestWf', label: '🧩 Nên thêm workflow nào', prompt: 'workflow-suggest' },
-  { k: 'debugEndpoint', label: '🐞 Endpoint (gỡ lỗi)', prompt: 'debug' },
-  { k: 'design', label: '🎨 Thiết kế / bổ sung', prompt: 'Dựa trên dữ liệu hiện có, đề xuất schema hoàn chỉnh cho base đang chọn rồi (sau khi tôi duyệt) tạo các bảng/cột còn thiếu.' },
-  { k: 'kanban', label: '📌 Tạo Kanban pipeline', prompt: 'Tạo một view Kanban theo cột trạng thái/giai đoạn cho bảng chính của base đang chọn để làm pipeline.' },
-  { k: 'sampleData', label: '🌱 Nhập dữ liệu mẫu', prompt: 'Tạo và nhập một vài bản ghi mẫu hợp lý vào các bảng của base đang chọn để minh hoạ.' },
-];
 
 /** Animated "…" while the agent is working (before it streams text). Width-stable. */
 function TypingDots() {
@@ -616,6 +591,8 @@ export function LarkChat({
 
   // Direct-API mode (run via provider API, no local CLI) + whether the chosen provider has a key.
   const [apiKeyReady, setApiKeyReady] = useState(false);
+  /** Đã kết nối custom app (App ID) chưa — quyết định nút "Hỏi nhanh" dùng tool Open API hay phiên Lark web. */
+  const [appConnected, setAppConnected] = useState(true);
   /** Nguồn chạy agent: CLI trên máy · khoá API riêng · gói Larkwave (MAIC). */
   const [runSource, setRunSource] = useState<'cli' | 'api' | 'maic'>('cli');
   const [maicAvailable, setMaicAvailable] = useState(false);
@@ -624,6 +601,7 @@ export function LarkChat({
   useEffect(() => {
     runtime.larkStatus?.().then((s) => {
       setAutoApprove(!!s.autoApprove);
+      setAppConnected(!!s.connected);
       setApiKeyReady(!!s.apiKeyReady);
       setRunSource(s.larkRunSource ?? (s.apiMode ? 'api' : 'cli'));
       setMaicAvailable(!!s.maicAvailable);
@@ -1389,30 +1367,23 @@ export function LarkChat({
   // User-defined "Hỏi nhanh" (quick-asks) — one-click prompts the user adds, persisted
   // per-device in localStorage (these are lightweight prompt shortcuts, distinct from the
   // heavier Skills system). They append to the built-in chips.
-  const [customAsks, setCustomAsks] = useState<{ label: string; prompt: string }[]>(() => {
+  // Mỗi chế độ (hội thoại thường / Tạo workflow) một danh sách riêng.
+  const asksKey = CUSTOM_ASKS_KEYS[workflow ? 'workflow' : 'chat'];
+  const [customAsks, setCustomAsks] = useState<QuickAsk[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
-      const v = JSON.parse(localStorage.getItem('tw_lark_quickasks') || '[]');
-      if (!Array.isArray(v)) return [];
-      // Drop malformed/empty entries + de-dupe by label (corrupted storage → unique keys).
-      const seen = new Set<string>();
-      const out: { label: string; prompt: string }[] = [];
-      for (const x of v) {
-        const label = typeof x?.label === 'string' ? x.label.trim() : '';
-        const prompt = typeof x?.prompt === 'string' ? x.prompt.trim() : '';
-        if (label && prompt && !seen.has(label)) {
-          seen.add(label);
-          out.push({ label, prompt });
-        }
-      }
-      return out;
+      return parseCustomAsks(localStorage.getItem(asksKey));
     } catch {
       return [];
     }
   });
-  const persistAsks = (list: { label: string; prompt: string }[]) => {
+  const persistAsks = (list: QuickAsk[]) => {
     setCustomAsks(list);
-    if (typeof window !== 'undefined') localStorage.setItem('tw_lark_quickasks', JSON.stringify(list));
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem(asksKey, JSON.stringify(list));
+    } catch {
+      /* bộ nhớ trình duyệt bị chặn — vẫn giữ trong phiên */
+    }
   };
   const [guideChip, setGuideChip] = useState<{ label: string; prompt: string; custom?: boolean } | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
@@ -1424,66 +1395,22 @@ export function LarkChat({
   const [newLabel, setNewLabel] = useState('');
   const [newPrompt, setNewPrompt] = useState('');
 
-  const baseChips = (convBases.length ? BASE_UTILS : EXAMPLES.map((e) => ({ k: e.k, label: e.text, prompt: e.text }))).map((c) => {
-    // "Đọc workflow": inject the applied Base's app_token(s) so the agent doesn't call the tool
-    // with an empty app_token (the CLI often won't fill it from context on its own).
-    if (c.label.includes('Đọc workflow') && convBases.length) {
-      const list = convBases.map((b) => `${b.name} (app_token=${b.appToken})`).join('; ');
-      return {
-        ...c,
-        prompt:
-          `Đọc và giải thích ĐẦY ĐỦ, CHI TIẾT các workflow/automation (tự động hoá) của base đang áp dụng: ${list}. ` +
-          `Gọi bitable_read_workflows với app_token=${convBases[0].appToken}${convBases.length > 1 ? ' (rồi lần lượt các base còn lại)' : ''}. ` +
-          'ĐỊNH DẠNG BẮT BUỘC (giao diện sẽ tự vẽ đẹp): với TỪNG workflow, in một tiêu đề đúng dạng "**WF<số>: <tên>** — đang bật/đang tắt" ' +
-          '(đánh số WF1, WF2… để bấm liên kết được); NGAY DƯỚI đó dán NGUYÊN VĂN nội dung field "logic" của workflow đó từ kết quả tool — ' +
-          'GIỮ nguyên từng dòng "• <biểu tượng> …", thụt lề 2 khoảng trắng mỗi cấp, tên bảng/cột/tuỳ chọn trong «…», và các nhãn "┗ ✔ ĐÚNG →", "┗ ✗ NGƯỢC LẠI →", "┗ Nhánh …", "┗ Mặc định …", "↳ chỉ chạy tiếp NẾU …". ' +
-          'TUYỆT ĐỐI KHÔNG diễn giải cây thành đoạn văn, KHÔNG rút gọn, KHÔNG bỏ bước, KHÔNG đổi «…» thành id. Khi nhắc lại một workflow ở chỗ khác thì viết "WF<số>". ' +
-          'Nếu tool báo chưa kết nối Lark web, nhắc tôi vào Cài đặt → "Kết nối Lark web".',
-      };
+  // Nút dựng sẵn theo chế độ. Tạo workflow: Base là cái đang chọn ở bộ chọn (không phải convBases,
+  // vốn chỉ được đồng bộ sau khi hội thoại có id) → app_token chèn thẳng vào câu lệnh.
+  const quickDev = (() => {
+    try {
+      return typeof window !== 'undefined' && localStorage.getItem('lw_dev_quickasks') === '1';
+    } catch {
+      return false;
     }
-    // Audit chip: find problems in the existing workflows.
-    if (c.label.includes('Soát lỗi') && convBases.length) {
-      return {
-        ...c,
-        prompt:
-          `Soát lỗi/rà soát toàn bộ workflow của base ${convBases[0].name} (app_token=${convBases[0].appToken}). ` +
-          'Gọi bitable_read_workflows để đọc tất cả (và bitable_list_fields nếu cần đối chiếu cột). Đánh số các workflow WF1, WF2… (nhắc tới chúng bằng "WF<số>" để bấm liên kết được). Tìm và chỉ ra các vấn đề: ' +
-          'workflow đang TẮT (có nên bật không?); nhánh không bao giờ chạy hoặc điều kiện mâu thuẫn/không thể thoả; ' +
-          'hành động trỏ tới bảng/cột đã bị đổi tên hoặc xoá; workflow không có hành động; ' +
-          'hai workflow cùng ghi vào một cột (xung đột) hoặc trùng lặp; thiếu nhánh "Nếu không"; nguy cơ vòng lặp/kích hoạt dây chuyền vô tận. ' +
-          'Với mỗi vấn đề: nêu rõ WF<số> nào, lỗi gì, mức độ (cao/vừa/thấp), và CÁCH SỬA cụ thể. Trình bày thành bảng dễ đọc (tên bảng/cột để trong «…»); nếu không có lỗi thì nói rõ.',
-      };
-    }
-    // Suggest chip: propose new workflows the base should have.
-    if (c.label.includes('Nên thêm') && convBases.length) {
-      return {
-        ...c,
-        prompt:
-          `Dựa trên các bảng/cột hiện có của base ${convBases[0].name} (app_token=${convBases[0].appToken}) và các workflow đang có ` +
-          '(quét bằng bitable_scan_base — đã kèm danh sách workflow đang có), đề xuất những automation/workflow NÊN THÊM để base hoàn thiện & tự động hơn. ' +
-          'Gợi ý theo các nhóm: nhắc hạn/quá hạn, tự điền & tính toán, thông báo khi đổi trạng thái, kiểm tra tồn kho/ngưỡng, chống trùng, tổng hợp/rollup, đồng bộ giữa bảng. ' +
-          'Với mỗi đề xuất nêu: mục đích, TRIGGER (bảng + điều kiện), HÀNH ĐỘNG, và mức ưu tiên (tên bảng/cột để trong «…»). ' +
-          'Sau khi tôi chọn, bạn TẠO trực tiếp bằng bitable_workflow_create (Open API chính thức — luôn tạo ở trạng thái TẮT cho tôi xem lại rồi tự bật).',
-      };
-    }
-    // Debug chip: dump the sniffed internal endpoints VERBATIM so we can locate the base's
-    // node-tree list endpoint (needed to enumerate + name the flowchart Workflows).
-    if (c.label.includes('gỡ lỗi') && convBases.length) {
-      return {
-        ...c,
-        prompt:
-          `Gọi bitable_read_workflows với app_token=${convBases[0].appToken} và debug=true. ` +
-          'IN NGUYÊN VĂN toàn bộ kết quả JSON (đặc biệt captured_endpoints và captured_workflow_ids), ' +
-          'KHÔNG tóm tắt, KHÔNG bỏ bớt dòng nào — tôi cần copy danh sách endpoint này.',
-      };
-    }
-    return c;
+  })();
+  const baseChips = buildQuickAsks({
+    mode: workflow ? 'workflow' : 'chat',
+    bases: workflow ? (workflow.base ? [workflow.base] : []) : convBases,
+    appConnected,
+    dev: quickDev,
   });
-  const baseLabels = new Set(baseChips.map((b) => b.label));
-  // A custom ask never shadows a built-in label → the combined labels stay unique (safe
-  // React keys) and `isCustom` can trust the label to identify a deletable custom entry.
-  const chips = [...baseChips, ...customAsks.filter((a) => !baseLabels.has(a.label))];
-  const isCustom = (label: string) => !baseLabels.has(label) && customAsks.some((a) => a.label === label);
+  const { chips, isCustom } = mergeChips(baseChips, customAsks);
 
   // Show the toggle only when the chips actually overflow one line (re-measure on
   // chip-count, expand state, and window resize).
@@ -1876,7 +1803,7 @@ export function LarkChat({
                   : tr('chat.larkQaIntro', 'Hỏi đáp & tuỳ chỉnh dữ liệu Lark bằng AI (Claude / Grok / …)')}
               </div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 460, margin: '12px auto 0' }}>
-                {(workflow ? (workflow.base ? workflow.examples ?? [] : []) : chips).map((c) => (
+                {(workflow ? (workflow.base ? (workflow.examples ?? workflowEmptyExamples(workflow.base)) : []) : chips).map((c) => (
                   <div
                     key={c.label}
                     onClick={() => send(c.prompt, chipLabel(c))}
@@ -2091,7 +2018,7 @@ export function LarkChat({
           {/* Skills / quick utils — base-scoped when a Base is active. Wraps to multiple
               lines (no horizontal scroll); collapsed to one line with a Xem thêm / Thu gọn
               toggle when it overflows. */}
-          <div style={{ display: workflow ? 'none' : 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
+          <div data-testid="lark-quickasks" style={{ display: workflow && !workflow.base ? 'none' : 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
           <div
             ref={chipsRef}
             style={{

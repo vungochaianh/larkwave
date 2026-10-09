@@ -46,11 +46,6 @@ const writeNum = (k: string, v: number) => {
   }
 };
 
-const EXAMPLES = [
-  { label: '🔔 Khi thêm bản ghi thì gửi tin nhắn cho tôi', prompt: 'Khi thêm bản ghi mới thì gửi tin nhắn Lark cho tôi, kèm nút mở bản ghi.' },
-  { label: '🔁 Khi trạng thái đổi thì báo tôi', prompt: 'Khi cột trạng thái của bảng chính đổi sang giá trị hoàn thành thì gửi tin nhắn cho tôi.' },
-  { label: '🧩 Base này nên có automation nào?', prompt: 'Quét Base này và đề xuất 3–5 automation hữu ích nhất (chưa tạo gì cả).' },
-];
 
 /**
  * "Tạo workflow" — chế độ thứ hai của Lark × Agents.
@@ -416,7 +411,7 @@ export function LarkWorkflowStudio({ runtime, onOpenSkills }: { runtime: Runtime
             hideSessionList
             onOpenSkills={onOpenSkills}
             blocked={connected ? null : t('wf.blockedLogin', 'Đăng nhập Lark ở khung bên phải để bắt đầu.')}
-            workflow={{ base: activeBase, header, examples: EXAMPLES }}
+            workflow={{ base: activeBase, header }}
           />
         ) : (
           <Empty style={{ marginTop: 60 }} />

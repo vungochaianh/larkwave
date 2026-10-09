@@ -53,6 +53,7 @@ export const readOnlyTools = (): LarkToolDef[] => ALL.filter((t) => !t.gated);
 export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_web_list_bases',
   'lark_web_scan_base',
+  'lark_web_read_automations',
   'lark_web_create_automation',
   'lark_web_create_automations',
   'lark_web_add_table',

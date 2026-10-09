@@ -1960,6 +1960,45 @@ export class LarkWebSession {
   }
 
   /**
+   * Automation + Quy trình (khối) của Base ở dạng THÔ (draft/extra còn nguyên) — để dịch ra cây
+   * logic đầy đủ (điều kiện, người nhận, nội dung) mà bản tóm tắt của scanWebBase không giữ.
+   * CHỈ ĐỌC: automation/list + workflow/detail (docs/lark-web-api.md mục 3).
+   */
+  async readWebAutomationsRaw(token: string): Promise<{
+    automations: J[];
+    blocks: { name: string; workflowId: string; raw: J }[];
+    users: Record<string, J>;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    let automations: J[] = [];
+    let users: Record<string, J> = {};
+    const j = await this.webJson(`${bit(token)}/automation/list`);
+    if (j?.code !== 0) throw new Error(`Không đọc được danh sách automation (Lark báo ${j?.code}: ${j?.msg || ''}).`);
+    automations = Array.isArray(j?.data?.workflowList) ? j.data.workflowList : [];
+    if (j?.data?.users && typeof j.data.users === 'object') users = j.data.users;
+    const blocks: { name: string; workflowId: string; raw: J }[] = [];
+    try {
+      const first = await this.webJson(clientVarsPath(token, undefined, 0));
+      if (first?.code === 0) {
+        const meta = parseBaseMeta(decodeLarkGz(first.data?.base));
+        for (const b of meta.workflowBlocks.slice(0, 10)) {
+          try {
+            const d = await this.webJson(`${bit(token)}/workflow/detail?workflowID=${enc(b.workflowId)}&bizType=2`);
+            if (d?.code !== 0) throw new Error(`${d?.code}: ${d?.msg || ''}`);
+            blocks.push({ name: b.name, workflowId: b.workflowId, raw: d.data?.workflow || {} });
+          } catch (e) {
+            errors.push(`Quy trình «${b.name}»: ${(e as Error)?.message || e}`);
+          }
+        }
+      }
+    } catch (e) {
+      errors.push(`Danh sách quy trình: ${(e as Error)?.message || e}`);
+    }
+    return { automations, blocks, users, errors };
+  }
+
+  /**
    * Tạo một Automation ở trạng thái TẮT — ĐÚNG request trình soạn Automation của Lark gửi (đọc từ
    * mã của chính trang, xem docs/lark-web-api.md): POST /space/api/bitable/automation/create
    * {token, draft, extra, triggerName, status:0}. Khi TẮT, trình soạn KHÔNG gửi flowSchema/nodeSchema
