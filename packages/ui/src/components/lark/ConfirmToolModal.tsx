@@ -109,7 +109,7 @@ const preStyle: React.CSSProperties = {
 };
 
 /** Tool tạo/sửa workflow Lark (Open API v3) — hộp xác nhận vẽ THIẾT KẾ thay vì JSON. */
-const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update']);
+const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update', 'lark_web_create_automation']);
 
 interface WorkflowView {
   update: boolean;

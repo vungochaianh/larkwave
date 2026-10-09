@@ -132,6 +132,7 @@ const CH = {
   larkShareStatus: 'tw:larkShareStatus',
   larkSessions: 'tw:larkSessions',
   larkNewSession: 'tw:larkNewSession',
+  larkWebListBases: 'tw:larkWebListBases',
   larkSwitchSession: 'tw:larkSwitchSession',
   larkSaveSession: 'tw:larkSaveSession',
   larkDeleteSession: 'tw:larkDeleteSession',
@@ -372,7 +373,8 @@ const bridge = {
   larkUnshareSession: (id: string, token: string) => ipcRenderer.invoke(CH.larkUnshareSession, id, token),
   larkShareStatus: (id: string, token: string) => ipcRenderer.invoke(CH.larkShareStatus, id, token),
   larkSessions: () => ipcRenderer.invoke(CH.larkSessions),
-  larkNewSession: (base?: unknown) => ipcRenderer.invoke(CH.larkNewSession, base),
+  larkNewSession: (base?: unknown, opts?: unknown) => ipcRenderer.invoke(CH.larkNewSession, base, opts),
+  larkWebListBases: (input?: { query?: string }) => ipcRenderer.invoke(CH.larkWebListBases, input),
   larkSwitchSession: (id: string) => ipcRenderer.invoke(CH.larkSwitchSession, id),
   larkSaveSession: (id: string, items: unknown, bases?: unknown) =>
     ipcRenderer.invoke(CH.larkSaveSession, id, items, bases),

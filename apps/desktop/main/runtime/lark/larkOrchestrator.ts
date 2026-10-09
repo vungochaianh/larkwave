@@ -44,10 +44,13 @@ export async function* runLarkOrchestrator(
   }
 
   const extra = deps.extraTools ?? [];
+  // toolsOverride (lượt uỷ quyền, chế độ Tạo workflow) phải được tôn trọng ở CẢ đường này — trước
+  // đây chỉ runLarkChat (claude) đọc nó, nên đổi runner là lọt ra bộ công cụ đầy đủ.
   const tools: LarkToolDef[] =
-    mode === 'ask'
+    deps.toolsOverride ??
+    (mode === 'ask'
       ? [...readOnlyTools(), ...extra.filter((t) => !t.gated)]
-      : [...allTools(), ...extra];
+      : [...allTools(), ...extra]);
 
   const toolCtx = {
     tools,

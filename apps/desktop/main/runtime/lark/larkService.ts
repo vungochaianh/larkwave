@@ -164,6 +164,8 @@ interface StoredSession {
   bases?: LarkBaseRef[];
   /** User-authored notes + todos for this conversation. */
   notes?: LarkNoteDoc;
+  /** 'workflow' = hội thoại của chế độ "Tạo workflow" (danh sách riêng). */
+  kind?: 'workflow';
   /** AI summaries of collapsed answers, keyed by chat-item id. Cached because each
    *  one costs a model call — regenerating on every reopen would burn tokens. */
   summaries?: Record<string, string>;
@@ -310,7 +312,7 @@ function mergeSpec(local: LarkSpecDoc | null, remote: LarkSpecDoc | null): LarkS
     syncLog: [...syncLog.values()].sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 50),
   };
 }
-import { allTools, isWriteTool, readOnlyTools } from './tools';
+import { allTools, isWriteTool, readOnlyTools, workflowModeTools } from './tools';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
@@ -331,13 +333,13 @@ import { runLarkMaicAgent } from './larkMaicAgent';
 import { getActiveKey } from '../claudeKeyStore';
 import { getProviderKey } from '../runners/runnerTokenStore';
 import { resolveTool } from './tools';
-import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt } from './systemPrompt';
+import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildWorkflowSystemPrompt } from './systemPrompt';
 import { versionPromptLine } from '../versionHint';
 import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebBase } from '@larkwave/core';
 
 /**
  * Owns the connected Lark custom app in the main process: credential storage,
@@ -739,6 +741,7 @@ export class LarkService {
       // Bản nháp thuộc về tài khoản CŨ. Giữ lại thì một lượt lưu muộn sẽ tạo tệp trong thư mục
       // của tài khoản mới — đúng thứ chốt chặn trong `larkSaveSession` sinh ra để ngăn.
       this.draftBases.clear();
+      this.draftKinds.clear();
       this.turnState.clear();
     }
     this.currentUserId = next;
@@ -861,6 +864,7 @@ export class LarkService {
           model: s.model,
           openTodos: (s.notes?.notes ?? []).filter((n) => n.todo && !n.done).length || undefined,
           active: s.id === this.activeSessionId,
+          ...(s.kind === 'workflow' ? { kind: 'workflow' as const } : {}),
         });
     }
     metas.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
@@ -868,7 +872,7 @@ export class LarkService {
   }
 
   /** Start a brand-new conversation (fresh Claude session) scoped to `bases`. */
-  async larkNewSession(bases?: LarkBaseRef[]): Promise<{ id: string }> {
+  async larkNewSession(bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }): Promise<{ id: string }> {
     const now = new Date().toISOString();
     const id = randomUUID();
     const agentId = randomUUID();
@@ -888,8 +892,12 @@ export class LarkService {
     void now;
     this.turnState.set(id, { agentSessionId: agentId, started: false, runner, model });
     this.draftBases.set(id, Array.isArray(bases) ? bases : []);
+    if (opts?.kind === 'workflow') this.draftKinds.set(id, 'workflow');
     return { id };
   }
+
+  /** Loại (kind) của hội thoại CHƯA ghi đĩa — để lần lưu đầu tiên không làm mất nhãn "workflow". */
+  private readonly draftKinds = new Map<string, 'workflow'>();
 
   /**
    * Base đã chọn cho một hội thoại CHƯA được ghi xuống đĩa. `persistSession` đọc lại khi lưu
@@ -1140,9 +1148,11 @@ export class LarkService {
       updatedAt: now,
       items,
       bases: bases !== undefined ? bases : existing?.bases ?? draft,
+      ...(existing?.kind || this.draftKinds.get(id) ? { kind: existing?.kind ?? this.draftKinds.get(id) } : {}),
     });
     // Đã có tệp thật → bản nháp hết vai trò.
     this.draftBases.delete(id);
+    this.draftKinds.delete(id);
   }
 
   // ── Delegated access ("Cổng uỷ quyền") ────────────────────────────────────
@@ -3211,6 +3221,11 @@ export class LarkService {
   browserDetach(): void {
     getLarkWebSession().browserDetach();
   }
+  /** Mọi Base thấy qua phiên Lark web (chế độ Tạo workflow — không cần App ID). */
+  async larkWebListBases(input?: { query?: string }): Promise<LarkWebBase[]> {
+    return getLarkWebSession().listWebBases({ query: input?.query });
+  }
+
   browserState(): LarkBrowserState {
     return getLarkWebSession().browserState();
   }
@@ -4058,7 +4073,9 @@ export class LarkService {
     // (a renderer tab, or the phone relay) owns that object.
     const { prompt: basePrompt, applied: commandSkillIds } = await this.expandSkillCommands(input.prompt);
     const client = this.ensureClient();
-    if (!client && !general) {
+    // Chế độ "Tạo workflow" chạy bằng PHIÊN LARK WEB — không cần custom app (App ID/App Secret).
+    const workflowTurn = !general && !!input.workflow;
+    if (!client && !general && !workflowTurn) {
       yield { type: 'error', message: 'Chưa kết nối Lark. Hãy nhập App ID + App Secret ở panel kết nối.' };
       yield { type: 'done' };
       return;
@@ -4178,10 +4195,18 @@ export class LarkService {
     // Cho agent biết bản cài đang chạy có cũ không. Chỉ thêm ở lượt TRÒ CHUYỆN (có người đang đọc);
     // lượt tóm tắt nội bộ và tác vụ định kỳ thì không cần và chỉ làm bẩn kết quả.
     const versionLine = versionPromptLine();
+    const wfMe = workflowTurn ? await getLarkWebSession().webMe().catch(() => null) : null;
     const systemPrompt =
       (general
         ? buildGeneralSystemPrompt({ versionLine })
-        : buildSystemPrompt({
+        : workflowTurn
+          ? buildWorkflowSystemPrompt({
+              versionLine,
+              base: input.workflow?.base ?? input.activeBases?.[0],
+              me: wfMe ? { name: wfMe.name } : undefined,
+              openApi: !!client,
+            })
+          : buildSystemPrompt({
             versionLine,
             tenantName: this.tenantName,
             bases: this.store.getBases(),
@@ -4191,7 +4216,8 @@ export class LarkService {
             userBitableScopeMissing: this.userBitableScopeMissing(),
           })) + skillsBlock;
     // When auto-approve is on, writes run without the per-tool confirm prompt.
-    const autoApprove = this.store.getSettings().autoApprove ?? false;
+    // Tạo workflow: LUÔN hỏi xác nhận trước khi ghi (hộp xác nhận vẽ thiết kế) — bỏ qua "Tự động duyệt".
+    const autoApprove = workflowTurn ? false : this.store.getSettings().autoApprove ?? false;
 
     // Pin EVERY turn of this conversation to one working directory so `claude --resume` always
     // looks in the bucket the previous turns wrote to (see workDirPath). Best-effort: if the dir
@@ -4246,11 +4272,13 @@ export class LarkService {
     const apiKey = apiMode ? this.resolveApiKey(runner) : null;
     // Ran the DIRECT API (vs the local CLI). Skip the API if its key was already seen out of
     // credit this session → go straight to the CLI/subscription (no dead-key retry every turn).
-    const onApi = !!(apiMode && apiKey && !general && !this.apiCreditOut.has(runner));
+    // Tạo workflow luôn chạy CLI trên máy: đường API/MAIC dựng bộ công cụ theo `mode` (không có
+    // bộ riêng của chế độ này) và cần client Open API — chế độ này cố ý không đòi.
+    const onApi = !!(apiMode && apiKey && !general && !workflowTurn && !this.apiCreditOut.has(runner));
     // NGUỒN CHẠY THỨ BA: gói Larkwave (MAIC). Không cần CLI cài trên máy, không cần khoá API
     // riêng — máy chủ giữ khoá MAIC, chặn theo gói của người dùng và ghi sổ token; công cụ Lark
     // vẫn chạy TRÊN MÁY NÀY nên App Secret không rời máy. Xem larkMaicAgent.ts.
-    const onMaic = !!(this.store.getSettings().larkRunSource === 'maic' && !general && this.accountTokenGetter?.());
+    const onMaic = !!(this.store.getSettings().larkRunSource === 'maic' && !general && !workflowTurn && this.accountTokenGetter?.());
     // The CLI spawn injects a stored API key (if any) into claude's env — so a credit error may be
     // THAT key being drained while the user's own `claude` subscription is fine. When set, recover
     // by retrying on the subscription (key stripped).
@@ -4267,7 +4295,7 @@ export class LarkService {
      * Cờ này ở trong settings nên đọc lại mỗi lần gần như không tốn gì.
      */
     const confirm = (callId: string, name: string, input: unknown) => {
-      if (this.store.getSettings().autoApprove) return Promise.resolve(true);
+      if (!workflowTurn && this.store.getSettings().autoApprove) return Promise.resolve(true);
       return new Promise<boolean>((resolve) => this.pending.set(callId, { convId, resolve, name, input }));
     };
 
@@ -4316,6 +4344,7 @@ export class LarkService {
           runnerSwitchNote,
           session,
           extraTools: this.plugins.collectTools(),
+          ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client) } : {}),
           autoApprove,
           allowVersionHint: true, // xem nhánh trên
           allowFileTools: true, // lượt của chính chủ máy — xem LarkAgentDeps.allowFileTools
@@ -4399,6 +4428,7 @@ export class LarkService {
             readOnly: false,
             cwd: workDir ?? (general ? attachDir : undefined),
             preferSubscription: true, // ← ignore the injected key; use the subscription
+            ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client) } : {}),
             awaitConfirm: confirm,
             awaitAsk: (callId, question, choices) =>
               new Promise<string>((resolve) => {
@@ -4439,7 +4469,8 @@ export class LarkService {
           for await (const ev of fb) yield ev;
         } else {
           // Local CLI ran out of API credit → re-run THIS turn via the direct API if a key exists.
-          const fbKey = this.resolveApiKey(runner);
+          // (Không cho lượt Tạo workflow: đường API không có bộ công cụ riêng của chế độ này.)
+          const fbKey = workflowTurn ? null : this.resolveApiKey(runner);
           if (fbKey) {
             yield { type: 'text', delta: '\n\n_(Hết credit ở CLI — tự chuyển sang API trực tiếp, giữ nguyên hội thoại…)_\n\n' };
             const history = this.buildApiHistory(stored?.items ?? []);

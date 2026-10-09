@@ -1,0 +1,4 @@
+{"id":"7654164657346711263","token":"BaseTokDDDDDDDDDDDDDDDDDDDDDDD","name":"Base Test","rev":16,"owner":"7000000000000000001","schemaVersion":5,"objType":8,"timezone":"Asia/Saigon",
+ "blocks":["wkfjsVtNDZBXzZiv","tblkQBhz17Rnuqg7","tblMqfzvjMpJiGRt","tbl3cyqBbDwma84c"],
+ "blockInfos":{"tblkQBhz17Rnuqg7":{"id":"tblkQBhz17Rnuqg7","name":"Khách hàng"},"tblMqfzvjMpJiGRt":{"id":"tblMqfzvjMpJiGRt","name":"Tương tác"},"wkfjsVtNDZBXzZiv":{"id":"wkfjsVtNDZBXzZiv","name":"Quy trình làm việc","blockToken":"7654164572698316507","blockType":86},"tbl3cyqBbDwma84c":{"id":"tbl3cyqBbDwma84c","name":""}},
+ "trashBlockMap":{"tbl3cyqBbDwma84c":true},"isBaseManager":true}

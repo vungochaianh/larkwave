@@ -358,7 +358,7 @@ export class LarkCdpDriver {
 
   private stoppedResult(): J {
     this.lastAt = Date.now();
-    return { ok: false, error: 'stopped-by-user', blocked: 'user-stop', hint: 'Người dùng đã bấm DỪNG trong "Trình duyệt Lark". DỪNG NGAY, không thao tác tiếp, báo lại đã làm tới đâu.' };
+    return { ok: false, error: 'stopped-by-user', blocked: 'user-stop', hint: 'Người dùng đã bấm DỪNG ở khung Lark. DỪNG NGAY, không thao tác tiếp, báo lại đã làm tới đâu.' };
   }
 
   private hostGuard(session = ''): J | null {

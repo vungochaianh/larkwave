@@ -1258,7 +1258,7 @@ export function mapWorkflowError(e: unknown, op: WorkflowOp): MappedWorkflowErro
       kind: 'unsupported',
       ...base,
       error: 'Máy chủ Lark của tenant này chưa có API Workflow (Base v3).',
-      fix: ['Có thể tenant/khu vực chưa mở API này. Dùng đường dự phòng: dựng workflow bằng cách lái giao diện Lark (Trình duyệt Lark).'],
+      fix: ['Có thể tenant/khu vực chưa mở API này. Dùng đường dự phòng: dựng workflow bằng phiên Lark web (Lark × Agents → Tạo workflow).'],
       fallback: 'ui',
     };
   if (code === 91403 || code === 1254302 || code === 1254304 || code === 1254301 || /no ?permission|forbidden|permission denied|not have permission/i.test(msg))

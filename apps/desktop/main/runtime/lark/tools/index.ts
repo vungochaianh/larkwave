@@ -4,6 +4,7 @@ import { bitablePermissionTools } from './bitablePermissions';
 import { workflowTools } from './workflows';
 import { workflowV3Tools } from './workflowsV3';
 import { larkUiTools } from './larkUi';
+import { larkWebTools } from './larkWeb';
 import { messagingTools } from './messaging';
 import { docsTools } from './docs';
 import { contactsTools } from './contacts';
@@ -24,6 +25,7 @@ const ALL: LarkToolDef[] = [
   ...fileTools,
   ...bitableTools,
   ...bitablePermissionTools,
+  ...larkWebTools,
   ...workflowV3Tools,
   ...workflowTools,
   ...larkUiTools,
@@ -42,6 +44,31 @@ const BY_NAME = new Map(ALL.map((t) => [t.name, t]));
 export const allTools = (): LarkToolDef[] => ALL;
 /** Only the non-destructive read tools. Used in Ask (Q&A) mode. */
 export const readOnlyTools = (): LarkToolDef[] => ALL.filter((t) => !t.gated);
+/**
+ * Bộ công cụ của chế độ "Tạo workflow": chạy bằng PHIÊN LARK WEB (không cần App ID) — liệt kê/quét
+ * Base, tra schema chính thức, tạo automation TẮT, và tự lái trình soạn của Lark (lark_ui_*) cho
+ * loại bước chưa tạo thẳng được. Cố ý KHÔNG gồm tool Open API (cần token của custom app) — trừ khi
+ * người dùng đã kết nối app (`withOpenApi`), khi đó thêm đường v3 làm phương án phụ.
+ */
+export const WORKFLOW_MODE_TOOL_NAMES = [
+  'lark_web_list_bases',
+  'lark_web_scan_base',
+  'lark_web_create_automation',
+  'bitable_workflow_schema',
+  'lark_ui_open',
+  'lark_ui_snapshot',
+  'lark_ui_act',
+  'lark_ui_wait',
+  'lark_ui_drag',
+  'lark_ui_saved',
+  'lark_ui_template_list',
+  'lark_ui_template_apply',
+] as const;
+const OPEN_API_WORKFLOW = ['bitable_scan_base', 'bitable_workflow_validate', 'bitable_workflow_create'];
+export function workflowModeTools(withOpenApi = false): LarkToolDef[] {
+  const names = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, ...(withOpenApi ? OPEN_API_WORKFLOW : [])]);
+  return ALL.filter((t) => names.has(t.name));
+}
 /** Resolve a tool by name (for the MCP bridge dispatcher). */
 export const resolveTool = (name: string): LarkToolDef | undefined => BY_NAME.get(name);
 

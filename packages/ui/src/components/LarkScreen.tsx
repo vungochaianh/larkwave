@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Modal, Spin } from 'antd';
-import { SettingOutlined, ReadOutlined, TeamOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Modal, Segmented, Spin } from 'antd';
+import { SettingOutlined, ReadOutlined, TeamOutlined, MessageOutlined, ApartmentOutlined } from '@ant-design/icons';
 import type { LarkConnection } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { useAccountAuth } from '../account/auth';
@@ -16,8 +16,10 @@ import { PluginPanelsCard } from './lark/PluginPanelsCard';
 import { BotPanel } from './lark/BotPanel';
 import { LarkGuideModal } from './lark/LarkGuideModal';
 import { LarkWebPanel } from './lark/LarkWebPanel';
+import { LarkWorkflowStudio } from './lark/LarkWorkflowStudio';
 import { PageHeader } from '../kit';
 
+const SCREEN_MODE_KEY = 'larkwave.lark.screenMode';
 
 /**
  * The "Lark × Agents" screen (desktop only). Gates on a Lark custom-app
@@ -41,6 +43,26 @@ export function LarkScreen({
   const [guideOpen, setGuideOpen] = useState(false);
   /** Bumped when Bases change so the chat re-loads its Base list immediately. */
   const [basesRev, setBasesRev] = useState(0);
+  /**
+   * "Trò chuyện" (custom app, Open API) | "Tạo workflow" (phiên Lark web — KHÔNG cần App ID).
+   * Nhớ theo máy (tiện ích riêng của người xem; storage hỏng thì về mặc định).
+   */
+  const [screenMode, setScreenModeState] = useState<'chat' | 'workflow'>(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(SCREEN_MODE_KEY) === 'workflow' ? 'workflow' : 'chat';
+    } catch {
+      return 'chat';
+    }
+  });
+  const setScreenMode = (m: 'chat' | 'workflow') => {
+    setScreenModeState(m);
+    try {
+      window.localStorage.setItem(SCREEN_MODE_KEY, m);
+    } catch {
+      /* không có storage */
+    }
+  };
+  const workflowSupported = !!runtime.larkWebListBases && !!runtime.larkBrowserAttach;
 
   useEffect(() => {
     if (!supported) {
@@ -120,6 +142,17 @@ export function LarkScreen({
         actions={
           !loading && (
             <>
+              {workflowSupported && (
+                <Segmented
+                  data-testid="lark-screen-mode"
+                  value={screenMode}
+                  onChange={(v) => setScreenMode(v as 'chat' | 'workflow')}
+                  options={[
+                    { value: 'chat', label: 'Trò chuyện', icon: <MessageOutlined /> },
+                    { value: 'workflow', label: 'Tạo workflow', icon: <ApartmentOutlined /> },
+                  ]}
+                />
+              )}
               <Button icon={<ReadOutlined />} onClick={() => setGuideOpen(true)}>
                 Hướng dẫn
               </Button>
@@ -155,7 +188,22 @@ export function LarkScreen({
         <LarkGrantsPanel runtime={runtime} mode="all" />
       </Modal>
 
-      {loading ? (
+      {workflowSupported && screenMode === 'workflow' ? (
+        // Không qua cổng "đã kết nối custom app": chế độ này chạy hoàn toàn bằng phiên Lark web.
+        <Card
+          size="small"
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          styles={{ body: { padding: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } }}
+        >
+          {accountReady ? (
+            <LarkWorkflowStudio key={user?.id || '_local'} runtime={runtime} onOpenSkills={onOpenSkills} />
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Spin />
+            </div>
+          )}
+        </Card>
+      ) : loading ? (
         <div style={{ textAlign: 'center', marginTop: 60 }}>
           <Spin size="large" />
         </div>

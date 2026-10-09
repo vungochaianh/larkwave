@@ -332,6 +332,9 @@ export interface LarkChatInput {
    *  `resume` continues that CLI session. Ignored for Lark turns. */
   sessionId?: string;
   resume?: boolean;
+  /** Chế độ "Tạo workflow": lượt chạy bằng PHIÊN LARK WEB (không cần custom app), bộ công cụ riêng
+   *  (quét Base → thiết kế → tạo automation TẮT / tự lái trình soạn Lark), trên Base đã chọn. */
+  workflow?: { base?: LarkBaseRef };
   /** 'relay' = this turn was initiated remotely (web/phone) and is driving THIS desktop. Surfaces
    *  as a `kind:'relay'` busy-lock so the desktop shows "đang chạy từ xa" + blocks concurrent sends. */
   source?: 'relay';
@@ -472,6 +475,19 @@ export interface LarkBrowserState {
   };
   /** The latest VALID automation save captured (can be saved as a template). */
   capturedSave?: { endpoint: string; base: string; title?: string; fields: string[] };
+}
+
+/** Một Base thấy được qua phiên Lark web (Drive hoặc trong Wiki). `token` = app_token thật. */
+export interface LarkWebBase {
+  token: string;
+  name: string;
+  url: string;
+  isWiki: boolean;
+  wikiToken?: string;
+  /** Giây epoch. */
+  editTime?: number;
+  openTime?: number;
+  wikiSpace?: string;
 }
 
 export interface LarkUiTemplateVar {
@@ -748,6 +764,8 @@ export interface LarkSessionMeta {
   model?: string;
   /** Unfinished todos in this conversation's notes — drives the sidebar badge. */
   openTodos?: number;
+  /** 'workflow' = hội thoại của chế độ "Tạo workflow" (danh sách riêng); bỏ trống = hội thoại thường. */
+  kind?: 'workflow';
   /** True for the CURRENTLY-active session — lets a client (incl. the web over the relay) adopt
    *  the shared active conversation instead of blindly opening the most-recent one. */
   active?: boolean;
@@ -1795,7 +1813,9 @@ export interface RuntimeAdapter {
   /** List saved Lark conversations, newest first. */
   larkSessions?(): Promise<LarkSessionMeta[]>;
   /** Begin a brand-new conversation (fresh Claude session) scoped to `bases`. */
-  larkNewSession?(bases?: LarkBaseRef[]): Promise<{ id: string }>;
+  larkNewSession?(bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }): Promise<{ id: string }>;
+  /** Mọi Base người dùng thấy qua phiên Lark web (không cần App ID). `query` = tìm thêm Base cũ. */
+  larkWebListBases?(input?: { query?: string }): Promise<LarkWebBase[]>;
   /** Open a saved conversation — resumes its Claude session, returns items + bases. */
   larkSwitchSession?(id: string): Promise<{ items: unknown[]; bases?: LarkBaseRef[]; runner?: string; model?: string }>;
   larkSetAgentPrefs?(prefs: { runner?: string; model?: string; apiMode?: boolean; larkRunSource?: 'cli' | 'api' | 'maic' }): Promise<LarkConnection>;

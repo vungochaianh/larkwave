@@ -62,8 +62,10 @@ export function LarkChatShell({
 
   /** Danh sách hội thoại (để đặt tên tab) — làm mới khi mở tab và sau mỗi lượt. */
   const refreshTitles = useCallback(async () => {
-    const list = await runtime.larkSessions?.().catch(() => []);
-    if (!Array.isArray(list)) return;
+    const all = await runtime.larkSessions?.().catch(() => []);
+    if (!Array.isArray(all)) return;
+    // Hội thoại "Tạo workflow" có danh sách riêng ở màn đó — không trộn vào đây.
+    const list = all.filter((s) => s?.kind !== 'workflow');
     const next: Record<string, string> = {};
     for (const s of list as { id: string; title?: string }[]) {
       if (s?.id) next[s.id] = (s.title || '').trim() || 'Cuộc trò chuyện';

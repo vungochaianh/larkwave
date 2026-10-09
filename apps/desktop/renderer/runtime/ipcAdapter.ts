@@ -55,6 +55,7 @@ import type {
   LarkReloginEntry,
   LarkBrowserRect,
   LarkBrowserState,
+  LarkWebBase,
   LarkUiTemplate,
   LarkUiTemplateApplyResult,
 } from '@larkwave/core';
@@ -179,7 +180,8 @@ interface Bridge {
   larkUnshareSession(id: string, token: string): Promise<void>;
   larkShareStatus(id: string, token: string): Promise<{ url: string | null }>;
   larkSessions(): Promise<LarkSessionMeta[]>;
-  larkNewSession(bases?: LarkBaseRef[]): Promise<{ id: string }>;
+  larkNewSession(bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }): Promise<{ id: string }>;
+  larkWebListBases?(input?: { query?: string }): Promise<LarkWebBase[]>;
   larkSwitchSession(id: string): Promise<{ items: unknown[]; bases?: LarkBaseRef[] }>;
   larkSaveSession(id: string, items: unknown[], bases?: LarkBaseRef[]): Promise<void>;
   larkDeleteSession(id: string): Promise<void>;
@@ -617,8 +619,12 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   larkSessions(): Promise<LarkSessionMeta[]> {
     return this.bridge.larkSessions();
   }
-  larkNewSession(bases?: LarkBaseRef[]): Promise<{ id: string }> {
-    return this.bridge.larkNewSession(bases);
+  larkNewSession(bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }): Promise<{ id: string }> {
+    return opts ? this.bridge.larkNewSession(bases, opts) : this.bridge.larkNewSession(bases);
+  }
+  larkWebListBases(input?: { query?: string }): Promise<LarkWebBase[]> {
+    if (!this.bridge.larkWebListBases) return Promise.reject(new Error('"Tạo workflow" cần bản cài mới (.dmg).'));
+    return this.bridge.larkWebListBases(input);
   }
   larkSwitchSession(id: string): Promise<{ items: unknown[]; bases?: LarkBaseRef[]; runner?: string; model?: string }> {
     return this.bridge.larkSwitchSession(id);

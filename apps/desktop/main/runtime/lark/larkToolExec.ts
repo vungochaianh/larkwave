@@ -195,7 +195,7 @@ const TIER_BY_CODE: Record<string, FailureTier> = {
   'sensitive-action': 'blocked',
   'no-window': 'blocked',
   'budget-exhausted': 'blocked', // hint của nó: "dừng và báo người dùng"
-  'stopped-by-user': 'blocked', // người dùng bấm Dừng ở "Trình duyệt Lark"
+  'stopped-by-user': 'blocked', // người dùng bấm Dừng ở khung Lark (Tạo workflow)
   'not-lark-host': 'blocked', // chốt chỉ-Lark: trang/khung ngoài Lark
   // Nhiễu nội bộ — agent tự thử lại được.
   'stale-ref': 'noise',

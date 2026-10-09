@@ -8,6 +8,25 @@ import { SENSITIVE_UI, isLarkHost } from './larkUiCore';
 import { extractTemplate, fillTemplate, loadTemplates, saveTemplates, templateSummary, SAFE_ID, type UiTemplate } from './larkTemplates';
 import { hiddenMode } from '../../hiddenMode';
 import { canProbeLogin, classifyLarkPage, classifyWhoami, WHOAMI_PATH, type LarkWhoami } from './larkLoginState';
+import {
+  pageFetchJs,
+  recentListPath,
+  parseRecentList,
+  searchPath,
+  parseSearch,
+  mergeBases,
+  clientVarsPath,
+  decodeLarkGz,
+  parseBaseMeta,
+  parseTableSchema,
+  parseAutomationList,
+  summarizeWorkflow,
+  OBJ_BITABLE,
+  type WebBase,
+  type WebBaseMeta,
+  type WebTable,
+  type WebAutomation,
+} from './larkWebApi';
 
 /** Hạn giờ cho một lần hỏi "tôi là ai" (xem whoami()). */
 const WHOAMI_TIMEOUT_MS = 6000;
@@ -1049,7 +1068,7 @@ export class LarkWebSession {
         url: r?.url,
         title: r?.title,
         driver,
-        hint: this.win.isEmbedded ? 'Người dùng đang xem trực tiếp trong "Trình duyệt Lark".' : 'Người dùng có thể mở "Trình duyệt Lark" để xem bạn thao tác trực tiếp.',
+        hint: this.win.isEmbedded ? 'Người dùng đang xem trực tiếp trong khung Lark (Lark × Agents → Tạo workflow).' : 'Người dùng có thể mở Lark × Agents → "Tạo workflow" để xem bạn thao tác trực tiếp.',
       };
     } catch (e) {
       return { ok: false, error: String((e as Error)?.message || e) };
@@ -1304,7 +1323,7 @@ export class LarkWebSession {
   async templateSave(input: { name: string; description?: string }): Promise<LarkUiTemplate> {
     await this.pullRecording().catch(() => null);
     const valid = this.cdp.lastValidSave() || (this.capturedWfPayload ? { endpoint: '/space/api/bitable/automation/update', body: this.capturedWfPayload.rawBody as Record<string, unknown>, at: 0 } : null);
-    if (!valid) throw new Error('Chưa bắt được lần LƯU automation/workflow nào. Hãy dựng 1 cái bằng tay trong "Trình duyệt Lark" (bấm Lưu trong Lark), rồi thử lại.');
+    if (!valid) throw new Error('Chưa bắt được lần LƯU automation/workflow nào. Hãy dựng 1 cái bằng tay trong khung Lark của màn "Tạo workflow" (bấm Lưu trong Lark), rồi thử lại.');
     const tpl = extractTemplate(valid.body, { name: input.name, description: input.description, endpoint: valid.endpoint });
     const list = loadTemplates(this.templatesFile());
     list.unshift(tpl);
@@ -1636,16 +1655,8 @@ export class LarkWebSession {
    */
   private async rawCall(path: string, method: string, body?: unknown): Promise<RawResult> {
     if (!this.win || this.win.isDestroyed()) return { error: 'Cửa sổ Lark đã đóng' };
-    const js = `(async () => {
-      try {
-        const opts = { method: ${JSON.stringify(method)}, headers: { 'accept': 'application/json, text/plain, */*' }, credentials: 'include' };
-        ${body !== undefined ? `opts.headers['content-type'] = 'application/json'; opts.body = ${JSON.stringify(JSON.stringify(body))}; var _m = document.cookie.match(/(?:^|; )_csrf_token=([^;]+)/); if (_m) { opts.headers['x-csrftoken'] = decodeURIComponent(_m[1]); }` : ''}
-        const r = await fetch(${JSON.stringify(path)}, opts);
-        const text = await r.text();
-        let json = null; try { json = JSON.parse(text); } catch (e) {}
-        return { status: r.status, finalUrl: r.url, redirected: r.redirected, pageUrl: location.href, json, snippet: json ? null : text.slice(0, 300) };
-      } catch (e) { return { error: String((e && e.message) || e), pageUrl: location.href }; }
-    })()`;
+    // x-csrftoken cho MỌI phương thức (đúng như app Lark gửi) — xem pageFetchJs.
+    const js = pageFetchJs(path, method, body);
     return (await this.win!.webContents.executeJavaScript(js, true)) as RawResult;
   }
 
@@ -1769,6 +1780,172 @@ export class LarkWebSession {
       msg: j.msg || (code === 0 ? 'OK' : ''),
       raw: JSON.stringify(j).slice(0, 400),
     };
+  }
+
+  // ── Lớp dữ liệu web (KHÔNG cần App ID/App Secret) — xem larkWebApi.ts + docs/lark-web-api.md ──
+
+  /**
+   * Gọi một API nội bộ CÙNG ORIGIN trong trang Lark đang đăng nhập, gắn `x-csrftoken` cho MỌI
+   * phương thức (recent/list thiếu nó là HTTP 500, tablesv3 là 403). Có hạn giờ: executeJavaScript
+   * treo vô hạn khi trang đang chuyển hướng. Trả nguyên JSON (kể cả code ≠ 0) để parser quyết định.
+   */
+  async webJson(path: string, method = 'GET', body?: unknown, timeoutMs = 25_000): Promise<J> {
+    if (!this.win || this.win.isDestroyed() || !this.host) {
+      throw new Error('Chưa đăng nhập Lark web — mở "Tạo workflow" và đăng nhập Lark ngay trong khung bên phải.');
+    }
+    const wc = this.win.webContents;
+    // Fetch tương đối chạy theo origin HIỆN TẠI của trang. Trang lạc sang origin khác (trang đăng
+    // nhập, www.larksuite.com) thì cookie/csrf của tenant không áp → đưa về đúng tenant trước.
+    let cur = '';
+    try {
+      cur = wc.getURL();
+    } catch {
+      /* ignore */
+    }
+    if (safeOrigin(cur) !== safeOrigin(this.host)) {
+      try {
+        await this.win.loadURL(`${this.host}/drive/home/`, { userAgent: CHROME_UA });
+        await new Promise((r) => setTimeout(r, 1500));
+      } catch {
+        /* để fetch bên dưới báo lỗi thật */
+      }
+    }
+    const run = wc.executeJavaScript(pageFetchJs(path, method, body), true) as Promise<RawResult>;
+    const res = await Promise.race([
+      run.catch((e) => ({ error: String((e as Error)?.message || e) }) as RawResult),
+      new Promise<RawResult>((r) => setTimeout(() => r({ error: `quá ${Math.round(timeoutMs / 1000)}s không trả lời` }), timeoutMs)),
+    ]);
+    if (res?.error) throw new Error(`Lỗi gọi Lark web (${path.split('?')[0]}): ${res.error}`);
+    if (!res?.json) {
+      const looksLogin = /login|passport|sign\s?in|đăng nhập|log in/i.test(res?.snippet || '') || LOGIN_MARKERS.test(res?.finalUrl || '');
+      if (looksLogin) {
+        this.markDead();
+        throw new Error('Phiên Lark web đã hết — bấm "Đăng nhập lại" ở khung Lark bên phải.');
+      }
+      throw new Error(`Lark web trả về không phải JSON (HTTP ${res?.status ?? '?'}, ${path.split('?')[0]}).`);
+    }
+    return res.json;
+  }
+
+  /** Người đang đăng nhập Lark web (id dùng cho "gửi cho tôi" trong automation). */
+  async webMe(): Promise<{ id: string; name: string; avatarUrl?: string; tenant?: string } | null> {
+    try {
+      const j = await this.webJson(WHOAMI_PATH);
+      const d = j?.data;
+      if (!d || d.is_Anonymous) return null;
+      const id = String(d.suid || d.id || d.uid || '');
+      return id ? { id, name: String(d.name || d.cn_name || ''), avatarUrl: d.avatar_url ? String(d.avatar_url) : undefined, tenant: d.tenant_name ? String(d.tenant_name) : undefined } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * TẤT CẢ Base người dùng thấy: duyệt hết các trang recent/list (obj_type 8 — đã gồm Base trong
+   * Wiki) rồi, nếu có `query`, gộp thêm kết quả ô tìm kiếm của Drive (để ra cả Base lâu chưa mở).
+   */
+  async listWebBases(opts: { query?: string; maxPages?: number } = {}): Promise<WebBase[]> {
+    const lists: WebBase[][] = [];
+    let label: string | undefined;
+    for (let page = 0; page < (opts.maxPages ?? 12); page++) {
+      const r = parseRecentList(await this.webJson(recentListPath({ types: [OBJ_BITABLE], lastLabel: label })));
+      lists.push(r.bases);
+      if (!r.hasMore || !r.lastLabel || r.lastLabel === label) break;
+      label = r.lastLabel;
+    }
+    const q = (opts.query || '').trim();
+    let all = mergeBases(...lists);
+    if (q) {
+      const found = parseSearch(await this.webJson(searchPath(q))).bases;
+      const norm = (s: string) => s.toLowerCase();
+      all = mergeBases(found, all.filter((b) => norm(b.name).includes(norm(q))));
+    }
+    return all;
+  }
+
+  /**
+   * Quét một Base CHỈ ĐỌC: tên + bảng (cột/kiểu/lựa chọn/view + vài bản ghi mẫu) + automation và
+   * workflow đã có. Một GET clientvars cho mỗi bảng (recordLimit nhỏ) — không cần quyền App.
+   */
+  async scanWebBase(token: string, opts: { maxTables?: number; samples?: number } = {}): Promise<{
+    meta: WebBaseMeta;
+    tables: WebTable[];
+    automations: WebAutomation[];
+    workflows: WebAutomation[];
+    errors: string[];
+  }> {
+    const samples = Math.max(0, Math.min(5, opts.samples ?? 3));
+    const first = await this.webJson(clientVarsPath(token, undefined, samples));
+    if (first?.code !== 0) throw new Error(`Không đọc được Base (Lark báo ${first?.code}: ${first?.msg || ''}). Kiểm tra bạn có quyền xem Base này.`);
+    const meta = parseBaseMeta(decodeLarkGz(first.data?.base));
+    const names: Record<string, string> = Object.fromEntries(meta.tables.map((t) => [t.id, t.name]));
+    const tables: WebTable[] = [];
+    const errors: string[] = [];
+    const firstTable = first.data?.table ? decodeLarkGz(first.data.table) : null;
+    for (const t of meta.tables.slice(0, opts.maxTables ?? 20)) {
+      try {
+        let raw = firstTable && firstTable.meta?.id === t.id ? firstTable : null;
+        if (!raw) {
+          const j = await this.webJson(clientVarsPath(token, t.id, samples));
+          if (j?.code !== 0) throw new Error(`${j?.code}: ${j?.msg || ''}`);
+          raw = decodeLarkGz(j.data?.table);
+        }
+        tables.push(parseTableSchema(raw, t.name, samples));
+      } catch (e) {
+        errors.push(`Bảng «${t.name}»: ${(e as Error)?.message || e}`);
+      }
+    }
+    let automations: WebAutomation[] = [];
+    try {
+      automations = parseAutomationList(await this.webJson(`${bit(token)}/automation/list`), names);
+    } catch (e) {
+      errors.push(`Danh sách automation: ${(e as Error)?.message || e}`);
+    }
+    const workflows: WebAutomation[] = [];
+    for (const b of meta.workflowBlocks.slice(0, 10)) {
+      try {
+        const j = await this.webJson(`${bit(token)}/workflow/detail?workflowID=${enc(b.workflowId)}&bizType=2`);
+        if (j?.code !== 0) throw new Error(`${j?.code}: ${j?.msg || ''}`);
+        workflows.push(summarizeWorkflow(j.data?.workflow, 'workflow', names, b.name));
+      } catch (e) {
+        errors.push(`Quy trình «${b.name}»: ${(e as Error)?.message || e}`);
+      }
+    }
+    return { meta, tables, automations, workflows, errors };
+  }
+
+  /**
+   * Tạo một Automation ở trạng thái TẮT — ĐÚNG request trình soạn Automation của Lark gửi (đọc từ
+   * mã của chính trang, xem docs/lark-web-api.md): POST /space/api/bitable/automation/create
+   * {token, draft, extra, triggerName, status:0}. Khi TẮT, trình soạn KHÔNG gửi flowSchema/nodeSchema
+   * (chỉ tính khi bật) — nên bản nháp tắt không vướng lỗi 800004006 của đường cũ.
+   * KHÔNG có tham số bật: status luôn là 0.
+   */
+  async createWebAutomation(token: string, p: { draft: string; extra: string; triggerName: string }): Promise<{ workflowID: string; raw: J }> {
+    const body = { token, draft: p.draft, extra: p.extra, triggerName: p.triggerName, status: 0 };
+    const j = await this.webJson('/space/api/bitable/automation/create', 'POST', body);
+    if (j?.code !== 0) throw new Error(`Lark từ chối tạo automation (mã ${j?.code}: ${j?.msg || 'không rõ'}).`);
+    const id = j?.data?.workflowID || j?.data?.workflowId || j?.data?.workflow?.workflowID;
+    if (!id) throw new Error('Lark báo tạo xong nhưng không trả workflowID: ' + JSON.stringify(j?.data ?? null).slice(0, 300));
+    return { workflowID: String(id), raw: j.data };
+  }
+
+  /** Đọc lại một automation theo id từ automation/list (draft/extra/status đúng như Lark lưu). */
+  async readWebAutomation(token: string, workflowID: string): Promise<J | null> {
+    const j = await this.webJson(`${bit(token)}/automation/list`);
+    if (j?.code !== 0) throw new Error(`Không đọc lại được danh sách automation (mã ${j?.code}).`);
+    const list: J[] = Array.isArray(j?.data?.workflowList) ? j.data.workflowList : [];
+    return list.find((w) => String(w?.workflowID) === String(workflowID)) ?? null;
+  }
+
+  /** Đưa khung Lark tới Base (để người dùng/AI thấy ngay automation vừa tạo). Chỉ host Lark. */
+  async showBase(token: string): Promise<void> {
+    if (!this.win || this.win.isDestroyed() || !this.host) return;
+    try {
+      await this.win.loadURL(`${this.host}/base/${encodeURIComponent(token)}`, { userAgent: CHROME_UA });
+    } catch {
+      /* best-effort */
+    }
   }
 
   /** Try a path; return its `data` on code 0, else null (for probing candidate endpoints).

@@ -1,0 +1,15 @@
+{"meta":{"id":"tblMqfzvjMpJiGRt","rev":100,"recordsNum":5},
+ "views":["vewA1","vewB2"],
+ "viewMap":{"vewA1":{"id":"vewA1","name":"Grid","type":1,"property":{"fields":["fld52eqPQQ","fldGoAQZa3","fldUi0s6Ud","fldKbyDVKT","fldP7utf0A"]}},"vewB2":{"id":"vewB2","name":"Kanban","type":2,"property":{"fields":[]}}},
+ "fieldMap":{
+   "fldUi0s6Ud":{"name":"Người xử lý","isPrimary":false,"type":11,"property":{"multiple":true},"fieldUIType":"User"},
+   "fldGoAQZa3":{"name":"Trạng thái","isPrimary":false,"type":3,"property":{"options":[{"color":0,"id":"optRxUBe2x","name":"Chưa xử lý"},{"name":"Đang xử lý","color":1,"id":"optCeNoBcv"},{"color":3,"id":"optwQirOpQ","name":"Đóng"}]},"fieldUIType":"SingleSelect"},
+   "fldP7utf0A":{"name":"Chiến dịch liên quan","isPrimary":false,"type":18,"property":{"tableId":"tblzILAQn0CepAAT","multiple":true},"fieldUIType":"SingleLink"},
+   "fldKbyDVKT":{"name":"Thời gian","isPrimary":false,"type":5,"property":{"dateFormat":"yyyy/MM/dd"},"fieldUIType":"DateTime"},
+   "fld52eqPQQ":{"name":"Tiêu đề","isPrimary":true,"type":1,"fieldUIType":"Text"}
+ },
+ "primaryKey":"fld52eqPQQ",
+ "recordMap":{
+   "recvnklDd0QnkO":{"fldGoAQZa3":{"value":"optRxUBe2x"},"fld52eqPQQ":{"value":[{"type":"text","text":"Inbox hỏi giá"}]},"fldKbyDVKT":{"value":1781913600000},"fldUi0s6Ud":{"value":null}},
+   "recvnklDd00N9E":{"fldGoAQZa3":{"value":"optwQirOpQ"},"fld52eqPQQ":{"value":[{"type":"text","text":"Comment hỏi dịch vụ"}]}}
+ }}

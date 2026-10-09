@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, App, Badge, Button, Checkbox, Drawer, Dropdown, Grid, Input, Modal, Popover, Segmented, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
 import { renderUserText } from '../chat/renderUserText';
@@ -188,6 +188,7 @@ export function LarkChat({
   onOpenSkills,
   pinnedSessionId,
   hideSessionList = false,
+  workflow,
 }: {
   runtime: RuntimeAdapter;
   basesRev?: number;
@@ -199,6 +200,12 @@ export function LarkChat({
   pinnedSessionId?: string;
   /** Ẩn danh sách hội thoại bên trong: ở chế độ nhiều tab thanh tab đã thay vai trò đó. */
   hideSessionList?: boolean;
+  /**
+   * Chế độ "Tạo workflow": hội thoại chạy bằng phiên Lark web trên MỘT Base đã chọn (`base`).
+   * Thanh "Base áp dụng" thay bằng `header` (bộ chọn Base của màn Tạo workflow), không có nút
+   * Hỏi đáp/Thực thi, không có Tự động duyệt (ghi luôn hỏi xác nhận).
+   */
+  workflow?: { base: LarkBaseRef | null; header?: ReactNode; examples?: { label: string; prompt: string }[] };
   /** Open the Skills screen — the "/" menu's "Tạo lệnh mới" row. Absent = the row is hidden. */
   onOpenSkills?: () => void;
   /** Hand the synthesized app brief to the builder (fills the Composer + navigates). */
@@ -633,8 +640,10 @@ export function LarkChat({
       .catch(() => undefined);
   };
 
+  /** Hội thoại thường và hội thoại "Tạo workflow" là hai danh sách riêng. */
+  const ofThisKind = (s: LarkSessionMeta) => (s.kind === 'workflow') === !!workflow;
   const refreshSessions = () => {
-    runtime.larkSessions?.().then((s) => setSessions(s || [])).catch(() => undefined);
+    runtime.larkSessions?.().then((s) => setSessions((s || []).filter(ofThisKind))).catch(() => undefined);
   };
 
   const mountedRef = useRef(true);
@@ -653,13 +662,15 @@ export function LarkChat({
     if (!runtime.larkSessions) return; // web with no session support (shouldn't happen over relay)
     let list: LarkSessionMeta[];
     try {
-      list = (await runtime.larkSessions()) || [];
+      list = ((await runtime.larkSessions()) || []).filter(ofThisKind);
     } catch {
       return; // relay/RPC failed (e.g. desktop busy) — keep the current view, NEVER clobber
     }
     if (!mountedRef.current) return;
     setSessions(list);
-    if (!list.length) {
+    // Khung đã khoá vào một hội thoại (tab / Tạo workflow) thì KHÔNG tự đẻ hội thoại mới — kể cả khi
+    // danh sách rỗng (hội thoại vừa tạo chưa có trên đĩa).
+    if (!list.length && !pinnedSessionId) {
       // Only spawn a fresh session when the machine GENUINELY has none AND nothing is loaded here —
       // a transient relay hiccup must never replace a conversation with a blank one.
       if (sessionIdRef.current) return;
@@ -707,6 +718,18 @@ export function LarkChat({
     prevOwnerKind.current = agentOwner?.kind ?? null;
     if (prev === 'relay' && !agentOwner && !busy) void syncFromActive();
   }, [agentOwner, busy, syncFromActive]);
+
+  // Tạo workflow: Base của hội thoại do bộ chọn ở màn ngoài quyết định — giữ convBases khớp và lưu
+  // ngay (để mở lại hội thoại vẫn nhớ Base đã chọn).
+  const wfBaseTok = workflow?.base?.appToken || '';
+  useEffect(() => {
+    if (!workflow || !wfBaseTok || !sessionId) return;
+    if (convBases.length === 1 && convBases[0].appToken === wfBaseTok) return;
+    const next = [workflow.base as LarkBaseRef];
+    setConvBases(next);
+    if (runtime.larkSaveSession) void runtime.larkSaveSession(sessionId, items as unknown[], next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wfBaseTok, sessionId]);
 
   /** Persist the conversation's Bases immediately (so add/remove survives reopen). */
   const persistBases = (next: LarkBaseRef[]) => {
@@ -977,8 +1000,9 @@ export function LarkChat({
       lastAgentRef.current = `${runnerId}${runnerModel ? ` · ${runnerModel}` : ''}`;
       for await (const ev of runtime.larkChat({
         prompt: effective,
-        mode,
-        activeBases: convBases,
+        mode: workflow ? 'build' : mode,
+        activeBases: workflow ? (workflow.base ? [workflow.base] : []) : convBases,
+        ...(workflow ? { workflow: { base: workflow.base ?? undefined } } : {}),
         attachments: atts.length ? atts : undefined,
         runner: runnerId,
         model: runnerModel || undefined,
@@ -1781,7 +1805,9 @@ export function LarkChat({
           )}
           </div>
         </div>
+        {workflow && workflow.header}
         {/* Applied-Bases bar — the conversation works across these Bases. */}
+        {!workflow && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8, marginBottom: 4, borderBottom: `1px solid ${V.borderSub}`, flexWrap: 'wrap' }}>
           <DatabaseOutlined style={{ color: BRAND }} />
           <Text style={{ fontSize: 13, fontWeight: 600, color: V.textSub }}>{tr('chat.appliedBases', 'Base áp dụng:')}</Text>
@@ -1835,17 +1861,22 @@ export function LarkChat({
             </Popover>
           )}
         </div>
+        )}
         <div style={{ flex: 1, overflowY: 'auto', padding: '2px 2px 6px' }}>
           {items.length === 0 && (
             <div style={{ textAlign: 'center', color: V.textFaint, marginTop: 36 }}>
               <RobotOutlined style={{ fontSize: 28, color: BRAND }} />
               <div style={{ marginTop: 10, fontWeight: 600, color: V.textSub }}>
-                {convBases.length
+                {workflow
+                  ? workflow.base
+                    ? `${tr('wf.emptyFor', 'Mô tả automation bạn muốn cho')} «${workflow.base.name}»`
+                    : tr('wf.pickBaseFirst', 'Chọn một Base ở trên, rồi mô tả automation bạn muốn')
+                  : convBases.length
                   ? `${tr('chat.quickAskFor', 'Hỏi nhanh cho')} ${convBases.length} ${tr('chat.basesApplied', 'base đang áp dụng')}`
                   : tr('chat.larkQaIntro', 'Hỏi đáp & tuỳ chỉnh dữ liệu Lark bằng AI (Claude / Grok / …)')}
               </div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 460, margin: '12px auto 0' }}>
-                {chips.map((c) => (
+                {(workflow ? (workflow.base ? workflow.examples ?? [] : []) : chips).map((c) => (
                   <div
                     key={c.label}
                     onClick={() => send(c.prompt, chipLabel(c))}
@@ -2060,7 +2091,7 @@ export function LarkChat({
           {/* Skills / quick utils — base-scoped when a Base is active. Wraps to multiple
               lines (no horizontal scroll); collapsed to one line with a Xem thêm / Thu gọn
               toggle when it overflows. */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
+          <div style={{ display: workflow ? 'none' : 'flex', alignItems: 'flex-start', gap: 6, paddingBottom: 8 }}>
           <div
             ref={chipsRef}
             style={{
@@ -2277,7 +2308,8 @@ export function LarkChat({
               }
             />
           )}
-          {/* Settings row: mode + auto-approve. */}
+          {/* Settings row: mode + auto-approve. (Tạo workflow: không có — luôn ghi có xác nhận.) */}
+          {!workflow && (
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, rowGap: 8, marginBottom: 8 }}>
             <Segmented
               value={mode}
@@ -2317,6 +2349,7 @@ export function LarkChat({
               </Tooltip>
             )}
           </div>
+          )}
           {attachments.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               {attachments.map((a, i) => (

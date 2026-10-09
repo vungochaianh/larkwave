@@ -1,0 +1,10 @@
+{
+  "code": 0, "msg": "Success",
+  "data": {
+    "entities": { "nodes": {
+      "BaseTokDDDDDDDDDDDDDDDDDDDDDDD": { "url": "https://tenant.sg.larksuite.com/base/BaseTokDDDDDDDDDDDDDDDDDDDDDDD", "name": "Base Test", "type": 8, "obj_token": "BaseTokDDDDDDDDDDDDDDDDDDDDDDD" },
+      "BaseTokFFFFFFFFFFFFFFFFFFFFFFF": { "url": "https://tenant.sg.larksuite.com/base/BaseTokFFFFFFFFFFFFFFFFFFFFFFF", "name": "", "type": 8, "obj_token": "BaseTokFFFFFFFFFFFFFFFFFFFFFFF" }
+    }, "users": {} },
+    "has_more": false, "last_label": "", "node_list": ["BaseTokDDDDDDDDDDDDDDDDDDDDDDD", "BaseTokFFFFFFFFFFFFFFFFFFFFFFF"], "total": 0
+  }
+}

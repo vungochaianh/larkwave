@@ -174,6 +174,7 @@ export const IPC = {
   larkListTables: 'tw:larkListTables',
   larkSessions: 'tw:larkSessions',
   larkNewSession: 'tw:larkNewSession',
+  larkWebListBases: 'tw:larkWebListBases',
   larkSwitchSession: 'tw:larkSwitchSession',
   larkSetAgentPrefs: 'tw:larkSetAgentPrefs',
   larkSaveSession: 'tw:larkSaveSession',

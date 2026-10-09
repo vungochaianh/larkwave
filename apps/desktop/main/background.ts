@@ -435,7 +435,12 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkBackupSync, (_e, token: string) => runtime.larkBackupSync(token));
   ipcMain.handle(IPC.larkResetChat, () => runtime.larkResetChat());
   ipcMain.handle(IPC.larkSessions, () => runtime.larkSessions());
-  ipcMain.handle(IPC.larkNewSession, (_e, bases?: LarkBaseRef[]) => runtime.larkNewSession(bases));
+  ipcMain.handle(IPC.larkNewSession, (_e, bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }) =>
+    runtime.larkNewSession(bases, opts?.kind === 'workflow' ? { kind: 'workflow' } : undefined),
+  );
+  ipcMain.handle(IPC.larkWebListBases, (_e, input?: { query?: string }) =>
+    runtime.larkWebListBases(typeof input?.query === 'string' ? { query: input.query.slice(0, 200) } : undefined),
+  );
   ipcMain.handle(IPC.larkSwitchSession, (_e, id: string) => runtime.larkSwitchSession(id));
   ipcMain.handle(IPC.larkSaveSession, (_e, id: string, items: unknown[], bases?: LarkBaseRef[]) =>
     runtime.larkSaveSession(id, items, bases),

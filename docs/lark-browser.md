@@ -1,5 +1,7 @@
 # Trình duyệt Lark (desktop)
 
+> **Cập nhật 09/10/2026:** màn "Trình duyệt Lark" riêng đã gỡ. Trang Lark giờ gắn cạnh hội thoại trong Lark × Agents → **Tạo workflow** (`packages/ui/src/components/lark/LarkWorkflowStudio.tsx`, máy trạng thái `larkDock.ts`). Panel "Mẫu — làm một lần, dùng lại" và nút "Nâng cao" cũng đã gỡ; mã mẫu chỉ còn là tool dự phòng `lark_ui_template_list/apply`. API nội bộ: xem `docs/lark-web-api.md`.
+
 Màn **Lark → Trình duyệt Lark** hiện chính trang Lark web mà mọi tính năng nền đang dùng (Đồng bộ
 Bitable, đọc workflow, AI điều khiển Lark) — cùng `webContents`, cùng partition
 `persist:tw-lark-web-<tài khoản>`, nên không có lần đăng nhập thứ hai.

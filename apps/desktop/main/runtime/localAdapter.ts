@@ -4,7 +4,7 @@ import { app, dialog, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
 import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillLister } from './lark/skillBridge';
 import type { SkillContractFields, LarkPendingPrompts } from '@larkwave/core';
-import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult } from '@larkwave/core';
+import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
@@ -452,8 +452,11 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   larkSessions(): Promise<LarkSessionMeta[]> {
     return this.lark.larkSessions();
   }
-  larkNewSession(bases?: LarkBaseRef[]): Promise<{ id: string }> {
-    return this.lark.larkNewSession(bases);
+  larkNewSession(bases?: LarkBaseRef[], opts?: { kind?: 'workflow' }): Promise<{ id: string }> {
+    return this.lark.larkNewSession(bases, opts);
+  }
+  larkWebListBases(input?: { query?: string }): Promise<LarkWebBase[]> {
+    return this.lark.larkWebListBases(input);
   }
   larkSwitchSession(id: string): Promise<{ items: unknown[]; bases?: LarkBaseRef[]; runner?: string; model?: string }> {
     return this.lark.larkSwitchSession(id);

@@ -1,0 +1,13 @@
+{
+  "code": 0, "msg": "Success",
+  "data": {
+    "candidates": null,
+    "entities": { "objs": {
+      "OldBaseTokGGGGGGGGGGGGGGGGGGGG": { "token": "OldBaseTokGGGGGGGGGGGGGGGGGGGG", "type": 8, "title": "<em>TEST</em> LOGIC LARK", "url": "https://tenant.sg.larksuite.com/base/OldBaseTokGGGGGGGGGGGGGGGGGGGG", "edit_time": 1783321732, "open_time": 1783388429, "wiki_infos": null },
+      "DocTokHHHHHHHHHHHHHHHHHHHHHHHH": { "token": "DocTokHHHHHHHHHHHHHHHHHHHHHHHH", "type": 22, "title": "Kế hoạch <em>test</em>", "url": "", "wiki_infos": [{ "wiki_token": "Uz4Y", "wiki_url": "https://tenant.sg.larksuite.com/wiki/Uz4Y" }] },
+      "WikiBaseTokIIIIIIIIIIIIIIIIIIII": { "token": "WikiBaseTokIIIIIIIIIIIIIIIIIIII", "type": 8, "title": "Quy trình <em>Test</em>", "url": "", "wiki_infos": [{ "wiki_token": "WikiNodeJJJJ", "space_name": "Thư viện", "wiki_url": "https://tenant.sg.larksuite.com/wiki/WikiNodeJJJJ" }] }
+    }, "users": {} },
+    "has_more": true, "strategy": "search_file_default",
+    "tokens": ["OldBaseTokGGGGGGGGGGGGGGGGGGGG", "DocTokHHHHHHHHHHHHHHHHHHHHHHHH", "WikiBaseTokIIIIIIIIIIIIIIIIIIII"], "total": 32
+  }
+}
