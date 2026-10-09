@@ -21,81 +21,68 @@ const askEnables = (p) =>
       .replace(/đang bật/g, ''),
   );
 
-t('Tạo workflow: bộ nút riêng, đủ 8 nút, Base đang chọn được chèn token', () => {
-  const c = q.buildQuickAsks({ mode: 'workflow', bases: [BASE], appConnected: false });
-  assert.deepStrictEqual(c.map((x) => x.k), ['wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'wfStruct']);
-  for (const x of c) assert.ok(x.prompt.includes('BaseTokABC123'), x.label);
-  for (const x of c) assert.ok(x.prompt.includes('«Base Test»'), x.label);
-  assert.ok(!c.some((x) => /Bảng đầu tiên/.test(x.label)), 'không rơi về câu ví dụ chung');
+const WF = ['wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'wfStruct'];
+t('Bố cục frame (Tạo workflow): MỘT bộ hợp nhất — nút workflow trước, rồi nút dữ liệu; Base chèn token', () => {
+  const c = q.buildQuickAsks({ layout: 'frame', bases: [BASE], appConnected: false });
+  assert.deepStrictEqual(c.slice(0, 8).map((x) => x.k), WF);
+  assert.deepStrictEqual(c.slice(8).map((x) => x.k), ['tablesCols', 'summaryBase', 'evalBase']);
+  for (const x of c.filter((y) => WF.includes(y.k))) assert.ok(x.prompt.includes('BaseTokABC123') && x.prompt.includes('«Base Test»'), x.label);
+  // mode cũ 'workflow' ≙ layout 'frame' (relay / nơi gọi cũ)
+  assert.deepStrictEqual(q.buildQuickAsks({ mode: 'workflow', bases: [BASE], appConnected: false }).map((x) => x.k), c.map((x) => x.k));
 });
-t('Tạo workflow chưa chọn Base → không có nút dựng sẵn, ô gợi ý trống', () => {
-  assert.deepStrictEqual(q.buildQuickAsks({ mode: 'workflow', bases: [], appConnected: true }), []);
-  assert.deepStrictEqual(q.workflowEmptyExamples(null), []);
+t('Bố cục chat (Lark × Agents): cùng bộ nút, nút dữ liệu trước; không trùng vai (readWf/auditWf/suggestWf cũ đã gộp)', () => {
+  const c = q.buildQuickAsks({ layout: 'chat', bases: [BASE, { name: 'B2', appToken: 'Tok2' }], appConnected: true });
+  assert.deepStrictEqual(c.map((x) => x.k), ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData']);
+  assert.strictEqual(new Set(c.map((x) => x.label)).size, c.length, 'nhãn duy nhất');
+  assert.ok(!c.some((x) => ['readWf', 'auditWf', 'suggestWf'].includes(x.k)));
+  assert.deepStrictEqual(q.chatQuickAsks([BASE], true).map((x) => x.k), q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: true }).map((x) => x.k));
 });
-t('Tạo workflow: chỉ dùng phiên Lark web — không tool Open API, không nút gỡ lỗi (kể cả có app/dev)', () => {
+t('Chưa có Base: chat → câu ví dụ (nhãn = câu lệnh); frame → không nút, ô gợi ý trống', () => {
+  const c = q.buildQuickAsks({ layout: 'chat', bases: [], appConnected: true });
+  assert.strictEqual(c.length, 8);
+  for (const x of c) assert.strictEqual(x.label, x.prompt);
+  assert.deepStrictEqual(q.buildQuickAsks({ layout: 'frame', bases: [], appConnected: true }), []);
+  assert.deepStrictEqual(q.emptyExamples({ layout: 'frame', bases: [], appConnected: true }), []);
+});
+t('Ô gợi ý theo bố cục: frame = 4 nút workflow; chat = 2 nút dữ liệu + 2 nút workflow', () => {
+  assert.deepStrictEqual(q.emptyExamples({ layout: 'frame', bases: [BASE], appConnected: false }).map((x) => x.k), ['wfSuggest', 'wfStatus', 'wfRemind', 'wfRead']);
+  assert.deepStrictEqual(q.emptyExamples({ layout: 'chat', bases: [BASE], appConnected: false }).map((x) => x.k), ['tablesCols', 'summaryBase', 'wfSuggest', 'wfRead']);
+});
+t('"workflow" = KHỐI Workflow: nút tạo dùng lark_web_create_workflows, không bao giờ Open API v3 / automation cổ điển', () => {
   for (const appConnected of [false, true]) {
-    const c = q.buildQuickAsks({ mode: 'workflow', bases: [BASE], appConnected, dev: true });
-    for (const x of c) {
+    const c = q.buildQuickAsks({ layout: 'frame', bases: [BASE], appConnected, dev: true });
+    for (const x of c.filter((y) => WF.includes(y.k))) {
       assert.ok(!OPEN_API_CREATE.test(x.prompt), x.label);
-      assert.ok(!/bitable_read_workflows|bitable_scan_base|debug=true/.test(x.prompt), x.label);
+      assert.ok(!/lark_web_create_automations?\b/.test(x.prompt), x.label + ' không tạo automation cổ điển');
     }
-    assert.ok(!c.some((x) => /gỡ lỗi/.test(x.label)));
   }
-});
-t('Tạo workflow: đọc dùng lark_web_read_automations + giữ định dạng WF<số>; tạo dùng lark_web_create_automations', () => {
   const by = Object.fromEntries(q.workflowQuickAsks(BASE).map((x) => [x.k, x.prompt]));
+  for (const k of ['wfSuggest', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner']) assert.ok(by[k].includes('lark_web_create_workflows') && /KHỐI Workflow/.test(by[k]), k);
   assert.ok(by.wfRead.includes('lark_web_read_automations') && by.wfRead.includes('**WF<số>: <tên>**') && by.wfRead.includes('NGUYÊN VĂN'));
   assert.ok(by.wfAudit.includes('lark_web_read_automations') && /mức độ \(cao\/vừa\/thấp\)/.test(by.wfAudit));
-  for (const k of ['wfSuggest', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner']) assert.ok(by[k].includes('lark_web_create_automations'), k);
   assert.ok(by.wfStruct.includes('lark_web_add_table') && by.wfStruct.includes('lark_web_add_fields') && /KHÔNG tạo automation/.test(by.wfStruct));
   assert.ok(/KHÔNG sửa hay xoá automation gốc/.test(by.wfOwner));
 });
 t('Không câu lệnh nào bảo trợ lý BẬT; câu tạo đều có chốt "KHÔNG bật"', () => {
-  const all = [...q.workflowQuickAsks(BASE), ...q.chatQuickAsks([BASE], true, true), ...q.chatQuickAsks([BASE], false)];
+  const all = [...q.workflowQuickAsks(BASE), ...q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: true, dev: true }), ...q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: false })];
   for (const x of all) assert.ok(!askEnables(x.prompt), x.label + ': ' + x.prompt);
-  for (const x of q.workflowQuickAsks(BASE).filter((x) => /lark_web_create_automations/.test(x.prompt))) assert.ok(/KHÔNG bật/.test(x.prompt), x.label);
+  for (const x of q.workflowQuickAsks(BASE).filter((x) => /lark_web_create_workflows/.test(x.prompt))) assert.ok(/KHÔNG bật/.test(x.prompt), x.label);
 });
-t('Ô gợi ý trống của Tạo workflow = 4 nút đầu của bộ nút, theo Base', () => {
-  const e = q.workflowEmptyExamples(BASE);
-  assert.deepStrictEqual(e.map((x) => x.k), ['wfSuggest', 'wfStatus', 'wfRemind', 'wfRead']);
-  const all = q.workflowQuickAsks(BASE);
-  for (const x of e) assert.strictEqual(x.prompt, all.find((y) => y.k === x.k).prompt);
-});
-t('Hội thoại thường không Base → câu ví dụ cũ (nhãn = câu lệnh)', () => {
-  const c = q.buildQuickAsks({ mode: 'chat', bases: [], appConnected: true });
-  assert.strictEqual(c.length, 8);
-  for (const x of c) assert.strictEqual(x.label, x.prompt);
-});
-t('Hội thoại thường có app: giữ nút cũ, đọc/soát dùng bitable_read_workflows kèm app_token; nút gỡ lỗi chỉ ở dev', () => {
-  const c = q.chatQuickAsks([BASE, { name: 'B2', appToken: 'Tok2' }], true);
-  assert.deepStrictEqual(c.map((x) => x.k), ['tablesCols', 'summaryBase', 'evalBase', 'permissions', 'readWf', 'auditWf', 'suggestWf', 'design', 'kanban', 'sampleData']);
+t('Không custom app: nút dữ liệu dùng phiên web, ẩn nút chỉ chạy được với App ID; nút gỡ lỗi chỉ ở dev + có app', () => {
+  const c = q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: false, dev: true });
+  for (const x of c) assert.ok(!/bitable_(base_overview|list_roles|read_workflows|list_fields|scan_base)|debug=true/.test(x.prompt), x.label);
+  assert.ok(!c.some((x) => ['permissions', 'kanban', 'sampleData', 'debugEndpoint'].includes(x.k)));
   const by = Object.fromEntries(c.map((x) => [x.k, x.prompt]));
-  assert.ok(by.readWf.includes('bitable_read_workflows với app_token=BaseTokABC123 (rồi lần lượt'));
-  assert.ok(by.readWf.includes('B2 (app_token=Tok2)'));
-  assert.ok(by.auditWf.includes('app_token=BaseTokABC123'));
-  assert.ok(by.summaryBase.startsWith('Dùng bitable_base_overview'));
-  assert.ok(!c.some((x) => x.k === 'debugEndpoint'));
-  assert.ok(q.chatQuickAsks([BASE], true, true).some((x) => x.k === 'debugEndpoint'));
-});
-t('Hội thoại thường KHÔNG có app: không tool Open API nào (v3/overview/roles/read_workflows), dùng phiên web', () => {
-  const c = q.chatQuickAsks([BASE], false, true);
-  for (const x of c) {
-    assert.ok(!OPEN_API_CREATE.test(x.prompt), x.label);
-    assert.ok(!/bitable_(base_overview|list_roles|read_workflows|list_fields|scan_base)|debug=true/.test(x.prompt), x.label);
-  }
-  assert.ok(!c.some((x) => ['permissions', 'kanban', 'sampleData', 'debugEndpoint'].includes(x.k)), 'nút chỉ chạy được với App ID bị ẩn');
-  const by = Object.fromEntries(c.map((x) => [x.k, x.prompt]));
-  assert.ok(by.readWf.includes('lark_web_read_automations với app_token=BaseTokABC123'));
   assert.ok(by.summaryBase.includes('lark_web_scan_base (app_token=BaseTokABC123'));
-  assert.ok(by.suggestWf.includes('lark_web_create_automations'));
+  assert.ok(q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: true, dev: true }).some((x) => x.k === 'debugEndpoint'));
+  assert.ok(!q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: true }).some((x) => x.k === 'debugEndpoint'));
 });
-t('Hỏi nhanh của tôi: khoá riêng theo chế độ; đọc bỏ mục hỏng + trùng; không che nút dựng sẵn', () => {
-  assert.notStrictEqual(q.CUSTOM_ASKS_KEYS.chat, q.CUSTOM_ASKS_KEYS.workflow);
-  assert.strictEqual(q.CUSTOM_ASKS_KEYS.chat, 'tw_lark_quickasks', 'giữ khoá cũ — không mất danh sách người dùng đã có');
+t('Hỏi nhanh của tôi: MỘT khoá (giữ khoá cũ của hội thoại thường); đọc bỏ mục hỏng + trùng; không che nút dựng sẵn', () => {
+  assert.strictEqual(q.CUSTOM_ASKS_KEY, 'tw_lark_quickasks');
+  assert.strictEqual(q.CUSTOM_ASKS_KEYS.chat, q.CUSTOM_ASKS_KEY, 'không mất danh sách người dùng đã có');
   const parsed = q.parseCustomAsks(JSON.stringify([{ label: ' A ', prompt: 'x' }, { label: 'A', prompt: 'y' }, { label: '', prompt: 'z' }, null, { label: 'B' }]));
   assert.deepStrictEqual(parsed, [{ label: 'A', prompt: 'x' }]);
   assert.deepStrictEqual(q.parseCustomAsks('{bad'), []);
-  assert.deepStrictEqual(q.parseCustomAsks(null), []);
   const built = q.workflowQuickAsks(BASE);
   const { chips, isCustom } = q.mergeChips(built, [{ label: '🔧 Đọc workflow', prompt: 'đè' }, { label: 'Của tôi', prompt: 'p' }]);
   assert.strictEqual(chips.length, built.length + 1);

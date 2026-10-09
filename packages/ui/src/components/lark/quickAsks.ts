@@ -2,9 +2,14 @@
  * "⚡ Hỏi nhanh" của Lark × Agents — các nút bấm-một-cái gửi một yêu cầu dài, chính xác cho trợ lý
  * (bong bóng chat chỉ hiện NHÃN ngắn; câu lệnh thật đi thẳng tới AI).
  *
- * Hàm THUẦN (không React) để kiểm được bằng node: bộ nút theo chế độ (hội thoại thường / Tạo
- * workflow), chèn app_token của Base đang áp dụng vào câu lệnh, chọn đường công cụ theo việc có
- * custom app (App ID) hay chỉ có phiên Lark web, và danh sách "Hỏi nhanh của tôi" tách theo chế độ.
+ * Hàm THUẦN (không React) để kiểm được bằng node. Từ 10/2026 "Lark × Agents" và "Tạo workflow" là MỘT
+ * agent / MỘT danh sách hội thoại, hai BỐ CỤC — nên chỉ còn MỘT bộ nút (gộp nút dữ liệu + nút workflow,
+ * khử trùng), xếp thứ tự theo bố cục: 'chat' → nút dữ liệu trước; 'frame' → nút workflow trước. Câu lệnh
+ * chèn app_token của Base của hội thoại, chọn đường công cụ theo việc có custom app hay chỉ có phiên
+ * Lark web, và "Hỏi nhanh của tôi" là một danh sách duy nhất.
+ *
+ * Quy ước tên gọi: "workflow" = KHỐI Workflow (canvas ở thanh bên Base, lark_web_create_workflows);
+ * "tự động hoá/automation" = Automation cổ điển — nút chỉ tạo automation khi nhãn nói rõ như vậy.
  *
  * Luật chung: không câu lệnh nào được bảo trợ lý BẬT automation — bản nháp luôn TẮT, người dùng tự bật.
  */
@@ -20,9 +25,12 @@ export interface QuickBase {
   appToken: string;
 }
 export type QuickAskMode = 'chat' | 'workflow';
+export type QuickAskLayout = 'chat' | 'frame';
 export interface QuickAskCtx {
-  mode: QuickAskMode;
-  /** Base đang áp dụng (chế độ Tạo workflow: đúng Base đang chọn ở bộ chọn). */
+  /** Bố cục đang hiển thị ('frame' = màn Tạo workflow). `mode` cũ: 'workflow' ≙ 'frame'. */
+  layout?: QuickAskLayout;
+  mode?: QuickAskMode;
+  /** Base của hội thoại (một hoặc nhiều). */
   bases: QuickBase[];
   /** Đã kết nối custom app (App ID/App Secret) → được dùng thêm tool Open API. */
   appConnected: boolean;
@@ -57,12 +65,12 @@ const AUDIT_CHECKLIST =
   'Với mỗi vấn đề: nêu rõ WF<số> nào, lỗi gì, mức độ (cao/vừa/thấp), và CÁCH SỬA cụ thể. Trình bày thành bảng dễ đọc (tên bảng/cột để trong «…»); nếu không có lỗi thì nói rõ. ' +
   'Đây là việc CHỈ ĐỌC — không tạo/sửa gì.';
 
-/** Luật an toàn + cách tạo chung cho mọi nút tạo automation ở chế độ Tạo workflow. */
+/** Luật an toàn + cách tạo chung cho mọi nút tạo WORKFLOW (khối canvas). */
 const WF_CREATE_RULES =
-  'Tạo bằng lark_web_create_automations (MỘT lần cho cả bộ; chỉ 1 cái thì lark_web_create_automation) — chế độ tự động, không hỏi lại; luôn là bản nháp TẮT. ' +
-  'Loại bước chưa tạo thẳng được (kind "unsupported": trigger theo ngày/hẹn giờ, tìm bản ghi, rẽ nhánh, gửi nhóm…) → dựng trong trình soạn Lark ở khung bên phải bằng lark_ui_*, bấm "Lưu" (KHÔNG "Lưu và bật") rồi lark_ui_saved. ' +
+  'Tạo bằng lark_web_create_workflows (MỘT lần cho cả bộ, kể cả khi chỉ 1 cái) — mỗi cái thành một KHỐI Workflow (canvas) ở thanh bên Base; chế độ tự động, không hỏi lại; luôn TẮT. ' +
+  'Loại bước chưa tạo thẳng được (kind "unsupported": trigger theo ngày/hẹn giờ, tìm bản ghi, rẽ nhánh, gửi nhóm…) → tạo khối với phần tạo được rồi thêm bước còn lại trên canvas trong khung Lark bằng lark_ui_*, rồi lark_ui_saved. ' +
   'Thiếu cột cần dùng → thêm bằng lark_web_add_fields trước. Người nhận ưu tiên CỘT NGƯỜI của bản ghi (vd «Người phụ trách») — chỉ dùng "tôi" khi bảng không có cột Người. ' +
-  'TUYỆT ĐỐI KHÔNG bật, xoá hay chạy thử automation. Cuối cùng báo bảng: tên · workflow_id · "đang TẮT", và nhắc tôi mở "Tự động hoá" trong khung Lark để xem lại rồi TỰ BẬT.';
+  'TUYỆT ĐỐI KHÔNG bật, xoá hay chạy thử workflow. Cuối cùng báo bảng: tên · workflow_id · "đang TẮT", và nhắc tôi xem canvas trong khung Lark rồi TỰ BẬT.';
 
 const baseRef = (b: QuickBase) => `Base «${b.name}» (app_token=${b.appToken})`;
 
@@ -76,7 +84,7 @@ export function workflowQuickAsks(base: QuickBase): QuickAsk[] {
       label: '🧩 Nên thêm workflow nào',
       prompt:
         `Quét ${B} bằng lark_web_scan_base (đã kèm danh sách automation đang có — tránh tạo trùng). ` +
-        'Đề xuất 3–6 automation NÊN THÊM để Base hoàn thiện & tự động hơn, theo các nhóm: nhắc hạn/quá hạn, báo khi đổi trạng thái, giao việc cho người phụ trách, báo cáo định kỳ, kiểm tra ngưỡng/tồn kho, chống trùng. ' +
+        'Đề xuất 3–6 WORKFLOW NÊN THÊM để Base hoàn thiện & tự động hơn, theo các nhóm: nhắc hạn/quá hạn, báo khi đổi trạng thái, giao việc cho người phụ trách, báo cáo định kỳ, kiểm tra ngưỡng/tồn kho, chống trùng. ' +
         'Với mỗi đề xuất nêu ngắn: mục đích, TRIGGER (bảng + cột + điều kiện), HÀNH ĐỘNG, NGƯỜI NHẬN, mức ưu tiên (tên bảng/cột để trong «…»). ' +
         'Rồi TẠO NGAY các đề xuất ưu tiên cao/vừa. ' +
         WF_CREATE_RULES,
@@ -154,11 +162,10 @@ export function workflowEmptyExamples(base: QuickBase | null | undefined): Quick
   return pick.map((k) => all.find((c) => c.k === k)!).filter(Boolean);
 }
 
-/** Bộ nút của hội thoại thường khi đã gắn Base. */
-export function chatQuickAsks(bases: QuickBase[], appConnected: boolean, dev = false): QuickAsk[] {
-  if (!bases.length) return CHAT_EXAMPLES;
+/** Nút DỮ LIỆU khi hội thoại đã có Base (hỏi đáp, đánh giá, phân quyền, dựng cấu trúc…). */
+export function dataQuickAsks(bases: QuickBase[], appConnected: boolean, dev = false): QuickAsk[] {
+  if (!bases.length) return [];
   const b0 = bases[0];
-  const all = bases.map((b) => `${b.name} (app_token=${b.appToken})`).join('; ');
   const more = bases.length > 1 ? ' (rồi lần lượt các base còn lại)' : '';
   const out: QuickAsk[] = [
     {
@@ -183,41 +190,6 @@ export function chatQuickAsks(bases: QuickBase[], appConnected: boolean, dev = f
       label: '🔐 Phân quyền',
       prompt: 'Xem cấu hình phân quyền của base đang chọn: gọi bitable_list_roles để liệt kê các vai trò + quyền theo từng bảng/bản ghi/cột, và (nếu cần) bitable_list_role_members để xem thành viên mỗi vai trò. Trình bày gọn thành bảng dễ đọc.',
     });
-  out.push(
-    {
-      k: 'readWf',
-      label: '🔧 Đọc workflow',
-      prompt:
-        `Đọc và giải thích ĐẦY ĐỦ, CHI TIẾT các workflow/automation (tự động hoá) của base đang áp dụng: ${all}. ` +
-        (appConnected
-          ? `Gọi bitable_read_workflows với app_token=${b0.appToken}${more}. `
-          : `Gọi lark_web_read_automations với app_token=${b0.appToken}${more} (phiên Lark web — không cần App ID). `) +
-        WF_FORMAT +
-        ' Nếu tool báo chưa kết nối/hết phiên Lark web, nhắc tôi đăng nhập Lark web (mở "Tạo workflow" và đăng nhập trong khung Lark).',
-    },
-    {
-      k: 'auditWf',
-      label: '🔎 Soát lỗi workflow',
-      prompt:
-        `Soát lỗi/rà soát toàn bộ workflow của base ${b0.name} (app_token=${b0.appToken}). ` +
-        (appConnected
-          ? 'Gọi bitable_read_workflows để đọc tất cả (và bitable_list_fields nếu cần đối chiếu cột). '
-          : 'Gọi lark_web_read_automations để đọc tất cả (và lark_web_scan_base nếu cần đối chiếu cột). ') +
-        AUDIT_CHECKLIST,
-    },
-    {
-      k: 'suggestWf',
-      label: '🧩 Nên thêm workflow nào',
-      prompt:
-        `Dựa trên các bảng/cột hiện có của base ${b0.name} (app_token=${b0.appToken}) và các workflow đang có ` +
-        '(quét bằng lark_web_scan_base — đã kèm danh sách workflow đang có), đề xuất những automation/workflow NÊN THÊM để base hoàn thiện & tự động hơn. ' +
-        'Gợi ý theo các nhóm: nhắc hạn/quá hạn, tự điền & tính toán, thông báo khi đổi trạng thái, kiểm tra tồn kho/ngưỡng, chống trùng, tổng hợp/rollup, đồng bộ giữa bảng. ' +
-        'Với mỗi đề xuất nêu: mục đích, TRIGGER (bảng + điều kiện), HÀNH ĐỘNG, và mức ưu tiên (tên bảng/cột để trong «…»). ' +
-        'Sau khi tôi chọn (ở chế độ Thực thi), bạn TẠO bằng lark_web_create_automations (phiên Lark web, một lần cho cả bộ)' +
-        (appConnected ? ' — loại bước nó chưa hỗ trợ thì dùng bitable_workflow_create (Open API v3)' : '') +
-        '. Luôn tạo ở trạng thái TẮT; bạn KHÔNG bật — tôi tự xem lại rồi bật trong Lark.',
-    },
-  );
   if (dev && appConnected)
     out.push({
       k: 'debugEndpoint',
@@ -231,7 +203,7 @@ export function chatQuickAsks(bases: QuickBase[], appConnected: boolean, dev = f
     k: 'design',
     label: '🎨 Thiết kế / bổ sung',
     prompt:
-      'Dựa trên dữ liệu hiện có, đề xuất schema hoàn chỉnh cho base đang chọn rồi (sau khi tôi duyệt) tạo các bảng/cột còn thiếu' +
+      'Dựa trên dữ liệu hiện có, đề xuất schema hoàn chỉnh cho base đang chọn rồi tạo các bảng/cột còn thiếu' +
       (appConnected ? '.' : ' bằng lark_web_add_table / lark_web_add_fields (chỉ cộng thêm, không đổi/xoá cái đang có).'),
   });
   if (appConnected)
@@ -242,13 +214,42 @@ export function chatQuickAsks(bases: QuickBase[], appConnected: boolean, dev = f
   return out;
 }
 
-/** Bộ nút dựng sẵn theo chế độ. */
+/** (Tên cũ) bộ nút của hội thoại thường = bộ hợp nhất ở bố cục chat. */
+export function chatQuickAsks(bases: QuickBase[], appConnected: boolean, dev = false): QuickAsk[] {
+  return buildQuickAsks({ layout: 'chat', bases, appConnected, dev });
+}
+
+/**
+ * MỘT bộ nút cho mọi hội thoại. Chưa có Base: bố cục chat → câu ví dụ; bố cục frame → không có nút
+ * (ô gợi ý nhắc chọn Base). Có Base: nút dữ liệu + nút workflow (Base đầu), khử trùng — 'frame' đặt
+ * nút workflow lên trước, 'chat' đặt nút dữ liệu lên trước. "Dựng bảng/cột còn thiếu" (wfStruct) trùng
+ * vai với "Thiết kế / bổ sung" → bố cục chat giữ "Thiết kế", bố cục frame giữ wfStruct.
+ */
 export function buildQuickAsks(ctx: QuickAskCtx): QuickAsk[] {
-  if (ctx.mode === 'workflow') return ctx.bases[0]?.appToken ? workflowQuickAsks(ctx.bases[0]) : [];
-  return chatQuickAsks(ctx.bases, ctx.appConnected, !!ctx.dev);
+  const layout: QuickAskLayout = ctx.layout ?? (ctx.mode === 'workflow' ? 'frame' : 'chat');
+  const bases = (ctx.bases || []).filter((b) => b?.appToken);
+  if (!bases.length) return layout === 'frame' ? [] : CHAT_EXAMPLES;
+  const wf = workflowQuickAsks(bases[0]);
+  const data = dataQuickAsks(bases, ctx.appConnected, !!ctx.dev);
+  if (layout === 'frame') return [...wf, ...data.filter((c) => c.k !== 'design')];
+  const order = ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData', 'debugEndpoint'];
+  const all = [...data, ...wf.filter((c) => c.k !== 'wfStruct')];
+  return order.map((k) => all.find((c) => c.k === k)).filter((c): c is QuickAsk => !!c);
+}
+
+/** Ô gợi ý của hội thoại trống, theo bố cục. */
+export function emptyExamples(ctx: QuickAskCtx): QuickAsk[] {
+  const layout: QuickAskLayout = ctx.layout ?? (ctx.mode === 'workflow' ? 'frame' : 'chat');
+  if (layout === 'frame') return workflowEmptyExamples(ctx.bases?.[0]);
+  const all = buildQuickAsks(ctx);
+  if (!ctx.bases?.length) return all;
+  const pick = ['tablesCols', 'summaryBase', 'wfSuggest', 'wfRead'];
+  return pick.map((k) => all.find((c) => c.k === k)).filter((c): c is QuickAsk => !!c);
 }
 
 /** Khoá localStorage của "Hỏi nhanh của tôi" — mỗi chế độ một danh sách. */
+/** Khoá DUY NHẤT của "Hỏi nhanh của tôi" sau khi hợp nhất (danh sách workflow cũ được gộp vào, xem migrateCustomAsks). */
+export const CUSTOM_ASKS_KEY = 'tw_lark_quickasks';
 export const CUSTOM_ASKS_KEYS: Record<QuickAskMode, string> = {
   chat: 'tw_lark_quickasks',
   workflow: 'tw_lark_quickasks_wf',

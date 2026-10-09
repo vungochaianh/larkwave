@@ -332,9 +332,13 @@ export interface LarkChatInput {
    *  `resume` continues that CLI session. Ignored for Lark turns. */
   sessionId?: string;
   resume?: boolean;
-  /** Chế độ "Tạo workflow": lượt chạy bằng PHIÊN LARK WEB (không cần custom app), bộ công cụ riêng
-   *  (quét Base → thiết kế → tạo automation TẮT / tự lái trình soạn Lark), trên Base đã chọn. */
+  /** (Cũ — trước khi hợp nhất.) Base của màn "Tạo workflow"; nay gộp vào `activeBases`. Vẫn nhận để
+   *  relay/bản cũ gửi lên không mất Base. */
   workflow?: { base?: LarkBaseRef };
+  /** Bố cục đang hiển thị hội thoại: 'chat' = Lark × Agents (khung Lark là ngăn phụ, mặc định đóng),
+   *  'frame' = Tạo workflow (khung Lark lớn, hội thoại thu gọn bên trái). Cùng agent, cùng công cụ —
+   *  chỉ đổi lời dặn "khung Lark ở đâu". */
+  layout?: 'chat' | 'frame';
   /** 'relay' = this turn was initiated remotely (web/phone) and is driving THIS desktop. Surfaces
    *  as a `kind:'relay'` busy-lock so the desktop shows "đang chạy từ xa" + blocks concurrent sends. */
   source?: 'relay';
@@ -764,7 +768,8 @@ export interface LarkSessionMeta {
   model?: string;
   /** Unfinished todos in this conversation's notes — drives the sidebar badge. */
   openTodos?: number;
-  /** 'workflow' = hội thoại của chế độ "Tạo workflow" (danh sách riêng); bỏ trống = hội thoại thường. */
+  /** (Cũ) 'workflow' = hội thoại tạo ra ở màn "Tạo workflow" trước khi hợp nhất. Nay mọi hội thoại chung
+   *  một danh sách; trường này chỉ còn là gợi ý bố cục mở mặc định (xem larkConversations.ts). */
   kind?: 'workflow';
   /** True for the CURRENTLY-active session — lets a client (incl. the web over the relay) adopt
    *  the shared active conversation instead of blindly opening the most-recent one. */

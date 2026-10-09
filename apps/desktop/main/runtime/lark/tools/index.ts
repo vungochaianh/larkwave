@@ -18,6 +18,20 @@ import { attachmentTools } from './attachments';
 import { skillTools } from './skills';
 import { fileTools } from './files';
 
+/**
+ * Ghi CỘNG THÊM của đường Open API (tạo bản ghi/bảng/cột/view mới, tạo workflow v3 — luôn TẮT):
+ * không phá gì đang có → công tắc "Tự động" được tự duyệt, như các tool phiên web có cờ `additive`.
+ * Gửi tin nhắn / sửa / xoá KHÔNG nằm đây — luôn hỏi.
+ */
+const ADDITIVE_OPEN_API = new Set([
+  'bitable_create_record',
+  'bitable_batch_create_records',
+  'bitable_create_table',
+  'bitable_create_field',
+  'bitable_create_view',
+  'bitable_workflow_create',
+]);
+
 const ALL: LarkToolDef[] = [
   ...automationTools,
   ...skillTools,
@@ -37,7 +51,7 @@ const ALL: LarkToolDef[] = [
   ...wikiTools,
   ...sheetsTools,
   ...driveTools,
-];
+].map((t) => (t.gated && ADDITIVE_OPEN_API.has(t.name) ? { ...t, additive: true } : t));
 const BY_NAME = new Map(ALL.map((t) => [t.name, t]));
 
 /** Every built-in Lark tool (read + gated writes). Used in Build mode. */
@@ -45,15 +59,15 @@ export const allTools = (): LarkToolDef[] => ALL;
 /** Only the non-destructive read tools. Used in Ask (Q&A) mode. */
 export const readOnlyTools = (): LarkToolDef[] => ALL.filter((t) => !t.gated);
 /**
- * Bộ công cụ của chế độ "Tạo workflow": chạy bằng PHIÊN LARK WEB (không cần App ID) — liệt kê/quét
- * Base, tra schema chính thức, tạo automation TẮT, và tự lái trình soạn của Lark (lark_ui_*) cho
- * loại bước chưa tạo thẳng được. Cố ý KHÔNG gồm tool Open API (cần token của custom app) — trừ khi
- * người dùng đã kết nối app (`withOpenApi`), khi đó thêm đường v3 làm phương án phụ.
+ * Công cụ chạy bằng PHIÊN LARK WEB (không cần App ID): liệt kê/quét Base, đọc automation/quy trình,
+ * tạo KHỐI Workflow / automation TẮT, dựng bảng/cột, tra schema chính thức, và lái giao diện Lark
+ * (lark_ui_*) cho loại bước chưa tạo thẳng được.
  */
 export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_web_list_bases',
   'lark_web_scan_base',
   'lark_web_read_automations',
+  'lark_web_create_workflows',
   'lark_web_create_automation',
   'lark_web_create_automations',
   'lark_web_add_table',
@@ -70,10 +84,25 @@ export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_ui_template_list',
   'lark_ui_template_apply',
 ] as const;
-const OPEN_API_WORKFLOW = ['bitable_scan_base', 'bitable_workflow_validate', 'bitable_workflow_create'];
+/** Tool không cần client Open API: phiên web + dựng tệp cục bộ. */
+const CLIENTLESS = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, 'create_file', 'fill_xlsx']);
+
+/**
+ * BỘ CÔNG CỤ HỢP NHẤT của Lark × Agents (một agent cho cả "Lark × Agents" và "Tạo workflow" — hai
+ * màn chỉ là hai bố cục của cùng hội thoại):
+ *   - Có custom app (`withOpenApi`): mọi tool (Open API + phiên web + giao diện).
+ *   - Chưa có: chỉ tool phiên web + tệp cục bộ (CLIENTLESS) — không bày tool sẽ chết vì thiếu client.
+ *   - `mode: 'ask'` (lượt cũ từ relay/bản cũ còn gửi): bỏ mọi tool ghi.
+ * Ghi chép duyệt KHÔNG nằm ở đây: needsConfirmation (larkToolExec) quyết định — tool `additive` chạy
+ * luôn khi công tắc "Tự động" BẬT, xoá/sửa/gửi tin luôn hỏi.
+ */
+export function agentTools(opts: { withOpenApi: boolean; mode?: 'ask' | 'build' }): LarkToolDef[] {
+  const base = opts.withOpenApi ? ALL : ALL.filter((t) => CLIENTLESS.has(t.name));
+  return opts.mode === 'ask' ? base.filter((t) => !t.gated) : base;
+}
+/** Tên cũ (chế độ "Tạo workflow" trước khi hợp nhất) — giữ cho nơi gọi/test cũ. */
 export function workflowModeTools(withOpenApi = false): LarkToolDef[] {
-  const names = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, ...(withOpenApi ? OPEN_API_WORKFLOW : [])]);
-  return ALL.filter((t) => names.has(t.name));
+  return withOpenApi ? ALL.filter((t) => CLIENTLESS.has(t.name) || ['bitable_scan_base', 'bitable_workflow_validate', 'bitable_workflow_create'].includes(t.name)) : agentTools({ withOpenApi: false });
 }
 /** Resolve a tool by name (for the MCP bridge dispatcher). */
 export const resolveTool = (name: string): LarkToolDef | undefined => BY_NAME.get(name);

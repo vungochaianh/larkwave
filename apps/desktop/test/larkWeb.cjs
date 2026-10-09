@@ -318,7 +318,7 @@ const test = async (name, fn) => {
     assert.ok(p.includes('BaseTokX') && p.includes('Larkwave Test'));
     const iScan = p.indexOf('lark_web_scan_base');
     const iStruct = p.indexOf('lark_web_add_table');
-    const iBatch = p.indexOf('lark_web_create_automations');
+    const iBatch = p.indexOf('6) TẠO');
     assert.ok(iScan > 0 && iStruct > iScan && iBatch > iStruct);
     assert.ok(/VIẾT RA VĂN BẢN/.test(p) && /TẠO NGAY/.test(p), 'mặc định tự động: viết thiết kế rồi tạo luôn');
     assert.ok(!/choices \["Tạo bản nháp"/.test(p), 'không còn xin phép bằng ask_user');
@@ -331,15 +331,11 @@ const test = async (name, fn) => {
     assert.ok(sp.buildWorkflowSystemPrompt({ openApi: true }).includes('bitable_workflow_create'));
     assert.ok(/CHƯA CHỌN BASE/.test(sp.buildWorkflowSystemPrompt({})));
   });
-  await test('larkService: lượt workflow không đòi custom app; KHÔNG dùng Tự động duyệt chung; công tắc riêng chỉ duyệt tool additive', () => {
+  await test('larkService: (hợp nhất) KHÔNG dùng Tự động duyệt chung cho lượt Lark; công tắc riêng chỉ duyệt tool additive', () => {
     const src = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
-    assert.ok(/if \(!client && !general && !workflowTurn\)/.test(src));
     assert.ok(/const autoApprove = workflowTurn \? false/.test(src));
     assert.ok(/!workflowTurn && this\.store\.getSettings\(\)\.autoApprove/.test(src));
     assert.ok(/const autoApproveTool = workflowTurn \? \(name: string\) => this\.workflowAutoOn\(\) && isAdditiveTool\(name\)/.test(src));
-    assert.ok(/onApi = !!\(apiMode && apiKey && !general && !workflowTurn/.test(src));
-    assert.ok(/!general && !workflowTurn && this\.accountTokenGetter/.test(src));
-    assert.ok((src.match(/toolsOverride: workflowModeTools\(!!client\), autoApproveTool/g) || []).length >= 2);
     assert.ok(/workflowAuto !== false/.test(src), 'mặc định BẬT');
   });
 
