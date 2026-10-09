@@ -1,5 +1,12 @@
 # Trình duyệt Lark (desktop)
 
+> **Cập nhật 09/10/2026 (tối) — MỘT màn:** mục "Tạo workflow" ở thanh bên đã GỠ. "Lark × Agents" là màn
+> duy nhất; nút ⤢ trên thanh đầu hội thoại đổi qua lại hội thoại-trước ↔ khung-Lark-trước ngay trong màn
+> (`larkLayout.ts` `mode` + `switchMode`, nhớ riêng máy; cùng khoá hội thoại `ACTIVE_CONV_KEY` nên đổi cách
+> xếp vẫn ở đúng hội thoại). Đóng khung (×) ở cách xếp khung-trước = về hội thoại-trước. Liên kết cũ
+> `tw-lark-wf` mở thẳng cách xếp khung-trước. Phần cần App ID/App Secret (bot, webhook/đường hầm, plugin,
+> Base qua Open API, chia sẻ) ở mục mới **"Lark Bot (App ID)"** (`LarkBotScreen.tsx`) — không có ô chat riêng.
+>
 > **Cập nhật 10/2026 (hợp nhất):** "Lark × Agents" và "Tạo workflow" là MỘT agent, MỘT danh sách hội thoại,
 > hai bố cục. Lark × Agents = hội thoại trước, khung Lark là ngăn phụ bên phải (nút "Khung Lark", mặc định
 > đóng, tự mở khi AI thao tác). Mục "Tạo workflow" ở thanh bên = khung Lark lớn, hội thoại gắn trái (mở rộng /

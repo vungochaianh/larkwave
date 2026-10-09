@@ -127,13 +127,14 @@ Kết luận: Open API v3 chỉ dùng được khi người dùng đã kết n�
 1. **Tạo thẳng qua phiên web**, tool `lark_web_create_workflows` (khối) hoặc `lark_web_create_automation`. Agent dựng `steps` theo chuẩn v3 và
    được kiểm bằng `validateWorkflowBody` với hồ sơ Base quét từ web. Sau đó `v3ToInternal` chuyển sang
    draft/extra nội bộ, rồi gửi `automation/create` với status 0 và đọc lại.
-   - Chỉ hỗ trợ những khuôn đã thấy trong dữ liệu thật: `AddRecordTrigger`, `SetRecordTrigger` (lọc theo
-     lựa chọn), `LarkMessageAction` (người nhận: "tôi", id người dùng nội bộ, hoặc **cột Người của bản ghi
-     trigger**; tiêu đề; nội dung gồm chữ và ref cột của trigger; nút mở bản ghi). Xem mục 7.
+   - Hỗ trợ ĐỦ bộ bước thường dùng (mục 12): trigger AddRecord/SetRecord/ChangeRecord/Timer/Reminder/Button;
+     AddRecord/SetRecord/FindRecord/LarkMessage/HTTPClient/Delay/GenerateAiText; IfElse/Switch; Loop. Chỉ
+     LarkMessageTrigger, AIAnalysisAction, AIClassificationBranch và người nhận nhóm chat (cần id nội bộ) còn
+     phải dựng trong trình soạn (đường 2).
    - Nhiều automation một lần: `lark_web_create_automations` (tạo lần lượt, mục lỗi báo riêng, không
      dừng các mục khác).
-2. **Lái trình soạn Lark** bằng `lark_ui_*` (CDP), trong khung Chromium gắn cạnh hội thoại. Dùng cho mọi
-   loại bước chưa hỗ trợ ở đường 1 (rẽ nhánh, nhóm chat, cập nhật bản ghi…). Kết quả được xác nhận bằng
+2. **Lái trình soạn Lark** bằng `lark_ui_*` (CDP), trong khung Chromium gắn cạnh hội thoại. Chỉ cho các
+   loại bước chưa hỗ trợ ở đường 1 (LarkMessageTrigger, AI phân tích/phân loại, nhóm chat). Kết quả được xác nhận bằng
    request lưu mà CDP bắt được (`lark_ui_saved`).
 3. **Open API v3** (`bitable_workflow_create`): chỉ khi đã kết nối custom app.
 
@@ -270,3 +271,66 @@ chưa thấy khối và rơi về bảng gần nhất → thử lại tới khi 
 tắt; (2) qua agent thật (Claude CLI, bố cục Tạo workflow, 31 giây, 4 tool) — workflowID
 `7694595822633438941`, khối `wkfzQ8qEWCbjpeKz`. Cả hai đã xoá (vào thùng rác của Base) + disable.
 Fixture: `apps/desktop/test/fixtures/lark-web/workflow-block.json`; kiểm: `test/larkMerge.cjs`.
+
+
+## 12. Khuôn NỘI BỘ đủ bộ bước (đo 09/10/2026) — `workflowInternal.ts`
+
+**Cách học** (không đoán):
+1. ĐỌC (chỉ đọc) 176 khối Workflow + 187 automation thật trên 59 Base của tenant (`workflow/detail`,
+   `automation/list`): có mẫu thật cho mọi loại dưới đây trừ Delay/GenerateAiText. Fixture đã thay id:
+   `test/fixtures/lark-web/workflow-internal-real.json`.
+2. Mã trình soạn (`vb_19231…chunk.js`): mỗi lớp bước có `fromAgentData()` — bộ chuyển "Agent Data" (CHÍNH là
+   thiết kế v3 viết camelCase, cảnh `WORKFLOW_CLI`) → dữ liệu nội bộ. Luật giá trị theo kiểu cột = hàm `uA`,
+   toán tử = `AS`, ref = `$I`/`II`, Delay = `{duration, unit:"minute"}`, Timer = `setScheduleFromAgent`.
+3. Kiểm thật trên Base Test: 6 khối thử phủ mọi loại → canvas hiện đúng, bộ kiểm của chính trình soạn
+   (`window.workflow`: `getIsConfigError/NotReady` từng bước + `toSchema()` — thứ Lark tính khi BẬT) đều đạt →
+   đã xoá cả 6.
+
+**Khung chung**: bước `{id, type, data, stepTitle, next:[{ids:[…], condition?}], version?}`; id tiền tố
+`trig`/`act`/`branch`/`system`. Liên kết KHÔNG nằm ở `next` mà ở `data`:
+
+| Loại | Nối con | `next` |
+|---|---|---|
+| IfElseBranch | `meetConditionStepId` / `notMeetConditionStepId` (null = nhánh trống) | bước sau hội tụ (thường `[]`) |
+| SwitchBranch | `childBranchList[i].entryChildStepId`, `defaultBranchInfo.entryStepId` | như trên |
+| Loop | `startChildStepId` | bước sau vòng lặp |
+
+Mỗi chuỗi con kết thúc `next: []`. Điều kiện của TRIGGER (condition_list) nằm ở `next[0].condition`
+(`{conjunction:"or", conditions:[{conjunction:"and", conditions:[{fieldId, fieldType, operator, value, conditionId}]}]}`).
+
+| Bước | `data` nội bộ |
+|---|---|
+| TimerTrigger | `{startTime: ms (giờ treo tường theo múi Base), rule, timezone?}`; WEEKLY lặp đúng thứ của startTime (sub_unit 1 ngày → dời ngày bắt đầu; nhiều ngày → CUSTOM unit WEEK subUnit); triggerName `cron` |
+| ReminderTrigger | `{tableId, fieldId, offset, unit: 1 phút·2 giờ·3 ngày·4 tuần·5 tháng, hour, minute}`; `datetimeField` |
+| ButtonTrigger | `{tableId, buttonType:"buttonField"}`, `version:"2.0.0"`, `extra.BtnTrigger.TableID`; `buttonField` |
+| ChangeRecordTrigger | `{tableId, fields:[điều kiện, conditionId "<fld>-<op>"], triggerControlList}` + bản sao ở `next[0].condition` |
+| SetRecordTrigger | `fields:[{fieldId, fieldType[, operator, value]}]`, `recordType All/Filter`, `filterInfo` |
+| AddRecordAction | `{tableId, values:[{fieldId, valueType, value}]}` |
+| SetRecordAction | + `recordType:"Ref", recordInfo:{stepId, stepNum: độ sâu 0-based}` hoặc `"Filter"` + điều kiện; `maxSetRecordNum` |
+| FindRecordAction | `{tableId, fieldIds, fieldsMap:{fld:{type}}, recordType Filter/Ref, recordInfo, shouldProceedWithNoResults}` — cột mà bước sau ref tới phải nằm trong fieldIds |
+| Loop | `{loopType:"forEach", loopData: thẻ stepRecordFields, maxLoopTimes ≤ 1000, loopMode 2=tiếp tục/1=dừng}` |
+| HTTPClientAction | `{method, url:[đoạn], queries, headers:[{key,value:[đoạn]}], bodyType, rawBody, responseType, responseValue, formBody}` |
+| Delay | `{duration 1–120, unit:"minute"}` · GenerateAiTextAction `{prompt:[đoạn], promptType:"customize"}` |
+| IfElse/Switch điều kiện | `{conjunction:"Or", conditions:[{conjunction:"And", conditions:[{leftValue: thẻ ref, operator, rightValue}]}]}`; vế phải theo kiểu vế trái: chọn → `["opt…"]`, số → `[n]`, chữ → `[{text,type:"text"}]`, rỗng → `null`; containsAll→contains |
+
+**Giá trị gán cột** (`uA`): chữ/vị trí → `valueType:"ref"` + đoạn; số/ô tích → `value` hằng; chọn một (cả
+Stage type 24) → `value:"opt…"`; chọn nhiều → `[opt…]`; người → `{userId,name,enName,avatarUrl,not_notify}`;
+ngày → ms hoặc thẻ `{tagType:"time", time:"now"}`; liên kết/tệp → chỉ ref; công thức/tra cứu/tự động → không ghi.
+
+**Thẻ ref** (`stepNum` = độ sâu 1-based): cột của bản ghi → `tagType:"step"` (+`recordInfo:{type:"firstRecord"}`
+khi lấy từ bản ghi đầu của Tìm); `recordId`/`recordNum` → `RecordAttribute`; `recordLink` → `stepLink`;
+người/giờ tạo/sửa → `stepPureValue` (object/user, timestamp); `startTime`/`scheduleTime` → `stepAttribute`;
+`fieldRecords` → `stepRecordFields` (isAllFields); `$.<loop>.item.<fld>` → `tagType:"loop", loopValue:"item",
+path:[{type:"Field", value:fld}]`; HTTP `body.<k>` → `stepPureValue` path json; AI tạo văn bản → `stepPureValue` string.
+Nhóm chat: `{tagType:"user", owner_type:1, id/entityId = id nội bộ}` (đọc từ mã; chưa có mẫu thật).
+
+**Kiểm sau khi tạo**: đọc lại `workflow/detail` → so CHỮ KÝ CÂY (loại + cạnh + độ sâu, `outlineSignature`) với
+bản gửi; mở canvas → `canvasSelfCheckScript` (bộ kiểm của chính trình soạn, chỉ tính toán) → tool trả
+`saved_tree` + `lark_check`.
+
+**Đã chạy thật (agent Claude CLI, cách xếp khung-trước, 09/10/2026)**, giữ lại cho người dùng xem (đang TẮT):
+- «Larkwave DEMO — phân luồng khách mới» — khối `wkfNuhRu4HS3KiKO`, workflowID `7694692279050735333`:
+  thêm khách → Nếu «Nguồn tiếp cận» = Quảng cáo: cập nhật «Phân loại» + nhắn «Người phụ trách» / Nếu không:
+  nhắn người phụ trách. 46 giây, 6 tool, lark_check đạt 5 bước.
+- «Larkwave DEMO — báo cáo thứ Hai» — khối `wkfaj244hiPGAKJC`, workflowID `7694693489674260200`: 8:30 thứ
+  Hai hằng tuần → tìm «Công việc follow-up» Chưa làm → lặp → nhắn người phụ trách. 42 giây, lark_check đạt 4 bước.
