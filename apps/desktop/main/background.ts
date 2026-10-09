@@ -380,7 +380,21 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkWebGetRecording, () => runtime.larkWebGetRecording!());
   ipcMain.handle(IPC.larkWebReplayWorkflow, (_e, opts?: { enable?: boolean }) => runtime.larkWebReplayWorkflow!(opts));
   // "Trình duyệt Lark": the SAME Lark web page embedded in the window that asked for it.
+  // Khung Lark gắn THẲNG vào cửa sổ chính, nằm trên lớp giao diện. Giao diện tải lại / sập thì màn
+  // Trình duyệt Lark không kịp gọi detach → khung nổi đè cả app (gặp thật 09/10/2026). Nên main tự
+  // thu khung về chỗ đỗ mỗi khi trang của cửa sổ đó điều hướng (không phải đổi #hash) hoặc sập.
+  const larkHostWatched = new WeakSet<Electron.WebContents>();
+  const watchLarkHost = (wc: Electron.WebContents): void => {
+    if (larkHostWatched.has(wc)) return;
+    larkHostWatched.add(wc);
+    wc.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) runtime.larkBrowserDetach();
+    });
+    wc.on('render-process-gone', () => runtime.larkBrowserDetach());
+    wc.once('destroyed', () => runtime.larkBrowserDetach());
+  };
   ipcMain.handle(IPC.larkBrowserAttach, (e, rect: LarkBrowserRect) => {
+    watchLarkHost(e.sender);
     const r = rect || { x: 0, y: 0, width: 0, height: 0 };
     const safe = { x: Number(r.x) || 0, y: Number(r.y) || 0, width: Number(r.width) || 0, height: Number(r.height) || 0 };
     return runtime.larkBrowserAttach(safe, BrowserWindow.fromWebContents(e.sender) ?? undefined);
