@@ -46,7 +46,7 @@ export function ConfirmToolModal({
   }, [pending?.callId]);
 
   const names = fieldNamesOf(pending?.preview);
-  const batch = pending && pending.name === 'lark_web_create_automations' ? batchView(pending.input, names) : null;
+  const batch = pending && (pending.name === 'lark_web_create_automations' || pending.name === 'lark_web_create_workflows') ? batchView(pending.input, names) : null;
   const wf = !batch && pending && WORKFLOW_TOOLS.has(pending.name) ? workflowView(pending.input, names) : null;
   // Tạo nháp TẮT / thêm cấu trúc (cộng thêm) → cho "nhớ trong hội thoại này". Sửa workflow ĐANG CÓ
   // (bitable_workflow_update) thì không: thay toàn bộ bước của thứ người dùng làm, phải duyệt tận mắt.
@@ -122,7 +122,7 @@ const preStyle: React.CSSProperties = {
 };
 
 /** Tool tạo/sửa workflow Lark (Open API v3) — hộp xác nhận vẽ THIẾT KẾ thay vì JSON. */
-const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update', 'lark_web_create_automation', 'lark_web_create_automations']);
+const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update', 'lark_web_create_automation', 'lark_web_create_automations', 'lark_web_create_workflows']);
 
 interface WorkflowView {
   update: boolean;

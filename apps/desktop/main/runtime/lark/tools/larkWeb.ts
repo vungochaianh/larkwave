@@ -7,6 +7,7 @@ import { profileFromWebTables, v3ToInternal, verifyReadBack, WEB_SUPPORTED_TYPES
 import { FIELD_KINDS, planFields, structureScript, verifyStructure, type FieldSpec } from '../baseStructure';
 import { clientVarsPath, decodeLarkGz, parseTableSchema } from '../larkWebApi';
 import { translateWebWorkflows } from './workflows';
+import { toWorkflowBlockDraft, verifyWorkflowBlock } from '../workflowBlock';
 
 /**
  * Công cụ "Tạo workflow" chạy bằng PHIÊN LARK WEB đang đăng nhập — KHÔNG cần App ID/App Secret.
@@ -153,6 +154,57 @@ async function freshTable(token: string, tableId: string, name?: string): Promis
   } catch {
     return null;
   }
+}
+
+/** Tạo lần lượt các KHỐI Workflow (đã qua prepare) → đọc lại từng cái → mở canvas khối đầu. */
+export async function createWorkflowBlocks(i: J): Promise<J> {
+  const token = tokenOf(i);
+  const list: J[] = (Array.isArray(i.workflows) ? i.workflows : []).slice(0, 8);
+  const fieldNames = await fieldNamesFor(token);
+  const web = getLarkWebSession();
+  const items: J[] = [];
+  for (const w of list) {
+    try {
+      const p = await prepare({ app_token: token, title: w?.title, steps: w?.steps });
+      if (!p.ok) {
+        items.push({ title: w?.title, ...p, ...(p.kind === 'unsupported' ? { next: String(p.next || '').replace('mở "Tự động hoá"', 'mở khối Workflow (canvas)') } : {}) });
+        continue;
+      }
+      const { tables } = await tablesFor(token);
+      const blk = toWorkflowBlockDraft(p.conv.draft, p.conv.extra, tables);
+      const name = String(p.body.title).trim().slice(0, 100);
+      const created = await web.createWorkflowBlock(token, { name, draft: blk.draft, extra: blk.extra, triggerName: p.conv.triggerName || '' });
+      const back = await web.readWorkflowBlockBack(token, created.workflowID).catch(() => ({ meta: null, detail: null }));
+      const v = verifyWorkflowBlock(back.meta, back.detail, { workflowID: created.workflowID, steps: blk.draft.steps, name });
+      items.push({
+        ok: v.ok,
+        kind: 'workflow',
+        workflow_id: created.workflowID,
+        block_id: created.blockId,
+        title: name,
+        verified: v.ok,
+        status_text: v.enabled ? 'ĐANG BẬT (bất thường — kiểm tra ngay)' : 'đang TẮT — chờ người dùng xem lại và tự bật',
+        ...(v.problems.length ? { problems: v.problems } : {}),
+        design_text: workflowDesignText(p.body.steps, { fieldNames }),
+        ...(p.warnings.length ? { warnings: p.warnings } : {}),
+      });
+    } catch (e) {
+      items.push({ title: w?.title, ok: false, kind: 'error', error: String((e as Error)?.message || e) });
+    }
+  }
+  const first = items.find((x) => x.ok && x.block_id) || items.find((x) => x.block_id);
+  if (first) await web.showWorkflowBlock(token, first.block_id);
+  else void web.showBase(token);
+  const okN = items.filter((x) => x.ok).length;
+  return {
+    // Lỗi MỘT PHẦN vẫn là ok:true ở cấp lượt gọi — các khối đã tạo là thật; mục lỗi nằm trong items.
+    ok: okN > 0,
+    created: okN,
+    failed: items.length - okN,
+    items,
+    ...(okN < items.length ? { next: 'Sửa các mục ok:false theo lỗi của chúng rồi gọi lại CHỈ với các mục đó (mục ok đã được tạo — đừng tạo trùng).' } : {}),
+    review: 'Tất cả đang TẮT. Khung Lark đang mở canvas của workflow vừa tạo — người dùng xem lại từng khối ở thanh bên Base và tự bật.',
+  };
 }
 
 const FIELD_SPEC_SCHEMA = {
@@ -365,6 +417,49 @@ export const larkWebTools: LarkToolDef[] = [
         review: 'Tất cả đang TẮT. Người dùng mở "Tự động hoá" trong khung Lark bên phải, xem lại từng cái và tự bật.',
       };
     },
+  },
+  {
+    name: 'lark_web_create_workflows',
+    gated: true,
+    additive: true,
+    description:
+      'TẠO một hay nhiều KHỐI "Quy trình làm việc" (WORKFLOW — hiện ở thanh bên của Base cạnh các bảng, mở ra là CANVAS sơ đồ các bước) qua phiên Lark web, KHÔNG cần App ID. ' +
+      'ĐÂY LÀ MẶC ĐỊNH khi người dùng nói "workflow"/"quy trình". Chỉ dùng lark_web_create_automation(s) khi họ nói rõ "tự động hoá"/"automation". ' +
+      'Mỗi mục {title, steps} theo ĐÚNG luật thiết kế của lark_web_create_automation (cùng schema `steps` chính thức, cùng bộ kiểm). ' +
+      `Hỗ trợ tạo thẳng: ${WEB_SUPPORTED_TYPES.join(', ')} (luồng thẳng). Tạo LẦN LƯỢT, luôn TẮT; đọc lại từng khối (thanh bên + chi tiết); mục lỗi không làm dừng mục khác. ` +
+      'Xong thì khung Lark tự mở canvas của khối đầu tiên để người dùng xem; họ tự bật trong Lark. Loại bước chưa hỗ trợ → kind "unsupported": dựng trong canvas bằng lark_ui_*.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token Base (đã chọn ở đầu hội thoại)'),
+        workflows: {
+          type: 'array',
+          description: 'Các workflow cần tạo (1–8). title = tên khối ở thanh bên Base.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { title: { type: 'string' }, steps: { type: 'array', items: { type: 'object', additionalProperties: true } } },
+            required: ['title', 'steps'],
+          },
+        },
+      },
+      required: ['app_token', 'workflows'],
+    },
+    preview: async (i) => ({ fieldNames: await fieldNamesFor(tokenOf(i)) }),
+    preflight: async (i) => {
+      try {
+        const list: J[] = Array.isArray(i.workflows) ? i.workflows : [];
+        if (!list.length) return { ok: false, kind: 'invalid', error: 'Thiếu `workflows` (mảng {title, steps}).' };
+        if (list.length > 8) return { ok: false, kind: 'invalid', error: 'Tối đa 8 workflow mỗi lần gọi — chia làm nhiều lần.' };
+        const preps = await Promise.all(list.map((w) => prepare({ app_token: i.app_token, url: i.url, title: w?.title, steps: w?.steps }).catch((e) => ({ ok: false, kind: 'error', error: String((e as Error)?.message || e) }))));
+        if (preps.some((p: J) => p.ok)) return null;
+        return { ok: false, kind: preps.every((p: J) => p.kind === 'unsupported') ? 'unsupported' : 'invalid', error: 'Không workflow nào hợp lệ — sửa theo lỗi từng mục rồi gọi lại.', items: preps.map((p: J, k) => ({ title: list[k]?.title, ...p })) };
+      } catch (e) {
+        return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
+      }
+    },
+    exec: async (i) => createWorkflowBlocks(i),
   },
   {
     name: 'lark_web_add_table',

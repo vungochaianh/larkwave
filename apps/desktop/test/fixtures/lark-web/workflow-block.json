@@ -1,0 +1,30 @@
+{
+  "_note": "Đo trên Base Test 09/10/2026, id đã thay. create = request thanh bên Lark gửi khi '+ Mới → Workflow' (bundle vb_31004/createBlockWorkflow + __viewpack handleAddWorkFlow); addBlock = lớp lệnh trong trang; detail = GET /workflow/detail?workflowID=…&bizType=2 của khối Larkwave tạo.",
+  "createResponse": { "code": 0, "msg": "", "data": { "workflowID": "7600000000000000001" } },
+  "addBlockResult": { "result": 2, "data": { "id": "wkfTESTBLOCK00001", "index": 17 } },
+  "detail": {
+    "code": 0,
+    "data": {
+      "workflow": {
+        "bizType": 2,
+        "status": 0,
+        "source": 2001,
+        "accessMode": 0,
+        "workflowID": "7600000000000000001",
+        "nodeSchema": {},
+        "draft": "{\"steps\":[{\"id\":\"trigAAAAAAAA\",\"type\":\"AddRecordTrigger\",\"data\":{\"tableId\":\"ref_tblCUSTOMER0001\",\"watchedFieldId\":\"ref_tblCUSTOMER0001_fldNAME00001\",\"triggerControlList\":[\"pasteUpdate\",\"automationBatchUpdate\",\"appendImport\",\"openAPIBatchUpdate\"]},\"stepTitle\":\"Khi thêm khách hàng\",\"next\":[{\"ids\":[\"actBBBBBBBB\"]}]},{\"id\":\"actBBBBBBBB\",\"type\":\"LarkMessageAction\",\"data\":{},\"stepTitle\":\"Báo người phụ trách\",\"next\":[]}],\"extensionI18nMap\":{},\"tabldFieldMap\":{\"tblCUSTOMER0001\":{\"fldNAME00001\":{\"type\":1},\"fldOWNER0001\":{\"type\":11}}}}",
+        "extra": "{\"TableMap\":{\"ref_tblCUSTOMER0001\":{\"TableID\":\"tblCUSTOMER0001\",\"FieldMap\":{\"ref_tblCUSTOMER0001_fldNAME00001\":\"fldNAME00001\",\"ref_tblCUSTOMER0001_fldOWNER0001\":\"fldOWNER0001\"},\"ViewMap\":{}}},\"BlockMap\":{},\"BtnTrigger\":{\"TableID\":\"\",\"FieldID\":\"\"}}"
+      }
+    }
+  },
+  "baseAfter": {
+    "token": "BaseTokTEST",
+    "name": "Base Test",
+    "blocks": ["tblCUSTOMER0001", "wkfTESTBLOCK00001"],
+    "blockInfos": {
+      "tblCUSTOMER0001": { "id": "tblCUSTOMER0001", "name": "Khách hàng" },
+      "wkfTESTBLOCK00001": { "id": "wkfTESTBLOCK00001", "name": "Larkwave test — báo người phụ trách", "blockToken": "7600000000000000001", "blockType": 86 }
+    },
+    "trashBlockMap": {}
+  }
+}

@@ -27,6 +27,14 @@ import {
   type WebTable,
   type WebAutomation,
 } from './larkWebApi';
+import {
+  addWorkflowBlockScript,
+  deleteWorkflowBlockScript,
+  parseCreateResponse,
+  workflowBlockUrl,
+  workflowCreateBody,
+  workflowDetailPath,
+} from './workflowBlock';
 
 /** Hạn giờ cho một lần hỏi "tôi là ai" (xem whoami()). */
 const WHOAMI_TIMEOUT_MS = 6000;
@@ -2020,6 +2028,67 @@ export class LarkWebSession {
     if (j?.code !== 0) throw new Error(`Không đọc lại được danh sách automation (mã ${j?.code}).`);
     const list: J[] = Array.isArray(j?.data?.workflowList) ? j.data.workflowList : [];
     return list.find((w) => String(w?.workflowID) === String(workflowID)) ?? null;
+  }
+
+  /**
+   * Tạo một KHỐI Quy trình làm việc (Workflow — canvas ở thanh bên Base), ở trạng thái TẮT. Đúng hai
+   * bước thanh bên của Lark làm khi bấm "+ Mới → Workflow" (workflowBlock.ts): workflow/create rồi
+   * baseOperate.addBlock trong trang. addBlock hỏng → đóng workflow mồ côi (workflow/disable, đúng
+   * việc Lark làm khi xoá khối) để Base không còn rác vô hình.
+   */
+  async createWorkflowBlock(token: string, p: { name: string; draft: J; extra: J; triggerName: string }): Promise<{ workflowID: string; blockId: string }> {
+    const j = await this.webJson(`${bit(token)}/workflow/create`, 'POST', workflowCreateBody(token, p));
+    const c = parseCreateResponse(j);
+    if (!c.ok) throw new Error((c as { error: string }).error);
+    const r = await this.runBaseStructure(token, addWorkflowBlockScript({ token, workflowID: c.workflowID, name: p.name }));
+    if (!r?.ok || !r.blockId) {
+      await this.webJson(`${bit(token)}/workflow/disable`, 'POST', { workflowID: c.workflowID, bizType: '2' }).catch(() => undefined);
+      throw new Error(`Lark đã tạo workflow nhưng không gắn được khối vào thanh bên Base (${r?.error || 'không rõ'}${r?.hint ? ` — ${r.hint}` : ''}).`);
+    }
+    return { workflowID: c.workflowID, blockId: String(r.blockId) };
+  }
+
+  /** Đọc lại khối Workflow: thanh bên (clientvars) + chi tiết (workflow/detail). clientvars trễ vài giây → thử lại. */
+  async readWorkflowBlockBack(token: string, workflowID: string): Promise<{ meta: WebBaseMeta | null; detail: J }> {
+    let meta: WebBaseMeta | null = null;
+    for (let k = 0; k < 8; k++) {
+      try {
+        const first = await this.webJson(clientVarsPath(token, undefined, 0));
+        if (first?.code === 0) meta = parseBaseMeta(decodeLarkGz(first.data?.base));
+      } catch {
+        /* thử lại */
+      }
+      if (meta?.workflowBlocks.some((b) => b.workflowId === workflowID)) break;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    const d = await this.webJson(workflowDetailPath(token, workflowID));
+    return { meta, detail: d?.code === 0 ? d.data?.workflow : null };
+  }
+
+  /** Mở thẳng canvas của khối Workflow trong khung Lark. */
+  async showWorkflowBlock(token: string, blockId: string): Promise<void> {
+    if (!this.win || this.win.isDestroyed() || !this.host) return;
+    // Đo thật: mở ?table=<khối> NGAY sau khi tạo, trang Base đôi khi chưa thấy khối mới (đồng bộ trễ)
+    // và tự rơi về bảng xem gần nhất. Thử lại vài lần cho tới khi URL giữ đúng khối.
+    const url = workflowBlockUrl(this.host, token, blockId);
+    for (let k = 0; k < 4; k++) {
+      try {
+        await this.win.loadURL(url, { userAgent: CHROME_UA });
+      } catch {
+        /* best-effort */
+      }
+      await new Promise((r) => setTimeout(r, 3500));
+      if (!this.win || this.win.isDestroyed()) return;
+      if (this.win.webContents.getURL().includes(`table=${blockId}`)) return;
+      await new Promise((r) => setTimeout(r, 1500 * (k + 1)));
+    }
+  }
+
+  /** Dọn khối Workflow do CHÍNH Larkwave tạo (kiểm thử / tạo hỏng). Không có tool nào cho agent gọi. */
+  async deleteOwnWorkflowBlock(token: string, blockId: string, workflowID: string): Promise<J> {
+    const r = await this.runBaseStructure(token, deleteWorkflowBlockScript({ token, blockId, workflowID }));
+    const d = await this.webJson(`${bit(token)}/workflow/disable`, 'POST', { workflowID, bizType: '2' }).catch((e) => ({ error: String(e) }));
+    return { block: r, disable: d };
   }
 
   /** Đưa khung Lark tới Base (để người dùng/AI thấy ngay automation vừa tạo). Chỉ host Lark. */
