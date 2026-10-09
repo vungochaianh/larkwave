@@ -3,7 +3,7 @@ import { type LarkToolDef, str } from './types';
 import { getLarkWebSession } from '../larkWebSession';
 import { baseTokenFromUrl, type WebAutomation, type WebTable } from '../larkWebApi';
 import { formatIssues, normalizeWorkflowInput, validateWorkflowBody } from '../workflowV3';
-import { profileFromWebTables, v3ToInternal, verifyReadBack, WEB_SUPPORTED_TYPES } from '../webAutomation';
+import { internalTreeText, profileFromWebTables, v3ToInternal, verifyReadBack, WEB_SUPPORTED_TYPES, WEB_UI_ONLY_TYPES } from '../webAutomation';
 import { FIELD_KINDS, planFields, structureScript, verifyStructure, type FieldSpec } from '../baseStructure';
 import { clientVarsPath, decodeLarkGz, parseTableSchema } from '../larkWebApi';
 import { translateWebWorkflows } from './workflows';
@@ -26,7 +26,7 @@ import { toWorkflowBlockDraft, verifyWorkflowBlock } from '../workflowBlock';
 type J = any;
 
 /** Cache quét gần nhất theo token — create kiểm lại theo đúng hồ sơ người dùng vừa xem. */
-const scanCache = new Map<string, { at: number; tables: WebTable[]; name: string }>();
+const scanCache = new Map<string, { at: number; tables: WebTable[]; name: string; timezone?: string }>();
 const SCAN_TTL = 10 * 60_000;
 
 function tokenOf(i: J): string {
@@ -58,11 +58,11 @@ function autoLine(a: WebAutomation): string {
   return `${a.kind === 'workflow' ? 'Quy trình' : 'Automation'} «${a.title}» [${a.enabled ? 'đang BẬT' : 'tắt'}] #${a.workflowId}: ${a.steps.map((s) => s.label + (s.table ? ` (${s.table})` : '')).join(' → ') || '(trống)'}`;
 }
 
-async function tablesFor(token: string): Promise<{ tables: WebTable[]; name: string }> {
+async function tablesFor(token: string): Promise<{ tables: WebTable[]; name: string; timezone?: string }> {
   const c = scanCache.get(token);
   if (c && Date.now() - c.at < SCAN_TTL) return c;
   const r = await getLarkWebSession().scanWebBase(token, { samples: 0 });
-  const v = { at: Date.now(), tables: r.tables, name: r.meta.name };
+  const v = { at: Date.now(), tables: r.tables, name: r.meta.name, timezone: r.meta.timezone };
   scanCache.set(token, v);
   return v;
 }
@@ -72,13 +72,13 @@ async function prepare(i: J): Promise<J> {
   const token = tokenOf(i);
   const { body, notes } = normalizeWorkflowInput(i);
   if (!body.title || !String(body.title).trim()) return { ok: false, kind: 'invalid', error: 'Thiếu `title` (tên automation).' };
-  const { tables, name } = await tablesFor(token);
+  const { tables, name, timezone } = await tablesFor(token);
   const r = validateWorkflowBody(body, { mode: 'create', profile: profileFromWebTables(tables) });
   // Người nhận "tôi" ở phiên web không phải open_id ou_… — bỏ đúng lỗi đó, phần còn lại giữ nguyên.
   const errors = r.errors.filter((e) => !/receiver|open_?id|ou_/i.test(`${e.path} ${e.message}`));
   if (errors.length) return { ok: false, kind: 'invalid', errors: formatIssues({ errors, warnings: [] }), hint: 'Sửa thiết kế theo các lỗi trên rồi gọi lại.' };
   const me = await getLarkWebSession().webMe();
-  const conv = v3ToInternal({ title: String(body.title), steps: body.steps as J[] }, tables, me);
+  const conv = v3ToInternal({ title: String(body.title), steps: body.steps as J[] }, tables, me, { timezone });
   if (!conv.ok) {
     return conv.unsupported?.length
       ? {
@@ -86,7 +86,8 @@ async function prepare(i: J): Promise<J> {
           kind: 'unsupported',
           error: conv.errors.join(' '),
           supported: WEB_SUPPORTED_TYPES,
-          next: `Dựng automation này trong trình soạn của Lark: lark_ui_open({app_token:"${token}"}) → mở "Tự động hoá" → tạo theo thiết kế bằng lark_ui_snapshot/act/wait; luôn để TẮT; lark_ui_saved để xác nhận Lark đã lưu.`,
+          ui_only: conv.unsupported,
+          next: `Bỏ bước ${conv.unsupported.join(', ')} khỏi thiết kế để tạo thẳng phần còn lại, rồi bổ sung bước đó trong trình soạn của Lark: lark_ui_open({app_token:"${token}"}) → mở "Tự động hoá" → thêm bước bằng lark_ui_snapshot/act/wait; luôn để TẮT; lark_ui_saved để xác nhận Lark đã lưu.`,
         }
       : { ok: false, kind: 'invalid', errors: conv.errors };
   }
@@ -176,15 +177,26 @@ export async function createWorkflowBlocks(i: J): Promise<J> {
       const created = await web.createWorkflowBlock(token, { name, draft: blk.draft, extra: blk.extra, triggerName: p.conv.triggerName || '' });
       const back = await web.readWorkflowBlockBack(token, created.workflowID).catch(() => ({ meta: null, detail: null }));
       const v = verifyWorkflowBlock(back.meta, back.detail, { workflowID: created.workflowID, steps: blk.draft.steps, name });
+      // Soi bằng CHÍNH bộ kiểm của trình soạn Lark trên canvas vừa mở (cấu hình từng bước + schema lúc bật).
+      const check = await web.selfCheckWorkflowBlock(token, created.blockId, created.workflowID).catch(() => null);
+      const checkProblems: string[] =
+        check && check.ok === false && !check.error
+          ? (check.bad || [])
+              .map((b: J) => `Lark báo bước «${b.title || b.type}» chưa hợp lệ: ${b.getConfigErrorInfoList || b.getTaskConfigErrorInfoList || b.getConfigNotReadyErrorInfoList || b.getTaskConfigNotReadyErrorInfoList || 'cấu hình chưa đủ'}`)
+              .concat(check.schemaError ? [`Lark không dựng được schema lúc bật: ${check.schemaError}`] : [])
+          : [];
+      const savedDraft = back.detail?.draft ?? blk.draft;
       items.push({
-        ok: v.ok,
+        ok: v.ok && !checkProblems.length,
         kind: 'workflow',
         workflow_id: created.workflowID,
         block_id: created.blockId,
         title: name,
         verified: v.ok,
         status_text: v.enabled ? 'ĐANG BẬT (bất thường — kiểm tra ngay)' : 'đang TẮT — chờ người dùng xem lại và tự bật',
-        ...(v.problems.length ? { problems: v.problems } : {}),
+        ...(v.problems.length || checkProblems.length ? { problems: [...v.problems, ...checkProblems] } : {}),
+        lark_check: check ? (check.error ? `không soi được (${check.error})` : check.ok ? `đạt — trình soạn Lark thấy ${check.steps} bước hợp lệ và dựng được schema lúc bật` : 'có lỗi (xem problems)') : 'không soi được',
+        saved_tree: internalTreeText(savedDraft),
         design_text: workflowDesignText(p.body.steps, { fieldNames }),
         ...(p.warnings.length ? { warnings: p.warnings } : {}),
       });
@@ -273,7 +285,7 @@ export const larkWebTools: LarkToolDef[] = [
         ...(r.errors.length ? { errors: r.errors } : {}),
         next:
           'Thiếu bảng/cột → lark_web_add_table / lark_web_add_fields (không bấm giao diện). Thiết kế theo `steps` chính thức (bitable_workflow_schema để tra) → viết thiết kế ra chat bằng tiếng Việt → tạo ngay bằng lark_web_create_automations (một lần cho cả bộ). ' +
-          `Tạo thẳng được: ${WEB_SUPPORTED_TYPES.join(', ')}; loại khác dựng trong trình soạn Lark bằng lark_ui_*.`,
+          `Tạo thẳng được: ${WEB_SUPPORTED_TYPES.join(', ')}; chỉ ${WEB_UI_ONLY_TYPES.join(', ')} phải dựng trong trình soạn Lark bằng lark_ui_*.`,
       };
     },
   },
@@ -319,7 +331,7 @@ export const larkWebTools: LarkToolDef[] = [
     description:
       'TẠO một Automation MỚI trong Base qua phiên Lark web (KHÔNG cần App ID) — luôn ở trạng thái TẮT, người dùng tự bật trong Lark. Có từ 2 automation trở lên → dùng lark_web_create_automations (một lần gọi). ' +
       'Gọi SAU khi: lark_web_scan_base → dựng `title` + `steps` theo schema chính thức → viết thiết kế ra chat. ' +
-      `Hỗ trợ: ${WEB_SUPPORTED_TYPES.join(', ')} (luồng thẳng, không rẽ nhánh). Bảng/cột theo TÊN (table_name/field_name/watched_field_name); nội dung tin nhắn: [{value_type:"text",value:"…"},{value_type:"ref",value:"$.<id trigger>.<field_id>"}]; ` +
+      `Hỗ trợ: ${WEB_SUPPORTED_TYPES.join(', ')} — cả rẽ nhánh (IfElseBranch/SwitchBranch qua children.links) và vòng lặp (Loop). Bảng/cột theo TÊN (table_name/field_name/watched_field_name); nội dung tin nhắn: [{value_type:"text",value:"…"},{value_type:"ref",value:"$.<id trigger>.<field_id>"}]; ` +
       'người nhận: "tôi" = {value_type:"user",value:{id:"me"}}; CỘT NGƯỜI của bản ghi (vd «Sales phụ trách») = {value_type:"ref",value:"$.<id trigger>.<field_id cột Người>"}; nút mở bản ghi: btn_list:[{text:"Xem bản ghi",btn_action:"openLink",link:[{value_type:"ref",value:"$.<id trigger>.recordLink"}]}]. Loại khác → kind "unsupported" kèm cách dựng bằng lark_ui_*. Tool tự kiểm, tạo, rồi ĐỌC LẠI để xác minh.',
     inputSchema: {
       type: 'object',
@@ -426,8 +438,12 @@ export const larkWebTools: LarkToolDef[] = [
       'TẠO một hay nhiều KHỐI "Quy trình làm việc" (WORKFLOW — hiện ở thanh bên của Base cạnh các bảng, mở ra là CANVAS sơ đồ các bước) qua phiên Lark web, KHÔNG cần App ID. ' +
       'ĐÂY LÀ MẶC ĐỊNH khi người dùng nói "workflow"/"quy trình". Chỉ dùng lark_web_create_automation(s) khi họ nói rõ "tự động hoá"/"automation". ' +
       'Mỗi mục {title, steps} theo ĐÚNG luật thiết kế của lark_web_create_automation (cùng schema `steps` chính thức, cùng bộ kiểm). ' +
-      `Hỗ trợ tạo thẳng: ${WEB_SUPPORTED_TYPES.join(', ')} (luồng thẳng). Tạo LẦN LƯỢT, luôn TẮT; đọc lại từng khối (thanh bên + chi tiết); mục lỗi không làm dừng mục khác. ` +
-      'Xong thì khung Lark tự mở canvas của khối đầu tiên để người dùng xem; họ tự bật trong Lark. Loại bước chưa hỗ trợ → kind "unsupported": dựng trong canvas bằng lark_ui_*.',
+      `Tạo thẳng ĐỦ bộ bước: ${WEB_SUPPORTED_TYPES.join(', ')} — gồm rẽ nhánh IfElseBranch (children.links if_true/if_false), SwitchBranch (case label branch_1…/default), Loop (loop_start, data = $.<tìm bản ghi>.fieldRecords; trong thân lặp ref $.<loop>.item.<field_id>). ` +
+      'Ref hợp lệ: $.<trigger bản ghi>.<field_id>|recordId|recordLink|recordCreatedTime…; $.<tìm>.fieldRecords|recordNum|firstfieldsRecord.<field_id>; $.<loop>.item.<field_id>; $.<http>.body.<khoá>|status_code; $.<AI tạo văn bản>. ' +
+      'SetRecordAction cập nhật bản ghi trigger: ref_info:{step_id:"<id trigger>"}; giá trị cột chọn = {value_type:"option",value:{name:"…"}}. ' +
+      `Chỉ ${WEB_UI_ONLY_TYPES.join(', ')} và nhóm chat (cần id nội bộ) mới phải dựng trong trình soạn Lark (lark_ui_*). ` +
+      'Tạo LẦN LƯỢT, luôn TẮT; đọc lại từng khối (thanh bên + chi tiết, so CẤU TRÚC cây) rồi soi bằng chính bộ kiểm của trình soạn Lark (lark_check); trả saved_tree = cây Lark đã lưu. Mục lỗi không làm dừng mục khác. ' +
+      'Xong thì khung Lark mở canvas của khối đầu tiên để người dùng xem; họ tự bật trong Lark.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,

@@ -30,6 +30,7 @@ import {
 import {
   addWorkflowBlockScript,
   deleteWorkflowBlockScript,
+  canvasSelfCheckScript,
   parseCreateResponse,
   workflowBlockUrl,
   workflowCreateBody,
@@ -2082,6 +2083,30 @@ export class LarkWebSession {
       if (this.win.webContents.getURL().includes(`table=${blockId}`)) return;
       await new Promise((r) => setTimeout(r, 1500 * (k + 1)));
     }
+  }
+
+  /**
+   * Soi khối vừa tạo bằng CHÍNH bộ kiểm của trình soạn Lark (canvasSelfCheckScript): mở canvas, chờ
+   * `window.workflow` đúng khối, chạy kiểm cấu hình từng bước + thử dựng schema lúc bật. Chỉ tính toán
+   * trong trang — không lưu, không bật. null = không soi được (trang không mở được canvas).
+   */
+  async selfCheckWorkflowBlock(token: string, blockId: string, workflowID: string): Promise<J | null> {
+    if (!this.win || this.win.isDestroyed() || !this.host) return null;
+    if (!this.win.webContents.getURL().includes(`table=${blockId}`)) await this.showWorkflowBlock(token, blockId);
+    const script = canvasSelfCheckScript(workflowID);
+    let last: J = null;
+    for (let k = 0; k < 8; k++) {
+      if (!this.win || this.win.isDestroyed()) return last;
+      try {
+        last = (await Promise.race([this.win.webContents.executeJavaScript(script, true), new Promise((r) => setTimeout(() => r({ ok: false, error: 'timeout' }), 20_000))])) as J;
+      } catch (e) {
+        last = { ok: false, error: String((e as Error)?.message || e) };
+      }
+      if (last && last.error !== 'no-canvas' && last.error !== 'other-workflow' && last.error !== 'timeout') return last;
+      await new Promise((r) => setTimeout(r, 2000));
+      if (k === 3 && !this.win.webContents.getURL().includes(`table=${blockId}`)) await this.showWorkflowBlock(token, blockId);
+    }
+    return last;
   }
 
   /** Dọn khối Workflow do CHÍNH Larkwave tạo (kiểm thử / tạo hỏng). Không có tool nào cho agent gọi. */
