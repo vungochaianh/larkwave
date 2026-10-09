@@ -13,6 +13,8 @@ export interface ToolExecContext {
   confirm: (callId: string, name: string, input: unknown) => Promise<boolean>;
   ask: (callId: string, question: string, choices?: string[]) => Promise<string>;
   autoApprove?: boolean;
+  /** Tự duyệt riêng từng tool (chế độ Tạo workflow: tool cộng-thêm khi công tắc Tự động bật). */
+  autoApproveTool?: (name: string) => boolean;
   /**
    * Lượt này có được phép nhắc "cài lại bản mới" không.
    *
@@ -70,8 +72,8 @@ export async function executeLarkTool(
   const callId = `lt_${randomUUID()}`;
   // Kiểm trước: thiết kế chắc chắn bị từ chối thì đừng bắt người dùng duyệt (xem LarkToolDef.preflight).
   const pre = await runPreflight(tool, input, ctx.client);
-  const needsConfirm = tool.gated && !ctx.autoApprove && !pre;
-  ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm });
+  const needsConfirm = needsConfirmation(tool, ctx, !!pre);
+  ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
   if (needsConfirm) {
     const CONFIRM_TIMEOUT_MS = 10 * 60_000;
@@ -119,6 +121,40 @@ export async function executeLarkTool(
     const suspect = suspectAppBugError(e);
     ctx.emit({ type: 'tool_result', callId, ok: false, error: message, suspectAppBug: suspect, tier: tierForError(e) });
     return { ok: false, text: message + (suspect ? await versionNote(ctx.allowVersionHint) : '') };
+  }
+}
+
+/**
+ * Thao tác này có phải DỪNG chờ người dùng bấm "Cho phép" không — luật DUY NHẤT, dùng chung cho
+ * cầu MCP (Claude CLI), toolBridge (API/MAIC) và executeLarkTool (orchestrator). Ba chỗ từng tự
+ * viết `tool.gated && !autoApprove && !pre` riêng; thêm một ngoại lệ ở một chỗ là ba bộ luật trôi lệch.
+ *
+ *  - Tool không ghi → không hỏi.
+ *  - Preflight đã chặn (thiết kế chắc chắn bị từ chối) → không hỏi: kết quả lỗi về thẳng model.
+ *  - "Tự động duyệt" toàn cục → không hỏi.
+ *  - `autoApproveTool(name)` (chế độ Tạo workflow, công tắc Tự động) → không hỏi, NHƯNG chỉ cho tool
+ *    có cờ `additive` (tạo nháp TẮT / thêm bảng-cột-lựa chọn). Tool xoá/ghi đè không có cờ đó nên
+ *    vẫn hỏi dù hàm tự duyệt có trả true — chốt nằm ở đây, không phụ thuộc nơi gọi lọc đúng.
+ */
+export function needsConfirmation(
+  tool: { gated?: boolean; additive?: boolean; name: string },
+  ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean },
+  preflightBlocked = false,
+): boolean {
+  if (!tool.gated || preflightBlocked) return false;
+  if (ctx.autoApprove) return false;
+  if (tool.additive && ctx.autoApproveTool?.(tool.name)) return false;
+  return true;
+}
+
+/** `{preview}` cho sự kiện tool_call của một thao tác đang chờ duyệt — lỗi thì bỏ qua (chỉ để hiển thị). */
+export async function previewFor(tool: { preview?: (i: Record<string, any>) => Promise<unknown> }, input: unknown): Promise<{ preview?: unknown }> {
+  if (!tool.preview) return {};
+  try {
+    const p = await Promise.race([tool.preview((input ?? {}) as Record<string, any>), new Promise((r) => setTimeout(() => r(undefined), 8000))]);
+    return p === undefined ? {} : { preview: p };
+  } catch {
+    return {};
   }
 }
 

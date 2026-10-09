@@ -161,6 +161,8 @@ export const IPC = {
   larkConfirmTool: 'tw:larkConfirmTool',
   larkAnswerAsk: 'tw:larkAnswerAsk',
   larkSetAutoApprove: 'tw:larkSetAutoApprove',
+  larkGetWorkflowAuto: 'tw:larkGetWorkflowAuto',
+  larkSetWorkflowAuto: 'tw:larkSetWorkflowAuto',
   larkBackupSync: 'tw:larkBackupSync',
   larkResetChat: 'tw:larkResetChat',
   larkShareSession: 'tw:larkShareSession',

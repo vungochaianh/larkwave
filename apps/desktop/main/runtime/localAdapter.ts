@@ -431,6 +431,12 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   larkSetAutoApprove(on: boolean): Promise<LarkConnection> {
     return this.lark.setAutoApprove(on);
   }
+  async larkGetWorkflowAuto(): Promise<{ workflowAuto: boolean }> {
+    return { workflowAuto: this.lark.workflowAutoOn() };
+  }
+  async larkSetWorkflowAuto(on: boolean): Promise<{ workflowAuto: boolean }> {
+    return this.lark.setWorkflowAuto(on);
+  }
   larkSetAgentPrefs(prefs: { runner?: string; model?: string; apiMode?: boolean }): Promise<LarkConnection> {
     return this.lark.setAgentPrefs(prefs);
   }

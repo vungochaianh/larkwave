@@ -469,3 +469,84 @@ export function summarizeSave(url: string, method: string, reqBody: string | nul
 export function isTemplateableSave(req: Record<string, unknown> | null, code: number | undefined): boolean {
   return !!req && typeof req.draft === 'string' && (req.draft as string).length > 40 && (code === 0 || code === undefined);
 }
+
+// ── Blocking UI (hộp thoại / lớp che / thông báo lỗi) ────────────────────────────────────────
+
+/** Số thao tác tối đa của một lượt lái giao diện (đủ để dựng vài automation; vẫn có trần). */
+export const UI_ACTION_CAP = 200;
+
+/** Một phần tử nổi (hộp thoại, popover, toast) thu thập trong trang bằng BLOCKING_COLLECT_JS. */
+export interface OverlayCandidate {
+  role: string;
+  cls: string;
+  text: string;
+  buttons: { text: string; x: number; y: number }[];
+  w: number;
+  h: number;
+}
+export interface BlockingInfo {
+  kind: 'unsaved-record' | 'confirm-dialog' | 'record-form' | 'dialog' | 'error-toast' | 'panel';
+  text: string;
+  buttons: string[];
+  /** Có bao nhiêu lớp nổi khác đang mở. */
+  others?: number;
+}
+
+/**
+ * Đoạn JS chạy trong trang: liệt kê các lớp nổi ĐANG HIỆN (dialog/alertdialog/modal/drawer/popover/
+ * toast) cùng nút bấm của chúng (toạ độ khung nhìn). Chỉ đọc; trả dữ liệu thô — phân loại ở
+ * classifyBlocking (thuần, có test).
+ */
+export const BLOCKING_COLLECT_JS = `(() => {
+  function vis(el) { try { var r = el.getBoundingClientRect(); if (r.width < 8 || r.height < 8) return false; if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) return false; var cs = getComputedStyle(el); return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05; } catch (e) { return false; } }
+  var sel = '[role=dialog],[role=alertdialog],[aria-modal=true],[class*="modal-content"],[class*="ud__modal"],[class*="ud__dialog"],[class*="drawer-content"],[class*="ud__drawer"],[class*="popconfirm"],[class*="ud__popover"],[class*="toast"],[class*="ud__message"],[class*="message-notice"],[role=alert]';
+  var els = Array.prototype.slice.call(document.querySelectorAll(sel)).filter(vis);
+  var top = els.filter(function (e) { return !els.some(function (o) { return o !== e && o.contains(e); }); });
+  return top.slice(0, 10).map(function (el) {
+    var r = el.getBoundingClientRect();
+    var btns = Array.prototype.slice.call(el.querySelectorAll('button,[role=button]')).filter(vis).slice(0, 10).map(function (b) { var q = b.getBoundingClientRect(); return { text: String(b.innerText || b.getAttribute('aria-label') || b.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 40), x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
+    return { role: el.getAttribute('role') || '', cls: String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '').slice(0, 200), text: String(el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 300), buttons: btns, w: r.width, h: r.height };
+  });
+})()`;
+
+const UNSAVED_RE = /(haven'?t submitted|not be saved|won'?t be saved|chưa (gửi|lưu)|sẽ không được lưu|未提交|不会被保存|不会保存|尚未保存)/i;
+const ERROR_RE = /(fail|error|lỗi|thất bại|không thành công|không có quyền|no permission|denied|失败|错误|无权限|出错)/i;
+const TOAST_CLS = /(toast|ud__message|message-notice)/i;
+const MODAL_CLS = /(modal|dialog|drawer|popconfirm|popover)/i;
+
+/**
+ * Từ các lớp nổi đang hiện → lớp đang CHẶN thao tác (nếu có), ưu tiên: hộp "bản ghi chưa gửi" →
+ * hộp xác nhận → hộp thoại → toast lỗi. Toast thường (đã lưu, đã sao chép…) không tính là chặn.
+ * Trả null khi giao diện sạch.
+ */
+export function classifyBlocking(cands: OverlayCandidate[] | null | undefined): BlockingInfo | null {
+  const list = (Array.isArray(cands) ? cands : []).filter((c) => c && (c.text || c.buttons?.length));
+  const scored: { b: BlockingInfo; p: number }[] = [];
+  for (const c of list) {
+    const text = normLabel(c.text).slice(0, 240);
+    const buttons = (c.buttons || []).map((b) => normLabel(b.text)).filter(Boolean);
+    if (UNSAVED_RE.test(text)) scored.push({ b: { kind: 'unsaved-record', text, buttons }, p: 5 });
+    else if (c.role === 'alertdialog' || /popconfirm/i.test(c.cls)) scored.push({ b: { kind: 'confirm-dialog', text, buttons }, p: 4 });
+    else if (/drawer/i.test(c.cls) && buttons.some((b) => /^(submit|gửi|提交)$/i.test(b))) scored.push({ b: { kind: 'record-form', text, buttons }, p: 3 });
+    else if (TOAST_CLS.test(c.cls) || c.role === 'alert') {
+      if (ERROR_RE.test(text)) scored.push({ b: { kind: 'error-toast', text, buttons }, p: 2 });
+    } else if (c.role === 'dialog' || MODAL_CLS.test(c.cls)) scored.push({ b: { kind: c.w > 240 && c.h > 120 && buttons.length ? 'dialog' : 'panel', text, buttons }, p: c.w > 240 && c.h > 120 && buttons.length ? 3 : 1 });
+  }
+  if (!scored.length) return null;
+  scored.sort((a, b) => b.p - a.p);
+  const top = scored[0].b;
+  return scored.length > 1 ? { ...top, others: scored.length - 1 } : top;
+}
+
+/** Nút AN TOÀN để đóng một lớp chặn: thoát / huỷ / đóng / để sau. KHÔNG BAO GIỜ xoá/bật/lưu/gửi/xác nhận. */
+const SAFE_BUTTON = /^(exit|cancel|close|dismiss|not now|later|got it|no|đóng|huỷ|hủy|huỷ bỏ|hủy bỏ|thoát|bỏ qua|để sau|đã hiểu|không|取消|关闭|退出|知道了|稍后|暂不)$/i;
+const NEVER_BUTTON = /(delete|remove|enable|activate|publish|submit|confirm|save|apply|send|xoá|xóa|gỡ|bật|kích hoạt|xuất bản|gửi|xác nhận|lưu|áp dụng|删除|移除|启用|发布|提交|确认|确定|保存|发送)/i;
+
+/** Chọn nút an toàn trong một lớp chặn (theo tên) — null nếu không có nút nào an toàn. */
+export function pickSafeButton<T extends { text: string }>(buttons: T[] | null | undefined): T | null {
+  for (const b of Array.isArray(buttons) ? buttons : []) {
+    const n = normLabel(b?.text || '');
+    if (n && SAFE_BUTTON.test(n) && !NEVER_BUTTON.test(n)) return b;
+  }
+  return null;
+}

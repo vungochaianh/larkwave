@@ -14,7 +14,7 @@ npx tsc main/runtime/versionHint.ts main/runtime/apiRunner.ts main/runtime/lark/
   main/runtime/lark/fileBuild.ts main/runtime/lark/filePaths.ts \
   main/runtime/lark/larkUiCore.ts main/runtime/lark/larkCdp.ts main/runtime/lark/larkTemplates.ts main/runtime/lark/larkLoginState.ts \
   main/runtime/lark/workflowV3.ts main/runtime/lark/tools/workflowsV3.ts \
-  main/runtime/lark/larkWebApi.ts main/runtime/lark/webAutomation.ts \
+  main/runtime/lark/larkWebApi.ts main/runtime/lark/webAutomation.ts main/runtime/lark/baseStructure.ts main/runtime/lark/mcpServer.ts \
   --outDir .test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck
 # Bộ gánh nhiều tenant của tw-lark-runner. Nằm ngoài apps/desktop nên outDir sinh ra đường dẫn
 # .test-build/tw-lark-runner/src/hosted.js — test dựa vào đúng đường đó. Nuốt lỗi KIỂU vì cây

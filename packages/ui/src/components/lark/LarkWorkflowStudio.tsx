@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Empty, Select, Tag, Tooltip, Typography } from 'antd';
+import { App, Button, Empty, Segmented, Select, Tag, Tooltip, Typography } from 'antd';
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
@@ -58,7 +58,7 @@ const EXAMPLES = [
  *   [Hội thoại workflow] │ [Base ▾ + hội thoại + ô nhập] ║ [Trang Lark thật (Chromium) + AI strip]
  *
  * Không cần App ID/App Secret: mọi thứ chạy bằng phiên Lark web của chính người dùng — danh sách
- * Base quét từ trình duyệt, agent quét Base → thiết kế → chờ đồng ý → tạo automation TẮT, và khi
+ * Base quét từ trình duyệt, agent quét Base → thiết kế → tạo automation TẮT (tự động, hoặc hỏi trước nếu người dùng chọn), và khi
  * cần thao tác giao diện thì khung Lark bên phải hiện đúng trang AI đang điều khiển (có nút Dừng).
  * Trang Lark là native view: thu gọn/hộp thoại mở → giấu (vẫn vẽ), rời màn → tháo (phiên vẫn chạy).
  */
@@ -125,6 +125,25 @@ export function LarkWorkflowStudio({ runtime, onOpenSkills }: { runtime: Runtime
     },
     [runtime],
   );
+
+  // ── Công tắc "Tự động (không hỏi lại)" — riêng máy này, lưu ở main (mặc định BẬT) ──
+  const [autoMode, setAutoMode] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!runtime.larkGetWorkflowAuto) return;
+    runtime
+      .larkGetWorkflowAuto()
+      .then((r) => setAutoMode(!!r?.workflowAuto))
+      .catch(() => setAutoMode(null));
+  }, [runtime]);
+  const changeAuto = async (on: boolean) => {
+    setAutoMode(on);
+    try {
+      const r = await runtime.larkSetWorkflowAuto?.(on);
+      if (r) setAutoMode(!!r.workflowAuto);
+    } catch {
+      message.error(t('wf.autoSaveErr', 'Không lưu được lựa chọn.'));
+    }
+  };
 
   // ── Trạng thái khung Lark ──
   const [st, setSt] = useState<LarkBrowserState | null>(null);
@@ -326,6 +345,27 @@ export function LarkWorkflowStudio({ runtime, onOpenSkills }: { runtime: Runtime
       <Text type="secondary" style={{ fontSize: 12 }}>
         {bases.length ? `${bases.length} Base` : basesErr ? basesErr.slice(0, 80) : ''}
       </Text>
+      {autoMode !== null && (
+        <Tooltip
+          title={
+            autoMode
+              ? t('wf.autoTip', 'Tạo bản nháp TẮT, thêm bảng/cột/lựa chọn chạy ngay. Xoá hoặc ghi đè vẫn hỏi. Không bao giờ tự bật automation.')
+              : t('wf.askTip', 'Mỗi thao tác ghi đều hiện hộp xác nhận vẽ sẵn thiết kế.')
+          }
+        >
+          <Segmented
+            data-testid="wf-auto-toggle"
+            size="small"
+            style={{ marginLeft: 'auto' }}
+            value={autoMode ? 'auto' : 'ask'}
+            onChange={(v) => void changeAuto(v === 'auto')}
+            options={[
+              { label: t('wf.auto', 'Tự động (không hỏi lại)'), value: 'auto' },
+              { label: t('wf.ask', 'Hỏi trước khi ghi'), value: 'ask' },
+            ]}
+          />
+        </Tooltip>
+      )}
     </div>
   );
 

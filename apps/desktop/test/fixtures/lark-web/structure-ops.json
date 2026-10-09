@@ -1,0 +1,115 @@
+{
+ "note": "Đo 09/10/2026 trên Base Test bằng cách bọc ctx.operate.tableOperate/baseOperate rồi thao tác tay (thêm cột Chọn một, thêm bảng). Đã thay id người dùng.",
+ "addField_args": {
+  "tableId": "tbl5TZxh3Ze4Crww",
+  "viewId": "vewEGaOfOD",
+  "data": {
+   "type": 3,
+   "name": "LW opt",
+   "property": {
+    "options": [
+     {
+      "name": "Mở",
+      "color": 0,
+      "id": "optqoMxFVe"
+     },
+     {
+      "name": "Đóng",
+      "color": 1,
+      "id": "optqXtjBIU"
+     }
+    ],
+    "optionsType": 0
+   },
+   "fieldUIType": "SingleSelect",
+   "exInfo": {
+    "disableCredential": true,
+    "colOrCustomRowType": "custom",
+    "customRows": 5
+   },
+   "defaultValueRule": null
+  }
+ },
+ "addField_result": {
+  "result": 2,
+  "data": {
+   "fieldId": "fldh986ajl",
+   "indexes": {
+    "vewEGaOfOD": 9
+   }
+  }
+ },
+ "existing_fieldMap": {
+  "person": {
+   "type": 11,
+   "property": {
+    "multiple": false
+   },
+   "fieldUIType": "User"
+  },
+  "date": {
+   "type": 5,
+   "property": {
+    "autoFill": false,
+    "dateFormat": "yyyy/MM/dd",
+    "timeFormat": ""
+   },
+   "fieldUIType": "DateTime"
+  },
+  "text": {
+   "type": 1,
+   "fieldUIType": "Text"
+  }
+ },
+ "addTable_args": {
+  "sourceTableId": null,
+  "parentId": null,
+  "exInfo": {
+   "contentCreation": false
+  }
+ },
+ "addTable_result": {
+  "result": 2,
+  "data": {
+   "tableId": "tblJ3obpXhtaLUM1",
+   "index": 15,
+   "blockIndex": 17
+  },
+  "operation": {
+   "command": "AddTableV2",
+   "actions": [
+    {
+     "action": "base.addTableV2",
+     "tableId": "tblJ3obpXhtaLUM1",
+     "data": {
+      "name": "Table",
+      "snapshot": {
+       "recordMap": {
+        "reczz28LAyx2qBKh": {},
+        "reczz28LAyx2thhM": {},
+        "reczz28LAyx2sdYO": {},
+        "reczz28LAyx2sAgs": {},
+        "reczz28LAyx2tw0f": {}
+       },
+       "fieldMap": {
+        "fldnFOtJzV": {
+         "id": "fldnFOtJzV",
+         "name": "Text",
+         "type": 1,
+         "property": null,
+         "fieldUIType": "Text"
+        }
+       },
+       "primaryKey": "fldnFOtJzV"
+      }
+     }
+    }
+   ]
+  }
+ },
+ "setBlock_args": {
+  "id": "tblJ3obpXhtaLUM1",
+  "name": "LW test table"
+ },
+ "ws_user_changes_note": "Cùng thao tác đó trên dây: websocket frontier, {type:\"BITABLE_TABLE\", data:{type:\"USER_CHANGES\", member_id, user_ticket, localRev, operations:\"H4sI…\"}} — không có HTTP tương đương."
+}

@@ -1106,7 +1106,15 @@ export type LarkChatEvent =
        *  tài khoản đúng như hội thoại, thay vì nằm chết trên máy vừa tạo ra nó. */
       uploadId?: string;
     }
-  | { type: 'tool_call'; callId: string; name: string; input: unknown; gated: boolean }
+  | {
+      type: 'tool_call';
+      callId: string;
+      name: string;
+      input: unknown;
+      gated: boolean;
+      /** Bản dễ đọc cho hộp xác nhận (vd `{ fieldNames: { fld…: 'Tên cột' } }`) — chỉ để hiển thị. */
+      preview?: unknown;
+    }
   /**
    * `suspectAppBug`: thất bại này ĐÁNG NGỜ là do ỨNG DỤNG hỏng (công cụ không tồn tại, lỗi cấp
    * ngôn ngữ) chứ không phải Lark từ chối / mạng / giới hạn sản phẩm. Phân loại làm ở main; UI
@@ -1775,6 +1783,9 @@ export interface RuntimeAdapter {
   /** Toggle auto-approving writes (Build mode runs without per-tool confirm).
    *  Returns the updated connection status. */
   larkSetAutoApprove?(on: boolean): Promise<LarkConnection>;
+  /** Tạo workflow: công tắc "Tự động (không hỏi lại)" — riêng máy này, mặc định BẬT. */
+  larkGetWorkflowAuto?(): Promise<{ workflowAuto: boolean }>;
+  larkSetWorkflowAuto?(on: boolean): Promise<{ workflowAuto: boolean }>;
   /** Back up + sync local Lark data (sessions/bases/settings, NOT the app_secret) to
    *  the Larkwave account so it survives a lost machine + syncs across devices.
    *  Returns the server timestamp, or null when offline/unreachable (local stays safe). */

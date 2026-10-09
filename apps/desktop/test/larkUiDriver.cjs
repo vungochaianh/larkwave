@@ -266,9 +266,10 @@ function fakeWc(url) {
 
   // 6h. trần thao tác
   d.budget.reset();
-  for (let i = 0; i < 80; i++) assert.ok(d.budget.take());
+  assert.strictEqual(d.budget.cap, 200, 'trần thao tác mỗi lượt = 200 (vẫn có trần)');
+  for (let i = 0; i < 200; i++) assert.ok(d.budget.take());
   assert.strictEqual((await d.act({ ref: refOf('Gửi tin nhắn'), action: 'click' })).error, 'budget-exhausted');
-  console.log('✓ driver: quá 80 thao tác/lượt → budget-exhausted');
+  console.log('✓ driver: quá 200 thao tác/lượt → budget-exhausted');
 
   // 6i. Dừng
   d.stop();

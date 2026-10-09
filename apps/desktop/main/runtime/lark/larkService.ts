@@ -312,7 +312,7 @@ function mergeSpec(local: LarkSpecDoc | null, remote: LarkSpecDoc | null): LarkS
     syncLog: [...syncLog.values()].sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, 50),
   };
 }
-import { allTools, isWriteTool, readOnlyTools, workflowModeTools } from './tools';
+import { allTools, isAdditiveTool, isWriteTool, readOnlyTools, workflowModeTools } from './tools';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
@@ -3419,6 +3419,15 @@ export class LarkService {
     return this.status();
   }
 
+  /** Công tắc "Tự động (không hỏi lại)" của Tạo workflow — RIÊNG máy này, mặc định BẬT. */
+  workflowAutoOn(): boolean {
+    return this.store.getMachinePrefs().workflowAuto !== false;
+  }
+  setWorkflowAuto(on: boolean): { workflowAuto: boolean } {
+    this.store.setMachinePrefs({ workflowAuto: !!on });
+    return { workflowAuto: this.workflowAutoOn() };
+  }
+
   /** Toggle auto-approving writes (Build mode runs without per-tool confirm). */
   async setAutoApprove(on: boolean): Promise<LarkConnection> {
     this.store.setSettings({ autoApprove: on });
@@ -4205,6 +4214,7 @@ export class LarkService {
               base: input.workflow?.base ?? input.activeBases?.[0],
               me: wfMe ? { name: wfMe.name } : undefined,
               openApi: !!client,
+              auto: this.workflowAutoOn(),
             })
           : buildSystemPrompt({
             versionLine,
@@ -4216,8 +4226,12 @@ export class LarkService {
             userBitableScopeMissing: this.userBitableScopeMissing(),
           })) + skillsBlock;
     // When auto-approve is on, writes run without the per-tool confirm prompt.
-    // Tạo workflow: LUÔN hỏi xác nhận trước khi ghi (hộp xác nhận vẽ thiết kế) — bỏ qua "Tự động duyệt".
+    // Tạo workflow: KHÔNG dùng "Tự động duyệt" chung (nó mở cả thao tác xoá). Thay vào đó công tắc
+    // riêng của màn này ("Tự động (không hỏi lại)", mặc định BẬT) chỉ tự duyệt tool có cờ `additive`
+    // — tạo nháp TẮT, thêm bảng/cột/lựa chọn. Xoá / ghi đè vẫn hỏi (needsConfirmation). Đọc lại
+    // mỗi lần hỏi để bật/tắt giữa lượt có tác dụng ngay.
     const autoApprove = workflowTurn ? false : this.store.getSettings().autoApprove ?? false;
+    const autoApproveTool = workflowTurn ? (name: string) => this.workflowAutoOn() && isAdditiveTool(name) : undefined;
 
     // Pin EVERY turn of this conversation to one working directory so `claude --resume` always
     // looks in the bucket the previous turns wrote to (see workDirPath). Best-effort: if the dir
@@ -4296,6 +4310,7 @@ export class LarkService {
      */
     const confirm = (callId: string, name: string, input: unknown) => {
       if (!workflowTurn && this.store.getSettings().autoApprove) return Promise.resolve(true);
+      if (autoApproveTool?.(name)) return Promise.resolve(true);
       return new Promise<boolean>((resolve) => this.pending.set(callId, { convId, resolve, name, input }));
     };
 
@@ -4344,7 +4359,7 @@ export class LarkService {
           runnerSwitchNote,
           session,
           extraTools: this.plugins.collectTools(),
-          ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client) } : {}),
+          ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client), autoApproveTool } : {}),
           autoApprove,
           allowVersionHint: true, // xem nhánh trên
           allowFileTools: true, // lượt của chính chủ máy — xem LarkAgentDeps.allowFileTools
@@ -4428,7 +4443,7 @@ export class LarkService {
             readOnly: false,
             cwd: workDir ?? (general ? attachDir : undefined),
             preferSubscription: true, // ← ignore the injected key; use the subscription
-            ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client) } : {}),
+            ...(workflowTurn ? { toolsOverride: workflowModeTools(!!client), autoApproveTool } : {}),
             awaitConfirm: confirm,
             awaitAsk: (callId, question, choices) =>
               new Promise<string>((resolve) => {

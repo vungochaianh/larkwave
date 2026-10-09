@@ -11,7 +11,7 @@ import { getLarkWebSession } from '../larkWebSession';
  *
  * SAFETY: these build a DISABLED draft only. Clicks on enable/publish/delete/test-run controls and
  * on "OK" inside a delete/enable dialog are refused (requires-confirm) — a human enables in Lark.
- * Lark-host-only; capped per run (80); the user's "Dừng" aborts; fail-closed (covered point,
+ * Lark-host-only; capped per run (UI_ACTION_CAP = 200); the user's "Dừng" aborts; fail-closed (covered point,
  * unknown ref → refuse). Truth = the captured network save, not "I clicked".
  * See docs/lark-browser.md + toolswave-lark-workflow-800004006 memory.
  */
@@ -25,6 +25,30 @@ function baseUrl(appToken?: string): string | undefined {
 }
 
 export const larkUiTools: LarkToolDef[] = [
+  {
+    name: 'lark_ui_health',
+    gated: false,
+    description:
+      '(ĐIỀU KHIỂN UI LARK) TỰ KIỂM khung Lark: đang ở URL nào, có hộp thoại / lớp che / form chưa gửi / thông báo LỖI nào đang mở không (`blocking: {kind, text, buttons}`), còn bao nhiêu thao tác. GỌI TRƯỚC khi bắt đầu thao tác giao diện và SAU KHI xong (phải sạch: clean=true). kind: unsaved-record (hộp "bản ghi chưa gửi") | record-form (form thêm bản ghi đang mở) | confirm-dialog | dialog | error-toast | panel.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
+    exec: async () => {
+      const web = getLarkWebSession();
+      if (!web.status().connected) return { ok: false, error: NEED_WEB };
+      return web.uiHealth();
+    },
+  },
+  {
+    name: 'lark_ui_dismiss',
+    gated: false,
+    description:
+      '(ĐIỀU KHIỂN UI LARK) ĐÓNG an toàn lớp đang chặn khung Lark: nhấn Escape, nếu còn thì bấm nút an toàn (Thoát/Exit, Huỷ/Cancel, Đóng/Close, Để sau…). KHÔNG BAO GIỜ bấm Xoá/Bật/Lưu/Gửi/Xác nhận. Dùng để dọn form/hộp thoại CHÍNH BẠN đã mở (vd "You haven\'t submitted the record… [Exit] [Back to Edit]" → Exit). Trả `dismissed`, lớp trước/sau; không đóng được → DỪNG và báo người dùng đang kẹt ở đâu.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {}, required: [] },
+    exec: async () => {
+      const web = getLarkWebSession();
+      if (!web.status().connected) return { ok: false, error: NEED_WEB };
+      return web.uiDismiss();
+    },
+  },
   {
     name: 'lark_ui_open',
     gated: false,
@@ -65,7 +89,8 @@ export const larkUiTools: LarkToolDef[] = [
     description:
       '(THỬ NGHIỆM — ĐIỀU KHIỂN UI LARK) Thực hiện 1 hành động trên 1 `ref` của snapshot MỚI NHẤT. `action`: click | dblclick | fill | clear | select | press | hover | scrollIntoView | scrollBy. `value` cho fill/select; `key` cho press (Enter/Escape/ArrowDown…); `dx`/`dy` cho scrollBy. ' +
       'Chọn control theo VAI TRÒ + TÊN (VN/EN/CN khác nhau), đừng bám số #ref qua nhiều snapshot. Combobox tuỳ biến: click để mở → snapshot lại → click đúng option. ' +
-      'AN TOÀN: hành động BẬT/XUẤT BẢN/XOÁ automation bị CHẶN (trả requires-confirm) — KHÔNG tự bật, hãy DỪNG và để người dùng tự bấm trong Lark. Sau hành động nếu domChanged/urlChanged → snapshot lại.',
+      'AN TOÀN: hành động BẬT/XUẤT BẢN/XOÁ automation bị CHẶN (trả requires-confirm) — KHÔNG tự bật, hãy DỪNG và để người dùng tự bấm trong Lark. Sau hành động nếu domChanged/urlChanged → snapshot lại. ' +
+      'Kết quả có `blocking` {kind,text,buttons} khi hộp thoại / form chưa gửi / toast LỖI đang chặn — xử lý nó TRƯỚC (đọc chữ; thứ bạn mở mà không cần → lark_ui_dismiss).',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -163,6 +188,7 @@ export const larkUiTools: LarkToolDef[] = [
   {
     name: 'lark_ui_template_apply',
     gated: true,
+    additive: true, // chỉ tạo bản nháp TẮT mới
     description:
       '(MẪU "LÀM MẪU MỘT LẦN → DÙNG LẠI") Tạo một automation/workflow MỚI dạng BẢN NHÁP (TẮT) từ một mẫu — gửi lại đúng khuôn Lark đã lưu khi người dùng làm tay, chỉ thay id. `template_id`; `app_token` = Base đích (bỏ trống = Base gốc của mẫu → nhân bản); `vars` = { "<key>": "<id mới>" } — BẮT BUỘC đủ mọi biến bảng/cột/view/option khi Base đích KHÁC Base gốc (lấy id thật qua bitable_list_tables / bitable_list_fields, khớp theo `hint`/tên); người/nhóm mặc định giữ nguyên. `title` = tên mới (tuỳ chọn). KHÔNG bao giờ bật — báo người dùng workflowID và bảo họ mở Lark xem lại rồi tự BẬT.',
     inputSchema: {

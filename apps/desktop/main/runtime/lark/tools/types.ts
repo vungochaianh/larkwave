@@ -16,6 +16,18 @@ export interface LarkToolDef {
   /** Destructive write → confirmation required. */
   gated: boolean;
   /**
+   * Ghi CỘNG THÊM, không phá gì của người dùng: tạo automation TẮT, thêm bảng/cột/lựa chọn mới.
+   * Ở chế độ "Tạo workflow" với công tắc "Tự động (không hỏi lại)" đang bật, tool gated có cờ này
+   * chạy luôn không hỏi. Xoá / ghi đè / sửa cái đang có / bật automation thì KHÔNG BAO GIỜ được
+   * gắn cờ này — chúng vẫn luôn hỏi (xem needsConfirmation trong larkToolExec).
+   */
+  additive?: boolean;
+  /**
+   * Bản dễ đọc của input cho hộp xác nhận (vd thay `fld…` bằng tên cột). Chỉ để HIỂN THỊ — lỗi ở
+   * đây không được chặn thao tác (nơi gọi nuốt lỗi).
+   */
+  preview?(input: Record<string, any>): Promise<unknown>;
+  /**
    * Kiểm TRƯỚC hộp xác nhận (chỉ có nghĩa với tool gated). Trả một payload `{ok:false,…}` thì
    * KHÔNG hỏi người dùng và KHÔNG chạy exec — kết quả đó đi thẳng về model như kết quả của tool.
    * Trả null = hợp lệ, hỏi xác nhận như thường. Lý do: không bắt người dùng duyệt một thiết kế mà

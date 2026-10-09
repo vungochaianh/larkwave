@@ -24,6 +24,8 @@ export interface WorkflowDesignLine {
 export interface WorkflowDesignOptions {
   /** fieldId (fld…) → tên cột, để ref hiện «Tên cột» thay vì mã. */
   fieldNames?: Record<string, string>;
+  /** id người dùng → tên hiển thị (người nhận). */
+  userNames?: Record<string, string>;
 }
 
 const OP_VI: Record<string, string> = {
@@ -65,6 +67,9 @@ const q = (s: unknown) => `«${String(s ?? '?')}»`;
 function refText(v: string, o: WorkflowDesignOptions): string {
   const path = String(v || '').replace(/^\$\./, '');
   const segs = path.split('.');
+  // Ref cột của bản ghi trigger ("$.trigger_1.fld…") → chỉ «Tên cột»: người duyệt không cần thấy mã bước.
+  if (segs.length === 2 && o.fieldNames?.[segs[1]]) return q(o.fieldNames[segs[1]]);
+  if (segs.length === 2 && segs[1] === 'recordLink') return '«link bản ghi»';
   const named = segs.map((s, i) => (i > 0 && o.fieldNames?.[s] ? q(o.fieldNames[s]) : s));
   return `[${named.join('.')}]`;
 }
@@ -86,7 +91,7 @@ export function valueText(v: J, o: WorkflowDesignOptions = {}): string {
     case 'option':
       return `“${String(val?.name ?? val?.id ?? '')}”`;
     case 'user':
-      return `@${String(val?.name || val?.id || '')}`;
+      return val?.id === 'me' && !val?.name ? '@bạn (người đang đăng nhập)' : `@${String(val?.name || o.userNames?.[val?.id] || val?.id || '')}`;
     case 'group':
       return `#${String(val?.name || val?.id || '')}`;
     case 'link':
@@ -186,7 +191,7 @@ export function stepText(s: J, o: WorkflowDesignOptions = {}): string {
     case 'Delay':
       return `Chờ ${d.duration ?? '?'} phút`;
     case 'LarkMessageAction': {
-      const to = d.send_to_everyone ? 'mọi người' : valueText(d.receiver, o) || '?';
+      const to = d.send_to_everyone ? 'mọi người' : (Array.isArray(d.receiver) ? d.receiver.map((r: J) => valueText(r, o)).filter(Boolean).join(', ') : valueText(d.receiver, o)) || '?';
       const title = valueText(d.title, o);
       return `Gửi tin Lark tới ${to}: ${title ? `“${cut(title, 50)}” — ` : ''}${cut(valueText(d.content, o), 100)}`;
     }

@@ -59,6 +59,7 @@ export async function* runLarkOrchestrator(
     confirm: deps.awaitConfirm,
     ask: deps.awaitAsk,
     autoApprove: deps.autoApprove,
+    autoApproveTool: deps.autoApproveTool,
     allowVersionHint: deps.allowVersionHint,
   };
 

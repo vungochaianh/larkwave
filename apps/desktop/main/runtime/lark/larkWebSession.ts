@@ -1063,11 +1063,13 @@ export class LarkWebSession {
     const driver = (await this.cdp.ensure()) ? 'cdp' : 'legacy';
     try {
       const r = (await this.win.webContents.executeJavaScript('({ url: location.href, title: document.title })', true)) as J;
+      const health = driver === 'cdp' ? await this.cdp.health().catch(() => null) : null;
       return {
         ok: true,
         url: r?.url,
         title: r?.title,
         driver,
+        ...(health?.blocking ? { blocking: health.blocking, blocking_hint: 'Khung Lark đang có lớp nổi từ trước — xem nó là gì; đóng bằng lark_ui_dismiss nếu là thứ còn sót lại.' } : {}),
         hint: this.win.isEmbedded ? 'Người dùng đang xem trực tiếp trong khung Lark (Lark × Agents → Tạo workflow).' : 'Người dùng có thể mở Lark × Agents → "Tạo workflow" để xem bạn thao tác trực tiếp.',
       };
     } catch (e) {
@@ -1137,6 +1139,49 @@ export class LarkWebSession {
     if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
     if (!(await this.cdp.ensure())) return { ok: false, error: 'drag-unsupported', hint: 'Không gắn được trình điều khiển CDP — dùng "Làm mẫu một lần" (ghi tay rồi dùng lại).' };
     return this.cdp.drag(input);
+  }
+
+  /** Tự kiểm khung Lark: đang ở đâu, có hộp thoại/lớp che/toast lỗi nào không (CDP). */
+  async uiHealth(): Promise<J> {
+    if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
+    if (!(await this.cdp.ensure())) return { ok: false, error: 'cdp-unavailable', hint: 'Không gắn được trình điều khiển CDP.' };
+    return this.cdp.health();
+  }
+
+  /** Đóng an toàn lớp đang chặn (Escape → nút Thoát/Huỷ/Đóng…; không bao giờ Xoá/Bật/Lưu). */
+  async uiDismiss(): Promise<J> {
+    if (!this.win || this.win.isDestroyed()) return { ok: false, error: 'no-window' };
+    if (!(await this.cdp.ensure())) return { ok: false, error: 'cdp-unavailable' };
+    return this.cdp.dismiss();
+  }
+
+  /**
+   * Chạy một đoạn dựng CẤU TRÚC (baseStructure.structureScript) trong trang Base: đưa khung Lark tới
+   * đúng Base nếu đang ở chỗ khác, chờ ngữ cảnh Base của trang sẵn sàng, rồi chạy. Không ném — lỗi
+   * nằm trong kết quả.
+   */
+  async runBaseStructure(token: string, script: string): Promise<J> {
+    if (!this.win || this.win.isDestroyed() || !this.host) return { ok: false, error: 'Chưa đăng nhập Lark web — đăng nhập trong khung Lark bên phải.' };
+    const wc = this.win.webContents;
+    const probe = `(() => { try { var a = window.bitableConnectContexts ? Array.from(window.bitableConnectContexts) : []; return a.some(function (c) { try { return c.base.getToken() === ${JSON.stringify(token)} && c.base.isLoaded(); } catch (e) { return false; } }); } catch (e) { return false; } })()`;
+    const ready = async () => {
+      try {
+        return (await Promise.race([wc.executeJavaScript(probe, true), new Promise((r) => setTimeout(() => r(false), 3000))])) === true;
+      } catch {
+        return false;
+      }
+    };
+    if (!(await ready())) {
+      await this.showBase(token);
+      const end = Date.now() + 30_000;
+      while (Date.now() < end && !(await ready())) await new Promise((r) => setTimeout(r, 700));
+      if (!(await ready())) return { ok: false, error: 'base-not-ready', hint: 'Trang Base chưa tải xong trong khung Lark (30 giây) — thử lại, hoặc kiểm tra quyền sửa Base.' };
+    }
+    try {
+      return (await Promise.race([wc.executeJavaScript(script, true), new Promise((r) => setTimeout(() => r({ ok: false, error: 'timeout', hint: 'Lark không trả lời trong 60 giây.' }), 60_000))])) as J;
+    } catch (e) {
+      return { ok: false, error: String((e as Error)?.message || e) };
+    }
   }
 
   /** What Lark ACTUALLY saved during this run (automation/workflow write requests + responses). */

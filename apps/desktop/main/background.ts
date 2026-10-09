@@ -429,6 +429,8 @@ function registerIpc(win: BrowserWindow) {
   );
   ipcMain.handle(IPC.larkAnswerAsk, (_e, callId: string, answer: string) => runtime.larkAnswerAsk(callId, answer));
   ipcMain.handle(IPC.larkSetAutoApprove, (_e, on: boolean) => runtime.larkSetAutoApprove(on));
+  ipcMain.handle(IPC.larkGetWorkflowAuto, () => runtime.larkGetWorkflowAuto());
+  ipcMain.handle(IPC.larkSetWorkflowAuto, (_e, on: boolean) => runtime.larkSetWorkflowAuto(!!on));
   ipcMain.handle(IPC.larkSetAgentPrefs, (_e, prefs: { runner?: string; model?: string }) =>
     runtime.larkSetAgentPrefs(prefs),
   );

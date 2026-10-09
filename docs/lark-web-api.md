@@ -123,11 +123,106 @@ Kết luận: Open API v3 chỉ dùng được khi người dùng đã kết n�
    được kiểm bằng `validateWorkflowBody` với hồ sơ Base quét từ web. Sau đó `v3ToInternal` chuyển sang
    draft/extra nội bộ, rồi gửi `automation/create` với status 0 và đọc lại.
    - Chỉ hỗ trợ những khuôn đã thấy trong dữ liệu thật: `AddRecordTrigger`, `SetRecordTrigger` (lọc theo
-     lựa chọn), `LarkMessageAction` (gửi người dùng nội bộ hoặc "tôi"; tiêu đề; nội dung gồm chữ và ref
-     cột của trigger; nút mở bản ghi).
-   - Phần **ref cột trong nội dung tin nhắn** dựng theo khuôn `leftValue` của IfElseBranch thật. Phần này
-     chưa đối chiếu với một lần lưu thật của trình soạn: cần kiểm khi có "Larkwave Test".
+     lựa chọn), `LarkMessageAction` (người nhận: "tôi", id người dùng nội bộ, hoặc **cột Người của bản ghi
+     trigger**; tiêu đề; nội dung gồm chữ và ref cột của trigger; nút mở bản ghi). Xem mục 7.
+   - Nhiều automation một lần: `lark_web_create_automations` (tạo lần lượt, mục lỗi báo riêng, không
+     dừng các mục khác).
 2. **Lái trình soạn Lark** bằng `lark_ui_*` (CDP), trong khung Chromium gắn cạnh hội thoại. Dùng cho mọi
    loại bước chưa hỗ trợ ở đường 1 (rẽ nhánh, nhóm chat, cập nhật bản ghi…). Kết quả được xác nhận bằng
    request lưu mà CDP bắt được (`lark_ui_saved`).
 3. **Open API v3** (`bitable_workflow_create`): chỉ khi đã kết nối custom app.
+
+## 7. Người nhận là cột Người, và ref cột trong nội dung (đo 09/10/2026)
+
+Đọc từ một automation THẬT đang chạy trên tenant (người nhận là một cột của bản ghi), rồi tạo thử
+trong Base Test và mở lại trong trình soạn của Lark: ô "To" hiện `Record added in… › Sales phụ trách`.
+Fixture: `apps/desktop/test/fixtures/lark-web/automation-person-field.json`.
+
+```json
+"persons": [{
+  "fields": [{ "fieldId": "ref_<tbl>_<fld>", "type": 11 }],
+  "id": "<trigId>-<tbl>-<fld>-<số ngẫu nhiên>",
+  "stepId": "<trigId>", "stepNum": 1, "stepType": "AddRecordTrigger",
+  "tableId": "ref_<tbl>", "tagType": "step", "type": "ref", "value": "step", "recordInfo": {}
+}],
+"groups": [ …bản sao y hệt persons… ]
+```
+
+- `groups` trong mọi bản Lark lưu đều là **bản sao của `persons`** (cả với người dùng lẫn cột).
+- Ref cột trong `richTextContent` cùng khuôn đó, thêm `"extra": {}`; `value` là chữ `"step"` (không phải
+  tên cột), đuôi `id` là số ngẫu nhiên (không phải mã kiểu cột).
+- Kiểu cột nhận được làm người nhận: 11 Người, 1003 Người tạo, 1004 Người sửa, 19 Tra cứu.
+- Thiết kế v3: `receiver: [{ "value_type": "ref", "value": "$.<trigger>.<fld…>" }]` (nhận cả khi bọc trong
+  `value_type: "user"`). Nhóm chat vẫn chưa có khuôn → lái trình soạn.
+
+## 8. Dựng cấu trúc Base (thêm bảng / cột / lựa chọn)
+
+**Không có endpoint HTTP.** Bắt mạng khi thêm cột trên Lark web: trang gửi changeset cộng tác qua
+websocket "frontier":
+`{ type: "BITABLE_TABLE", data: { type: "USER_CHANGES", member_id, user_ticket, token: <tbl>, localRev, operations: "H4sI…" } }`
+(`operations` giải ra `[{ command: "AddField", actions: [{ action: "data.addField", … }, { action: "data.setFieldAttr", … }] }]`).
+Tự dựng lại đường này là phải giữ đúng `localRev`, `member_id`, `user_ticket` của chính trang — lệch là
+`accept_commit_error_rev`. Larkwave KHÔNG làm vậy.
+
+Thay vào đó gọi đúng **lớp lệnh** giao diện Lark gọi khi người dùng bấm (đo bằng cách bọc các hàm rồi
+thao tác tay; trang tự lo phiên bản, đồng bộ, lưu):
+
+```js
+ctx = [...window.bitableConnectContexts].find(c => c.base.getToken() === token && c.base.isLoaded())
+ctx.operate.baseOperate.addTable({ sourceTableId: null, parentId: null, exInfo: { contentCreation: false } })
+  // → { result: 2, data: { tableId }, operation: { actions: [{ data: { snapshot: { recordMap: {5 dòng trống} } } }] } }
+ctx.operate.baseOperate.setBlock({ id: tableId, name })                       // đổi tên bảng
+ctx.operate.tableOperate.setField({ tableId, fieldId, data: { ...field, name } })  // đổi tên cột chính
+ctx.operate.tableOperate.addField({ tableId, data: { type, name, property, fieldUIType, exInfo, defaultValueRule: null } })
+  // → { result: 2, data: { fieldId } }
+ctx.operate.tableOperate.addSelectFieldOption({ tableId, fieldId, names: [...] })
+ctx.operate.tableOperate.delRecords({ tableId, recordIds })                    // CHỈ dòng trống addTable vừa sinh
+```
+
+`result`: 2 = thành công, 0 = không đổi gì, 1 = lỗi (`reason`). Trang phải đang mở đúng Base (tool tự
+đưa khung Lark tới Base và chờ ngữ cảnh sẵn sàng). Khuôn `data` của từng loại cột (đã tạo thử đủ 10 loại
+và đọc lại bằng clientvars):
+
+| loại | type | fieldUIType | property |
+|---|---|---|---|
+| text | 1 | Text | null |
+| number | 2 | Number | `{ formatter: "0" }` |
+| single_select / multi_select | 3 / 4 | SingleSelect / MultiSelect | `{ options: [{ name, color, id: "opt…" }], optionsType: 0 }` |
+| date | 5 | DateTime | `{ autoFill: false, dateFormat: "yyyy/MM/dd", timeFormat: "" }` |
+| checkbox | 7 | Checkbox | null |
+| person | 11 | User | `{ multiple: false }` |
+| phone / url / attachment | 13 / 15 / 17 | Phone / Url / Attachment | null |
+
+`exInfo` luôn là `{ disableCredential: true, colOrCustomRowType: "custom", customRows: 5 }`.
+
+- Lark **tự thêm 5 dòng trống** khi tạo bảng (nằm trong snapshot của addTable). Tool chỉ xoá đúng các id
+  đó và chỉ khi chúng vẫn trống hoàn toàn.
+- **Đọc lại bị trễ**: clientvars đọc ngay sau khi trang lưu có thể chưa thấy cột mới (thấy sau vài giây).
+  Tool đọc lại tối đa ~15 giây trước khi kết luận.
+- Tool: `lark_web_add_table`, `lark_web_add_fields` (chỉ cộng thêm: cột trùng tên bỏ qua, không đổi kiểu,
+  không xoá). Code: `baseStructure.ts`.
+
+## 9. Duyệt thao tác ghi và hạn chờ của Claude CLI
+
+- Màn Tạo workflow có công tắc **"Tự động (không hỏi lại)"** (mặc định BẬT, lưu riêng máy này ở
+  `machine-prefs.json`). Khi BẬT, tool có cờ `additive` (tạo automation TẮT, thêm bảng/cột/lựa chọn, áp mẫu
+  thành nháp) chạy không hỏi. Xoá / ghi đè / sửa cái đang có không bao giờ có cờ đó nên vẫn hỏi. Luật nằm
+  ở một chỗ: `needsConfirmation` (larkToolExec.ts).
+- Claude CLI 2.1.286, server MCP kiểu HTTP: mỗi POST bọc hạn **60 giây** (`AbortSignal`, lỗi "The operation
+  timed out."), sau đó CLI gỡ luôn server ("MCP server "lark" is not connected"). Hạn đọc từ trường
+  `timeout` của cấu hình server, rồi `MCP_TOOL_TIMEOUT`; hạn im lặng `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`
+  (mặc định 5 phút). Larkwave đặt cả ba = 15 phút (dài hơn hạn chờ duyệt 10 phút của ta), và trả
+  `tools/call` bằng SSE kèm `notifications/progress` mỗi 15 giây khi client nhận SSE.
+- Đo lại: một lượt "Hỏi trước khi ghi" chờ 130 giây ở MỖI hộp xác nhận (2 hộp) rồi mới duyệt — cả hai
+  thao tác chạy xong, không lỗi hạn giờ, không rớt kết nối.
+
+## 10. Tự kiểm khung Lark
+
+- Lớp chặn thu thập trong trang (`BLOCKING_COLLECT_JS`: dialog/alertdialog/modal/drawer/popover/toast
+  đang hiện) rồi phân loại (`classifyBlocking`): `unsaved-record` ("You haven't submitted the record.
+  Edits made will not be saved." [Back to Edit] [Exit]), `confirm-dialog`, `record-form` (ngăn kéo thêm
+  bản ghi có nút Submit), `dialog`, `error-toast`, `panel`. Mọi kết quả `lark_ui_act`/`lark_ui_snapshot`
+  kèm `blocking` khi có.
+- `lark_ui_dismiss`: Escape trước; còn thì bấm nút có tên an toàn (Exit/Thoát/Cancel/Huỷ/Close/Đóng/取消…),
+  không bao giờ Xoá/Bật/Lưu/Gửi/Xác nhận. Đo thật: form đã gõ → Escape → hiện hộp "chưa gửi" → Exit → sạch.
+- `lark_ui_health`: URL, lớp chặn, số thao tác còn lại. Trần thao tác mỗi lượt: 200.

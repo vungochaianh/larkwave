@@ -1,5 +1,11 @@
 import {
   ActionBudget,
+  BLOCKING_COLLECT_JS,
+  classifyBlocking,
+  pickSafeButton,
+  UI_ACTION_CAP,
+  type BlockingInfo,
+  type OverlayCandidate,
   classifySensitive,
   compactAxTree,
   dragSequence,
@@ -103,7 +109,7 @@ export class LarkCdpDriver {
   /** The latest VALID full automation save body (for templates). */
   private lastValid: { endpoint: string; body: Record<string, unknown>; at: number } | null = null;
 
-  readonly budget = new ActionBudget(80);
+  readonly budget = new ActionBudget(UI_ACTION_CAP);
   private stopped = false;
   private stoppedAt = 0;
   private runStartedAt = 0;
@@ -470,8 +476,99 @@ export class LarkCdpDriver {
       text: lines.join('\n'),
       hint: 'Chọn theo VAI TRÒ + TÊN. ref ổn định giữa các snapshot khi phần tử còn đó; trang đổi URL thì ref cũ hết hạn.',
       saves: this.savesSince(this.runStartedAt).slice(-5),
+      ...(await this.blockingField()),
     };
   }
+
+  // ── blocking UI: self-check + safe dismiss ──────────────────────────────────────────────────
+
+  /** Lớp nổi đang chặn ở khung chính (hộp thoại, "bản ghi chưa gửi", toast lỗi…) — null nếu sạch. */
+  async blocking(): Promise<(BlockingInfo & { raw: OverlayCandidate[] }) | null> {
+    try {
+      const r = await this.send('Runtime.evaluate', { expression: BLOCKING_COLLECT_JS, returnByValue: true });
+      const raw = Array.isArray(r?.result?.value) ? (r.result.value as OverlayCandidate[]) : [];
+      const b = classifyBlocking(raw);
+      return b ? { ...b, raw } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async blockingField(): Promise<{ blocking?: BlockingInfo; blocking_hint?: string }> {
+    const b = await this.blocking();
+    if (!b) return {};
+    const { raw: _raw, ...info } = b;
+    return {
+      blocking: info,
+      blocking_hint:
+        info.kind === 'error-toast'
+          ? 'Lark vừa báo LỖI (toast) — đọc chữ, sửa nguyên nhân rồi làm lại.'
+          : 'Có lớp nổi đang mở/chặn thao tác. Nếu là thứ bạn tự mở và không cần nữa: lark_ui_dismiss. Đừng thao tác tiếp phía sau nó.',
+    };
+  }
+
+  /** Đọc tình trạng khung Lark: URL, có đang ở Lark không, lớp chặn, ngân sách thao tác. */
+  async health(): Promise<J> {
+    const url = this.wc?.getURL() || '';
+    const b = await this.blocking();
+    const { raw: _r, ...info } = b || ({} as J);
+    return {
+      ok: true,
+      url,
+      on_lark: isLarkHost(url),
+      clean: !b,
+      ...(b ? { blocking: info } : {}),
+      actions_used: this.budget.count,
+      actions_left: this.budget.left,
+      stopped: this.stopped,
+      hint: b ? 'Khung Lark đang có lớp nổi — dùng lark_ui_dismiss nếu là thứ bạn đã mở, hoặc báo người dùng nếu không chắc.' : 'Khung Lark sạch.',
+    };
+  }
+
+  /**
+   * Đóng lớp chặn một cách AN TOÀN: Escape trước; nếu vẫn còn thì bấm nút có tên an toàn
+   * (Thoát/Huỷ/Đóng/Để sau…) — không bao giờ Xoá/Bật/Lưu/Gửi/Xác nhận. Không dùng ngân sách thao tác
+   * của agent quá 2 lần cho một lần gọi.
+   */
+  async dismiss(): Promise<J> {
+    if (this.stopped) return this.stoppedResult();
+    const g = this.hostGuard();
+    if (g) return g;
+    const before = await this.blocking();
+    if (!before) return { ok: true, dismissed: false, clean: true, note: 'Không có lớp nào đang chặn.' };
+    this.noteStep('Đóng hộp thoại đang chặn');
+    const steps: string[] = [];
+    let now: (BlockingInfo & { raw: OverlayCandidate[] }) | null = before;
+    let escaped = false;
+    // Tối đa 3 vòng: một form đã gõ dở → Escape → hiện "bản ghi chưa gửi" → bấm Thoát.
+    for (let round = 0; round < 3 && now; round++) {
+      const btn = now.kind === 'unsaved-record' || escaped ? pickSafeButton(now.raw.flatMap((c) => c.buttons || [])) : null;
+      if (btn) {
+        if (!this.budget.take()) break;
+        await this.mouse([
+          { type: 'mouseMoved', x: btn.x, y: btn.y },
+          { type: 'mousePressed', x: btn.x, y: btn.y, button: 'left', buttons: 1, clickCount: 1 },
+          { type: 'mouseReleased', x: btn.x, y: btn.y, button: 'left', buttons: 0, clickCount: 1 },
+        ]);
+        steps.push(`bấm «${btn.text}»`);
+      } else if (!escaped || now.kind !== before.kind) {
+        await this.key('Escape').catch(() => undefined);
+        steps.push('Escape');
+        escaped = true;
+      } else break;
+      await sleep(500);
+      now = await this.blocking();
+    }
+    const strip = (b: (BlockingInfo & { raw?: unknown }) | null) => (b ? { kind: b.kind, text: b.text, buttons: b.buttons } : null);
+    return {
+      ok: !now,
+      dismissed: !now,
+      steps,
+      before: strip(before),
+      ...(now ? { still: strip(now), hint: 'Không đóng được bằng nút an toàn — DỪNG thao tác UI và báo người dùng đang kẹt ở hộp nào (chữ + các nút).' } : { clean: true }),
+    };
+  }
+
 
   // ── geometry ───────────────────────────────────────────────────────────────────────────────
 
@@ -696,6 +793,7 @@ export class LarkCdpDriver {
       url: urlAfter,
       actionsLeft: this.budget.left,
       saves: this.savesSince(t0),
+      ...(await this.blockingField()),
     };
   }
 

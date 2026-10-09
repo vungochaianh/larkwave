@@ -833,7 +833,7 @@ export function LarkChat({
         if (isToolAllowed(sessionId, activeSkillRef.current?.id, ev.name)) {
           runtime.larkConfirmTool?.(ev.callId, 'allow');
         } else {
-          setPendings((p) => [...p, { callId: ev.callId, name: ev.name, input: ev.input }]);
+          setPendings((p) => [...p, { callId: ev.callId, name: ev.name, input: ev.input, preview: ev.preview }]);
         }
       }
     } else if (ev.type === 'tool_result') {
@@ -2308,7 +2308,7 @@ export function LarkChat({
               }
             />
           )}
-          {/* Settings row: mode + auto-approve. (Tạo workflow: không có — luôn ghi có xác nhận.) */}
+          {/* Settings row: mode + auto-approve. (Tạo workflow: không có — màn ngoài có công tắc Tự động / Hỏi trước khi ghi.) */}
           {!workflow && (
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, rowGap: 8, marginBottom: 8 }}>
             <Segmented

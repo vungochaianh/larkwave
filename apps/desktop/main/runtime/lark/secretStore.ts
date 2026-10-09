@@ -243,6 +243,23 @@ export class SecretStore {
     writeFileSync(this.settingsPath(), JSON.stringify({ ...this.getSettings(), ...s }, null, 2));
   }
 
+  // ── Tuỳ chọn RIÊNG MÁY NÀY (không đi theo bản sao lưu tài khoản như settings.json) ──
+  private machinePrefsPath() {
+    return join(this.dir, 'machine-prefs.json');
+  }
+  /** `workflowAuto`: chế độ Tạo workflow tự ghi phần cộng-thêm không hỏi (mặc định BẬT). */
+  getMachinePrefs(): { workflowAuto?: boolean } {
+    try {
+      const s = JSON.parse(readFileSync(this.machinePrefsPath(), 'utf8'));
+      return s && typeof s === 'object' ? s : {};
+    } catch {
+      return {};
+    }
+  }
+  setMachinePrefs(p: { workflowAuto?: boolean }): void {
+    writeFileSync(this.machinePrefsPath(), JSON.stringify({ ...this.getMachinePrefs(), ...p }, null, 2));
+  }
+
   getBases(): LarkBaseRef[] {
     try {
       const arr = JSON.parse(readFileSync(this.basesPath(), 'utf8'));

@@ -11,7 +11,7 @@ import {
   tierForError,
   tierForPayload,
   versionNote,
-  withVersionNote, fileEventFor, runPreflight } from './larkToolExec';
+  withVersionNote, fileEventFor, runPreflight, needsConfirmation, previewFor } from './larkToolExec';
 
 /**
  * A minimal in-process MCP server (Streamable HTTP, JSON responses) that exposes
@@ -41,6 +41,10 @@ export interface McpToolContext {
   /** When true, writes run WITHOUT the per-tool confirm (the tool_call is emitted
    *  as non-gated so the UI shows no modal). */
   autoApprove?: boolean;
+  /** Xem ToolExecContext.autoApproveTool / needsConfirmation. */
+  autoApproveTool?: (name: string) => boolean;
+  /** Nhịp giữ kết nối SSE khi tools/call đang chờ (mặc định MCP_HEARTBEAT_MS) — test đặt ngắn. */
+  heartbeatMs?: number;
   /** Xem ToolExecContext.allowVersionHint — mặc định KHÔNG nhắc. */
   allowVersionHint?: boolean;
 }
@@ -109,6 +113,14 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       res.writeHead(202).end();
       return;
     }
+    // tools/call có thể đứng chờ NGƯỜI (hộp xác nhận / ask_user) nhiều phút. Nếu client nhận được
+    // SSE (Streamable HTTP cho phép trả lời POST bằng một luồng sự kiện), mở luồng ngay và gửi nhịp
+    // giữ kết nối + tiến độ trong lúc chờ, để không có tầng mạng/proxy nào coi kết nối là chết.
+    // Client chỉ nhận JSON thì giữ đường cũ.
+    if (msg.method === 'tools/call' && /text\/event-stream/i.test(String(req.headers.accept || ''))) {
+      await streamToolCall(res, msg.id, msg.params);
+      return;
+    }
     const result = await dispatch(msg.method, msg.params);
     if (result === undefined) {
       // No defined method returns undefined → unknown method.
@@ -116,6 +128,30 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       return;
     }
     endResult(res, msg.id, result);
+  }
+
+  async function streamToolCall(res: ServerResponse, id: unknown, params: any): Promise<void> {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+    const token = params?._meta?.progressToken;
+    let n = 0;
+    const beat = setInterval(() => {
+      n++;
+      try {
+        if (token !== undefined && token !== null)
+          res.write(sseData({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken: token, progress: n, message: 'Đang chờ…' } }));
+        else res.write(': keepalive\n\n');
+      } catch {
+        /* client đã đóng */
+      }
+    }, ctx.heartbeatMs ?? MCP_HEARTBEAT_MS);
+    try {
+      const result = await callTool(params?.name, params?.arguments ?? {});
+      res.end(sseData({ jsonrpc: '2.0', id, result }));
+    } catch {
+      res.end(sseData({ jsonrpc: '2.0', id: id ?? null, error: { code: -32603, message: 'internal error' } }));
+    } finally {
+      clearInterval(beat);
+    }
   }
 
   async function dispatch(method: string | undefined, params: any): Promise<unknown> {
@@ -183,8 +219,8 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
     // source of truth the renderer keys off).
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
     const pre = await runPreflight(tool, input, ctx.client);
-    const needsConfirm = tool.gated && !ctx.autoApprove && !pre;
-    ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm });
+    const needsConfirm = needsConfirmation(tool, ctx, !!pre);
+    ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
     if (needsConfirm) {
       // Don't let a never-answered confirmation strand the Claude CLI forever — auto-deny
@@ -244,6 +280,13 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       });
     });
   });
+}
+
+/** Nhịp giữ kết nối khi một tools/call đang chờ người dùng (xem streamToolCall). */
+export const MCP_HEARTBEAT_MS = 15_000;
+
+function sseData(obj: unknown): string {
+  return `event: message\ndata: ${JSON.stringify(obj)}\n\n`;
 }
 
 function toolError(text: string) {

@@ -8,7 +8,7 @@ import {
   isSelfDeclaredFailure,
   suspectAppBugError,
   tierForError,
-  tierForPayload, fileEventFor, runPreflight } from './larkToolExec';
+  tierForPayload, fileEventFor, runPreflight, needsConfirmation, previewFor } from './larkToolExec';
 
 /** Tóm tắt ngắn gọn kết quả một công cụ, cho thẻ hiển thị ở giao diện. */
 function summarize(data: unknown): string {
@@ -40,6 +40,7 @@ export function createToolBridge(
     client: LarkClient;
     extraTools?: LarkToolDef[];
     autoApprove?: boolean;
+    autoApproveTool?: (name: string) => boolean;
     awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
     allowVersionHint?: boolean;
     /**
@@ -80,8 +81,8 @@ export function createToolBridge(
     const callId = randomUUID();
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
     const pre = await runPreflight(tool, input, deps.client);
-    const gated = !!tool.gated && !deps.autoApprove && !pre;
-    push({ type: 'tool_call', callId, name, input, gated });
+    const gated = needsConfirmation(tool, deps, !!pre);
+    push({ type: 'tool_call', callId, name, input, gated, ...(gated ? await previewFor(tool, input) : {}) });
     if (gated) {
       const ok = await deps.awaitConfirm(callId, name, input);
       if (!ok) {

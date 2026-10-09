@@ -95,6 +95,8 @@ export interface LarkAgentDeps {
    */
   allowFileTools?: boolean;
   autoApprove?: boolean;
+  /** Tự duyệt theo từng tool — xem needsConfirmation (chỉ tool `additive` mới được). */
+  autoApproveTool?: (name: string) => boolean;
   /** Temp dir holding the turn's attachments; when set, the CLI runs there with the
    *  Read tool enabled so Claude can read + analyse the files. */
   attachDir?: string;
@@ -140,6 +142,24 @@ export async function* runLarkAgent(
   yield* runLarkChat(prompt, mode, deps);
 }
 
+/**
+ * Hạn chờ một lần gọi tool Lark của Claude CLI: phải DÀI HƠN hạn chờ người dùng ở phía ta
+ * (CONFIRM/ASK 10 phút trong mcpServer) để người bấm muộn vẫn kịp, và phía ta luôn là bên trả lời
+ * trước (từ chối khi hết giờ) thay vì CLI tự cắt rồi gỡ server.
+ */
+export const MCP_TOOL_WAIT_MS = 15 * 60_000;
+
+/**
+ * Biến môi trường cho lượt có cầu MCP Lark. Đọc thẳng từ mã CLI đã cài (2.1.286):
+ *  - `MCP_TOOL_TIMEOUT` — hạn mỗi lần gọi (mặc định 60s với HTTP). Ghi thêm cạnh `timeout` trong
+ *    cấu hình server để bản CLI cũ chưa đọc trường đó vẫn ăn.
+ *  - `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` — hạn "im lặng" (mặc định 5 phút với HTTP), bị kẹp bởi
+ *    hạn trên; đặt bằng nhau để lần chờ duyệt dài không bị cắt vì im lặng.
+ */
+export function mcpWaitEnv(): Record<string, string> {
+  return { MCP_TOOL_TIMEOUT: String(MCP_TOOL_WAIT_MS), CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT: String(MCP_TOOL_WAIT_MS) };
+}
+
 export async function* runLarkChat(
   prompt: string,
   mode: LarkChatMode,
@@ -175,6 +195,7 @@ export async function* runLarkChat(
         confirm: deps.awaitConfirm,
         ask: deps.awaitAsk,
         autoApprove: deps.autoApprove,
+        autoApproveTool: deps.autoApproveTool,
         allowVersionHint: deps.allowVersionHint,
       });
 
@@ -186,7 +207,11 @@ export async function* runLarkChat(
     mcpConfigPath = join(tmpdir(), `tw-lark-mcp-${randomUUID()}.json`);
     await writeFile(
       mcpConfigPath,
-      JSON.stringify({ mcpServers: { lark: { type: 'http', url: bridge.url, headers: { 'x-tw-token': bridge.token } } } }),
+      // `timeout`: hạn cho MỖI lần gọi tool của server này. Mặc định của CLI với HTTP chỉ 60 giây
+      // (đo trong bản 2.1.286: fetch bọc AbortSignal 60s → "The operation timed out"), trong khi một
+      // tool ghi có thể đứng chờ người dùng duyệt tới 10 phút — lỗi đó còn làm CLI GỠ luôn server
+      // ("MCP server lark is not connected"). Xem MCP_TOOL_WAIT_MS.
+      JSON.stringify({ mcpServers: { lark: { type: 'http', url: bridge.url, headers: { 'x-tw-token': bridge.token }, timeout: MCP_TOOL_WAIT_MS } } }),
       { mode: 0o600 },
     );
   }
@@ -330,7 +355,7 @@ export async function* runLarkChat(
       const args = promptOverride ? ['-p', promptOverride, ...baseArgs.slice(2)] : baseArgs;
       const child = spawn('claude', [...args, ...sessionArgs], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: claudeEnv({ noKey: deps.preferSubscription }),
+        env: bridge ? { ...claudeEnv({ noKey: deps.preferSubscription }), ...mcpWaitEnv() } : claudeEnv({ noKey: deps.preferSubscription }),
         cwd: workCwd,
       });
       childRef.current = child;

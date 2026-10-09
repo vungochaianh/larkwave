@@ -1,0 +1,77 @@
+[
+ {
+  "role": "",
+  "cls": "ud__modal ud__modal-wrapper",
+  "text": "You haven't submitted the record. Edits made will not be saved. Back to Edit Exit",
+  "buttons": [
+   {
+    "text": "Back to Edit",
+    "x": 760,
+    "y": 452
+   },
+   {
+    "text": "Exit",
+    "x": 672.8,
+    "y": 452
+   }
+  ],
+  "w": 420,
+  "h": 180
+ },
+ {
+  "role": "",
+  "cls": "bitable-field-panel ud__popover",
+  "text": "Field title Field type Text Cancel Confirm",
+  "buttons": [
+   {
+    "text": "Cancel",
+    "x": 660,
+    "y": 510
+   },
+   {
+    "text": "Confirm",
+    "x": 770,
+    "y": 510
+   }
+  ],
+  "w": 330,
+  "h": 400
+ },
+ {
+  "role": "",
+  "cls": "ud__toast ud__toast-success",
+  "text": "Saved",
+  "buttons": [],
+  "w": 120,
+  "h": 40
+ },
+ {
+  "role": "",
+  "cls": "ud__drawer__root ud__drawer-right ud__drawer-open",
+  "text": "QR Code Get Link Untitled record More Text Trạng thái Please select Sales phụ trách Please select a member",
+  "buttons": [
+   {
+    "text": "QR Code",
+    "x": 1050,
+    "y": 95
+   },
+   {
+    "text": "Get Link",
+    "x": 1150,
+    "y": 95
+   },
+   {
+    "text": "",
+    "x": 1246,
+    "y": 95
+   },
+   {
+    "text": "Submit",
+    "x": 880,
+    "y": 790
+   }
+  ],
+  "w": 1280,
+  "h": 768
+ }
+]

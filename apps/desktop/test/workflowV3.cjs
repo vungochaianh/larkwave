@@ -257,7 +257,7 @@ ok('bảng chưa tải cột: không đoán bừa là sai');
 const lines = core.describeWorkflowSteps(good.steps, { fieldNames: { fldAmount: 'Số tiền', fldOwner: 'Phụ trách', fldCode: 'Mã đơn' } });
 const text = lines.map((l) => '  '.repeat(l.depth) + l.text).join('\n');
 assert.ok(/KHI có bản ghi MỚI trong bảng «Đơn hàng»/.test(text), text);
-assert.ok(/NẾU \[t\.«Số tiền»\] ≥ 10000000/.test(text), text);
+assert.ok(/NẾU «Số tiền» ≥ 10000000/.test(text), text); // ref cột của bản ghi trigger → chỉ tên cột
 assert.ok(/✔ ĐÚNG/.test(text) && /✗ NGƯỢC LẠI/.test(text), text);
 assert.ok(/Cập nhật bản ghi của bước t trong bảng «Đơn hàng»: «Trạng thái» = “Đã duyệt”/.test(text), text);
 assert.ok(lines.find((l) => l.stepId === 'msg').depth === 2, 'bước trong nhánh phải thụt vào');

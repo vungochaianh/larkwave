@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { ValidationProfile } from './workflowV3';
-import type { WebTable } from './larkWebApi';
+import type { WebField, WebTable } from './larkWebApi';
 
 /**
  * Thiết kế workflow dạng `steps` CHÍNH THỨC (Base v3 — cùng thứ agent dựng và bộ kiểm workflowV3
@@ -111,27 +111,39 @@ export function v3ToInternal(input: { title: string; steps: J[] }, tables: WebTa
   if (!trigTable) return { ok: false, errors: [`Không thấy bảng «${trigger?.data?.table_name ?? ''}» trong Base.`] };
   const stepNum = new Map<string, number>(steps.map((s, i) => [String(s.id), i + 1]));
 
-  /** "$.<step>.<fld>" → khối ref nội bộ (khuôn đo từ IfElseBranch.leftValue thật). */
-  const refItem = (ref: string): J | null => {
+  /** "$.<step>.<fld>" → cột của bản ghi trigger (hoặc null nếu không hợp lệ). */
+  const refField = (ref: string): { stepKey: string; src: J; f: WebField } | null => {
     const m = /^\$\.([^.]+)\.(fld[A-Za-z0-9]+)$/.exec(String(ref));
     if (!m) return null;
     const src = steps.find((s) => String(s.id) === m[1]);
     if (!src || !/Trigger$/.test(String(src.type))) return null; // chỉ tham chiếu bản ghi của trigger
     const f = trigTable.fields.find((x) => x.id === m[2]);
-    if (!f) return null;
-    const sid = idMap.get(m[1])!;
+    return f ? { stepKey: m[1], src, f } : null;
+  };
+  /**
+   * Khối ref nội bộ tới một cột của bản ghi trigger — ĐÚNG khuôn trình soạn Lark lưu (đo từ một
+   * automation thật đang chạy, xem fixture automation-person-field.json): `value: "step"`, id kết
+   * thúc bằng một số ngẫu nhiên. Dùng cho cả ref trong nội dung tin nhắn lẫn người nhận là cột Người.
+   */
+  const stepRef = (r: { stepKey: string; src: J; f: WebField }, withExtra: boolean): J => {
+    const sid = idMap.get(r.stepKey)!;
     return {
-      fields: [{ fieldId: fref(trigTable, f.id), type: f.type }],
-      id: `${sid}-${trigTable.id}-${f.id}-${f.type}`,
+      fields: [{ fieldId: fref(trigTable, r.f.id), type: r.f.type }],
+      id: `${sid}-${trigTable.id}-${r.f.id}-${10000 + Math.floor(Math.random() * 50000)}`,
       stepId: sid,
-      stepNum: stepNum.get(m[1]) ?? 1,
-      stepType: String(src.type),
+      stepNum: stepNum.get(r.stepKey) ?? 1,
+      stepType: String(r.src.type),
       tableId: tref(trigTable),
       tagType: 'step',
       type: 'ref',
-      value: f.name,
+      value: 'step',
       recordInfo: {},
+      ...(withExtra ? { extra: {} } : {}),
     };
+  };
+  const refItem = (ref: string): J | null => {
+    const r = refField(ref);
+    return r ? stepRef(r, true) : null;
   };
   const nextOf = (s: J) => (s?.next ? [{ ids: [idMap.get(String(s.next)) || String(s.next)] }] : []);
 
@@ -187,12 +199,24 @@ export function v3ToInternal(input: { title: string; steps: J[] }, tables: WebTa
     } else if (s.type === 'LarkMessageAction') {
       const persons: J[] = [];
       for (const r of Array.isArray(d.receiver) ? d.receiver : []) {
-        const v = r?.value || {};
-        const rawId = String(v.id ?? v ?? '');
+        const v = r?.value && typeof r.value === 'object' ? r.value : {};
+        const rawId = String(typeof r?.value === 'string' ? r.value : v.id ?? '');
+        // Người nhận = CỘT NGƯỜI của bản ghi trigger (vd «Sales phụ trách»): ref "$.<trigger>.<fld>".
+        // Chấp nhận cả khi agent bọc ref trong value_type "user" (`{id:"$.trigger_1.fld…"}`).
+        if (/^\$\./.test(rawId)) {
+          const rf = refField(rawId);
+          if (!rf) errors.push(`LarkMessageAction: người nhận «${rawId}» không hợp lệ (chỉ cột của bản ghi trigger, dạng $.<trigger>.<fld…>).`);
+          else if (!PERSON_FIELD_TYPES.has(rf.f.type)) errors.push(`LarkMessageAction: cột «${rf.f.name}» là ${rf.f.typeName}, không phải cột Người — không dùng làm người nhận được.`);
+          else persons.push(stepRef(rf, false));
+          continue;
+        }
         const isMe = !rawId || rawId === 'me' || (me && (rawId === me.id || fold(String(v.name || '')) === fold(me.name)));
         if (r?.value_type === 'user' && isMe && me) persons.push(userTag(me));
         else if (r?.value_type === 'user' && /^\d{6,}$/.test(rawId)) persons.push(userTag({ id: rawId, name: String(v.name || rawId) }));
-        else errors.push(`LarkMessageAction: người nhận «${v.name || rawId || r?.value_type}» chưa hỗ trợ qua phiên web (chỉ "tôi" hoặc id người dùng nội bộ). Nhóm chat → dùng trình soạn của Lark.`);
+        else
+          errors.push(
+            `LarkMessageAction: người nhận «${v.name || rawId || r?.value_type}» chưa hỗ trợ qua phiên web (được: "tôi", id người dùng nội bộ, hoặc cột Người của bản ghi trigger dạng {value_type:"ref",value:"$.<trigger>.<fld…>"}). Nhóm chat → dùng trình soạn của Lark.`,
+          );
       }
       if (!persons.length && !errors.length) errors.push('LarkMessageAction: cần ít nhất một người nhận.');
       const titleText = (Array.isArray(d.title) ? d.title : []).map((x: J) => (x?.value_type === 'text' ? String(x.value ?? '') : '')).join('');
@@ -223,7 +247,9 @@ export function v3ToInternal(input: { title: string; steps: J[] }, tables: WebTa
           notifyIdentity: 'mixed',
           robotType: 'baseApp',
           persons,
-          groups: [],
+          // Trình soạn Lark lưu `groups` là BẢN SAO của `persons` (thấy ở mọi automation thật đã
+          // đọc, cả người dùng lẫn cột Người) — giữ đúng như thế.
+          groups: JSON.parse(JSON.stringify(persons)),
           title: titleText ? [{ text: titleText, type: 'text' }] : [],
           titleTemplateColor: 'blue',
           content: [],
@@ -279,6 +305,9 @@ export function v3ToInternal(input: { title: string; steps: J[] }, tables: WebTa
     errors: [],
   };
 }
+
+/** Kiểu cột dùng làm người nhận được: Người, Người tạo, Người sửa, Tra cứu (thường tra ra người). */
+export const PERSON_FIELD_TYPES = new Set([11, 1003, 1004, 19]);
 
 function userTag(u: WebUser): J {
   return { type: 'ref', avatarUrl: u.avatarUrl || '', id: u.id, entityId: u.id, value: u.name, tagType: 'user', owner_type: 0, department: '' };

@@ -13,6 +13,8 @@ export interface PendingConfirm {
   callId: string;
   name: string;
   input: unknown;
+  /** Bản dễ đọc do main dựng (vd `{ fieldNames: { fld…: 'Tên cột' } }`). */
+  preview?: unknown;
 }
 
 /**
@@ -43,12 +45,17 @@ export function ConfirmToolModal({
     setScope('conversation');
   }, [pending?.callId]);
 
-  const wf = pending && WORKFLOW_TOOLS.has(pending.name) ? workflowView(pending.input) : null;
+  const names = fieldNamesOf(pending?.preview);
+  const batch = pending && pending.name === 'lark_web_create_automations' ? batchView(pending.input, names) : null;
+  const wf = !batch && pending && WORKFLOW_TOOLS.has(pending.name) ? workflowView(pending.input, names) : null;
+  // Tạo nháp TẮT / thêm cấu trúc (cộng thêm) → cho "nhớ trong hội thoại này". Sửa workflow ĐANG CÓ
+  // (bitable_workflow_update) thì không: thay toàn bộ bước của thứ người dùng làm, phải duyệt tận mắt.
+  const canRemember = !(wf?.update) && pending?.name !== 'bitable_workflow_update';
 
   return (
     <Modal
       open={!!pending}
-      width={wf ? 640 : undefined}
+      width={wf || batch ? 640 : undefined}
       title={
         <span>
           <WarningFilled style={{ color: '#F59E0B', marginRight: 8 }} />
@@ -68,13 +75,19 @@ export function ConfirmToolModal({
           <Paragraph style={{ marginBottom: 8 }}>
             {t('chat.claudeWantsToRun', 'Claude muốn chạy:')} <Text code>{pending.name}</Text>
           </Paragraph>
-          {wf ? (
+          {batch ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 460, overflowY: 'auto' }}>
+              <Alert type="info" showIcon style={{ padding: '6px 10px' }} message={t('chat.wfBatchNote', `${batch.length} automation, tạo lần lượt ở trạng thái TẮT. Bạn mở Lark kiểm tra rồi tự bật.`)} />
+              {batch.map((v, k) => (
+                <WorkflowDesign key={k} view={v} raw="" compact />
+              ))}
+            </div>
+          ) : wf ? (
             <WorkflowDesign view={wf} raw={safeJson(pending.input)} />
           ) : (
             <pre style={preStyle}>{safeJson(pending.input)}</pre>
           )}
-          {/* Thiết kế workflow nào cũng phải được duyệt tận mắt — không cho "lần sau khỏi hỏi". */}
-          {!wf && <div style={{ marginTop: 12 }}>
+          {canRemember && <div style={{ marginTop: 12 }}>
             <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)}>
               {t('chat.rememberAllow', 'Lần sau tự chạy, đừng hỏi lại công cụ này')}
             </Checkbox>
@@ -109,7 +122,7 @@ const preStyle: React.CSSProperties = {
 };
 
 /** Tool tạo/sửa workflow Lark (Open API v3) — hộp xác nhận vẽ THIẾT KẾ thay vì JSON. */
-const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update', 'lark_web_create_automation']);
+const WORKFLOW_TOOLS = new Set(['bitable_workflow_create', 'bitable_workflow_update', 'lark_web_create_automation', 'lark_web_create_automations']);
 
 interface WorkflowView {
   update: boolean;
@@ -119,7 +132,18 @@ interface WorkflowView {
   stepCount: number;
 }
 
-function workflowView(input: unknown): WorkflowView | null {
+function fieldNamesOf(preview: unknown): Record<string, string> | undefined {
+  const f = preview && typeof preview === 'object' ? (preview as { fieldNames?: unknown }).fieldNames : undefined;
+  return f && typeof f === 'object' ? (f as Record<string, string>) : undefined;
+}
+
+function batchView(input: unknown, fieldNames?: Record<string, string>): WorkflowView[] | null {
+  const list = input && typeof input === 'object' ? (input as { workflows?: unknown }).workflows : null;
+  if (!Array.isArray(list) || !list.length) return null;
+  return list.map((w) => workflowView(w, fieldNames)).filter((v): v is WorkflowView => !!v);
+}
+
+function workflowView(input: unknown, fieldNames?: Record<string, string>): WorkflowView | null {
   const i = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   let steps: unknown = i.steps;
   if (typeof steps === 'string') {
@@ -136,7 +160,7 @@ function workflowView(input: unknown): WorkflowView | null {
     update: i.workflow_id !== undefined,
     title: typeof i.title === 'string' ? i.title : '',
     workflowId: typeof i.workflow_id === 'string' ? i.workflow_id : undefined,
-    lines: describeWorkflowSteps(steps),
+    lines: describeWorkflowSteps(steps, { fieldNames }),
     stepCount: steps.length,
   };
 }
@@ -150,7 +174,7 @@ const KIND_ICON: Record<WorkflowDesignLine['kind'], string> = {
   note: '',
 };
 
-function WorkflowDesign({ view, raw }: { view: WorkflowView; raw: string }) {
+function WorkflowDesign({ view, raw, compact }: { view: WorkflowView; raw: string; compact?: boolean }) {
   const { t } = useI18n();
   const [showRaw, setShowRaw] = useState(false);
   return (
@@ -162,7 +186,7 @@ function WorkflowDesign({ view, raw }: { view: WorkflowView; raw: string }) {
           {view.update && view.workflowId ? ` · ${view.workflowId}` : ''}
         </Text>
       </div>
-      <Alert
+      {!compact && <Alert
         type={view.update ? 'warning' : 'info'}
         showIcon
         style={{ padding: '6px 10px' }}
@@ -171,7 +195,7 @@ function WorkflowDesign({ view, raw }: { view: WorkflowView; raw: string }) {
             ? t('chat.wfUpdateNote', 'Thay TOÀN BỘ các bước của workflow này bằng thiết kế dưới đây. Trạng thái bật/tắt giữ nguyên (TẮT).')
             : t('chat.wfCreateNote', 'Workflow được tạo ở trạng thái TẮT. Bạn mở Lark kiểm tra rồi tự bật.')
         }
-      />
+      />}
       <div
         style={{
           padding: '8px 10px',
@@ -200,12 +224,12 @@ function WorkflowDesign({ view, raw }: { view: WorkflowView; raw: string }) {
           </div>
         ))}
       </div>
-      <div>
+      {raw && <div>
         <a onClick={() => setShowRaw((v) => !v)} style={{ fontSize: 12 }}>
           {showRaw ? t('chat.wfHideJson', 'Ẩn JSON gốc') : t('chat.wfShowJson', 'Xem JSON gốc')}
         </a>
         {showRaw && <pre style={{ ...preStyle, marginTop: 6 }}>{raw}</pre>}
-      </div>
+      </div>}
     </div>
   );
 }

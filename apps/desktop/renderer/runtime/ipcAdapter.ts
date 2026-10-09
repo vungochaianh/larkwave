@@ -173,6 +173,9 @@ interface Bridge {
   larkConfirmTool(callId: string, decision: 'allow' | 'deny'): Promise<void>;
   larkAnswerAsk(callId: string, answer: string): Promise<void>;
   larkSetAutoApprove(on: boolean): Promise<LarkConnection>;
+  // Optional: bản main cũ chưa có (renderer có thể được code-push trước) — adapter tự đỡ.
+  larkGetWorkflowAuto?(): Promise<{ workflowAuto: boolean }>;
+  larkSetWorkflowAuto?(on: boolean): Promise<{ workflowAuto: boolean }>;
   larkSetAgentPrefs(prefs: { runner?: string; model?: string; apiMode?: boolean }): Promise<LarkConnection>;
   larkBackupSync(token: string): Promise<{ at: string } | null>;
   larkResetChat(): Promise<void>;
@@ -597,6 +600,12 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   larkSetAutoApprove(on: boolean): Promise<LarkConnection> {
     return this.bridge.larkSetAutoApprove(on);
+  }
+  larkGetWorkflowAuto(): Promise<{ workflowAuto: boolean }> {
+    return this.bridge.larkGetWorkflowAuto ? this.bridge.larkGetWorkflowAuto() : Promise.resolve({ workflowAuto: false });
+  }
+  larkSetWorkflowAuto(on: boolean): Promise<{ workflowAuto: boolean }> {
+    return this.bridge.larkSetWorkflowAuto ? this.bridge.larkSetWorkflowAuto(on) : Promise.resolve({ workflowAuto: false });
   }
   larkSetAgentPrefs(prefs: { runner?: string; model?: string; apiMode?: boolean }): Promise<LarkConnection> {
     return this.bridge.larkSetAgentPrefs(prefs);

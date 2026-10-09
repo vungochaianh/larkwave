@@ -4,6 +4,8 @@ import { getLarkWebSession } from '../larkWebSession';
 import { baseTokenFromUrl, type WebAutomation, type WebTable } from '../larkWebApi';
 import { formatIssues, normalizeWorkflowInput, validateWorkflowBody } from '../workflowV3';
 import { profileFromWebTables, v3ToInternal, verifyReadBack, WEB_SUPPORTED_TYPES } from '../webAutomation';
+import { FIELD_KINDS, planFields, structureScript, verifyStructure, type FieldSpec } from '../baseStructure';
+import { clientVarsPath, decodeLarkGz, parseTableSchema } from '../larkWebApi';
 
 /**
  * Công cụ "Tạo workflow" chạy bằng PHIÊN LARK WEB đang đăng nhập — KHÔNG cần App ID/App Secret.
@@ -88,6 +90,90 @@ async function prepare(i: J): Promise<J> {
   return { ok: true, token, baseName: name, body, notes, conv, me, warnings: r.warnings.map((w) => w.message) };
 }
 
+/** fld… → tên cột (mọi bảng trong lần quét gần nhất) — cho hộp xác nhận và design_text đọc được. */
+async function fieldNamesFor(token: string): Promise<Record<string, string>> {
+  try {
+    const { tables } = await tablesFor(token);
+    const out: Record<string, string> = {};
+    for (const t of tables) for (const f of t.fields) out[f.id] = f.name;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Tạo MỘT automation đã qua prepare(): gửi create (status 0) → đọc lại → kết quả gọn. */
+async function createPrepared(p: J, fieldNames: Record<string, string>): Promise<J> {
+  const web = getLarkWebSession();
+  const created = await web.createWebAutomation(p.token, { draft: JSON.stringify(p.conv.draft), extra: JSON.stringify(p.conv.extra), triggerName: p.conv.triggerName || '' });
+  let saved: J = null;
+  let verifyNote = '';
+  try {
+    saved = await web.readWebAutomation(p.token, created.workflowID);
+  } catch (e) {
+    verifyNote = String((e as Error)?.message || e);
+  }
+  const v = verifyReadBack(saved, p.conv.draft);
+  return {
+    ok: v.ok,
+    workflow_id: created.workflowID,
+    title: p.body.title,
+    verified: v.ok,
+    status_text: v.enabled ? 'ĐANG BẬT (bất thường — kiểm tra ngay)' : 'đang TẮT — chờ người dùng xem lại và tự bật',
+    ...(v.problems.length ? { problems: v.problems } : {}),
+    ...(verifyNote ? { verify_note: verifyNote } : {}),
+    design_text: workflowDesignText(p.body.steps, { fieldNames }),
+    ...(p.warnings.length ? { warnings: p.warnings } : {}),
+  };
+}
+
+/**
+ * Đọc lại cho tới khi khớp: clientvars của máy chủ trễ vài giây sau khi trang lưu (đo 09/10/2026:
+ * đọc ngay sau addField chưa thấy cột, 20 giây sau thì có). Thử lại tối đa ~15 giây rồi mới kết luận.
+ */
+async function readBackUntil<T>(read: () => Promise<WebTable | null>, check: (t: WebTable | null) => { ok: boolean } & T): Promise<{ table: WebTable | null; v: { ok: boolean } & T }> {
+  let table = await read();
+  let v = check(table);
+  for (let k = 0; k < 10 && !v.ok; k++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    table = await read();
+    v = check(table);
+  }
+  return { table, v };
+}
+
+/** Bảng của Base đọc lại TƯƠI (bỏ cache) — sau khi dựng cấu trúc. */
+async function freshTable(token: string, tableId: string, name?: string): Promise<WebTable | null> {
+  try {
+    const j = await getLarkWebSession().webJson(clientVarsPath(token, tableId, 0));
+    if (j?.code !== 0) return null;
+    return parseTableSchema(decodeLarkGz(j.data?.table), name, 0);
+  } catch {
+    return null;
+  }
+}
+
+const FIELD_SPEC_SCHEMA = {
+  type: 'array',
+  description: `Các cột. Mỗi cột {name, type, options?, multiple?, with_time?}. type: ${Object.keys(FIELD_KINDS).join(' | ')}. single_select/multi_select cần options. person: multiple=true cho nhiều người. date: with_time=true để có giờ.`,
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      name: { type: 'string' },
+      type: { type: 'string' },
+      options: { type: 'array', items: { type: 'string' } },
+      multiple: { type: 'boolean' },
+      with_time: { type: 'boolean' },
+    },
+    required: ['name', 'type'],
+  },
+};
+
+function specsOf(v: unknown): FieldSpec[] {
+  return (Array.isArray(v) ? v : []).filter((x) => x && typeof x === 'object').map((x: J) => ({ name: String(x.name ?? ''), type: String(x.type ?? 'text'), options: Array.isArray(x.options) ? x.options.map(String) : undefined, multiple: !!x.multiple, with_time: !!x.with_time }));
+}
+
 export const larkWebTools: LarkToolDef[] = [
   {
     name: 'lark_web_list_bases',
@@ -132,7 +218,7 @@ export const larkWebTools: LarkToolDef[] = [
         workflows: r.workflows.map(autoLine),
         ...(r.errors.length ? { errors: r.errors } : {}),
         next:
-          'Thiết kế theo `steps` chính thức (bitable_workflow_schema để tra) → trình bày thiết kế bằng tiếng Việt và CHỜ người dùng đồng ý → lark_web_create_automation. ' +
+          'Thiếu bảng/cột → lark_web_add_table / lark_web_add_fields (không bấm giao diện). Thiết kế theo `steps` chính thức (bitable_workflow_schema để tra) → viết thiết kế ra chat bằng tiếng Việt → tạo ngay bằng lark_web_create_automations (một lần cho cả bộ). ' +
           `Tạo thẳng được: ${WEB_SUPPORTED_TYPES.join(', ')}; loại khác dựng trong trình soạn Lark bằng lark_ui_*.`,
       };
     },
@@ -140,11 +226,12 @@ export const larkWebTools: LarkToolDef[] = [
   {
     name: 'lark_web_create_automation',
     gated: true,
+    additive: true,
     description:
-      'TẠO một Automation MỚI trong Base qua phiên Lark web (KHÔNG cần App ID) — luôn ở trạng thái TẮT, người dùng tự bật trong Lark. GHI: người dùng thấy hộp xác nhận vẽ sẵn thiết kế. ' +
-      'Chỉ gọi SAU khi: lark_web_scan_base → dựng `title` + `steps` theo schema chính thức → trình bày thiết kế → người dùng đồng ý. ' +
+      'TẠO một Automation MỚI trong Base qua phiên Lark web (KHÔNG cần App ID) — luôn ở trạng thái TẮT, người dùng tự bật trong Lark. Có từ 2 automation trở lên → dùng lark_web_create_automations (một lần gọi). ' +
+      'Gọi SAU khi: lark_web_scan_base → dựng `title` + `steps` theo schema chính thức → viết thiết kế ra chat. ' +
       `Hỗ trợ: ${WEB_SUPPORTED_TYPES.join(', ')} (luồng thẳng, không rẽ nhánh). Bảng/cột theo TÊN (table_name/field_name/watched_field_name); nội dung tin nhắn: [{value_type:"text",value:"…"},{value_type:"ref",value:"$.<id trigger>.<field_id>"}]; ` +
-      'người nhận "tôi" = [{value_type:"user",value:{id:"me"}}]; thêm nút mở bản ghi: btn_list:[{text:"Xem bản ghi",btn_action:"openLink",link:[{value_type:"ref",value:"$.<id trigger>.recordLink"}]}]. Loại khác → trả kind "unsupported" kèm cách dựng bằng lark_ui_*. Tool tự kiểm lại, tạo, rồi ĐỌC LẠI để xác minh.',
+      'người nhận: "tôi" = {value_type:"user",value:{id:"me"}}; CỘT NGƯỜI của bản ghi (vd «Sales phụ trách») = {value_type:"ref",value:"$.<id trigger>.<field_id cột Người>"}; nút mở bản ghi: btn_list:[{text:"Xem bản ghi",btn_action:"openLink",link:[{value_type:"ref",value:"$.<id trigger>.recordLink"}]}]. Loại khác → kind "unsupported" kèm cách dựng bằng lark_ui_*. Tool tự kiểm, tạo, rồi ĐỌC LẠI để xác minh.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -155,6 +242,7 @@ export const larkWebTools: LarkToolDef[] = [
       },
       required: ['app_token', 'title', 'steps'],
     },
+    preview: async (i) => ({ fieldNames: await fieldNamesFor(tokenOf(i)) }),
     preflight: async (i) => {
       try {
         const p = await prepare(i);
@@ -166,32 +254,204 @@ export const larkWebTools: LarkToolDef[] = [
     exec: async (i) => {
       const p = await prepare(i);
       if (!p.ok) return p;
-      const web = getLarkWebSession();
-      const draft = JSON.stringify(p.conv.draft);
-      const extra = JSON.stringify(p.conv.extra);
-      const created = await web.createWebAutomation(p.token, { draft, extra, triggerName: p.conv.triggerName || '' });
-      let saved: J = null;
-      let verifyNote = '';
-      try {
-        saved = await web.readWebAutomation(p.token, created.workflowID);
-      } catch (e) {
-        verifyNote = String((e as Error)?.message || e);
-      }
-      const v = verifyReadBack(saved, p.conv.draft);
+      const r = await createPrepared(p, await fieldNamesFor(p.token));
       // Cho người dùng thấy ngay trong khung Lark bên cạnh.
-      void web.showBase(p.token);
+      void getLarkWebSession().showBase(p.token);
+      return { ...r, base: p.baseName, review: `Trong khung Lark bên phải: mở "Tự động hoá" → «${p.body.title}» → kiểm từng bước → TỰ BẬT khi thấy đúng. Larkwave không bật automation.` };
+    },
+  },
+  {
+    name: 'lark_web_create_automations',
+    gated: true,
+    additive: true,
+    description:
+      'TẠO NHIỀU Automation MỚI một lần (cùng một Base) — dùng khi thiết kế có từ 2 automation trở lên: một lần gọi, người dùng (nếu đang ở chế độ hỏi trước) chỉ duyệt MỘT lần cho cả bộ. Mỗi mục {title, steps} theo đúng luật của lark_web_create_automation. ' +
+      'Tạo LẦN LƯỢT, luôn TẮT, đọc lại từng cái; mục lỗi KHÔNG làm dừng các mục khác — kết quả trả từng mục (ok / lỗi + lý do). Sửa mục lỗi rồi gọi lại CHỈ với các mục đó (đừng tạo lại mục đã ok).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token Base (đã chọn ở đầu hội thoại)'),
+        workflows: {
+          type: 'array',
+          description: 'Các automation cần tạo (tối đa 12)',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { title: { type: 'string' }, steps: { type: 'array', items: { type: 'object', additionalProperties: true } } },
+            required: ['title', 'steps'],
+          },
+        },
+      },
+      required: ['app_token', 'workflows'],
+    },
+    preview: async (i) => ({ fieldNames: await fieldNamesFor(tokenOf(i)) }),
+    preflight: async (i) => {
+      try {
+        const list: J[] = Array.isArray(i.workflows) ? i.workflows : [];
+        if (!list.length) return { ok: false, kind: 'invalid', error: 'Thiếu `workflows` (mảng {title, steps}).' };
+        if (list.length > 12) return { ok: false, kind: 'invalid', error: 'Tối đa 12 automation mỗi lần gọi — chia làm nhiều lần.' };
+        // Chỉ chặn trước khi TẤT CẢ đều hỏng — có mục hợp lệ thì vẫn cho duyệt, mục hỏng báo trong kết quả.
+        const preps = await Promise.all(list.map((w) => prepare({ app_token: i.app_token, url: i.url, title: w?.title, steps: w?.steps }).catch((e) => ({ ok: false, kind: 'error', error: String((e as Error)?.message || e) }))));
+        if (preps.some((p: J) => p.ok)) return null;
+        return { ok: false, kind: 'invalid', error: 'Không automation nào hợp lệ — sửa theo lỗi từng mục rồi gọi lại.', items: preps.map((p: J, k) => ({ title: list[k]?.title, ...p })) };
+      } catch (e) {
+        return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
+      }
+    },
+    exec: async (i) => {
+      const token = tokenOf(i);
+      const list: J[] = (Array.isArray(i.workflows) ? i.workflows : []).slice(0, 12);
+      const fieldNames = await fieldNamesFor(token);
+      const items: J[] = [];
+      for (const w of list) {
+        try {
+          const p = await prepare({ app_token: token, title: w?.title, steps: w?.steps });
+          if (!p.ok) {
+            items.push({ title: w?.title, ...p });
+            continue;
+          }
+          items.push(await createPrepared(p, fieldNames));
+        } catch (e) {
+          items.push({ title: w?.title, ok: false, kind: 'error', error: String((e as Error)?.message || e) });
+        }
+      }
+      void getLarkWebSession().showBase(token);
+      const okN = items.filter((x) => x.ok).length;
       return {
-        ok: v.ok,
-        workflow_id: created.workflowID,
-        title: p.body.title,
-        base: p.baseName,
-        verified: v.ok,
-        status_text: v.enabled ? 'ĐANG BẬT (bất thường — kiểm tra ngay)' : 'đang TẮT — chờ người dùng xem lại và tự bật',
+        // Lỗi MỘT PHẦN vẫn là ok:true ở cấp lượt gọi — các mục đã tạo là thật; mục lỗi nằm trong items.
+        ok: okN > 0,
+        created: okN,
+        failed: items.length - okN,
+        items,
+        ...(okN < items.length ? { next: 'Sửa các mục ok:false theo lỗi của chúng rồi gọi lại CHỈ với các mục đó (mục ok đã được tạo — đừng tạo trùng).' } : {}),
+        review: 'Tất cả đang TẮT. Người dùng mở "Tự động hoá" trong khung Lark bên phải, xem lại từng cái và tự bật.',
+      };
+    },
+  },
+  {
+    name: 'lark_web_add_table',
+    gated: true,
+    additive: true,
+    description:
+      'TẠO một BẢNG MỚI trong Base (qua chính lớp lệnh của trang Lark — không bấm giao diện, nhanh và chắc), đặt tên, đổi tên cột chính, thêm các cột (Văn bản/Số/Chọn một/Chọn nhiều/Ngày/Hộp kiểm/Người/SĐT/URL/Tệp) kèm lựa chọn. ' +
+      'Lark tự thêm 5 dòng trống khi tạo bảng — tool tự xoá đúng 5 dòng đó nếu chúng vẫn trống (không đụng dòng nào khác). Đọc lại để xác minh. Dùng THAY cho việc tự bấm trong lark_ui_*. Bảng trùng tên đã có → báo lỗi (không ghi đè).',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token Base'),
+        name: str('Tên bảng mới'),
+        primary_field_name: str('Tên cột chính (cột đầu tiên, kiểu Văn bản) — vd "Mã lô"'),
+        fields: FIELD_SPEC_SCHEMA,
+      },
+      required: ['app_token', 'name'],
+    },
+    preflight: async (i) => {
+      try {
+        const token = tokenOf(i);
+        const name = String(i.name ?? '').trim();
+        if (!name) return { ok: false, kind: 'invalid', error: 'Thiếu `name` (tên bảng).' };
+        const { tables } = await tablesFor(token);
+        if (tables.some((t) => t.name.trim().toLowerCase() === name.toLowerCase())) return { ok: false, kind: 'exists', error: `Base đã có bảng «${name}» — dùng lark_web_add_fields để thêm cột vào bảng đó.` };
+        const plan = planFields(null, specsOf(i.fields));
+        return plan.errors.length ? { ok: false, kind: 'invalid', errors: plan.errors } : null;
+      } catch (e) {
+        return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
+      }
+    },
+    exec: async (i) => {
+      const token = tokenOf(i);
+      const name = String(i.name ?? '').trim();
+      const plan = planFields(null, specsOf(i.fields));
+      if (plan.errors.length) return { ok: false, kind: 'invalid', errors: plan.errors };
+      const primary = i.primary_field_name ? String(i.primary_field_name).trim() : '';
+      const r = await getLarkWebSession().runBaseStructure(token, structureScript({ token, createTable: { name, primaryFieldName: primary || undefined, removePlaceholders: true }, fields: plan.add, addOptions: [] }));
+      scanCache.delete(token);
+      if (!r?.tableId) return { ok: false, error: r?.error || 'Không tạo được bảng.', ...(r?.hint ? { hint: r.hint } : {}), steps: r?.steps };
+      const { table: t, v } = await readBackUntil(() => freshTable(token, r.tableId, name), (x) => {
+        const b = verifyStructure(x, { fields: plan.add });
+        if (x && primary && !x.fields.some((f) => f.isPrimary && f.name === primary)) b.problems.push(`Cột chính chưa đổi tên thành «${primary}» khi đọc lại.`);
+        return { ok: !b.problems.length, problems: b.problems };
+      });
+      return {
+        ok: !!r.ok && v.ok,
+        table_id: r.tableId,
+        name,
+        fields: t ? t.fields.map((f) => `${f.id} · ${f.name} · ${f.typeName}${f.options?.length ? `: ${f.options.map((o) => o.name).join(' | ')}` : ''}`) : undefined,
+        removed_placeholder_rows: r.removedPlaceholders ?? 0,
         ...(v.problems.length ? { problems: v.problems } : {}),
-        ...(verifyNote ? { verify_note: verifyNote } : {}),
-        design_text: workflowDesignText(p.body.steps),
-        review: `Trong khung Lark bên phải: mở "Tự động hoá" → «${p.body.title}» → kiểm từng bước → TỰ BẬT khi thấy đúng. Larkwave không bật automation.`,
-        ...(p.warnings.length ? { warnings: p.warnings } : {}),
+        ...(r.ok ? {} : { steps: r.steps }),
+        next: 'Dùng field_id ở trên cho ref "$.<trigger>.<field_id>" khi thiết kế automation (không cần quét lại).',
+      };
+    },
+  },
+  {
+    name: 'lark_web_add_fields',
+    gated: true,
+    additive: true,
+    description:
+      'THÊM CỘT vào một bảng ĐÃ CÓ và/hoặc THÊM LỰA CHỌN vào cột chọn đã có (qua lớp lệnh của trang Lark — không bấm giao diện). Chỉ CỘNG THÊM: cột trùng tên được BỎ QUA (không đổi kiểu, không ghi đè), lựa chọn đã có được bỏ qua. Đọc lại để xác minh.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token Base'),
+        table_name: str('Tên bảng (hoặc table_id)'),
+        fields: FIELD_SPEC_SCHEMA,
+        add_options: {
+          type: 'array',
+          description: 'Thêm lựa chọn vào cột chọn đã có: [{field_name, options:[…]}]',
+          items: { type: 'object', additionalProperties: false, properties: { field_name: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['field_name', 'options'] },
+        },
+      },
+      required: ['app_token', 'table_name'],
+    },
+    preflight: async (i) => {
+      try {
+        const token = tokenOf(i);
+        const { tables } = await tablesFor(token);
+        const t = tables.find((x) => x.id === i.table_name || x.name.trim().toLowerCase() === String(i.table_name ?? '').trim().toLowerCase());
+        if (!t) return { ok: false, kind: 'invalid', error: `Không thấy bảng «${i.table_name}» trong Base.` };
+        const plan = planFields(t, specsOf(i.fields), Array.isArray(i.add_options) ? i.add_options : []);
+        if (plan.errors.length) return { ok: false, kind: 'invalid', errors: plan.errors };
+        return null;
+      } catch (e) {
+        return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
+      }
+    },
+    exec: async (i) => {
+      const token = tokenOf(i);
+      scanCache.delete(token);
+      const { tables } = await tablesFor(token);
+      const t = tables.find((x) => x.id === i.table_name || x.name.trim().toLowerCase() === String(i.table_name ?? '').trim().toLowerCase());
+      if (!t) return { ok: false, error: `Không thấy bảng «${i.table_name}» trong Base.` };
+      const plan = planFields(t, specsOf(i.fields), Array.isArray(i.add_options) ? i.add_options : []);
+      if (plan.errors.length) return { ok: false, kind: 'invalid', errors: plan.errors };
+      if (!plan.add.length && !plan.addOptions.length) return { ok: true, skipped: plan.skipped, note: 'Không có gì mới để thêm.' };
+      const r = await getLarkWebSession().runBaseStructure(token, structureScript({ token, tableId: t.id, fields: plan.add, addOptions: plan.addOptions }));
+      scanCache.delete(token);
+      const { table: fresh, v } = await readBackUntil(
+        () => freshTable(token, t.id, t.name),
+        (x) => {
+          const base = verifyStructure(x, { fields: plan.add });
+          for (const a of plan.addOptions) {
+            const f = x?.fields.find((y) => y.id === a.fieldId);
+            for (const n of a.names) if (!f?.options?.some((o) => o.name === n)) base.problems.push(`Cột «${a.fieldName}» chưa có lựa chọn «${n}» khi đọc lại.`);
+          }
+          return { ok: !base.problems.length, problems: base.problems };
+        },
+      );
+      const problems = v.problems;
+      return {
+        ok: !!r?.ok && !problems.length,
+        table_id: t.id,
+        added: r?.added ?? [],
+        ...(plan.skipped.length ? { skipped_existing: plan.skipped } : {}),
+        ...(plan.addOptions.length ? { options_added: plan.addOptions.map((a) => `${a.fieldName}: ${a.names.join(' | ')}`) } : {}),
+        fields: fresh ? fresh.fields.map((f) => `${f.id} · ${f.name} · ${f.typeName}`) : undefined,
+        ...(problems.length ? { problems } : {}),
+        ...(r?.ok ? {} : { error: r?.error, hint: r?.hint, steps: r?.steps }),
       };
     },
   },

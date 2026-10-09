@@ -1,0 +1,123 @@
+{
+ "note": "Một bước LarkMessageAction THẬT do trình soạn Lark lưu (automation đang chạy trên tenant thật, đọc 09/10/2026), người nhận = cột của bản ghi trigger. Đã thay id bảng/cột/bước và bỏ link nội bộ.",
+ "trigger": {
+  "id": "trigFAKE0001",
+  "type": "SetRecordTrigger"
+ },
+ "action": {
+  "id": "actFAKE00001",
+  "type": "LarkMessageAction",
+  "data": {
+   "notifyIdentity": "mixed",
+   "persons": [
+    {
+     "fields": [
+      {
+       "fieldId": "ref_tblFAKEtable0001_fldPERSON01",
+       "type": 19
+      }
+     ],
+     "id": "trigFAKE0001-tblFAKEtable0001-fldPERSON01-1591",
+     "stepId": "trigFAKE0001",
+     "stepNum": 1,
+     "stepType": "SetRecordTrigger",
+     "tableId": "ref_tblFAKEtable0001",
+     "tagType": "step",
+     "type": "ref",
+     "value": "step",
+     "recordInfo": {}
+    }
+   ],
+   "groups": [
+    {
+     "fields": [
+      {
+       "fieldId": "ref_tblFAKEtable0001_fldPERSON01",
+       "type": 19
+      }
+     ],
+     "id": "trigFAKE0001-tblFAKEtable0001-fldPERSON01-1591",
+     "stepId": "trigFAKE0001",
+     "stepNum": 1,
+     "stepType": "SetRecordTrigger",
+     "tableId": "ref_tblFAKEtable0001",
+     "tagType": "step",
+     "type": "ref",
+     "value": "step",
+     "recordInfo": {}
+    }
+   ],
+   "richTextContent": [
+    {
+     "type": "paragraph",
+     "lineMarkerList": [],
+     "value": [
+      {
+       "type": "text",
+       "text": "Mã Khai Báo: ",
+       "extra": {}
+      },
+      {
+       "fields": [
+        {
+         "fieldId": "ref_tblFAKEtable0001_fldCODE0001",
+         "type": 1005
+        }
+       ],
+       "id": "trigFAKE0001-tblFAKEtable0001-fldCODE0001-16896",
+       "stepId": "trigFAKE0001",
+       "stepNum": 1,
+       "stepType": "SetRecordTrigger",
+       "tableId": "ref_tblFAKEtable0001",
+       "tagType": "step",
+       "type": "ref",
+       "value": "step",
+       "recordInfo": {},
+       "extra": {}
+      },
+      {
+       "type": "text",
+       "text": ".\n",
+       "extra": {}
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "lineMarkerList": [],
+     "value": [
+      {
+       "type": "text",
+       "text": "Mã Vận Đơn: ",
+       "extra": {}
+      },
+      {
+       "fields": [
+        {
+         "fieldId": "ref_tblFAKEtable0001_fldLOOKUP01",
+         "type": 19
+        }
+       ],
+       "id": "trigFAKE0001-tblFAKEtable0001-fldLOOKUP01-28786",
+       "stepId": "trigFAKE0001",
+       "stepNum": 1,
+       "stepType": "SetRecordTrigger",
+       "tableId": "ref_tblFAKEtable0001",
+       "tagType": "step",
+       "type": "ref",
+       "value": "step",
+       "recordInfo": {},
+       "extra": {}
+      },
+      {
+       "type": "text",
+       "text": ".\n",
+       "extra": {}
+      }
+     ]
+    }
+   ],
+   "contentType": "rich_text"
+  }
+ }
+}

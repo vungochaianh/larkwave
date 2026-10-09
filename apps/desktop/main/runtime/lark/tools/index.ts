@@ -54,7 +54,12 @@ export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_web_list_bases',
   'lark_web_scan_base',
   'lark_web_create_automation',
+  'lark_web_create_automations',
+  'lark_web_add_table',
+  'lark_web_add_fields',
   'bitable_workflow_schema',
+  'lark_ui_health',
+  'lark_ui_dismiss',
   'lark_ui_open',
   'lark_ui_snapshot',
   'lark_ui_act',
@@ -82,4 +87,13 @@ export type { LarkToolDef } from './types';
  */
 export function isWriteTool(name: string): boolean {
   return !!ALL.find((t) => t.name === name)?.gated;
+}
+
+/**
+ * Tool này có phải thao tác ghi CỘNG THÊM (không phá gì của người dùng) không — chỉ những tool này
+ * được công tắc "Tự động" của Tạo workflow tự duyệt. Tra theo cờ `additive` của chính khai báo tool.
+ */
+export function isAdditiveTool(name: string): boolean {
+  const t = ALL.find((x) => x.name === name);
+  return !!(t?.gated && t.additive);
 }
