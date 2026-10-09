@@ -55,8 +55,9 @@ export function classifyWhoami(json: unknown): LarkWhoami {
   if (!j || typeof j !== 'object' || j.code !== 0 || !j.data || typeof j.data !== 'object') return { loggedIn: false, anonymous: false };
   const d = j.data;
   const anon = d.is_Anonymous === true || d.isAnonymous === true || d.is_anonymous === true;
-  const uid = String(d.uid ?? d.suid ?? '').trim();
-  const realUid = !!uid && String(d.uid ?? '').trim() !== '';
+  // Đo thật 09/10/2026 trên một tài khoản ĐÃ đăng nhập: `uid` là CHUỖI RỖNG, mã thật nằm ở `suid`
+  // (19 ký tự) và `id`. Khách ẩn danh thì is_Anonymous=true. Nên: không ẩn danh + có MỘT mã bất kỳ.
+  const realUid = [d.uid, d.suid, d.id].some((v) => String(v ?? '').trim() !== '');
   if (anon) return { loggedIn: false, anonymous: true };
   if (!realUid) return { loggedIn: false, anonymous: false };
   const domain = typeof d.domain === 'string' && /^[a-z0-9.-]+$/i.test(d.domain) && isLarkHost('https://' + d.domain) ? d.domain : undefined;

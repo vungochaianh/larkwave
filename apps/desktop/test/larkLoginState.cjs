@@ -40,6 +40,11 @@ assert.strictEqual(classifyWhoami({ code: 0, data: { uid: '1', is_Anonymous: fal
 for (const bad of [null, 'html', { code: 4, msg: 'not login' }, { code: 0 }, { code: 0, data: null }])
   assert.strictEqual(classifyWhoami(bad).loggedIn, false, 'trả lời lạ/lỗi → chưa đăng nhập: ' + JSON.stringify(bad));
 assert.strictEqual(classifyWhoami(null).anonymous, false, 'không trả lời ≠ ẩn danh (tránh báo "hết phiên" oan)');
+// Dạng THẬT đo ngày 09/10/2026 trên tài khoản đã đăng nhập: uid rỗng, mã nằm ở suid/id.
+const REAL = { code: 0, data: { uid: '', suid: '7400000000000000123', id: '7400000000000000123', is_Anonymous: false, domain: 'lsgav2gopb4m.sg.larksuite.com' } };
+assert.strictEqual(classifyWhoami(REAL).loggedIn, true, 'uid rỗng nhưng có suid + không ẩn danh → ĐÃ đăng nhập');
+assert.strictEqual(classifyWhoami(REAL).domain, 'lsgav2gopb4m.sg.larksuite.com');
+assert.strictEqual(classifyWhoami(GUEST).loggedIn, false, 'khách có suid nhưng ẩn danh → vẫn chưa');
 console.log('✓ classifyWhoami: khách ẩn danh / thiếu uid / lỗi → chưa đăng nhập; chỉ người dùng thật mới tính');
 
 assert.strictEqual(canProbeLogin('https://www.larksuite.com/en_sg/'), true);
