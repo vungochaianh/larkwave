@@ -266,21 +266,23 @@ const test = async (name, fn) => {
     );
     assert.strictEqual(bad.ok, false);
   });
-  await test('v3ToInternal: loại bước chưa có khuôn đo → unsupported (không đoán); rẽ nhánh cũng vậy', () => {
-    const r = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { id: 'a1', type: 'SetRecordAction', data: {} }] }, tables, me);
+  await test('v3ToInternal: loại bước cần trình soạn (LarkMessageTrigger…) → unsupported; nhánh trỏ tới bước không có → lỗi', () => {
+    const r = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { id: 'a1', type: 'AIAnalysisAction', data: {} }] }, tables, me);
     assert.strictEqual(r.ok, false);
-    assert.deepStrictEqual(r.unsupported, ['SetRecordAction']);
+    assert.deepStrictEqual(r.unsupported, ['AIAnalysisAction']);
     const br = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { ...design.steps[1], children: { links: [{ kind: 'if_true', to: 'z' }] } }] }, tables, me);
     assert.strictEqual(br.ok, false);
   });
-  await test('v3ToInternal: người nhận open_id ou_… / nhóm chat bị từ chối kèm lý do; ref ngoài trigger bị từ chối', () => {
+  await test('v3ToInternal: người nhận open_id ou_… / nhóm chat oc_… bị từ chối kèm lý do; ref tới bước SAU bị từ chối', () => {
     const r = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { ...design.steps[1], data: { ...design.steps[1].data, receiver: [{ value_type: 'group', value: { id: 'oc_x' } }] } }] }, tables, me);
     assert.strictEqual(r.ok, false);
     assert.ok(r.errors.some((e) => /người nhận/.test(e)));
     const r2 = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { ...design.steps[1], data: { ...design.steps[1].data, content: [{ value_type: 'ref', value: '$.a1.fldX' }] } }] }, tables, me);
     assert.strictEqual(r2.ok, false);
+    // Nút mở link chữ (URL) nay tạo được: link = đoạn chữ.
     const r3 = conv.v3ToInternal({ title: 'x', steps: [design.steps[0], { ...design.steps[1], data: { ...design.steps[1].data, btn_list: [{ text: 'Web', btn_action: 'openLink', link: [{ value_type: 'text', value: 'https://x' }] }] } }] }, tables, me);
-    assert.strictEqual(r3.ok, false);
+    assert.strictEqual(r3.ok, true, JSON.stringify(r3.errors));
+    assert.deepStrictEqual(r3.draft.steps[1].data.btnList[0].link, [{ type: 'text', text: 'https://x' }]);
   });
   await test('verifyReadBack: đúng bước + TẮT = ok; lệch bước hoặc ĐANG BẬT = không ok', () => {
     const r = conv.v3ToInternal(design, tables, me);
@@ -320,7 +322,9 @@ const test = async (name, fn) => {
     const iStruct = p.indexOf('lark_web_add_table');
     const iBatch = p.indexOf('6) TẠO');
     assert.ok(iScan > 0 && iStruct > iScan && iBatch > iStruct);
-    assert.ok(/VIẾT RA VĂN BẢN/.test(p) && /TẠO NGAY/.test(p), 'mặc định tự động: viết thiết kế rồi tạo luôn');
+    assert.ok(/VIẾT RA CÂY/.test(p) && /TẠO NGAY/.test(p), 'mặc định tự động: viết cây thiết kế rồi tạo luôn');
+    assert.ok(/THIẾT KẾ CÓ LOGIC THẬT/.test(p) && /IfElseBranch/.test(p) && /Loop/.test(p) && /KHÔNG rút gọn thành trigger → gửi tin/.test(p), 'yêu cầu có logic → dựng đủ bước');
+    assert.ok(/saved_tree/.test(p) && /lark_check/.test(p) && /block_id/.test(p));
     assert.ok(!/choices \["Tạo bản nháp"/.test(p), 'không còn xin phép bằng ask_user');
     assert.ok(/TỰ ĐỘNG/.test(p));
     assert.ok(/HỎI TRƯỚC KHI GHI/.test(sp.buildWorkflowSystemPrompt({ auto: false })));

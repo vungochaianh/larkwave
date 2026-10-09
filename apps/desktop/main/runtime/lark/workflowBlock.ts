@@ -1,4 +1,5 @@
 import type { WebBaseMeta, WebTable } from './larkWebApi';
+import { outlineSignature } from './workflowInternal';
 
 /**
  * Khối **Quy trình làm việc (Workflow)** của Base — KHÁC "Tự động hoá" (Automation).
@@ -138,9 +139,10 @@ export function verifyWorkflowBlock(
       draft = null;
     }
   }
-  const got: string[] = Array.isArray(draft?.steps) ? draft.steps.map((s: J) => String(s?.type)) : [];
-  const want = expected.steps.map((s: J) => String(s?.type));
-  if (w && got.join(',') !== want.join(',')) problems.push(`Bước đã lưu (${got.join(' → ') || 'trống'}) khác thiết kế (${want.join(' → ')}).`);
+  // So CẤU TRÚC cây (loại bước + cạnh rẽ nhánh/lặp + độ sâu), không chỉ danh sách loại.
+  const got = outlineSignature(draft);
+  const want = outlineSignature({ steps: expected.steps });
+  if (w && got !== want) problems.push(`Cây bước đã lưu (${got || 'trống'}) khác bản gửi (${want}).`);
   if (enabled) problems.push('Workflow đang BẬT — Larkwave không bao giờ bật; kiểm tra ngay trong Lark.');
   return { ok: !problems.length, blockId: blk?.blockId, enabled, problems };
 }
@@ -148,4 +150,38 @@ export function verifyWorkflowBlock(
 /** Link mở thẳng khối Workflow (canvas) trong Base. */
 export function workflowBlockUrl(host: string, token: string, blockId: string): string {
   return `${host.replace(/\/$/, '')}/base/${encodeURIComponent(token)}?table=${encodeURIComponent(blockId)}`;
+}
+
+/**
+ * JS chạy TRONG trang đang mở canvas của khối: dùng CHÍNH bộ kiểm của trình soạn Lark (`window.workflow`
+ * — đối tượng workflow của canvas) để soi cấu hình từng bước (`getIsConfigNotReady/getIsConfigError` +
+ * danh sách lỗi) và thử dựng `toSchema()` — thứ Lark tính khi BẬT (lỗi 800004006 cũ nằm ở đây). Chỉ
+ * TÍNH TOÁN cục bộ, không lưu, không bật. `expectWorkflowID` để chắc đang soi đúng khối.
+ */
+export function canvasSelfCheckScript(expectWorkflowID: string): string {
+  return `(async () => {
+  var W = window.workflow;
+  if (!W) return { ok: false, error: 'no-canvas' };
+  var wid = String(W.id || W.workflowID || W.workflowId || (W.config && W.config.workflowID) || '');
+  if (wid && wid !== ${JSON.stringify(expectWorkflowID)}) return { ok: false, error: 'other-workflow', wid: wid };
+  var steps = [];
+  try { steps = W.getAllSteps ? W.getAllSteps() : []; } catch (e) {}
+  if (!Array.isArray(steps)) steps = Object.values(steps || {});
+  var bad = [];
+  // Trình soạn gọi các hàm kiểm với ngữ cảnh có getMaxFlowLimit (vd Loop đọc maxLoopNum) — đưa đúng thứ đó.
+  var CTX = { getMaxFlowLimit: function () { return (W.config && W.config.limits) || { maxLoopNum: 5000 }; } };
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i], r = { id: s.id, type: s.type, title: s.stepTitle || '' }, isBad = false;
+    ['getIsConfigNotReady', 'getIsConfigError', 'getIsTaskConfigError', 'getIsTaskConfigNotReady'].forEach(function (f) {
+      try { if (s[f] && s[f](CTX)) { r[f] = true; isBad = true; } } catch (e) { r[f] = 'ERR ' + (e && e.message); isBad = true; }
+    });
+    ['getConfigErrorInfoList', 'getConfigNotReadyErrorInfoList', 'getTaskConfigErrorInfoList', 'getTaskConfigNotReadyErrorInfoList'].forEach(function (f) {
+      try { var v = s[f] && s[f](CTX); if (v && v.length) { r[f] = JSON.stringify(v).slice(0, 300); isBad = true; } } catch (e) {}
+    });
+    if (isBad) bad.push(r);
+  }
+  var schema = null, schemaError = null;
+  try { var sc = await W.toSchema(); schema = sc ? JSON.stringify(sc).length : 0; } catch (e) { schemaError = String(e && e.message || e); }
+  return { ok: bad.length === 0 && !schemaError, steps: steps.length, bad: bad, schemaBytes: schema, schemaError: schemaError };
+})()`;
 }

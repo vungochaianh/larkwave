@@ -1,0 +1,650 @@
+{
+ "_note": "Cấu trúc (đã thay id) của vài bảng trong Base Test — đầu vào cho test/workflowInternal.cjs.",
+ "timezone": "Asia/Saigon",
+ "tables": [
+  {
+   "id": "tbl7E06CF2BE8193",
+   "name": "Khách hàng",
+   "fields": [
+    {
+     "id": "fld9810d53",
+     "name": "Tên khách hàng",
+     "type": 1
+    },
+    {
+     "id": "fldd3065c4",
+     "name": "Tổng chi tiêu (VNĐ)",
+     "type": 2
+    },
+    {
+     "id": "fld1ad9f6e",
+     "name": "Phân loại",
+     "type": 3,
+     "options": [
+      {
+       "id": "optda5cff0",
+       "name": "Lead mới"
+      },
+      {
+       "id": "opt54d2b7f",
+       "name": "Đang tư vấn"
+      },
+      {
+       "id": "opt7726262",
+       "name": "Đã mua"
+      },
+      {
+       "id": "opt0a9364a",
+       "name": "VIP"
+      },
+      {
+       "id": "optf0d1b64",
+       "name": "Mất liên lạc"
+      }
+     ]
+    },
+    {
+     "id": "fld99d3137",
+     "name": "Ngày tiếp cận",
+     "type": 5
+    },
+    {
+     "id": "fldfe9d9fd",
+     "name": "Nguồn tiếp cận",
+     "type": 3,
+     "options": [
+      {
+       "id": "optb00a3ca",
+       "name": "Inbox"
+      },
+      {
+       "id": "opt7c7c996",
+       "name": "Comment"
+      },
+      {
+       "id": "opt4d1d088",
+       "name": "Quảng cáo"
+      },
+      {
+       "id": "opt40e611d",
+       "name": "Giới thiệu"
+      },
+      {
+       "id": "optb2debab",
+       "name": "Livestream"
+      },
+      {
+       "id": "opt3840aaa",
+       "name": "Khác"
+      }
+     ]
+    },
+    {
+     "id": "fldd309f3f",
+     "name": "Lần tiếp cận gần nhất",
+     "type": 5
+    },
+    {
+     "id": "fld80cdde0",
+     "name": "Kênh social chính",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt4954cbe",
+       "name": "Facebook"
+      },
+      {
+       "id": "optbd24fa5",
+       "name": "Instagram"
+      },
+      {
+       "id": "opt7a51489",
+       "name": "TikTok"
+      },
+      {
+       "id": "opt1902ba3",
+       "name": "Zalo"
+      },
+      {
+       "id": "opt456187f",
+       "name": "YouTube"
+      },
+      {
+       "id": "opt6c39228",
+       "name": "X (Twitter)"
+      },
+      {
+       "id": "opt7672d5a",
+       "name": "Threads"
+      }
+     ]
+    },
+    {
+     "id": "fld8bf9cee",
+     "name": "Số điện thoại",
+     "type": 13
+    },
+    {
+     "id": "fldb346f52",
+     "name": "Email",
+     "type": 1
+    },
+    {
+     "id": "flde503409",
+     "name": "Ghi chú",
+     "type": 1
+    },
+    {
+     "id": "fldee05365",
+     "name": "Người phụ trách",
+     "type": 11
+    },
+    {
+     "id": "flda558354",
+     "name": "Link profile",
+     "type": 15
+    }
+   ]
+  },
+  {
+   "id": "tbl9E7BDA4110FE7",
+   "name": "Tương tác",
+   "fields": [
+    {
+     "id": "fldc64cc27",
+     "name": "Người xử lý",
+     "type": 11
+    },
+    {
+     "id": "flde342b15",
+     "name": "Nội dung",
+     "type": 1
+    },
+    {
+     "id": "fld756c46b",
+     "name": "Trạng thái",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt75ae57d",
+       "name": "Chưa xử lý"
+      },
+      {
+       "id": "opt44cf741",
+       "name": "Đang xử lý"
+      },
+      {
+       "id": "opt512dc79",
+       "name": "Đã phản hồi"
+      },
+      {
+       "id": "opt7ee3623",
+       "name": "Đóng"
+      }
+     ]
+    },
+    {
+     "id": "fldf84e594",
+     "name": "Kênh",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt2365b52",
+       "name": "Facebook"
+      },
+      {
+       "id": "opt7fd1bd6",
+       "name": "Instagram"
+      },
+      {
+       "id": "opt550793e",
+       "name": "TikTok"
+      },
+      {
+       "id": "opt8598afa",
+       "name": "Zalo"
+      },
+      {
+       "id": "optd8224a4",
+       "name": "YouTube"
+      },
+      {
+       "id": "opt385481a",
+       "name": "X (Twitter)"
+      },
+      {
+       "id": "opt8bd59bb",
+       "name": "Threads"
+      }
+     ]
+    },
+    {
+     "id": "fld9cd58a0",
+     "name": "Loại tương tác",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt37ad014",
+       "name": "Inbox/DM"
+      },
+      {
+       "id": "opt90bb05e",
+       "name": "Comment"
+      },
+      {
+       "id": "optfc72ba3",
+       "name": "Phản hồi story"
+      },
+      {
+       "id": "optaedae78",
+       "name": "Gọi điện"
+      },
+      {
+       "id": "opt419bacf",
+       "name": "Email"
+      },
+      {
+       "id": "opt2fbe2a9",
+       "name": "Khác"
+      }
+     ]
+    },
+    {
+     "id": "fld16b37e9",
+     "name": "Chiến dịch liên quan",
+     "type": 18
+    },
+    {
+     "id": "fld855f70b",
+     "name": "Tiêu đề",
+     "type": 1
+    },
+    {
+     "id": "fld90604b0",
+     "name": "Khách hàng",
+     "type": 18
+    },
+    {
+     "id": "fld315b739",
+     "name": "Thời gian",
+     "type": 5
+    }
+   ]
+  },
+  {
+   "id": "tbl1DA21D23D3FB0",
+   "name": "Chiến dịch",
+   "fields": [
+    {
+     "id": "fld66d158b",
+     "name": "Doanh thu (VNĐ)",
+     "type": 2
+    },
+    {
+     "id": "fld81503a9",
+     "name": "Kênh",
+     "type": 4,
+     "options": [
+      {
+       "id": "opt179b70d",
+       "name": "Facebook"
+      },
+      {
+       "id": "opt59d9371",
+       "name": "Instagram"
+      },
+      {
+       "id": "opt37ed464",
+       "name": "TikTok"
+      },
+      {
+       "id": "opt3508393",
+       "name": "Zalo"
+      },
+      {
+       "id": "opt0656270",
+       "name": "YouTube"
+      },
+      {
+       "id": "opt6b3e4d8",
+       "name": "X (Twitter)"
+      }
+     ]
+    },
+    {
+     "id": "flde2c0840",
+     "name": "Tên chiến dịch",
+     "type": 1
+    },
+    {
+     "id": "fld9a6eb9e",
+     "name": "Số đơn",
+     "type": 2
+    },
+    {
+     "id": "flda354072",
+     "name": "CPL (VNĐ)",
+     "type": 20
+    },
+    {
+     "id": "fld3036db1",
+     "name": "Số lead",
+     "type": 2
+    },
+    {
+     "id": "fldbd56918",
+     "name": "Ngày kết thúc",
+     "type": 5
+    },
+    {
+     "id": "fldedb0047",
+     "name": "Ghi chú",
+     "type": 1
+    },
+    {
+     "id": "fld0a50fde",
+     "name": "Trạng thái",
+     "type": 3,
+     "options": [
+      {
+       "id": "optb3cdd82",
+       "name": "Lên kế hoạch"
+      },
+      {
+       "id": "optdad221f",
+       "name": "Đang chạy"
+      },
+      {
+       "id": "optc06b00c",
+       "name": "Tạm dừng"
+      },
+      {
+       "id": "opt304b9e7",
+       "name": "Hoàn thành"
+      }
+     ]
+    },
+    {
+     "id": "fld215c87f",
+     "name": "Ngân sách (VNĐ)",
+     "type": 2
+    },
+    {
+     "id": "fldd5d997e",
+     "name": "Loại",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt8bdb172",
+       "name": "Quảng cáo trả phí"
+      },
+      {
+       "id": "opta6a4695",
+       "name": "Content organic"
+      },
+      {
+       "id": "opt8b47b9e",
+       "name": "KOL/Influencer"
+      },
+      {
+       "id": "optcd713b0",
+       "name": "Livestream"
+      },
+      {
+       "id": "opt11bc96b",
+       "name": "Minigame/Giveaway"
+      },
+      {
+       "id": "optac45300",
+       "name": "Khác"
+      }
+     ]
+    },
+    {
+     "id": "fld1240526",
+     "name": "Người phụ trách",
+     "type": 11
+    },
+    {
+     "id": "fld4b21906",
+     "name": "ROI (%)",
+     "type": 20
+    },
+    {
+     "id": "fld135ac37",
+     "name": "Ngày bắt đầu",
+     "type": 5
+    }
+   ]
+  },
+  {
+   "id": "tbl39F83AA3BC681",
+   "name": "Công việc follow-up",
+   "fields": [
+    {
+     "id": "fld08e33e0",
+     "name": "Người phụ trách",
+     "type": 11
+    },
+    {
+     "id": "fld9392708",
+     "name": "Tiêu đề",
+     "type": 1
+    },
+    {
+     "id": "fld5c5a962",
+     "name": "Khách hàng",
+     "type": 18
+    },
+    {
+     "id": "fld04635af",
+     "name": "Loại",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt6ee0ca9",
+       "name": "Gọi điện"
+      },
+      {
+       "id": "opt7f1bf73",
+       "name": "Gửi báo giá"
+      },
+      {
+       "id": "opt80a14f0",
+       "name": "Gửi hợp đồng"
+      },
+      {
+       "id": "opt8171ed9",
+       "name": "Check-in"
+      },
+      {
+       "id": "opt3b602f4",
+       "name": "Khác"
+      }
+     ]
+    },
+    {
+     "id": "fld2b4ab3f",
+     "name": "Trạng thái",
+     "type": 3,
+     "options": [
+      {
+       "id": "optb2d4669",
+       "name": "Chưa làm"
+      },
+      {
+       "id": "opt58ba4fd",
+       "name": "Đang làm"
+      },
+      {
+       "id": "opt1fff431",
+       "name": "Xong"
+      },
+      {
+       "id": "opt470b58e",
+       "name": "Bỏ qua"
+      }
+     ]
+    },
+    {
+     "id": "fld6aacb4d",
+     "name": "Hạn hoàn thành",
+     "type": 5
+    },
+    {
+     "id": "fld1d2457e",
+     "name": "Ghi chú",
+     "type": 1
+    },
+    {
+     "id": "fld3d43f2b",
+     "name": "Ưu tiên",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt1f95dde",
+       "name": "Cao"
+      },
+      {
+       "id": "opt3e1dbcd",
+       "name": "Trung bình"
+      },
+      {
+       "id": "optc5cf0d8",
+       "name": "Thấp"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "tbl1B19749035DE9",
+   "name": "Kiểm chéo dữ liệu",
+   "fields": [
+    {
+     "id": "fldc5296b2",
+     "name": "Hạng mục kiểm tra",
+     "type": 1
+    },
+    {
+     "id": "flded65b98",
+     "name": "Số vấn đề phát hiện",
+     "type": 2
+    },
+    {
+     "id": "fldab69b8b",
+     "name": "Trạng thái",
+     "type": 3,
+     "options": [
+      {
+       "id": "opt1c4311f",
+       "name": "Đạt"
+      },
+      {
+       "id": "optcbb30df",
+       "name": "Có vấn đề"
+      }
+     ]
+    },
+    {
+     "id": "fldfab98e6",
+     "name": "Chi tiết",
+     "type": 1
+    },
+    {
+     "id": "fld8dd3f4d",
+     "name": "Thời gian kiểm tra",
+     "type": 5
+    }
+   ]
+  },
+  {
+   "id": "tbl2EE4F67667CA4",
+   "name": "Lô hàng",
+   "fields": [
+    {
+     "id": "fldf1e591e",
+     "name": "NV XNK",
+     "type": 11
+    },
+    {
+     "id": "fld160a699",
+     "name": "Trạng thái",
+     "type": 3,
+     "options": [
+      {
+       "id": "optc997e4c",
+       "name": "Yêu cầu báo giá"
+      },
+      {
+       "id": "opt480929f",
+       "name": "Đã báo giá"
+      },
+      {
+       "id": "opt1c4f16a",
+       "name": "KH xác nhận"
+      },
+      {
+       "id": "opt2e3e367",
+       "name": "Đang làm chứng từ"
+      },
+      {
+       "id": "opt957f4fa",
+       "name": "Đã thông quan"
+      },
+      {
+       "id": "opt8c6d717",
+       "name": "Đang vận chuyển"
+      },
+      {
+       "id": "opt7c38ecf",
+       "name": "Đã giao"
+      },
+      {
+       "id": "opt5df638f",
+       "name": "Đã xuất hoá đơn"
+      },
+      {
+       "id": "opt209295c",
+       "name": "Đã thanh toán"
+      },
+      {
+       "id": "opt939826d",
+       "name": "Huỷ"
+      }
+     ]
+    },
+    {
+     "id": "fld22cf5f1",
+     "name": "Sales phụ trách",
+     "type": 11
+    },
+    {
+     "id": "flda68389b",
+     "name": "Kế toán",
+     "type": 11
+    },
+    {
+     "id": "fld6ba9f3e",
+     "name": "Tuyến vận chuyển",
+     "type": 1
+    },
+    {
+     "id": "fld4cabd84",
+     "name": "ETA",
+     "type": 5
+    },
+    {
+     "id": "fld6be469a",
+     "name": "Khách hàng",
+     "type": 1
+    },
+    {
+     "id": "fldc631366",
+     "name": "Text",
+     "type": 1
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1813 @@
+{
+ "_note": "Bản nháp nội bộ THẬT (workflow/detail, chỉ đọc) của các khối Workflow trên tenant thật 09/10/2026 — id/tên/chữ đã thay. Dùng kiểm internalOutline (đọc cây rẽ nhánh/lặp).",
+ "ifelse_setrecord": {
+  "steps": [
+   {
+    "id": "trigtn1m05od",
+    "type": "AddRecordTrigger",
+    "data": {
+     "tableId": "ref_tblkQBhz17Rnuqg7",
+     "watchedFieldId": "ref_tblkQBhz17Rnuqg7_fld9810D53",
+     "triggerControlList": [
+      "pasteUpdate",
+      "automationBatchUpdate",
+      "appendImport",
+      "openAPIBatchUpdate"
+     ]
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "branchTUWsNTJs"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "branchTUWsNTJs",
+    "type": "IfElseBranch",
+    "data": {
+     "condition": {
+      "conjunction": "Or",
+      "conditions": [
+       {
+        "conjunction": "And",
+        "conditions": [
+         {
+          "leftValue": {
+           "fields": [
+            {
+             "fieldId": "ref_tblkQBhz17Rnuqg7_fld9810D53",
+             "type": 1
+            }
+           ],
+           "id": "trigtn1m05od-tblkQBhz17Rnuqg7-fld9810D53-9",
+           "stepId": "trigtn1m05od",
+           "stepNum": 1,
+           "stepType": "AddRecordTrigger",
+           "tableId": "ref_tblkQBhz17Rnuqg7",
+           "tagType": "step",
+           "type": "ref",
+           "value": "step",
+           "recordInfo": {}
+          },
+          "operator": "is",
+          "rightValue": [
+           {
+            "text": "…",
+            "type": "text"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "meetConditionStepId": "actBcSxCA7C",
+     "notMeetConditionStepId": "actWgt1HOVY"
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actBcSxCA7C",
+    "type": "SetRecordAction",
+    "data": {
+     "tableId": "ref_tblkQBhz17Rnuqg7",
+     "values": [
+      {
+       "fieldId": "ref_tblkQBhz17Rnuqg7_fldE503409",
+       "valueType": "ref",
+       "value": [
+        {
+         "text": "…",
+         "type": "text"
+        }
+       ]
+      }
+     ],
+     "recordType": "Ref",
+     "recordInfo": {
+      "stepId": "trigtn1m05od",
+      "stepNum": 0
+     },
+     "maxSetRecordNum": 100
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actWgt1HOVY",
+    "type": "SetRecordAction",
+    "data": {
+     "tableId": "ref_tblkQBhz17Rnuqg7",
+     "values": [
+      {
+       "fieldId": "ref_tblkQBhz17Rnuqg7_fldE503409",
+       "valueType": "ref",
+       "value": [
+        {
+         "text": "…",
+         "type": "text"
+        }
+       ]
+      }
+     ],
+     "recordType": "Ref",
+     "recordInfo": {
+      "stepId": "trigtn1m05od",
+      "stepNum": 0
+     },
+     "maxSetRecordNum": 100
+    },
+    "stepTitle": "…",
+    "next": []
+   }
+  ],
+  "extensionI18nMap": {},
+  "tabldFieldMap": {
+   "tblkQBhz17Rnuqg7": {
+    "fldEE05365": {
+     "type": 11
+    },
+    "fldE503409": {
+     "type": 1
+    },
+    "fld9810D53": {
+     "type": 1
+    },
+    "fldB346F52": {
+     "type": 1
+    },
+    "fld99D3137": {
+     "type": 5
+    },
+    "fld8BF9CEE": {
+     "type": 13
+    },
+    "fldA558354": {
+     "type": 15
+    },
+    "fld80CDDE0": {
+     "type": 3
+    },
+    "fldFE9D9FD": {
+     "type": 3
+    },
+    "fld1AD9F6E": {
+     "type": 3
+    }
+   }
+  }
+ },
+ "button_find_loop_switch": {
+  "steps": [
+   {
+    "id": "trigOwzcvJOh",
+    "type": "ButtonTrigger",
+    "data": {
+     "tableId": "ref_tblLaQQW25eYWF2O",
+     "buttonType": "buttonField"
+    },
+    "stepTitle": "…",
+    "version": "2.0.0",
+    "next": [
+     {
+      "ids": [
+       "acthySifPAT"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "acthySifPAT",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tbl1HgR8V20HzRxL",
+     "fieldIds": [
+      "ref_tbl1HgR8V20HzRxL_fld3792F44"
+     ],
+     "fieldsMap": {
+      "fld3792F44": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tbl1HgR8V20HzRxL_fld60A3CEC",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblLaQQW25eYWF2O_fld66D7662",
+            "type": 1
+           }
+          ],
+          "id": "trigOwzcvJOh-tblWKacKuSn730x8-fld66D7662-2368",
+          "stepId": "trigOwzcvJOh",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblLaQQW25eYWF2O",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "con3wDIoBf"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "systemL1hU0ZB6"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "systemL1hU0ZB6",
+    "type": "Loop",
+    "data": {
+     "loopType": "forEach",
+     "loopData": {
+      "id": "acthySifPAT-stepRecord3947",
+      "type": "ref",
+      "tagType": "stepRecordFields",
+      "stepType": "FindRecordAction",
+      "stepNum": 2,
+      "stepId": "acthySifPAT",
+      "fields": [],
+      "tableId": "ref_tbl1HgR8V20HzRxL",
+      "isAllFields": true,
+      "recordInfo": {
+       "displayType": "list"
+      }
+     },
+     "maxLoopTimes": 1000,
+     "loopMode": 2,
+     "startChildStepId": "actQJxIcKcQ"
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actQJxIcKcQ",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tbltxNIzOwrfCDwP",
+     "fieldIds": [
+      "ref_tbltxNIzOwrfCDwP_fld5A7D71F"
+     ],
+     "fieldsMap": {
+      "fld5A7D71F": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tbltxNIzOwrfCDwP_fld706D639",
+        "fieldType": 19,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblLaQQW25eYWF2O_fld66D7662",
+            "type": 1
+           }
+          ],
+          "id": "trigOwzcvJOh-tblWKacKuSn730x8-fld66D7662-4608",
+          "stepId": "trigOwzcvJOh",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblLaQQW25eYWF2O",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "conGglbGy6",
+        "valueType": 1
+       },
+       {
+        "fieldId": "ref_tbltxNIzOwrfCDwP_fld5A7D71F",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "stepId": "systemL1hU0ZB6",
+          "id": "loop-tag-segment-systemL1hU0ZB6-fld3792F44-6032",
+          "tagType": "loop",
+          "type": "ref",
+          "value": "",
+          "loopValue": "item",
+          "path": [
+           {
+            "type": "Field",
+            "value": "fld3792F44"
+           }
+          ],
+          "stepNum": 3
+         }
+        ],
+        "conditionId": "conN5P4zZO"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "actrSRgvIu8"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actrSRgvIu8",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tbl4Cha8gUgGL9aT",
+     "fieldIds": [
+      "ref_tbl4Cha8gUgGL9aT_fld5A7D71F"
+     ],
+     "fieldsMap": {
+      "fld5A7D71F": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tbl4Cha8gUgGL9aT_fld706D639",
+        "fieldType": 19,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblLaQQW25eYWF2O_fld66D7662",
+            "type": 1
+           }
+          ],
+          "id": "trigOwzcvJOh-tblWKacKuSn730x8-fld66D7662-6888",
+          "stepId": "trigOwzcvJOh",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblLaQQW25eYWF2O",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "conLA6qHZ2",
+        "valueType": 1
+       },
+       {
+        "fieldId": "ref_tbl4Cha8gUgGL9aT_fld5A7D71F",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "stepId": "systemL1hU0ZB6",
+          "id": "loop-tag-segment-systemL1hU0ZB6-fld3792F44-3744",
+          "tagType": "loop",
+          "type": "ref",
+          "value": "",
+          "loopValue": "item",
+          "path": [
+           {
+            "type": "Field",
+            "value": "fld3792F44"
+           }
+          ],
+          "stepNum": 3
+         }
+        ],
+        "conditionId": "conMnzzc4x"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "branchrxlF1DG9"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "branchrxlF1DG9",
+    "type": "SwitchBranch",
+    "data": {
+     "mode": "Exclusive",
+     "childBranchList": [
+      {
+       "entryChildStepId": "actHjhQU2CY",
+       "name": "…",
+       "condition": {
+        "conjunction": "Or",
+        "conditions": [
+         {
+          "conjunction": "And",
+          "conditions": [
+           {
+            "leftValue": {
+             "id": "actQJxIcKcQ-rec8B310B9EE3",
+             "value": "",
+             "attribute": "recordNum",
+             "stepId": "actQJxIcKcQ",
+             "type": "ref",
+             "tagType": "RecordAttribute",
+             "stepType": "FindRecordAction",
+             "recordInfo": {},
+             "stepNum": 4
+            },
+            "operator": "isLessEqual",
+            "rightValue": [
+             0
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "entryChildStepId": "actpnR03PeT",
+       "name": "…",
+       "condition": {
+        "conjunction": "Or",
+        "conditions": [
+         {
+          "conjunction": "And",
+          "conditions": [
+           {
+            "leftValue": {
+             "id": "actrSRgvIu8-recA0BA4E664F",
+             "value": "",
+             "attribute": "recordNum",
+             "stepId": "actrSRgvIu8",
+             "type": "ref",
+             "tagType": "RecordAttribute",
+             "stepType": "FindRecordAction",
+             "recordInfo": {},
+             "stepNum": 5
+            },
+            "operator": "isLessEqual",
+            "rightValue": [
+             0
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "defaultBranchInfo": {
+      "entryStepId": null,
+      "mode": "Execute"
+     }
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actHjhQU2CY",
+    "type": "AddRecordAction",
+    "data": {
+     "tableId": "ref_tbltxNIzOwrfCDwP",
+     "values": [
+      {
+       "fieldId": "ref_tbltxNIzOwrfCDwP_fld5A7D71F",
+       "valueType": "ref",
+       "value": [
+        {
+         "stepId": "systemL1hU0ZB6",
+         "id": "loop-tag-segment-systemL1hU0ZB6-fld3792F44-6243",
+         "tagType": "loop",
+         "type": "ref",
+         "value": "",
+         "loopValue": "item",
+         "path": [
+          {
+           "type": "Field",
+           "value": "fld3792F44"
+          }
+         ],
+         "stepNum": 3
+        }
+       ]
+      }
+     ]
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actpnR03PeT",
+    "type": "AddRecordAction",
+    "data": {
+     "tableId": "ref_tbl4Cha8gUgGL9aT",
+     "values": [
+      {
+       "fieldId": "ref_tbl4Cha8gUgGL9aT_fld5A7D71F",
+       "valueType": "ref",
+       "value": [
+        {
+         "stepId": "systemL1hU0ZB6",
+         "id": "loop-tag-segment-systemL1hU0ZB6-fld3792F44-7796",
+         "tagType": "loop",
+         "type": "ref",
+         "value": "",
+         "loopValue": "item",
+         "path": [
+          {
+           "type": "Field",
+           "value": "fld3792F44"
+          }
+         ],
+         "stepNum": 3
+        }
+       ]
+      }
+     ]
+    },
+    "stepTitle": "…",
+    "next": []
+   }
+  ],
+  "extensionI18nMap": {},
+  "tabldFieldMap": {
+   "tblWKacKuSn730x8": {
+    "fldD477176": {
+     "type": 2
+    },
+    "fld0F3C879": {
+     "type": 2
+    },
+    "fld436E893": {
+     "type": 1
+    },
+    "fld0238248": {
+     "type": 1
+    },
+    "fldD6F01D9": {
+     "type": 3
+    },
+    "fld589165E": {
+     "type": 17
+    },
+    "fld071DDC9": {
+     "type": 19,
+     "proxyType": 1
+    },
+    "fld1ED6E26": {
+     "type": 2
+    },
+    "fld66D7662": {
+     "type": 1
+    },
+    "fldBC39E84": {
+     "type": 4
+    },
+    "fld4F0FAD8": {
+     "type": 5
+    },
+    "fld3BDD1A1": {
+     "type": 3001
+    }
+   }
+  }
+ },
+ "switch_parallel": {
+  "steps": [
+   {
+    "id": "trig3HXjWqlq",
+    "type": "ButtonTrigger",
+    "data": {
+     "tableId": "ref_tblZ31ZP1JhbZoj1",
+     "buttonType": "buttonField"
+    },
+    "stepTitle": "…",
+    "version": "2.0.0",
+    "next": [
+     {
+      "ids": [
+       "actPkUaF7tc"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actPkUaF7tc",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tblNz7EFcNthHVur",
+     "fieldIds": [
+      "ref_tblNz7EFcNthHVur_fld79F330E"
+     ],
+     "fieldsMap": {
+      "fld79F330E": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tblNz7EFcNthHVur_fld8105722",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblZ31ZP1JhbZoj1_fld64FF8DD",
+            "type": 1
+           }
+          ],
+          "id": "trig3HXjWqlq-tbl7kfzWL0t3a09y-fld64FF8DD-8371",
+          "stepId": "trig3HXjWqlq",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblZ31ZP1JhbZoj1",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "conJqIQ30w"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "systemmQuiuB9B"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "systemmQuiuB9B",
+    "type": "Loop",
+    "data": {
+     "loopType": "forEach",
+     "loopData": {
+      "id": "actPkUaF7tc-stepRecord3051",
+      "type": "ref",
+      "tagType": "stepRecordFields",
+      "stepType": "FindRecordAction",
+      "stepNum": 2,
+      "stepId": "actPkUaF7tc",
+      "fields": [],
+      "tableId": "ref_tblNz7EFcNthHVur",
+      "isAllFields": true,
+      "recordInfo": {
+       "displayType": "list"
+      }
+     },
+     "maxLoopTimes": 1000,
+     "loopMode": 2,
+     "startChildStepId": "actbipDm78j"
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "act7MKbCQA0"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actbipDm78j",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tbloPvDGmrzndjdd",
+     "fieldIds": [
+      "ref_tbloPvDGmrzndjdd_fld5A7D71F"
+     ],
+     "fieldsMap": {
+      "fld5A7D71F": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tbloPvDGmrzndjdd_fld706D639",
+        "fieldType": 19,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblZ31ZP1JhbZoj1_fld64FF8DD",
+            "type": 1
+           }
+          ],
+          "id": "trig3HXjWqlq-tbl7kfzWL0t3a09y-fld64FF8DD-11138",
+          "stepId": "trig3HXjWqlq",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblZ31ZP1JhbZoj1",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "conJMM2JFs",
+        "valueType": 1
+       },
+       {
+        "fieldId": "ref_tbloPvDGmrzndjdd_fld5A7D71F",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "stepId": "systemmQuiuB9B",
+          "id": "loop-tag-segment-systemmQuiuB9B-fld79F330E-6241",
+          "tagType": "loop",
+          "type": "ref",
+          "value": "",
+          "loopValue": "item",
+          "path": [
+           {
+            "type": "Field",
+            "value": "fld79F330E"
+           }
+          ],
+          "stepNum": 3
+         }
+        ],
+        "conditionId": "conyIFWXeZ"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "actNNBIXavA"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actNNBIXavA",
+    "type": "FindRecordAction",
+    "data": {
+     "tableId": "ref_tblY4k7ECIfI93g4",
+     "fieldIds": [
+      "ref_tblY4k7ECIfI93g4_fld5A7D71F"
+     ],
+     "fieldsMap": {
+      "fld5A7D71F": {
+       "type": 1
+      }
+     },
+     "recordType": "Filter",
+     "shouldProceedWithNoResults": true,
+     "recordInfo": {
+      "conjunction": "and",
+      "conditions": [
+       {
+        "fieldId": "ref_tblY4k7ECIfI93g4_fld706D639",
+        "fieldType": 19,
+        "operator": "is",
+        "value": [
+         {
+          "fields": [
+           {
+            "fieldId": "ref_tblZ31ZP1JhbZoj1_fld64FF8DD",
+            "type": 1
+           }
+          ],
+          "id": "trig3HXjWqlq-tbl7kfzWL0t3a09y-fld64FF8DD-3058",
+          "stepId": "trig3HXjWqlq",
+          "stepNum": 1,
+          "stepType": "ButtonTrigger",
+          "tableId": "ref_tblZ31ZP1JhbZoj1",
+          "tagType": "step",
+          "value": "step",
+          "recordInfo": {},
+          "type": "ref"
+         }
+        ],
+        "conditionId": "conNP8i9p0",
+        "valueType": 1
+       },
+       {
+        "fieldId": "ref_tblY4k7ECIfI93g4_fld5A7D71F",
+        "fieldType": 1,
+        "operator": "is",
+        "value": [
+         {
+          "stepId": "systemmQuiuB9B",
+          "id": "loop-tag-segment-systemmQuiuB9B-fld79F330E-5447",
+          "tagType": "loop",
+          "type": "ref",
+          "value": "",
+          "loopValue": "item",
+          "path": [
+           {
+            "type": "Field",
+            "value": "fld79F330E"
+           }
+          ],
+          "stepNum": 3
+         }
+        ],
+        "conditionId": "contoWddlf"
+       }
+      ]
+     }
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "branch1kT38mqC"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "branch1kT38mqC",
+    "type": "SwitchBranch",
+    "data": {
+     "mode": "Parallel",
+     "childBranchList": [
+      {
+       "entryChildStepId": "actmQlwkIDd",
+       "name": "…",
+       "condition": {
+        "conjunction": "Or",
+        "conditions": [
+         {
+          "conjunction": "And",
+          "conditions": [
+           {
+            "leftValue": {
+             "id": "actbipDm78j-rec3E89154D5D",
+             "value": "",
+             "attribute": "recordNum",
+             "stepId": "actbipDm78j",
+             "type": "ref",
+             "tagType": "RecordAttribute",
+             "stepType": "FindRecordAction",
+             "recordInfo": {},
+             "stepNum": 4
+            },
+            "operator": "isLessEqual",
+            "rightValue": [
+             0
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "entryChildStepId": "actvdsq4E9d",
+       "name": "…",
+       "condition": {
+        "conjunction": "Or",
+        "conditions": [
+         {
+          "conjunction": "And",
+          "conditions": [
+           {
+            "leftValue": {
+             "id": "actbipDm78j-rec36000A58C3",
+             "value": "",
+             "attribute": "recordNum",
+             "stepId": "actbipDm78j",
+             "type": "ref",
+             "tagType": "RecordAttribute",
+             "stepType": "FindRecordAction",
+             "recordInfo": {},
+             "stepNum": 4
+            },
+            "operator": "isGreater",
+            "rightValue": [
+             0
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "entryChildStepId": "actgzgr9tyQ",
+       "name": "…",
+       "condition": {
+        "conjunction": "Or",
+        "conditions": [
+         {
+          "conjunction": "And",
+          "conditions": [
+           {
+            "leftValue": {
+             "id": "actNNBIXavA-recC9FEF69A7B",
+             "value": "",
+             "attribute": "recordNum",
+             "stepId": "actNNBIXavA",
+             "type": "ref",
+             "tagType": "RecordAttribute",
+             "stepType": "FindRecordAction",
+             "recordInfo": {},
+             "stepNum": 5
+            },
+            "operator": "isLessEqual",
+            "rightValue": [
+             0
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "failMode": "PartialSuccess",
+     "matchMode": "NoneMatchSkip"
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actmQlwkIDd",
+    "type": "AddRecordAction",
+    "data": {
+     "tableId": "ref_tbloPvDGmrzndjdd",
+     "values": [
+      {
+       "fieldId": "ref_tbloPvDGmrzndjdd_fld5A7D71F",
+       "valueType": "ref",
+       "value": [
+        {
+         "stepId": "systemmQuiuB9B",
+         "id": "loop-tag-segment-systemmQuiuB9B-fld79F330E-24305",
+         "tagType": "loop",
+         "type": "ref",
+         "value": "",
+         "loopValue": "item",
+         "path": [
+          {
+           "type": "Field",
+           "value": "fld79F330E"
+          }
+         ],
+         "stepNum": 3
+        }
+       ]
+      }
+     ]
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actvdsq4E9d",
+    "type": "SetRecordAction",
+    "data": {
+     "tableId": "ref_tblZ31ZP1JhbZoj1",
+     "values": [
+      {
+       "fieldId": "ref_tblZ31ZP1JhbZoj1_fld1177109",
+       "valueType": "value",
+       "value": "opt477648D"
+      }
+     ],
+     "recordType": "Ref",
+     "recordInfo": {
+      "stepId": "trig3HXjWqlq",
+      "stepNum": 0
+     },
+     "maxSetRecordNum": 100
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "actgzgr9tyQ",
+    "type": "AddRecordAction",
+    "data": {
+     "tableId": "ref_tblY4k7ECIfI93g4",
+     "values": [
+      {
+       "fieldId": "ref_tblY4k7ECIfI93g4_fld5A7D71F",
+       "valueType": "ref",
+       "value": [
+        {
+         "stepId": "systemmQuiuB9B",
+         "id": "loop-tag-segment-systemmQuiuB9B-fld79F330E-10663",
+         "tagType": "loop",
+         "type": "ref",
+         "value": "",
+         "loopValue": "item",
+         "path": [
+          {
+           "type": "Field",
+           "value": "fld79F330E"
+          }
+         ],
+         "stepNum": 3
+        }
+       ]
+      }
+     ]
+    },
+    "stepTitle": "…",
+    "next": []
+   },
+   {
+    "id": "act7MKbCQA0",
+    "type": "SetRecordAction",
+    "data": {
+     "tableId": "ref_tblZ31ZP1JhbZoj1",
+     "values": [
+      {
+       "fieldId": "ref_tblZ31ZP1JhbZoj1_fld1177109",
+       "valueType": "value",
+       "value": "opt477648D"
+      }
+     ],
+     "recordType": "Ref",
+     "recordInfo": {
+      "stepId": "trig3HXjWqlq",
+      "stepNum": 0
+     },
+     "maxSetRecordNum": 100
+    },
+    "stepTitle": "…",
+    "next": []
+   }
+  ],
+  "extensionI18nMap": {},
+  "tabldFieldMap": {
+   "tbl7kfzWL0t3a09y": {
+    "fld44617F8": {
+     "type": 2
+    },
+    "fldF014BCE": {
+     "type": 3001
+    },
+    "fld5375E09": {
+     "type": 19,
+     "proxyType": null
+    },
+    "fld1177109": {
+     "type": 3
+    },
+    "fld64FF8DD": {
+     "type": 1
+    },
+    "fldA5F3FEE": {
+     "type": 2
+    },
+    "fld019B778": {
+     "type": 4
+    },
+    "fld61D5BED": {
+     "type": 5
+    },
+    "fldD7DB66D": {
+     "type": 19,
+     "proxyType": 1
+    },
+    "fldB36740D": {
+     "type": 1
+    },
+    "fld7FC0F14": {
+     "type": 1
+    },
+    "fld09D10EC": {
+     "type": 3
+    },
+    "fldB41C09D": {
+     "type": 4
+    },
+    "fld7CE4A73": {
+     "type": 4
+    },
+    "fldA2A73ED": {
+     "type": 1
+    },
+    "fldF9A4C05": {
+     "type": 2
+    },
+    "fldDE81648": {
+     "type": 4
+    },
+    "fldD60DD9F": {
+     "type": 1
+    },
+    "fld8E39E21": {
+     "type": 3
+    },
+    "fld662A9AE": {
+     "type": 2
+    },
+    "fldB24619E": {
+     "type": 2
+    },
+    "fld7040AE3": {
+     "type": 4
+    },
+    "fld55FE2B7": {
+     "type": 3001
+    },
+    "fldA92EC30": {
+     "type": 2
+    },
+    "fld23215ED": {
+     "type": 4
+    },
+    "fld4A96EBB": {
+     "type": 1002
+    },
+    "fld32364E8": {
+     "type": 4
+    }
+   }
+  }
+ },
+ "timer": {
+  "steps": [
+   {
+    "id": "trigkSeAP06X",
+    "type": "TimerTrigger",
+    "data": {
+     "startTime": 1785547842402,
+     "rule": "DAILY"
+    },
+    "stepTitle": "…",
+    "next": [
+     {
+      "ids": [
+       "actx7M0nxYz"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actx7M0nxYz",
+    "type": "LarkMessageAction",
+    "data": {
+     "notifyIdentity": "mixed",
+     "robotType": "maker",
+     "persons": [
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000016831837",
+       "entityId": "7000000000016831837",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000112318839",
+       "entityId": "7000000000112318839",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000825642440",
+       "entityId": "7000000000825642440",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000273214623",
+       "entityId": "7000000000273214623",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      }
+     ],
+     "groups": [
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000016831837",
+       "entityId": "7000000000016831837",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000112318839",
+       "entityId": "7000000000112318839",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000825642440",
+       "entityId": "7000000000825642440",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000273214623",
+       "entityId": "7000000000273214623",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      }
+     ],
+     "title": [
+      {
+       "text": "…",
+       "type": "text"
+      }
+     ],
+     "titleTemplateColor": "purple",
+     "content": [],
+     "btnList": [
+      {
+       "text": "…",
+       "link": [
+        {
+         "text": "…",
+         "type": "text"
+        }
+       ],
+       "btnKey": "message_btn_FHu9cMO9",
+       "btnAction": "openLink",
+       "btnStyle": "primary"
+      }
+     ],
+     "needBtn": true,
+     "needTopBase": false,
+     "needCompress": true,
+     "sendMsgScene": "send",
+     "senders": [],
+     "senderType": 3,
+     "attachments": [],
+     "contentType": "rich_text",
+     "richTextContent": [
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      }
+     ],
+     "buttonConfig": {
+      "notRepeatClickMode": "AllUser",
+      "mutualExclusion": false
+     }
+    },
+    "stepTitle": "…",
+    "version": "1.1.0",
+    "next": [
+     {
+      "ids": [
+       "actm2N1ETGt"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "actm2N1ETGt",
+    "type": "LarkMessageAction",
+    "data": {
+     "notifyIdentity": "mixed",
+     "robotType": "maker",
+     "persons": [
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000863548516",
+       "entityId": "7000000000863548516",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000116681385",
+       "entityId": "7000000000116681385",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000341211855",
+       "entityId": "7000000000341211855",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000863820584",
+       "entityId": "7000000000863820584",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000564134098",
+       "entityId": "7000000000564134098",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      }
+     ],
+     "groups": [
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000863548516",
+       "entityId": "7000000000863548516",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000116681385",
+       "entityId": "7000000000116681385",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000341211855",
+       "entityId": "7000000000341211855",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000863820584",
+       "entityId": "7000000000863820584",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      },
+      {
+       "type": "ref",
+       "avatarUrl": "https://example.invalid/x",
+       "id": "7000000000564134098",
+       "entityId": "7000000000564134098",
+       "value": "User",
+       "tagType": "user",
+       "owner_type": 1
+      }
+     ],
+     "title": [
+      {
+       "text": "…",
+       "type": "text"
+      }
+     ],
+     "titleTemplateColor": "purple",
+     "content": [],
+     "btnList": [
+      {
+       "text": "…",
+       "link": [
+        {
+         "text": "…",
+         "type": "text"
+        }
+       ],
+       "btnKey": "message_btn_EOu0dpVD",
+       "btnAction": "openLink",
+       "btnStyle": "primary"
+      }
+     ],
+     "needBtn": true,
+     "needTopBase": false,
+     "needCompress": true,
+     "sendMsgScene": "send",
+     "senders": [],
+     "senderType": 3,
+     "attachments": [],
+     "contentType": "rich_text",
+     "richTextContent": [
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "lineMarkerList": [],
+       "value": [
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {
+          "richTextStyle": {
+           "color": "rgb(8, 27, 58)"
+          }
+         }
+        },
+        {
+         "type": "text",
+         "text": "…",
+         "extra": {}
+        }
+       ]
+      }
+     ],
+     "buttonConfig": {
+      "notRepeatClickMode": "AllUser",
+      "mutualExclusion": false
+     }
+    },
+    "stepTitle": "…",
+    "version": "1.1.0",
+    "next": []
+   }
+  ],
+  "extensionI18nMap": {},
+  "tabldFieldMap": {}
+ }
+}
