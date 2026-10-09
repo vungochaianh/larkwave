@@ -1925,6 +1925,10 @@ export interface RuntimeAdapter {
   /** Set the signed-in account so local Lark sessions are stored + synced PER-ACCOUNT
    *  (switching accounts on one device must not mix conversations). null = signed out. */
   larkSetAccount?(userId: string | null): Promise<void>;
+  /** Nhập dữ liệu cũ của app desktop Toolswave (desktop). Xem docs/migrate-from-toolswave.md. */
+  toolswaveMigrationStatus?(): Promise<ToolswaveMigrationStatus>;
+  toolswaveMigrate?(o: { dryRun?: boolean }): Promise<ToolswaveMigrationReport>;
+  onToolswaveMigrationEvent?(cb: (ev: ToolswaveMigrationEvent) => void): () => void;
   /** Owner-side scope for delegated grants (kept on this machine, never on the server). */
   larkGrantPolicies?(): Promise<Record<string, LarkGrantPolicy>>;
   larkSetGrantPolicy?(grantId: string, policy: LarkGrantPolicy | null): Promise<void>;
@@ -1961,3 +1965,42 @@ export interface RuntimeAdapter {
   /** Run a Lark tool directly (UI-initiated, e.g. a plugin form panel). */
   larkRunTool?(name: string, input: Record<string, unknown>): Promise<LarkToolRunResult>;
 }
+
+
+// ── Nhập dữ liệu từ app desktop Toolswave ──────────────────────────────────────────────────────
+export type ToolswaveMigrationCategory =
+  | 'sessions'
+  | 'deleted'
+  | 'specs'
+  | 'larkConfig'
+  | 'automations'
+  | 'bases'
+  | 'relogin'
+  | 'workFiles'
+  | 'skills'
+  | 'plugins';
+
+export interface ToolswaveMigrationReport {
+  dryRun: boolean;
+  userId: string;
+  sources: string[];
+  at: string;
+  counts: Record<ToolswaveMigrationCategory, { added: number; merged: number; unchanged: number }>;
+  /** Đường dẫn tương đối đã che id + lý do bỏ qua (không có nội dung). */
+  skipped: { path: string; reason: string }[];
+  droppedSecretFields: number;
+  followUps: string[];
+}
+
+export interface ToolswaveMigrationStatus {
+  found: boolean;
+  sources: number;
+  userId: string | null;
+  last: ToolswaveMigrationReport | null;
+  running: boolean;
+}
+
+export type ToolswaveMigrationEvent =
+  | { phase: 'start'; dryRun: boolean; auto: boolean }
+  | { phase: 'done'; report: ToolswaveMigrationReport; auto: boolean }
+  | { phase: 'error'; message: string; auto: boolean };

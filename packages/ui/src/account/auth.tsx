@@ -18,6 +18,7 @@ import {
 import { useRuntime } from '../RuntimeProvider';
 import { accountApi, ApiError, getToken, hydrateToken, setToken, type User } from './api';
 import { OAuthStatusModal, type OAuthState } from './OAuthStatusModal';
+import { ToolswaveImportWatcher } from './ToolswaveImport';
 
 interface AccountAuthState {
   user: User | null;
@@ -198,6 +199,7 @@ export function AccountAuthProvider({ children }: { children: ReactNode }) {
   return (
     <AccountAuthContext.Provider value={value}>
       {children}
+      <ToolswaveImportWatcher />
       <OAuthStatusModal
         state={oauth}
         onClose={closeOauth}

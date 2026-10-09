@@ -82,6 +82,10 @@ env -u ELECTRON_RUN_AS_NODE LARKWAVE_HIDDEN=1 npx nextron dev --renderer-port 88
 # lái / chụp qua CDP: http://127.0.0.1:9342/json (cổng này CHỈ có ở dev; bản cài không có)
 ```
 
+Thêm `LARKWAVE_USER_DATA=<thư mục tạm>` để chạy trên một userData riêng (chỉ có tác dụng ở dev + ẩn),
+không đụng phiên/hội thoại dev thật; `LARKWAVE_NO_AUTO_MIGRATE=1` tắt việc tự nhập dữ liệu Toolswave khi
+đặt tài khoản (xem migrate-from-toolswave.md).
+
 Chú ý: nextron dev luôn tự thêm `--remote-debugging-port` (mặc định 5858) — đó là cổng của bản dev,
 không phải của driver (driver dùng `webContents.debugger`). Làm xong thì `pkill` như dòng đầu.
 

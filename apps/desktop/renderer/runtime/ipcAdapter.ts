@@ -1,4 +1,7 @@
 import type {
+  ToolswaveMigrationEvent,
+  ToolswaveMigrationReport,
+  ToolswaveMigrationStatus,
   AgentClientStatus,
   AgentControls,
   TokenTestResult,
@@ -215,6 +218,9 @@ interface Bridge {
   larkSummaries(id: string): Promise<Record<string, string>>;
   larkSummarize(id: string, itemId: string, text: string): Promise<string>;
   larkSetAccount(userId: string | null): Promise<void>;
+  toolswaveMigrationStatus(): Promise<ToolswaveMigrationStatus>;
+  toolswaveMigrate(o: { dryRun?: boolean }): Promise<ToolswaveMigrationReport>;
+  onToolswaveMigrationEvent(cb: (ev: ToolswaveMigrationEvent) => void): () => void;
   larkGrantPolicies(): Promise<Record<string, LarkGrantPolicy>>;
   larkSetGrantPolicy(grantId: string, policy: LarkGrantPolicy | null): Promise<void>;
   larkRunGrantTurn(grantId: string, prompt: string): Promise<{ ok: boolean; text?: string; error?: string }>;
@@ -723,6 +729,15 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   larkSetAccount(userId: string | null): Promise<void> {
     return this.bridge.larkSetAccount(userId);
+  }
+  toolswaveMigrationStatus(): Promise<ToolswaveMigrationStatus> {
+    return this.bridge.toolswaveMigrationStatus();
+  }
+  toolswaveMigrate(o: { dryRun?: boolean }): Promise<ToolswaveMigrationReport> {
+    return this.bridge.toolswaveMigrate(o);
+  }
+  onToolswaveMigrationEvent(cb: (ev: ToolswaveMigrationEvent) => void): () => void {
+    return this.bridge.onToolswaveMigrationEvent(cb);
   }
   larkGrantPolicies(): Promise<Record<string, LarkGrantPolicy>> {
     return this.bridge.larkGrantPolicies();

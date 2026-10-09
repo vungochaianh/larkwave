@@ -558,6 +558,10 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   larkSetAccount(userId: string | null): Promise<void> {
     return this.lark.setAccount(userId);
   }
+  /** Sau khi nhập kỹ năng từ Toolswave: đọc lại thư viện + đặt bản sao vào thư mục các CLI. */
+  resyncSkills(): void {
+    this.skills.resync();
+  }
   larkGrantPolicies(): Promise<Record<string, LarkGrantPolicy>> {
     return this.lark.getGrantPolicies();
   }

@@ -29,9 +29,24 @@ const RUNNER_HOME: Record<string, string> = { claude: '.claude', grok: '.grok', 
 // Codex has no skills folder — it reads AGENTS.md. We own only a sentinel-delimited block,
 // identified by BOTH the sentinels AND our exact header (so we never strip a user's content
 // that happens to contain the sentinel strings).
-const CODEX_START = '<!-- toolswave:skills:start (managed — do not edit) -->';
-const CODEX_END = '<!-- toolswave:skills:end -->';
+const CODEX_START = '<!-- larkwave:skills:start (managed — do not edit) -->';
+const CODEX_END = '<!-- larkwave:skills:end -->';
 const CODEX_HEADER = '# Skills (Larkwave)';
+// Bản Larkwave trước 10/2026 viết khối với dấu mốc của Toolswave (+ tiêu đề Larkwave). Vẫn gỡ
+// được khối cũ đó; khối của app Toolswave (tiêu đề "# Skills (Toolswave)") thì KHÔNG đụng tới.
+const LEGACY_CODEX_START = '<!-- toolswave:skills:start (managed — do not edit) -->';
+const LEGACY_CODEX_END = '<!-- toolswave:skills:end -->';
+
+/**
+ * Tên thư mục kỹ năng Larkwave đặt vào thư mục khám phá của CLI (`~/.claude/skills/…`, grok,
+ * gemini). Có tiền tố riêng vì app Toolswave cùng máy quản lý `~/.claude/skills/<id>` với CÙNG
+ * id (kỹ năng được nhập từ Toolswave): không tách tên thì tắt/xoá một kỹ năng ở Larkwave sẽ xoá
+ * mất bản của Toolswave. Larkwave chỉ tạo/xoá thư mục có tiền tố này.
+ */
+export const LARKWAVE_SKILL_PREFIX = 'larkwave-';
+export function runnerSkillFolder(id: string): string {
+  return `${LARKWAVE_SKILL_PREFIX}${id}`;
+}
 
 /**
  * Manages user "skills" — SKILL.md folders, applied PER MODEL/CLI.
@@ -84,6 +99,14 @@ export class SkillHost {
 
   private registryPath() {
     return join(this.stateDir, 'registry.json');
+  }
+
+  /** Đọc lại registry/lib từ đĩa (sau khi nhập kỹ năng từ Toolswave) và đặt bản sao có tiền tố
+   *  `larkwave-` vào thư mục của từng CLI. */
+  resync(): SkillInfo[] {
+    this.migrate();
+    this.sync();
+    return this.list();
   }
   /**
    * BẢN LƯU: chụp lại SKILL.md trước MỌI thay đổi, để lùi lại được.
@@ -180,7 +203,7 @@ export class SkillHost {
     return join(this.libDir, id);
   }
   private runnerSkillPath(runner: string, id: string) {
-    return join(homedir(), RUNNER_HOME[runner], 'skills', id);
+    return join(homedir(), RUNNER_HOME[runner], 'skills', runnerSkillFolder(id));
   }
   private readRegistry(): SkillEntry[] {
     try {
@@ -510,6 +533,10 @@ export class SkillHost {
     const stripped = existing
       .replace(
         new RegExp(`\\n*${escapeRe(CODEX_START)}\\n${escapeRe(CODEX_HEADER)}[\\s\\S]*?${escapeRe(CODEX_END)}\\n*`, 'g'),
+        '\n',
+      )
+      .replace(
+        new RegExp(`\\n*${escapeRe(LEGACY_CODEX_START)}\\n${escapeRe(CODEX_HEADER)}[\\s\\S]*?${escapeRe(LEGACY_CODEX_END)}\\n*`, 'g'),
         '\n',
       )
       .trimEnd();

@@ -5,6 +5,7 @@ import { CloudServerOutlined } from '@ant-design/icons';
 import type { RuntimeAdapter } from '@larkwave/core';
 import { accountApi, type LarkHostedStatus } from '../../account/api';
 import { V } from '../../theme';
+import { FEATURE_HOSTED_RUNNER_WRITE } from '../../features';
 
 const { Text, Paragraph } = Typography;
 
@@ -125,7 +126,20 @@ export function HostedRunnerCard({ runtime }: { runtime: RuntimeAdapter }) {
         }
       />
 
-      {status.enabled ? (
+      {!FEATURE_HOSTED_RUNNER_WRITE ? (
+        <Alert
+          type="info"
+          showIcon
+          message="Cấu hình chạy hộ dùng chung với app Toolswave"
+          description={
+            <span style={{ color: V.textSub }}>
+              Larkwave dùng chung tài khoản với Toolswave, và máy chủ chỉ giữ MỘT cấu hình chạy hộ cho mỗi
+              tài khoản (chạy các lịch trong bản sao lưu của app Toolswave). Bật/tắt ở app Toolswave.
+              {status.enabled && status.appIdMasked ? <> App đang dùng: <Text code>{status.appIdMasked}</Text>.</> : null}
+            </span>
+          }
+        />
+      ) : status.enabled ? (
         <Space direction="vertical" style={{ width: '100%' }} size={8}>
           <Text type="secondary">
             App đang dùng: <Text code>{status.appIdMasked}</Text>

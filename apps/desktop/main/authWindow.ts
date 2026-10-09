@@ -19,7 +19,7 @@ const CHROME_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36';
 
 /** The JWT is only ever delivered to the trusted web origin's /auth/callback. */
-const TRUSTED_HOSTS = new Set(['toolswave.net', 'cms.toolswave.net']);
+const TRUSTED_HOSTS = new Set(['toolswave.net', 'app.toolswave.net', 'cms.toolswave.net']);
 
 /**
  * Run an OAuth flow inside a dedicated child window and intercept the server's

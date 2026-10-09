@@ -45,13 +45,14 @@ async function main() {
   await writeFile(join(dir, 'chat-1.json'), JSON.stringify(SESSION), 'utf8');
 
   // MÁY CHỦ vẫn giữ hội thoại đó — đây chính là thứ trước đây làm nó sống lại.
-  let pushed = null;
+  // Từ khi dùng chung API Toolswave, Larkwave CHỈ KÉO bản sao lưu (không PUT — ô đó là của app
+  // Toolswave). Đếm mọi lần PUT để chốt điều đó.
+  let puts = 0;
+  const reply = (o) => ({ ok: true, text: async () => JSON.stringify(o), json: async () => o });
   global.fetch = async (url, init) => {
-    if (!init || init.method !== 'PUT') {
-      return { ok: true, json: async () => ({ data: { sessions: [SESSION] } }) };
-    }
-    pushed = JSON.parse(init.body).data;
-    return { ok: true, json: async () => ({ updatedAt: new Date().toISOString() }) };
+    if (!init || init.method !== 'PUT') return reply({ data: { sessions: [SESSION] } });
+    puts++;
+    return reply({ updatedAt: new Date().toISOString() });
   };
 
   // 1. Đồng bộ khi CHƯA xoá: hội thoại phải còn.
@@ -67,12 +68,9 @@ async function main() {
     !existsSync(join(dir, 'chat-1.json')),
     'hội thoại đã bị kéo về từ máy chủ',
   );
-  check(
-    'không đẩy ngược hội thoại đã xoá lên máy chủ',
-    Array.isArray(pushed?.sessions) && !pushed.sessions.some((s) => s.id === 'chat-1'),
-    JSON.stringify(pushed?.sessions?.map((s) => s.id)),
-  );
-  check('bia mộ được đẩy lên để máy khác xoá theo', !!pushed?.deleted && 'chat-1' in pushed.deleted);
+  check('KHÔNG PUT lên ô sao lưu dùng chung với Toolswave', puts === 0, `${puts} lần PUT`);
+  const tomb = JSON.parse(readFileSync(join(base, 'lark', 'deleted', 'user1', 'deleted.json'), 'utf8'));
+  check('bia mộ vẫn giữ ở máy (chặn kéo về lại)', 'chat-1' in tomb);
 
   // 3. Máy KHÁC xoá (máy chủ gửi bia mộ về) → máy này phải xoá theo.
   const base2 = mkdtempSync(join(tmpdir(), 'tw-lark2-'));
@@ -82,13 +80,31 @@ async function main() {
   await mkdir(dir2, { recursive: true });
   await writeFile(join(dir2, 'chat-1.json'), JSON.stringify(SESSION), 'utf8');
   global.fetch = async (url, init) => {
-    if (!init || init.method !== 'PUT') {
-      return { ok: true, json: async () => ({ data: { sessions: [SESSION], deleted: { 'chat-1': Date.now() } } }) };
-    }
-    return { ok: true, json: async () => ({ updatedAt: new Date().toISOString() }) };
+    if (!init || init.method !== 'PUT') return reply({ data: { sessions: [SESSION], deleted: { 'chat-1': Date.now() } } });
+    puts++;
+    return reply({ updatedAt: new Date().toISOString() });
   };
   await svc2.larkBackupSync(TOKEN);
   check('máy khác xoá → máy này xoá theo', !existsSync(join(dir2, 'chat-1.json')));
+
+  // 4. runnerId của máy/app khác trong settings sao lưu KHÔNG được nhận về.
+  const base3 = mkdtempSync(join(tmpdir(), 'tw-lark3-'));
+  const svc3 = new LarkService(base3);
+  svc3.currentUserId = 'user1';
+  svc3.store.setScope('user1');
+  global.fetch = async (url, init) => {
+    if (!init || init.method !== 'PUT') return reply({ data: { settings: { runnerId: 'pc-toolswave', defaultModel: 'opus' } } });
+    puts++;
+    return reply({});
+  };
+  await svc3.larkBackupSync(TOKEN);
+  const st3 = JSON.parse(readFileSync(join(base3, 'lark', 'accounts', 'user1', 'settings.json'), 'utf8'));
+  check('settings từ máy chủ vẫn hợp nhất (defaultModel)', st3.defaultModel === 'opus', JSON.stringify(st3));
+  check('runnerId của Toolswave KHÔNG chảy sang', st3.runnerId === undefined, st3.runnerId);
+  // Bản sao lưu rỗng (200 + 0 byte) không được làm nổ.
+  global.fetch = async () => ({ ok: true, text: async () => '', json: async () => { throw new Error('empty'); } });
+  check('sao lưu rỗng → vẫn trả kết quả', !!(await svc3.larkBackupSync(TOKEN)));
+  check('tổng cộng không có lần PUT nào', puts === 0, `${puts}`);
 
   console.log(failed ? `\n${failed} ca SAI` : '\nTẤT CẢ ĐÚNG');
   process.exit(failed ? 1 : 0);

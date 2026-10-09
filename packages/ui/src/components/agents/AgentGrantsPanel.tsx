@@ -6,6 +6,7 @@ import { accountApi, type LarkGrant, type LarkGrantCall, type AssistantShareInfo
 import { V, BRAND } from '../../theme';
 import { useI18n } from '../../i18n';
 import { FEATURE_FRIENDS } from '../../features';
+import { useRuntime } from '../../RuntimeProvider';
 
 interface Friend {
   id: string;
@@ -31,6 +32,7 @@ const isAgent = (g: LarkGrant) => g.kind === 'agentchat';
  * distinguished by kind='agentchat'.
  */
 export function AgentGrantsPanel({ onChanged }: { onChanged?: () => void }) {
+  const runtime = useRuntime();
   const { t } = useI18n();
   const screens = Grid.useBreakpoint();
   const { message, modal } = App.useApp();
@@ -113,7 +115,10 @@ export function AgentGrantsPanel({ onChanged }: { onChanged?: () => void }) {
     if (!friendId) return;
     setBusy(true);
     try {
-      await accountApi.larkGrantCreate({ inviteeUserId: friendId, kind: 'agentchat', expiresInDays: days, label: 'Trợ lý AI' });
+      const g = await accountApi.larkGrantCreate({ inviteeUserId: friendId, kind: 'agentchat', expiresInDays: days, label: 'Trợ lý AI' });
+      // Dấu "quyền này do máy này phục vụ" — cổng uỷ quyền chỉ chạy lượt của quyền có chính sách
+      // tại máy (xem useGrantGateway). Trợ lý AI dùng chung chỉ đọc, không có Base nào.
+      await runtime.larkSetGrantPolicy?.(g.id, { appTokens: [], mode: 'ask', label: 'Trợ lý AI' }).catch(() => undefined);
       message.success(t('chat.inviteSent', 'Đã gửi lời mời. Bạn của bạn chỉ cần bấm "Kết nối" trong Larkwave.'));
       setOpen(false);
       setFriendId(undefined);

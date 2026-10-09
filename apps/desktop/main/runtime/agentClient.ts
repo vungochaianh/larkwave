@@ -19,6 +19,7 @@ import type {
 } from '@larkwave/shared';
 import type { LocalRuntimeAdapter } from './localAdapter';
 import { getLarkWebSession } from './lark/larkWebSession';
+import { relayDeviceName } from '../deviceIdentity';
 
 /**
  * Remote control ("Điều khiển từ xa") — the DESKTOP side of the phone → server →
@@ -80,12 +81,15 @@ export class AgentClient {
       const p = this.file();
       if (existsSync(p)) {
         const j = JSON.parse(readFileSync(p, 'utf8')) as Partial<PersistedSettings>;
-        return { enabled: !!j.enabled, deviceName: j.deviceName || hostname() };
+        // Tên trống, hoặc đúng tên máy trần (mặc định cũ — trùng với app Toolswave chạy cùng máy
+        // trong danh sách thiết bị của điện thoại) → đổi sang "Larkwave · <máy>".
+        const saved = (j.deviceName || '').trim();
+        return { enabled: !!j.enabled, deviceName: !saved || saved === hostname() ? relayDeviceName(hostname()) : saved };
       }
     } catch {
       /* fall through to defaults */
     }
-    return { enabled: false, deviceName: hostname() };
+    return { enabled: false, deviceName: relayDeviceName(hostname()) };
   }
   private save(): void {
     try {
@@ -658,6 +662,10 @@ export class AgentClient {
   private seen = new Set<string>();
   private enqueue(task: RemoteTask): void {
     if (this.seen.has(task.id)) return;
+    // API dùng chung với Toolswave: luồng /agent/stream phát MỌI lệnh của tài khoản tới MỌI máy.
+    // Tác vụ có `appId` là lệnh dựng app gửi cho app Toolswave — Larkwave không chạy (và không
+    // báo lỗi lên tác vụ, để app Toolswave nhận và chạy như thường).
+    if ((task as { appId?: string | null }).appId) return;
     // Bound the dedupe set (insertion-ordered) — evict the oldest id past the cap.
     if (this.seen.size >= 1000) {
       const oldest = this.seen.values().next().value;

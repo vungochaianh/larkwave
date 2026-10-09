@@ -211,6 +211,9 @@ export const IPC = {
   larkSummaries: 'tw:larkSummaries',
   larkSummarize: 'tw:larkSummarize',
   larkSetAccount: 'tw:larkSetAccount',
+  toolswaveMigrationStatus: 'tw:toolswaveMigrationStatus',
+  toolswaveMigrate: 'tw:toolswaveMigrate',
+  toolswaveMigrationEvent: 'tw:toolswaveMigrationEvent', // main → renderer push (tiến độ/kết quả nhập)
   larkGrantPolicies: 'tw:larkGrantPolicies',
   larkSetGrantPolicy: 'tw:larkSetGrantPolicy',
   larkRunGrantTurn: 'tw:larkRunGrantTurn',

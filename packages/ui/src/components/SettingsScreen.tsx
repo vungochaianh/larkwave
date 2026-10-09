@@ -12,6 +12,7 @@ import { BRAND, V, OK, WARN, BLUE, CARD_SHADOW } from '../theme';
 import { IconTile, MICRO, PageHeader } from '../kit';
 import type { View } from './HomeScreen';
 import { useI18n } from '../i18n';
+import { ToolswaveImportCard } from '../account/ToolswaveImport';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -800,9 +801,12 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
     </Card>
   );
   const devicesCard = (
-    <Card style={CARD_STYLE}>
-      <DeviceManager />
-    </Card>
+    <>
+      <Card style={CARD_STYLE}>
+        <DeviceManager />
+      </Card>
+      <ToolswaveImportCard style={CARD_STYLE} />
+    </>
   );
 
   /*

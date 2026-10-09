@@ -390,6 +390,8 @@ export function AgentChat({
   const openRef = useRef('');            // the conversation currently on screen (for async body hydrate)
   const idxPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const projPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** uid đã kéo-hợp-nhất dự án từ máy chủ ít nhất một lần (chốt trước khi được PUT thay-toàn-bộ). */
+  const projectsPulledRef = useRef<string | null>(null);
   // Responsive: on a phone / narrow web view the history sidebar becomes a Drawer (full-width chat).
   const screens = Grid.useBreakpoint();
   const narrow = !screens.lg;
@@ -747,7 +749,7 @@ export function AgentChat({
   const pushAllLocal = useCallback(async () => {
     const localIdx = loadIndex(uid);
     await accountApi.chatPushIndex(localIdx).catch(() => undefined);
-    await accountApi.chatPushProjects(loadProjects(uid)).catch(() => undefined);
+    if (projectsPulledRef.current === uid) await accountApi.chatPushProjects(loadProjects(uid)).catch(() => undefined);
     for (const c of localIdx.slice(0, 80)) {
       const b = loadBody(uid, c.id);
       if (b.length) await accountApi.chatPushBody(c.id, c, b).catch(() => undefined);
@@ -764,6 +766,7 @@ export function AgentChat({
         const idx = await accountApi.chatGetIndex();
         if (!alive) return;
         applyServerIndex(idx);
+        projectsPulledRef.current = uid;
         setSyncedAt(Date.now());
         const flag = `tw_agentchat_synced_${uid}`;
         if (!localStorage.getItem(flag)) {
@@ -807,8 +810,11 @@ export function AgentChat({
   }, [convs, signedIn, shared]);
 
   // Push projects whenever they change (debounced).
+  // `PUT /agent/chat/projects` THAY TOÀN BỘ danh sách dự án của tài khoản (máy chủ xoá dự án không
+  // có trong danh sách) — và danh sách đó dùng chung với app/web Toolswave. Máy vừa cài (danh sách
+  // rỗng) mà đẩy trước khi kéo-hợp-nhất xong là xoá sạch dự án bên kia. Chỉ đẩy SAU lần kéo đầu.
   useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || projectsPulledRef.current !== uid) return;
     if (projPushTimer.current) clearTimeout(projPushTimer.current);
     projPushTimer.current = setTimeout(() => { void accountApi.chatPushProjects(projects).catch(() => undefined); }, 1500);
     return () => { if (projPushTimer.current) clearTimeout(projPushTimer.current); };

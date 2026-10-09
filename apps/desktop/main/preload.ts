@@ -166,6 +166,9 @@ const CH = {
   larkSummaries: 'tw:larkSummaries',
   larkSummarize: 'tw:larkSummarize',
   larkSetAccount: 'tw:larkSetAccount',
+  toolswaveMigrationStatus: 'tw:toolswaveMigrationStatus',
+  toolswaveMigrate: 'tw:toolswaveMigrate',
+  toolswaveMigrationEvent: 'tw:toolswaveMigrationEvent', // main → renderer push (tiến độ/kết quả nhập)
   larkGrantPolicies: 'tw:larkGrantPolicies',
   larkSetGrantPolicy: 'tw:larkSetGrantPolicy',
   larkRunGrantTurn: 'tw:larkRunGrantTurn',
@@ -415,6 +418,13 @@ const bridge = {
   larkSummarize: (id: string, itemId: string, text: string) =>
     ipcRenderer.invoke(CH.larkSummarize, id, itemId, text),
   larkSetAccount: (userId: string | null) => ipcRenderer.invoke(CH.larkSetAccount, userId),
+  toolswaveMigrationStatus: () => ipcRenderer.invoke(CH.toolswaveMigrationStatus),
+  toolswaveMigrate: (o: { dryRun?: boolean }) => ipcRenderer.invoke(CH.toolswaveMigrate, o),
+  onToolswaveMigrationEvent: (cb: (ev: unknown) => void) => {
+    const handler = (_: unknown, ev: unknown) => cb(ev);
+    ipcRenderer.on(CH.toolswaveMigrationEvent, handler);
+    return () => ipcRenderer.removeListener(CH.toolswaveMigrationEvent, handler);
+  },
   larkGrantPolicies: () => ipcRenderer.invoke(CH.larkGrantPolicies),
   larkSetGrantPolicy: (grantId: string, policy: unknown) =>
     ipcRenderer.invoke(CH.larkSetGrantPolicy, grantId, policy),

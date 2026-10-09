@@ -13,6 +13,7 @@
  * nguyên để khỏi sửa 31 nơi gọi), và đặt `LARKWAVE_API_BASE` đổi được cho toàn bộ app.
  */
 import { APIA_BASE } from '@larkwave/core';
+import { filterStorageUsage, isLarkwaveStorageCategory, normalizeOverview } from './compat';
 
 export const API_BASE = APIA_BASE;
 
@@ -41,6 +42,8 @@ export interface MeOverview {
   scheduledTasks: number;
   reports: number;
   joinedAt: string;
+  /** true khi máy chủ (API Toolswave) không có các số đếm AI — xem account/compat.ts. */
+  partial?: boolean;
 }
 
 /** One cell of the contribution graph: a calendar day and its AI-activity count. */
@@ -734,7 +737,8 @@ export const accountApi = {
 
   // ── Dung lượng lưu trữ ──────────────────────────────────────────────────────
   /** GET /storage/usage — đang chiếm bao nhiêu, chia theo nhóm, kèm hạn mức. */
-  storageUsage: () => apiFetch<StorageUsage>('/storage/usage'),
+  // Chỉ giữ nhóm của Larkwave — xem account/compat.ts (filterStorageUsage).
+  storageUsage: () => apiFetch<StorageUsage>('/storage/usage').then(filterStorageUsage),
   /** GET /storage/items — danh sách từng mục trong một nhóm, nặng nhất trước. */
   storageItems: (category: StorageCategory) =>
     apiFetch<StorageItem[]>('/storage/items', { query: { category } }),
@@ -743,7 +747,9 @@ export const accountApi = {
     apiFetch<StorageOrder>('/payments/storage', { method: 'POST', body: { units } }),
   /** DELETE /storage/items/:category/:id — xoá và giải phóng chỗ thật (cả tệp trên đĩa). */
   storageRemove: (category: StorageCategory, id: string) =>
-    apiFetch<{ freedBytes: number }>(
+    !isLarkwaveStorageCategory(category)
+      ? Promise.reject(new ApiError('Nhóm này thuộc app Toolswave — quản lý trong app Toolswave.', 400, null))
+      : apiFetch<{ freedBytes: number }>(
       `/storage/items/${encodeURIComponent(category)}/${encodeURIComponent(id)}`,
       { method: 'DELETE' },
     ),
@@ -768,7 +774,8 @@ export const accountApi = {
     apiFetch<ChatMessage>(`/messages/${userId}`, { method: 'POST', body: { body } }),
 
   // profile
-  meOverview: () => apiFetch<MeOverview>('/me/overview'),
+  // API Toolswave trả hình khác (app/build) — chuẩn hoá về hình của Larkwave (account/compat.ts).
+  meOverview: () => apiFetch<unknown>('/me/overview').then((raw) => normalizeOverview(raw) as MeOverview),
   /** Contribution graph + streaks. `days` is clamped 1..365 by the server (default 365). */
   meActivity: (days?: number) =>
     apiFetch<MeActivity>('/me/activity', { query: days !== undefined ? { days } : undefined }),

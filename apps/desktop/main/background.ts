@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { hostname } from 'node:os';
 import { existsSync } from 'node:fs';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import serve from 'electron-serve';
@@ -16,6 +17,8 @@ import { resolveRenderer, downloadAndOpenInstaller, type UpdateInfo } from './co
 import { AccountCache } from './accountCache';
 import { AccountTokenStore } from './accountTokenStore';
 import { hiddenMode } from './hiddenMode';
+import { larkwaveUserAgent, withDefaultUserAgent } from './deviceIdentity';
+import { ToolswaveMigrationService } from './runtime/migrate/migrationService';
 import { getLarkWebSession } from './runtime/lark/larkWebSession';
 
 /** Larkwave API base (overridable for staging). */
@@ -23,9 +26,22 @@ import { getLarkWebSession } from './runtime/lark/larkWebSession';
 // không còn đọc lại ở đây: hai cơ chế song song đúng là cách một hôm nào đó chúng lệch nhau.
 const API_BASE = APIA_BASE;
 
+/**
+ * User-Agent cho các lời gọi tài khoản đi qua main (đăng nhập email/mật khẩu nằm ở đây).
+ * Máy chủ Toolswave tự dựng nhãn thiết bị từ UA (auth.service.ts deviceLabelFromUA) và KHÔNG đọc
+ * tên do client gửi. Fetch của Node mặc định gửi "node" → phiên hiện là "web" / "Thiết bị".
+ * Có "Electron" thì máy chủ xếp đúng loại desktop ("App Toolswave · macOS"); phần
+ * `Larkwave/<ver> (<host>)` giữ lại trong cột userAgent để phân biệt với app Toolswave và để một
+ * thay đổi 1 dòng phía máy chủ (khớp /Larkwave/ → "Larkwave · <host>") dùng được ngay.
+ */
+const ACCOUNT_UA = larkwaveUserAgent(process.platform, app.getVersion(), process.versions.electron ?? '', hostname());
+
 const isProd = process.env.NODE_ENV === 'production';
 if (isProd) serve({ directory: 'app' });
 else app.setPath('userData', `${app.getPath('userData')} (development)`);
+// Dev + chế độ ẩn: chạy thử trên một userData RIÊNG (thư mục tạm) để không đụng dữ liệu dev thật
+// (phiên đăng nhập, hội thoại). Bản cài bỏ qua biến này.
+if (!isProd && hiddenMode() && process.env.LARKWAVE_USER_DATA) app.setPath('userData', process.env.LARKWAVE_USER_DATA);
 
 const runtime = new LocalRuntimeAdapter(app.getPath('userData'));
 const accountCache = new AccountCache(app.getPath('userData'));
@@ -35,6 +51,14 @@ const accountTokenStore = new AccountTokenStore(app.getPath('userData'));
 let mainWin: BrowserWindow | null = null;
 // Remote control ("Điều khiển từ xa") agent client — pushes live status to the
 // window (mainWin is set once the window is created; guard with optional chaining).
+// Nhập dữ liệu cũ của app desktop Toolswave (chỉ đọc thư mục Toolswave; xem runtime/migrate).
+const toolswaveMigration = new ToolswaveMigrationService(
+  app.getPath('userData'),
+  (ev) => {
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.toolswaveMigrationEvent, ev);
+  },
+  () => runtime.resyncSkills(),
+);
 const agentClient = new AgentClient(runtime, app.getPath('userData'), (s) => {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.agentEvent, s);
 });
@@ -62,7 +86,8 @@ function registerIpc(win: BrowserWindow) {
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
-        const res = await fetch(req.url, { method, headers: req.headers, body: req.body, signal: controller.signal });
+        const headers = withDefaultUserAgent(req.headers, ACCOUNT_UA);
+        const res = await fetch(req.url, { method, headers, body: req.body, signal: controller.signal });
         clearTimeout(timer);
         const text = await res.text();
         if (cacheable && res.status >= 500) {
@@ -484,7 +509,13 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkSummarize, (_e, id: string, itemId: string, text: string) =>
     runtime.larkSummarize(id, itemId, text),
   );
-  ipcMain.handle(IPC.larkSetAccount, (_e, userId: string | null) => runtime.larkSetAccount(userId));
+  ipcMain.handle(IPC.larkSetAccount, async (_e, userId: string | null) => {
+    await runtime.larkSetAccount(userId);
+    // Lần đăng nhập đầu của tài khoản này ⇒ tự nhập dữ liệu cũ của app Toolswave (một lần).
+    toolswaveMigration.setAccount(userId);
+  });
+  ipcMain.handle(IPC.toolswaveMigrationStatus, () => toolswaveMigration.status());
+  ipcMain.handle(IPC.toolswaveMigrate, (_e, o?: { dryRun?: boolean }) => toolswaveMigration.run({ dryRun: !!o?.dryRun }));
   ipcMain.handle(IPC.larkGrantPolicies, () => runtime.larkGrantPolicies());
   ipcMain.handle(IPC.larkSetGrantPolicy, (_e, grantId: string, policy: LarkGrantPolicy | null) =>
     runtime.larkSetGrantPolicy(grantId, policy),

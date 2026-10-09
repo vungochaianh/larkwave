@@ -248,7 +248,7 @@ export class SecretStore {
     return join(this.dir, 'machine-prefs.json');
   }
   /** `workflowAuto`: chế độ Tạo workflow tự ghi phần cộng-thêm không hỏi (mặc định BẬT). */
-  getMachinePrefs(): { workflowAuto?: boolean } {
+  getMachinePrefs(): { workflowAuto?: boolean; runnerId?: string } {
     try {
       const s = JSON.parse(readFileSync(this.machinePrefsPath(), 'utf8'));
       return s && typeof s === 'object' ? s : {};
@@ -256,7 +256,7 @@ export class SecretStore {
       return {};
     }
   }
-  setMachinePrefs(p: { workflowAuto?: boolean }): void {
+  setMachinePrefs(p: { workflowAuto?: boolean; runnerId?: string }): void {
     writeFileSync(this.machinePrefsPath(), JSON.stringify({ ...this.getMachinePrefs(), ...p }, null, 2));
   }
 

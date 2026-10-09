@@ -130,17 +130,27 @@ export function LoginView() {
     let openUrl = oauthUrl(provider);
     // Desktop: open OAuth in the user's REAL browser (where they're already signed into
     // Google/GitHub — NO re-login), and have the API 302 the issued JWT back to a transient
-    // loopback http://127.0.0.1:<port>/cb the app catches (the deep link larkwave://auth is
-    // the fallback when the loopback can't bind). The loopback server then focuses the app +
-    // hands the token to AccountAuthProvider (authDeepLink) → auto-login, no manual switch.
+    // loopback http://127.0.0.1:<port>/cb the app catches → AccountAuthProvider (authDeepLink).
+    //
+    // Tài khoản Larkwave = tài khoản Toolswave (cùng API, cùng link auth). API Toolswave chỉ nhận
+    // redirect `toolswave://auth` hoặc loopback, nên KHÔNG có đường `larkwave://` nữa — gửi nó lên
+    // thì bị bỏ qua và trình duyệt rơi về trang web. Và TUYỆT ĐỐI không dùng `toolswave://auth`:
+    // hệ điều hành sẽ trao JWT cho app Toolswave chứ không phải app này.
+    // Khi loopback không mở được → cửa sổ đăng nhập TRONG app (bắt `/auth/callback` của web).
     if (runtime.kind === 'desktop') {
-      let redirect = 'larkwave://auth';
+      let redirect: string | null = null;
       try {
         if (runtime.startAuthLoopback) redirect = (await runtime.startAuthLoopback()).redirect;
       } catch {
-        /* fall back to the deep link */
+        redirect = null;
       }
-      openUrl = `${oauthUrl(provider)}?redirect=${encodeURIComponent(redirect)}`;
+      if (!redirect && runtime.openAuthWindow) {
+        beginOAuth(provider, openUrl);
+        const r = await runtime.openAuthWindow(openUrl).catch(() => ({ ok: false, error: 'oauth' }) as { ok: boolean; error?: string });
+        if (!r.ok && r.error !== 'cancelled') message.error(t('login2.oauthFailed', 'Đăng nhập chưa hoàn tất — thử lại.'));
+        return;
+      }
+      if (redirect) openUrl = `${oauthUrl(provider)}?redirect=${encodeURIComponent(redirect)}`;
       // Open the "đang đăng nhập…" modal AFTER openUrl is final, so the copy-link and
       // manual-token fallbacks inside it point at the URL we actually opened.
       beginOAuth(provider, openUrl);
@@ -157,8 +167,8 @@ export function LoginView() {
           <div style={{ width: 52, height: 52, borderRadius: 15, background: BRAND_GRADIENT, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 24 }}>
             <UserOutlined />
           </div>
-          <Title level={4} style={{ margin: 0 }}>{t('login2.title', 'Tài khoản Larkwave')}</Title>
-          <Text type="secondary">{t('login2.subtitle', 'Đăng nhập để dùng Lark × Agents, Trợ lý AI, Kỹ năng, Hồ sơ…')}</Text>
+          <Title level={4} style={{ margin: 0 }}>{t('login2.title', 'Tài khoản Toolswave')}</Title>
+          <Text type="secondary">{t('login2.subtitle', 'Larkwave dùng chung tài khoản Toolswave — đăng nhập để dùng Lark × Agents, Trợ lý AI, Kỹ năng…')}</Text>
         </div>
 
         <Segmented

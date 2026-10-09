@@ -39,6 +39,21 @@ export function useGrantGateway(runtime: RuntimeAdapter, enabled: boolean) {
         running.current = false;
         return;
       }
+      // Chỉ chạy lượt của quyền mà MÁY NÀY giữ chính sách. Larkwave dùng chung tài khoản (và hàng
+      // đợi lượt) với app Toolswave, mà máy chủ không có bước "giành" lượt nguyên tử — hai app cùng
+      // bốc một lượt là chạy hai lần. Quyền do app Toolswave tạo thì để app Toolswave phục vụ: bỏ
+      // qua (để nguyên trong hàng đợi) chứ KHÔNG báo "denied", nếu không là chặn mất lượt của nó.
+      let policies: Record<string, unknown> = {};
+      try {
+        policies = (await runtime.larkGrantPolicies?.()) ?? {};
+      } catch {
+        policies = {};
+      }
+      queued = queued.filter((t) => !!policies[t.grantId]);
+      if (!queued.length) {
+        running.current = false;
+        return;
+      }
       try {
         // Small batch per tick: the next tick re-fetches, so a pause or revoke lands
         // within seconds instead of after a long pre-fetched run.

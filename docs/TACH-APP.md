@@ -3,6 +3,19 @@
 > Ngày tách: 06/10/2026, từ Toolswave @06680ca. Repo này KHÔNG chia sẻ mã nguồn với `/Users/deveris/app`
 > (Toolswave) hay `/Users/deveris/appwave` (bản chỉ có phần dựng app) — mỗi bên tự sống.
 
+## Tài khoản dùng chung với Toolswave (10/2026)
+
+Larkwave desktop **dùng chung hệ tài khoản với Toolswave**: cùng API `https://api.toolswave.net/v1`
+(`APIA_BASE` mặc định, đổi được bằng `LARKWAVE_API_BASE` / `NEXT_PUBLIC_API_BASE`), cùng user id, cùng gói,
+cùng link OAuth Google/GitHub/GitLab, và chung hạn mức 3 thiết bị. Dữ liệu Lark cũ của app desktop
+Toolswave được nhập tự động sau lần đăng nhập đầu. Bản sao lưu Lark trên máy chủ chỉ được KÉO về, không
+ghi đè ô mà app Toolswave khôi phục. Chi tiết, quyết định cho từng chỗ ghi dùng chung và thay đổi cần ở máy
+chủ: **[migrate-from-toolswave.md](migrate-from-toolswave.md)**.
+
+Hệ quả cho các phần dưới:
+- API trong repo này (`apps/api`) KHÔNG phải nơi desktop gọi tới. Desktop gọi API Toolswave.
+- Mục "Phase deploy" 1, 2, 4 (tên miền API, DB mới, OAuth mới) KHÔNG còn áp dụng cho desktop.
+
 ## Larkwave là gì
 
 Sản phẩm làm việc với Lark/Feishu bằng AI + Trợ lý AI, cùng màu sắc và giao diện với Toolswave:
@@ -79,6 +92,9 @@ Sản phẩm làm việc với Lark/Feishu bằng AI + Trợ lý AI, cùng màu 
 - Schema Prisma đã đổi mạnh (bỏ bảng, bỏ cột) — dùng DB MỚI, không `db push` lên DB Toolswave.
 
 ## Phase deploy còn phải làm
+
+> Desktop đã chuyển sang dùng chung API/tài khoản Toolswave (xem đầu tài liệu). Các mục 1, 2, 4 dưới đây
+> chỉ còn ý nghĩa nếu sau này tách web/API riêng.
 
 1. **Tên miền**: `lark.toolswave.net` (web), API (vd `api.lark.toolswave.net`), admin (`cms.` tương ứng);
    sửa `APIA_BASE` mặc định (`packages/core/src/index.ts`), `NEXT_PUBLIC_API_BASE`, `CORS_ORIGINS`,

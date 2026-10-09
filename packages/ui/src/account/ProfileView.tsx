@@ -6,7 +6,9 @@ import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, CheckCircleOutli
 import { BLUE, BRAND, CARD_SHADOW, OK, V, WARN } from '../theme';
 import { IconTile, StatCard } from '../kit';
 import { useAccountAuth } from './auth';
+import { useRuntime } from '../RuntimeProvider';
 import { accountApi, ApiError, formatDate, fromNow, type Friend, type FriendRequest, type MeActivity, type MeOverview, type Referral, type User } from './api';
+import { overviewCell } from './compat';
 import { AchievementsCard } from './Achievements';
 import { ContributionGraph } from './ActivityCards';
 import { openMessenger } from './messenger';
@@ -34,6 +36,7 @@ export const PROFILE_PLAN_ANCHOR = 'tw-profile-plan';
 export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
   const { user } = useAccountAuth();
   const { message } = App.useApp();
+  const runtime = useRuntime();
   const [overview, setOverview] = useState<MeOverview | null>(null);
   const [activity, setActivity] = useState<MeActivity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,12 @@ export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
         // consumer below already renders a skeleton for `activity === null`.
         const [ov, act] = await Promise.all([accountApi.meOverview(), accountApi.meActivity(365).catch(() => null)]);
         if (cancelled) return;
+        // API Toolswave không đếm kỹ năng (partial) — đếm thư viện kỹ năng trên máy.
+        if (ov.partial && runtime.listSkills) {
+          const l = await runtime.listSkills().catch(() => null);
+          if (l) ov.skills = l.length;
+        }
+        if (cancelled) return;
         setOverview(ov);
         setActivity(act);
       } catch (e) {
@@ -59,7 +68,7 @@ export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [message]);
+  }, [message, runtime]);
 
   const joinedAt = overview?.joinedAt ?? user?.createdAt ?? null;
 
@@ -105,11 +114,11 @@ export function ProfileView({ onNav }: { onNav?: (v: View) => void }) {
 function StatBand({ overview, activity, loading, onNav }: { overview: MeOverview | null; activity: MeActivity | null; loading: boolean; onNav?: (v: View) => void }) {
   const go = (v: View) => (onNav ? () => onNav(v) : undefined);
   const tiles: { key: string; label: string; value: ReactNode; icon: ReactNode; color: string; onClick?: () => void }[] = [
-    { key: 'ai', label: 'Lượt AI', value: overview?.aiRuns, icon: <ThunderboltOutlined />, color: BRAND },
-    { key: 'remote', label: 'Tác vụ từ xa', value: overview?.remoteTasks, icon: <CloudServerOutlined />, color: BLUE },
-    { key: 'skills', label: 'Kỹ năng', value: overview?.skills, icon: <AppstoreOutlined />, color: WARN, onClick: go('skills') },
-    { key: 'artifacts', label: 'Artifacts', value: overview?.artifacts, icon: <DeploymentUnitOutlined />, color: OK },
-    { key: 'scheduled', label: 'Tác vụ định kỳ', value: overview?.scheduledTasks, icon: <CheckCircleOutlined />, color: OK },
+    { key: 'ai', label: 'Lượt AI', value: overviewCell(overview, 'aiRuns'), icon: <ThunderboltOutlined />, color: BRAND },
+    { key: 'remote', label: 'Tác vụ từ xa', value: overviewCell(overview, 'remoteTasks'), icon: <CloudServerOutlined />, color: BLUE },
+    { key: 'skills', label: 'Kỹ năng', value: overviewCell(overview, 'skills'), icon: <AppstoreOutlined />, color: WARN, onClick: go('skills') },
+    { key: 'artifacts', label: 'Artifacts', value: overviewCell(overview, 'artifacts'), icon: <DeploymentUnitOutlined />, color: OK },
+    { key: 'scheduled', label: 'Tác vụ định kỳ', value: overviewCell(overview, 'scheduledTasks'), icon: <CheckCircleOutlined />, color: OK },
     { key: 'streak', label: 'Chuỗi hiện tại', value: activity?.currentStreak ?? 0, icon: <FireOutlined />, color: WARN },
     { key: 'longest', label: 'Chuỗi dài nhất', value: activity?.longestStreak ?? 0, icon: <TrophyOutlined />, color: BRAND },
     { key: 'contrib', label: 'Tổng đóng góp', value: activity?.total ?? 0, icon: <ThunderboltOutlined />, color: OK },

@@ -10,6 +10,7 @@ import { FEATURE_FRIENDS } from '../features';
 import { PROFILE_PLAN_ANCHOR } from '../account/ProfileView';
 import { useAccountAuth } from '../account/auth';
 import { accountApi, formatDate, type MeSubscription, type MeActivity, type MeOverview, type Referral } from '../account/api';
+import { overviewCell } from '../account/compat';
 import type { View } from './HomeScreen';
 
 const { Title, Text } = Typography;
@@ -153,7 +154,17 @@ export function HomeOverview({
     let alive = true;
     accountApi.subscription().then((v) => alive && setSub(v)).catch(() => {});
     accountApi.meActivity(365).then((v) => alive && setAct(v)).catch(() => {});
-    accountApi.meOverview().then((v) => alive && setOv(v)).catch(() => {});
+    accountApi
+      .meOverview()
+      // API Toolswave không đếm kỹ năng (overview.partial) — kỹ năng của Larkwave nằm trên máy.
+      .then(async (v) => {
+        if (v.partial && runtime.listSkills) {
+          const l = await runtime.listSkills().catch(() => null);
+          if (l) v = { ...v, skills: l.length };
+        }
+        if (alive) setOv(v);
+      })
+      .catch(() => {});
     // Bạn bè tạm ẩn (FEATURE_FRIENDS) → không có lời mời nào để nhắc.
     if (FEATURE_FRIENDS) accountApi.friendRequests().then((v) => alive && setReqIn(v.filter((r) => r.direction === 'incoming').length)).catch(() => {});
     accountApi.getReferral().then((v) => alive && setRef(v)).catch(() => {});
@@ -413,9 +424,9 @@ export function HomeOverview({
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
         {[
-          { v: ov ? ov.aiRuns : weekTotal, l: ov ? 'lượt AI' : 'lượt/tuần' },
-          { v: ov ? ov.remoteTasks : '—', l: 'tác vụ từ xa' },
-          { v: ov ? ov.artifacts : '—', l: 'artifacts' },
+          { v: ov ? overviewCell(ov, 'aiRuns') : weekTotal, l: ov ? 'lượt AI' : 'lượt/tuần' },
+          { v: ov ? overviewCell(ov, 'remoteTasks') : '—', l: 'tác vụ từ xa' },
+          { v: ov ? overviewCell(ov, 'artifacts') : '—', l: 'artifacts' },
         ].map((s, i) => (
           <div key={i} style={{ flex: 1, borderLeft: i ? `1px solid ${V.borderSub}` : 'none', paddingLeft: i ? 12 : 0 }}>
             <div style={{ ...NUM, fontSize: 20 }}>{s.v}</div>
