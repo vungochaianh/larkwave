@@ -25,6 +25,11 @@ export interface TurnFileContext {
    * nằm trong thư mục quy tắc (giữ N lần) — tải lên mỗi lần chạy chỉ làm đầy hạn mức lưu trữ.
    */
   noUpload?: boolean;
+  /**
+   * LÀN của lượt = id hội thoại: mọi tool phiên Lark web chạy trên TRANG Lark riêng của hội thoại này
+   * (larkWebSession.withLarkLane) — hai tab làm hai Base khác nhau không kéo trang của nhau đi.
+   */
+  lane?: string;
 }
 
 const als = new AsyncLocalStorage<TurnFileContext>();

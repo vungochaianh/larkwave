@@ -157,10 +157,10 @@ export function LarkChat({
    */
   const [textFlowing, setTextFlowing] = useState(false);
   const flowRef = useRef(0);
-  // Shared AI lock (main process). If a lock is held but it isn't THIS chat's own in-flight
-  // turn (busy === false), another tab/build/relay is running → block sending here too.
+  // Khoá AI (main process) là theo TỪNG hội thoại, và mỗi hội thoại có trang Lark riêng → tab khác
+  // đang chạy KHÔNG chặn tab này nữa (trước đây một lượt ở bất kỳ đâu khoá nút Gửi của mọi tab).
+  // Chỉ chặn khi chính hội thoại này đang có một lượt khác (vd lượt gửi từ điện thoại).
   const agentOwner = useAgentBusy();
-  const blockedByOther = !!agentOwner && !busy;
   // ── "/" menu: the user's skills that carry a slash-command shortcut ──
   const [slashCmds, setSlashCmds] = useState<SlashCommandItem[]>([]);
   const slashRefreshed = useRef(false); // re-read the list once, the first time the composer is focused
@@ -200,6 +200,7 @@ export function LarkChat({
   const [activeSkill, setActiveSkill] = useState<{ id: string; name: string } | null>(null);
   const activeSkillRef = useRef<{ id: string; name: string } | null>(null);
   const [sessionId, setSessionId] = useState('');
+  const blockedByOther = !!agentOwner && !busy && !!agentOwner.sessionId && agentOwner.sessionId === sessionId;
   const [sessions, setSessions] = useState<LarkSessionMeta[]>([]);
   // Collapsed answers — a per-machine view preference (see larkFold.ts for why it is
   // deliberately NOT stored on the message or in the shared session payload).

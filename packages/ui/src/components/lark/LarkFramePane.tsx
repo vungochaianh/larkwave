@@ -11,17 +11,20 @@ import { isLarkLoginPage, loginUrlFor, loginViewFromUrl, type LarkLoginView } fr
 
 const { Text } = Typography;
 
-/** Trạng thái khung Lark (poll 1s) — dùng chung cho màn và cho khung. */
-export function useLarkBrowserState(runtime: RuntimeAdapter): [LarkBrowserState | null, () => Promise<void>, (s: LarkBrowserState) => void] {
+/**
+ * Trạng thái khung Lark (poll 1s) — dùng chung cho màn và cho khung. `lane` = id hội thoại của tab đang
+ * xem: mỗi hội thoại có TRANG Lark riêng, nên trạng thái (địa chỉ, AI đang thao tác…) là của trang đó.
+ */
+export function useLarkBrowserState(runtime: RuntimeAdapter, lane?: string | null): [LarkBrowserState | null, () => Promise<void>, (s: LarkBrowserState) => void] {
   const [st, setSt] = useState<LarkBrowserState | null>(null);
   const refresh = useCallback(async () => {
     if (!runtime.larkBrowserState) return;
     try {
-      setSt(await runtime.larkBrowserState());
+      setSt(await runtime.larkBrowserState(lane || undefined));
     } catch {
       /* giữ trạng thái cũ */
     }
-  }, [runtime]);
+  }, [runtime, lane]);
   useEffect(() => {
     void refresh();
     const id = setInterval(() => void refresh(), 1000);
@@ -66,6 +69,7 @@ export function LarkFramePane({
   refresh,
   onClose,
   homeUrl,
+  lane,
   style,
 }: {
   runtime: RuntimeAdapter;
@@ -76,12 +80,15 @@ export function LarkFramePane({
   onClose?: () => void;
   /** Nút "nhà": mở Base của hội thoại (bỏ trống = trang chủ Lark). */
   homeUrl?: string;
+  /** Hội thoại của tab đang xem — khung hiện TRANG Lark riêng của hội thoại này. */
+  lane?: string | null;
   style?: React.CSSProperties;
 }) {
   const { message } = App.useApp();
   const { t } = useI18n();
   const holder = useRef<HTMLDivElement | null>(null);
   const hasWindow = !!st?.hasWindow;
+  const laneId = lane || undefined;
   const [busy, setBusy] = useState<string | null>(null);
 
   useLayoutEffect(() => {
@@ -99,8 +106,8 @@ export function LarkFramePane({
           return { x: b.left, y: b.top, width: b.width, height: b.height };
         });
         const d = dockDecision({ visible: !!el && el.offsetParent !== null, paneOpen: true, overlayOpen: modal || overlayHitsPane(rects, pane), hasWindow, rect: pane });
-        if (d.kind === 'attach') void runtime.larkBrowserAttach!(d.rect).catch(() => undefined);
-        else if (d.kind === 'hide') void runtime.larkBrowserAttach!(ZERO_RECT).catch(() => undefined);
+        if (d.kind === 'attach') void runtime.larkBrowserAttach!(d.rect, laneId).catch(() => undefined);
+        else if (d.kind === 'hide') void runtime.larkBrowserAttach!(ZERO_RECT, laneId).catch(() => undefined);
         else void runtime.larkBrowserDetach?.().catch(() => undefined);
       });
     };
@@ -115,9 +122,9 @@ export function LarkFramePane({
       window.removeEventListener('resize', push);
       clearInterval(tick);
       // Ô này rời trang (đóng ngăn / chuyển màn): giấu view — màn cha tháo hẳn khi rời màn.
-      void runtime.larkBrowserAttach?.(ZERO_RECT).catch(() => undefined);
+      void runtime.larkBrowserAttach?.(ZERO_RECT, laneId).catch(() => undefined);
     };
-  }, [runtime, hasWindow]);
+  }, [runtime, hasWindow, laneId]);
 
   const run = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key);
@@ -136,7 +143,8 @@ export function LarkFramePane({
       if (info.connected) message.success(t('larkBrowser.loggedIn', 'Đã đăng nhập Lark.'));
       else if (info.error) message.warning(info.error);
     });
-  const nav = (input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) => run('nav', async () => setSt(await runtime.larkBrowserNavigate!(input)));
+  const nav = (input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) =>
+    run('nav', async () => setSt(await runtime.larkBrowserNavigate!({ ...input, ...(laneId ? { lane: laneId } : {}) })));
 
   // Trang đăng nhập Lark: mặc định MÃ QR, có nút đổi sang email/SSO. Lõi 0.1.1+ (`loginSwitch`) tự bật
   // QR và có action riêng. Lõi cũ (0.1.0) chỉ biết "mở URL Lark" → đổi bằng tham số URL (larkLoginUrl):
@@ -153,7 +161,7 @@ export function LarkFramePane({
     if (!legacyLogin || st?.loading || !url || preferForm.current || loginViewFromUrl(url)) return;
     if (rewritten.current === url) return; // mỗi URL một lần — không bao giờ tải lại vòng tròn
     rewritten.current = url;
-    void runtime.larkBrowserNavigate?.({ url: loginUrlFor(url, 'qr') }).catch(() => undefined);
+    void runtime.larkBrowserNavigate?.({ url: loginUrlFor(url, 'qr'), ...(laneId ? { lane: laneId } : {}) }).catch(() => undefined);
   }, [legacyLogin, st?.url, st?.loading, runtime]);
   const switchLogin = (to: LarkLoginView) => {
     preferForm.current = to === 'form';
@@ -236,11 +244,11 @@ export function LarkFramePane({
             {lastSave ? ` · Lark ${lastSave.op}${lastSave.ok ? ' ✓' : ' ✗'}` : ''}
           </Text>
           {ai.stopped ? (
-            <Button size="small" icon={<CaretRightOutlined />} onClick={() => run('resume', async () => setSt(await runtime.larkBrowserResumeAi!()))}>
+            <Button size="small" icon={<CaretRightOutlined />} onClick={() => run('resume', async () => setSt(await runtime.larkBrowserResumeAi!(laneId)))}>
               {t('larkBrowser.resume', 'Cho AI tiếp tục')}
             </Button>
           ) : (
-            <Button size="small" danger type="primary" icon={<StopOutlined />} loading={busy === 'stop'} onClick={() => run('stop', async () => setSt(await runtime.larkBrowserStopAi!()))}>
+            <Button size="small" danger type="primary" icon={<StopOutlined />} loading={busy === 'stop'} onClick={() => run('stop', async () => setSt(await runtime.larkBrowserStopAi!(laneId)))}>
               {t('larkBrowser.stop', 'Dừng')}
             </Button>
           )}

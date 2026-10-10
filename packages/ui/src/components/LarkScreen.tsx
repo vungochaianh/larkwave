@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Modal, Spin, type MenuProps } from 'antd';
 import { SettingOutlined, ReadOutlined, TeamOutlined, LoginOutlined, ApiOutlined } from '@ant-design/icons';
-import type { LarkConnection } from '@larkwave/core';
+import type { LarkBaseRef, LarkConnection } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { useAccountAuth } from '../account/auth';
 import { LarkConnectPanel } from './lark/LarkConnectPanel';
@@ -150,7 +150,9 @@ export function LarkScreen({
     });
   const frameFirst = prefs.mode === 'frame' && webSupported;
   const chatLayout = !frameFirst && webSupported;
-  const [st, refresh, setSt] = useLarkBrowserState(runtime);
+  // Hội thoại của tab đang xem = LÀN của khung Lark (mỗi hội thoại một trang Lark riêng).
+  const [activeLane, setActiveLane] = useState<string | null>(null);
+  const [st, refresh, setSt] = useLarkBrowserState(runtime, chatLayout ? activeLane : null);
   useAutoOpen(chatLayout ? st : null, () => setPrefs((p) => ({ ...p, sidePaneOpen: true })));
   useEffect(() => () => void runtime.larkBrowserDetach?.().catch(() => undefined), [runtime]);
   const rowRef = useRef<HTMLDivElement | null>(null);
@@ -175,7 +177,23 @@ export function LarkScreen({
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   };
-  const [homeUrl, setHomeUrl] = useState<string | undefined>(undefined);
+  // Nút "nhà" theo Base của TỪNG tab; trang của một tab mở lần đầu tự vào Base của tab đó (một lần —
+  // sau đó người dùng tự đi đâu trong trang của tab thì để yên).
+  const [homeUrls, setHomeUrls] = useState<Record<string, string | undefined>>({});
+  const homeUrl = activeLane ? homeUrls[activeLane] : undefined;
+  const homed = useRef<Set<string>>(new Set());
+  const baseUrlOf = (b: LarkBaseRef | { appToken: string; url?: string } | undefined) =>
+    b ? (b as { url?: string }).url || (st?.host ? `${st.host}/base/${b.appToken}` : undefined) : undefined;
+  const goHome = (lane: string, url: string | undefined) => {
+    if (!url || !prefs.sidePaneOpen) return;
+    homed.current.add(lane);
+    void runtime.larkBrowserNavigate?.({ url, lane }).catch(() => undefined);
+  };
+  useEffect(() => {
+    if (!chatLayout || !activeLane || homed.current.has(activeLane) || !st?.connected) return;
+    goHome(activeLane, homeUrls[activeLane]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatLayout, activeLane, homeUrls, st?.connected, prefs.sidePaneOpen]);
 
   if (!supported) {
     return (
@@ -314,11 +332,15 @@ export function LarkScreen({
                     }
                   : undefined
               }
+              onActiveChange={(id, bases) => {
+                setActiveLane(id);
+                if (id && bases) setHomeUrls((m) => (m[id] ? m : { ...m, [id]: baseUrlOf(bases[0]) }));
+              }}
               onBasesChange={(bases, added) => {
-                const b = added || bases[0];
-                const url = b ? (b as { url?: string }).url || (st?.host ? `${st.host}/base/${b.appToken}` : undefined) : undefined;
-                setHomeUrl(url);
-                if (url && prefs.sidePaneOpen) void runtime.larkBrowserNavigate?.({ url }).catch(() => undefined);
+                if (!activeLane) return;
+                const url = baseUrlOf(added || bases[0]);
+                setHomeUrls((m) => ({ ...m, [activeLane]: url }));
+                goHome(activeLane, url);
               }}
             />
           </Card>
@@ -333,6 +355,7 @@ export function LarkScreen({
                 setSt={setSt}
                 refresh={refresh}
                 homeUrl={homeUrl}
+                lane={activeLane}
                 onClose={() => setPrefs((p) => ({ ...p, sidePaneOpen: false }))}
                 style={{ width: paneW, flex: `0 0 ${paneW}px` }}
               />

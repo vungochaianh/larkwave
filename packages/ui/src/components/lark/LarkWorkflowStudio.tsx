@@ -149,7 +149,8 @@ export function LarkWorkflowStudio({
   const [title, setTitle] = useState('');
 
   // ── Khung Lark ──
-  const [st, refresh, setSt] = useLarkBrowserState(runtime);
+  // Khung lớn hiện TRANG Lark riêng của hội thoại đang chọn (mỗi hội thoại một trang).
+  const [st, refresh, setSt] = useLarkBrowserState(runtime, activeId);
   const webConnected = !!st?.connected && st?.health !== 'dead';
   const [appConnected, setAppConnected] = useState(false);
   useEffect(() => {
@@ -164,6 +165,14 @@ export function LarkWorkflowStudio({
     setHomeUrl(baseUrl(active?.bases?.[0]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, active?.bases?.[0]?.appToken, st?.host]);
+  // Trang Lark của một hội thoại mở lần đầu (lane mới, đang ở Drive) → tự vào Base của hội thoại đó, một
+  // lần cho mỗi hội thoại; sau đó người dùng tự đi đâu trong trang thì để yên.
+  const homed = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeId || !homeUrl || !st?.connected || homed.current.has(activeId)) return;
+    homed.current.add(activeId);
+    void runtime.larkBrowserNavigate?.({ url: homeUrl, lane: activeId }).catch(() => undefined);
+  }, [activeId, homeUrl, st?.connected, runtime]);
 
   // ── Danh sách hội thoại (trong cột trái) ──
   const [q, setQ] = useState('');
@@ -275,7 +284,7 @@ export function LarkWorkflowStudio({
             onBasesChange={(bases, added) => {
               const url = baseUrl(added || bases[0]);
               setHomeUrl(baseUrl(bases[0]));
-              if (url) void runtime.larkBrowserNavigate?.({ url }).catch(() => undefined);
+              if (url) void runtime.larkBrowserNavigate?.({ url, ...(activeId ? { lane: activeId } : {}) }).catch(() => undefined);
               setTimeout(() => void refreshSessions(), 800);
             }}
           />
@@ -296,7 +305,7 @@ export function LarkWorkflowStudio({
       </div>
 
       {/* Phải: KHUNG LARK lớn */}
-      <LarkFramePane runtime={runtime} st={st} setSt={setSt} refresh={refresh} homeUrl={homeUrl} onClose={onToChat ? () => onToChat('closeFrame') : undefined} style={{ flex: 1, paddingTop: 6 }} />
+      <LarkFramePane runtime={runtime} st={st} setSt={setSt} refresh={refresh} homeUrl={homeUrl} lane={activeId} onClose={onToChat ? () => onToChat('closeFrame') : undefined} style={{ flex: 1, paddingTop: 6 }} />
     </div>
   );
 }

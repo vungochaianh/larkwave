@@ -163,12 +163,13 @@ interface Bridge {
   larkWebStartRecorder?(url?: string): Promise<{ ok: boolean; error?: string }>;
   larkWebGetRecording?(): Promise<LarkWebRecording | null>;
   larkWebReplayWorkflow?(opts?: { enable?: boolean }): Promise<{ workflowID: string; baseId: string; title: string }>;
-  larkBrowserAttach?(rect: LarkBrowserRect): Promise<LarkBrowserState>;
+  larkBrowserAttach?(rect: LarkBrowserRect, lane?: string): Promise<LarkBrowserState>;
   larkBrowserDetach?(): Promise<void>;
-  larkBrowserState?(): Promise<LarkBrowserState>;
-  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState>;
-  larkBrowserStopAi?(): Promise<LarkBrowserState>;
-  larkBrowserResumeAi?(): Promise<LarkBrowserState>;
+  larkBrowserState?(lane?: string): Promise<LarkBrowserState>;
+  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState>;
+  larkBrowserStopAi?(lane?: string): Promise<LarkBrowserState>;
+  larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
+  larkBrowserRelease?(lane: string): Promise<void>;
   larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
   larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
   larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;
@@ -556,28 +557,32 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   larkWebReveal(): Promise<void> {
     return this.bridge.larkWebReveal ? this.bridge.larkWebReveal() : Promise.resolve();
   }
-  larkBrowserAttach(rect: LarkBrowserRect): Promise<LarkBrowserState> {
+  larkBrowserAttach(rect: LarkBrowserRect, lane?: string): Promise<LarkBrowserState> {
     if (!this.bridge.larkBrowserAttach) return Promise.reject(new Error('"Trình duyệt Lark" cần bản cài mới (.dmg).'));
-    return this.bridge.larkBrowserAttach(rect);
+    return this.bridge.larkBrowserAttach(rect, lane);
   }
   larkBrowserDetach(): Promise<void> {
     return this.bridge.larkBrowserDetach ? this.bridge.larkBrowserDetach() : Promise.resolve();
   }
-  larkBrowserState(): Promise<LarkBrowserState> {
+  larkBrowserState(lane?: string): Promise<LarkBrowserState> {
     if (!this.bridge.larkBrowserState) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
-    return this.bridge.larkBrowserState();
+    return this.bridge.larkBrowserState(lane);
   }
-  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState> {
     if (!this.bridge.larkBrowserNavigate) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
     return this.bridge.larkBrowserNavigate(input);
   }
-  larkBrowserStopAi(): Promise<LarkBrowserState> {
+  larkBrowserStopAi(lane?: string): Promise<LarkBrowserState> {
     if (!this.bridge.larkBrowserStopAi) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
-    return this.bridge.larkBrowserStopAi();
+    return this.bridge.larkBrowserStopAi(lane);
   }
-  larkBrowserResumeAi(): Promise<LarkBrowserState> {
+  larkBrowserResumeAi(lane?: string): Promise<LarkBrowserState> {
     if (!this.bridge.larkBrowserResumeAi) return Promise.reject(new Error('Cần bản cài mới (.dmg).'));
-    return this.bridge.larkBrowserResumeAi();
+    return this.bridge.larkBrowserResumeAi(lane);
+  }
+  /** Lõi cũ (một trang Lark chung) không có kênh này → không có gì để giải phóng. */
+  larkBrowserRelease(lane: string): Promise<void> {
+    return this.bridge.larkBrowserRelease ? this.bridge.larkBrowserRelease(lane) : Promise.resolve();
   }
   larkUiTemplateList(): Promise<LarkUiTemplate[]> {
     return this.bridge.larkUiTemplateList ? this.bridge.larkUiTemplateList() : Promise.resolve([]);

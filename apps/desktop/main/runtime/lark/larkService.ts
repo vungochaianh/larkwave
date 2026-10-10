@@ -3591,8 +3591,8 @@ export class LarkService {
     return getLarkWebSession().replayCapturedWorkflow(opts);
   }
   // "Trình duyệt Lark" screen + "Làm mẫu một lần → dùng lại" templates (same Lark web session).
-  browserAttach(win: import('electron').BrowserWindow, rect: LarkBrowserRect): LarkBrowserState {
-    return getLarkWebSession().browserAttach(win, rect);
+  browserAttach(win: import('electron').BrowserWindow, rect: LarkBrowserRect, lane?: string): LarkBrowserState {
+    return getLarkWebSession().browserAttach(win, rect, lane || undefined);
   }
   browserDetach(): void {
     getLarkWebSession().browserDetach();
@@ -3602,17 +3602,20 @@ export class LarkService {
     return getLarkWebSession().listWebBases({ query: input?.query });
   }
 
-  browserState(): LarkBrowserState {
-    return getLarkWebSession().browserState();
+  browserState(lane?: string): LarkBrowserState {
+    return getLarkWebSession().browserState(lane || undefined);
   }
-  browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
+  browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState> {
     return getLarkWebSession().browserNavigate(input);
   }
-  browserStopAi(): LarkBrowserState {
-    return getLarkWebSession().browserStopAi();
+  browserStopAi(lane?: string): LarkBrowserState {
+    return getLarkWebSession().browserStopAi(lane || undefined);
   }
-  browserResumeAi(): LarkBrowserState {
-    return getLarkWebSession().browserResumeAi();
+  browserResumeAi(lane?: string): LarkBrowserState {
+    return getLarkWebSession().browserResumeAi(lane || undefined);
+  }
+  browserRelease(lane: string): void {
+    getLarkWebSession().releaseLane(String(lane || ''));
   }
   uiTemplateList(): LarkUiTemplate[] {
     return getLarkWebSession().templateList();
@@ -4401,7 +4404,10 @@ export class LarkService {
       return;
     }
     try {
-      this.clearPending(); // drop any stale confirmations from a previous turn
+      // Chỉ dọn xác nhận / câu hỏi còn treo của CHÍNH hội thoại này. Dọn sạch (không truyền id) là tự
+      // bấm "Từ chối" hộ mọi tab khác đang chờ người dùng duyệt — mở tab mới gửi một câu là hộp xác
+      // nhận của tab kia biến mất.
+      this.clearPending(lockSessionId); // drop any stale confirmations from a previous turn
       // Phase 1b — HOSTED general chat: run "Trợ lý AI" on Larkwave's server (MAIC) instead of the
       // local CLI when there's no usable local Claude (or the user forced hosted). Lets the desktop
       // work with NO local Claude install. Claude users are unaffected (auto = local when available).
@@ -4552,7 +4558,9 @@ export class LarkService {
     setFileOutDir(workDir ?? null);
     // Cùng thư mục, nhưng đi theo TỪNG lần thực thi công cụ của lượt này (fileContext): một lịch tự động
     // chạy song song không còn ghi đè được thư mục của hội thoại đang mở.
-    const turnFiles = { outDir: workDir ?? null, attachDir: workDir ?? null };
+    // `lane` = trang Lark RIÊNG của hội thoại (larkWebSession.withLarkLane): mọi tool phiên web của lượt
+    // này chạy trên trang đó, không kéo trang của tab khác đi.
+    const turnFiles = { outDir: workDir ?? null, attachDir: workDir ?? null, ...(!general && convId ? { lane: convId } : {}) };
 
     // Materialise any attached files/images into the dir the agent runs in. It MUST be the
     // conversation dir, not a temp one: a temp dir would put this turn in a different Claude
@@ -4627,6 +4635,8 @@ export class LarkService {
     // Khai báo NGOÀI `try` để khối `finally` bên dưới còn thấy: nó phải gỡ đăng ký đúng lượt này.
     const abort = new AbortController();
     const runKey = conversationId;
+    const laneId = !general && convId ? convId : null;
+    if (laneId) getLarkWebSession().setLaneBusy(laneId, true);
     try {
       let inner: AsyncGenerator<LarkChatEvent>;
       if (onMaic) {
@@ -4831,6 +4841,7 @@ export class LarkService {
         // Chỉ gỡ khi ô đó VẪN là của lượt mình: một lượt kết thúc muộn không được xoá đăng ký
         // của lượt mới vừa bắt đầu trên cùng hội thoại (cùng kiểu kiểm danh tính như `release`).
         if (this.runs.get(runKey)?.abort === abort) this.runs.delete(runKey);
+        if (laneId) getLarkWebSession().setLaneBusy(laneId, false);
         this.clearPending(runKey);
         if (attachDir) await rm(attachDir, { recursive: true, force: true }).catch(() => undefined);
       }

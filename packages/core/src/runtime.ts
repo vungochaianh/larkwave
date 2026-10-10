@@ -1958,14 +1958,16 @@ export interface RuntimeAdapter {
 
   /** "Trình duyệt Lark": show the SAME Lark web page (session) inside the app at `rect` (CSS px).
    *  A zero-size rect keeps it attached but hidden (e.g. while an app modal is open). */
-  larkBrowserAttach?(rect: LarkBrowserRect): Promise<LarkBrowserState>;
+  larkBrowserAttach?(rect: LarkBrowserRect, lane?: string): Promise<LarkBrowserState>;
   /** Leave the screen — the page goes back to the hidden window (session stays warm). */
   larkBrowserDetach?(): Promise<void>;
-  larkBrowserState?(): Promise<LarkBrowserState>;
-  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState>;
+  larkBrowserState?(lane?: string): Promise<LarkBrowserState>;
+  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState>;
   /** "Dừng" — abort the running AI UI automation. */
-  larkBrowserStopAi?(): Promise<LarkBrowserState>;
-  larkBrowserResumeAi?(): Promise<LarkBrowserState>;
+  larkBrowserStopAi?(lane?: string): Promise<LarkBrowserState>;
+  larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
+  /** Hội thoại đóng tab → giải phóng TRANG Lark riêng của nó (`lane` = id hội thoại). Đăng nhập không đổi. */
+  larkBrowserRelease?(lane: string): Promise<void>;
   larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
   larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
   larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;

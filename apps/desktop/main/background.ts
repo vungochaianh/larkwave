@@ -466,17 +466,20 @@ function registerIpc(win: BrowserWindow) {
     wc.on('render-process-gone', () => runtime.larkBrowserDetach());
     wc.once('destroyed', () => runtime.larkBrowserDetach());
   };
-  ipcMain.handle(IPC.larkBrowserAttach, (e, rect: LarkBrowserRect) => {
+  // `lane` = id hội thoại của tab đang xem (mỗi hội thoại một trang Lark). Vắng = trang mặc định.
+  const laneArg = (v: unknown) => (typeof v === 'string' && v.length <= 200 ? v : undefined);
+  ipcMain.handle(IPC.larkBrowserAttach, (e, rect: LarkBrowserRect, lane?: string) => {
     watchLarkHost(e.sender);
     const r = rect || { x: 0, y: 0, width: 0, height: 0 };
     const safe = { x: Number(r.x) || 0, y: Number(r.y) || 0, width: Number(r.width) || 0, height: Number(r.height) || 0 };
-    return runtime.larkBrowserAttach(safe, BrowserWindow.fromWebContents(e.sender) ?? undefined);
+    return runtime.larkBrowserAttach(safe, laneArg(lane), BrowserWindow.fromWebContents(e.sender) ?? undefined);
   });
   ipcMain.handle(IPC.larkBrowserDetach, () => runtime.larkBrowserDetach());
-  ipcMain.handle(IPC.larkBrowserState, () => runtime.larkBrowserState());
-  ipcMain.handle(IPC.larkBrowserNavigate, (_e, input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) => runtime.larkBrowserNavigate(input || {}));
-  ipcMain.handle(IPC.larkBrowserStopAi, () => runtime.larkBrowserStopAi());
-  ipcMain.handle(IPC.larkBrowserResumeAi, () => runtime.larkBrowserResumeAi());
+  ipcMain.handle(IPC.larkBrowserState, (_e, lane?: string) => runtime.larkBrowserState(laneArg(lane)));
+  ipcMain.handle(IPC.larkBrowserNavigate, (_e, input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }) => runtime.larkBrowserNavigate({ ...(input || {}), lane: laneArg(input?.lane) }));
+  ipcMain.handle(IPC.larkBrowserStopAi, (_e, lane?: string) => runtime.larkBrowserStopAi(laneArg(lane)));
+  ipcMain.handle(IPC.larkBrowserResumeAi, (_e, lane?: string) => runtime.larkBrowserResumeAi(laneArg(lane)));
+  ipcMain.handle(IPC.larkBrowserRelease, (_e, lane?: string) => runtime.larkBrowserRelease(laneArg(lane) || ''));
   ipcMain.handle(IPC.larkUiTemplateList, () => runtime.larkUiTemplateList());
   ipcMain.handle(IPC.larkUiTemplateSave, (_e, input: { name: string; description?: string }) => runtime.larkUiTemplateSave(input));
   ipcMain.handle(IPC.larkUiTemplateDelete, (_e, id: string) => runtime.larkUiTemplateDelete(String(id || '')));

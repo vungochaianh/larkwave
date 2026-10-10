@@ -1,4 +1,6 @@
 import { app, session, type BrowserWindow } from 'electron';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { currentTurnFiles } from './fileContext';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LarkBrowserState, LarkReloginEntry, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebInfo } from '@larkwave/core';
@@ -421,14 +423,129 @@ const APP_HEALTH_COLLECT = `
   return { ok:true, status:status, url:location.href, title:document.title, spinnerVisible:spinnerVisible, rootFilled:rootFilled, bannerTexts:bannerTexts, consoleErrors:errors.slice(-12), failedRequests:failed.slice(-15), controlCount:controls.length, blockers:snap.blockers||[], controls: controls.slice(0,60), controlsText: (snap.text||'').slice(0,4000) };
 `;
 
+/** Làn mặc định: trang của đăng nhập / việc nền (kiểm phiên, lịch tự động, đồng bộ CMS). */
+const DEFAULT_LANE = '';
+/** Tối đa bao nhiêu trang LÀN (ngoài trang mặc định) sống cùng lúc — mỗi trang Base là cả trăm MB RAM. */
+const MAX_LANE_PAGES = 4;
+const laneAls = new AsyncLocalStorage<string>();
+
+/**
+ * Chạy `fn` trên TRANG Lark của làn `lane` (id hội thoại). Thao tác từ giao diện (khung Lark của một tab)
+ * truyền làn tường minh; trong lượt chat thì làn đi theo `TurnFileContext.lane` (mọi tool đã chạy trong
+ * withTurnFiles), không cần bọc lại.
+ */
+export function withLarkLane<T>(lane: string | null | undefined, fn: () => T): T {
+  return lane ? laneAls.run(lane, fn) : fn();
+}
+function currentLane(): string {
+  return laneAls.getStore() ?? currentTurnFiles()?.lane ?? DEFAULT_LANE;
+}
+
 export class LarkWebSession {
-  private win: LarkHost | null = null;
-  /** CDP driver bound to the current Lark webContents (falls back to the legacy JS driver). */
-  readonly cdp = new LarkCdpDriver();
+  /**
+   * MỖI HỘI THOẠI MỘT TRANG LARK. Làn = id hội thoại; '' = trang mặc định (đăng nhập + việc nền). Mọi
+   * trang chung MỘT partition (cùng cookie = cùng đăng nhập), nhưng là trang riêng: trước đây chỉ có MỘT
+   * trang, nên tab B mở Base B giữa lúc tab A đang ghi vào Base A → A nhận no-context / timeout, khung
+   * hiện nhầm Base, lái giao diện nhầm trang. Mọi chỗ đọc `this.win` / `this.cdp` tự ra trang của làn
+   * hiện tại (withLarkLane / ngữ cảnh lượt); trang của làn được tạo khi cần, chỉ khi đã đăng nhập.
+   */
+  private pages = new Map<string, { host: LarkHost; cdp: LarkCdpDriver; usedAt: number }>();
+  /** Làn đang có lượt chạy — không bao giờ bị đóng để nhường chỗ. */
+  private busyLanes = new Set<string>();
+  /** Bộ lái "rỗng" khi làn chưa có trang (status/stop không phải kiểm null ở khắp nơi). */
+  private readonly idleCdp = new LarkCdpDriver();
+  private get win(): LarkHost | null {
+    return this.pageFor(currentLane(), true);
+  }
+  /** Gán = đăng ký trang cho làn hiện tại (luồng đăng nhập: làn mặc định); null = dọn trang đã đóng. */
+  private set win(w: LarkHost | null) {
+    if (!w) {
+      for (const [k, p] of this.pages) if (p.host.isDestroyed()) this.pages.delete(k);
+      return;
+    }
+    const lane = currentLane();
+    if (this.pages.get(lane)?.host === w) return;
+    const cdp = new LarkCdpDriver();
+    cdp.bind(w.webContents);
+    this.pages.set(lane, { host: w, cdp, usedAt: Date.now() });
+  }
+  /** CDP driver của trang thuộc làn hiện tại (falls back to the legacy JS driver). */
+  get cdp(): LarkCdpDriver {
+    const w = this.pageFor(currentLane(), false);
+    for (const p of this.pages.values()) if (p.host === w) return p.cdp;
+    return this.idleCdp;
+  }
+
+  /**
+   * Trang của một làn. Làn chưa có trang: đã đăng nhập (trang mặc định sống + biết tenant + không đang
+   * chờ đăng nhập) và `create` → mở trang mới cho làn; chưa đăng nhập → trả trang MẶC ĐỊNH (chính là
+   * trang đăng nhập — khung của tab nào cũng hiện được nó).
+   */
+  private pageFor(lane: string, create: boolean): LarkHost | null {
+    if (lane) {
+      const p = this.pages.get(lane);
+      if (p && !p.host.isDestroyed()) {
+        p.usedAt = Date.now();
+        return p.host;
+      }
+      if (p) this.pages.delete(lane);
+      const def = this.pages.get(DEFAULT_LANE);
+      if (create && this.host && def && !def.host.isDestroyed() && !this.loginPending) return this.openLanePage(lane);
+    }
+    const d = this.pages.get(DEFAULT_LANE);
+    if (d && d.host.isDestroyed()) {
+      this.pages.delete(DEFAULT_LANE);
+      return null;
+    }
+    if (d) d.usedAt = Date.now();
+    return d?.host ?? null;
+  }
+
+  /** Mở trang cho một làn (đã đăng nhập): cùng partition, đưa về tenant ngay để fetch nội bộ chạy được. */
+  private openLanePage(lane: string): LarkHost {
+    this.evictLanePages(lane);
+    const win = laneAls.run(lane, () => this.makeWindow(false));
+    void win.loadURL(`${this.host}/drive/home/`, { userAgent: CHROME_UA }).catch(() => undefined);
+    return win;
+  }
+
+  /** Giữ tối đa MAX_LANE_PAGES trang làn: đóng trang ít dùng nhất — không bao giờ trang đang hiện / đang chạy. */
+  private evictLanePages(keep: string): void {
+    const lanes = [...this.pages.entries()].filter(([k]) => k !== DEFAULT_LANE);
+    if (lanes.length < MAX_LANE_PAGES) return;
+    const shown = this.embedTarget?.shown;
+    const victims = lanes
+      .filter(([k]) => k !== keep && k !== shown && !this.busyLanes.has(k))
+      .sort((a, b) => a[1].usedAt - b[1].usedAt);
+    for (const [k, p] of victims.slice(0, lanes.length - MAX_LANE_PAGES + 1)) this.closeLanePage(k, p);
+  }
+
+  private closeLanePage(lane: string, p = this.pages.get(lane)): void {
+    if (!p || lane === DEFAULT_LANE) return;
+    this.pages.delete(lane);
+    try {
+      p.cdp.bind(null);
+      if (!p.host.isDestroyed()) p.host.destroy();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Hội thoại đóng tab / bị xoá → giải phóng trang của nó (phiên đăng nhập không đổi). */
+  releaseLane(lane: string): void {
+    if (lane && !this.busyLanes.has(lane)) this.closeLanePage(lane);
+  }
+
+  /** Lượt chat của làn bắt đầu / kết thúc — làn đang chạy không bị đóng để nhường chỗ. */
+  setLaneBusy(lane: string, busy: boolean): void {
+    if (!lane) return;
+    if (busy) this.busyLanes.add(lane);
+    else this.busyLanes.delete(lane);
+  }
   /** Which driver produced the LAST snapshot (its refs are only valid for that driver). */
   private uiMode: 'cdp' | 'legacy' = 'cdp';
   /** "Trình duyệt Lark" screen: the main window + rect the page is embedded at (null = detached). */
-  private embedTarget: { win: BrowserWindow; rect: { x: number; y: number; width: number; height: number } } | null = null;
+  private embedTarget: { win: BrowserWindow; rect: { x: number; y: number; width: number; height: number }; want: string; shown: string } | null = null;
   /** A visible-login connect() is waiting for the user (so a detach must re-show the popup). */
   private loginPending = false;
   /** Trang đăng nhập đang hiện mã QR hay ô email/SSO (xem loginViewScript); vắng = chưa biết. */
@@ -820,15 +937,32 @@ export class LarkWebSession {
    *  probe / a live call found the cookies expired (lastHealth==='dead') — so the UI stops
    *  showing a stale green "connected" tag after the session silently dies. */
   status(): LarkWebInfo {
-    const alive = !!this.win && !this.win.isDestroyed() && !!this.host && this.lastHealth !== 'dead';
+    // Trạng thái ĐĂNG NHẬP (chung mọi làn) — không đọc `this.win` (getter đó tạo trang cho làn).
+    const anyPage = [...this.pages.values()].some((p) => !p.host.isDestroyed());
+    const alive = anyPage && !!this.host && this.lastHealth !== 'dead';
     return { connected: alive, host: this.host ?? undefined };
   }
 
   private makeWindow(show: boolean): LarkHost {
     const win = new LarkHost(this.partitionName(), 'Đăng nhập Lark (Larkwave)', this.parkingWin);
-    this.cdp.bind(win.webContents);
-    // The "Trình duyệt Lark" screen is open → the (new) page appears inside the app, not as a popup.
-    if (this.embedTarget) win.embed(this.embedTarget.win, this.embedTarget.rect);
+    // Đăng ký trang cho LÀN hiện tại (mặc định = trang đăng nhập / việc nền), bộ lái CDP riêng.
+    const lane = currentLane();
+    const old = this.pages.get(lane);
+    if (old && old.host !== win) old.cdp.bind(null);
+    const cdp = new LarkCdpDriver();
+    cdp.bind(win.webContents);
+    this.pages.set(lane, { host: win, cdp, usedAt: Date.now() });
+    win.on('closed', () => {
+      if (this.pages.get(lane)?.host === win) this.pages.delete(lane);
+    });
+    // Khung Lark đang mở và đang chờ ĐÚNG trang này (làn của tab đang xem; hoặc trang mặc định khi làn
+    // đó chưa có trang — trang đăng nhập) → trang hiện ngay trong app, không thành cửa sổ nổi.
+    const t = this.embedTarget;
+    if (t && (t.want === lane || (lane === DEFAULT_LANE && !this.pages.has(t.want)) || t.shown === lane)) {
+      for (const [k, p] of this.pages) if (k !== lane && k === t.shown && !p.host.isDestroyed()) p.host.unembed();
+      win.embed(t.win, t.rect);
+      t.shown = lane;
+    }
     if (show) {
       // Reveal once the first frame is painted; if Lark is slow/blocked, a fallback timer still
       // surfaces the (now white) window so the user is never left staring at nothing.
@@ -1281,23 +1415,44 @@ export class LarkWebSession {
     });
   }
 
-  /** Attach (or re-position) the Lark page inside `win`. Zero-size rect = attached but hidden. */
-  browserAttach(win: BrowserWindow, rect: { x: number; y: number; width: number; height: number }): LarkBrowserState {
-    this.embedTarget = { win, rect };
-    if (this.win && !this.win.isDestroyed()) {
-      this.win.embed(win, rect);
-      void this.cdp.ensure(); // network capture on → a hand-made automation becomes a template
-    }
-    return this.browserState();
+  /** Khoá của trang `w` trong danh sách làn ('' nếu là trang mặc định / không thấy). */
+  private laneOf(w: LarkHost | null): string {
+    for (const [k, p] of this.pages) if (p.host === w) return k;
+    return DEFAULT_LANE;
+  }
+
+  /**
+   * Attach (or re-position) the Lark page OF LANE `lane` (= hội thoại của tab đang xem) inside `win`.
+   * Zero-size rect = attached but hidden. Đổi tab → trang của tab cũ về chỗ đỗ (vẫn chạy), trang của tab
+   * mới vào khung; chưa đăng nhập thì khung nào cũng hiện trang mặc định (trang đăng nhập).
+   */
+  browserAttach(win: BrowserWindow, rect: { x: number; y: number; width: number; height: number }, lane = DEFAULT_LANE): LarkBrowserState {
+    return withLarkLane(lane, () => {
+      const page = this.win; // tạo trang cho làn nếu cần (đã đăng nhập)
+      const shown = this.laneOf(page);
+      const prev = this.embedTarget;
+      if (prev && prev.shown !== shown) {
+        const old = this.pages.get(prev.shown)?.host;
+        if (old && old !== page && !old.isDestroyed()) old.unembed();
+      }
+      this.embedTarget = { win, rect, want: lane, shown };
+      if (page && !page.isDestroyed()) {
+        page.embed(win, rect);
+        void this.cdp.ensure(); // network capture on → a hand-made automation becomes a template
+      }
+      return this.browserState(lane);
+    });
   }
 
   /** Leave the screen: the page goes back to the hidden host (session + automation keep running). */
   browserDetach(): void {
+    const t = this.embedTarget;
     this.embedTarget = null;
-    if (this.win && !this.win.isDestroyed()) {
-      this.win.unembed();
+    const w = t ? this.pages.get(t.shown)?.host ?? null : null;
+    if (w && !w.isDestroyed()) {
+      w.unembed();
       // A login was in progress inside the app → keep it reachable as the classic popup.
-      if (this.loginPending) this.win.show();
+      if (this.loginPending && t?.shown === DEFAULT_LANE) w.show();
     }
   }
 
@@ -1343,8 +1498,15 @@ export class LarkWebSession {
     }
   }
 
-  browserState(): LarkBrowserState {
-    const w = this.win && !this.win.isDestroyed() ? this.win : null;
+  browserState(lane = DEFAULT_LANE): LarkBrowserState {
+    return withLarkLane(lane, () => this.browserStateNow());
+  }
+
+  private browserStateNow(): LarkBrowserState {
+    // KHÔNG tạo trang chỉ vì giao diện hỏi trạng thái (khung hỏi mỗi giây): làn chưa có trang thì báo
+    // theo trang mặc định — trang của làn được tạo khi khung thật sự gắn vào hoặc khi một tool cần.
+    const pw = this.pageFor(currentLane(), false);
+    const w = pw && !pw.isDestroyed() ? pw : null;
     const wc = w?.webContents;
     this.maybeDetectViewLogin(wc);
     let url = '';
@@ -1394,7 +1556,11 @@ export class LarkWebSession {
   }
 
   /** Toolbar navigation. Pasted URLs must be Lark hosts (this page holds the user's Lark login). */
-  async browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
+  async browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState> {
+    return withLarkLane(input.lane, () => this.browserNavigateNow(input));
+  }
+
+  private async browserNavigateNow(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
     const w = this.win && !this.win.isDestroyed() ? this.win : null;
     if (!w) throw new Error('Chưa có phiên Lark web — bấm "Đăng nhập Lark" trước.');
     const wc = w.webContents;
@@ -1413,17 +1579,21 @@ export class LarkWebSession {
       this.preferLoginForm = want === 'form';
       await this.applyLoginView(wc, want);
     }
-    return this.browserState();
+    return this.browserStateNow();
   }
 
-  /** "Dừng" — abort the running UI automation (every lark_ui_* call refuses until it's lifted). */
-  browserStopAi(): LarkBrowserState {
-    this.cdp.stop();
-    return this.browserState();
+  /** "Dừng" — abort the running UI automation OF THIS LANE (every lark_ui_* call of it refuses until lifted). */
+  browserStopAi(lane = DEFAULT_LANE): LarkBrowserState {
+    return withLarkLane(lane, () => {
+      this.cdp.stop();
+      return this.browserStateNow();
+    });
   }
-  browserResumeAi(): LarkBrowserState {
-    this.cdp.resume();
-    return this.browserState();
+  browserResumeAi(lane = DEFAULT_LANE): LarkBrowserState {
+    return withLarkLane(lane, () => {
+      this.cdp.resume();
+      return this.browserStateNow();
+    });
   }
 
   // ── Templates: "Làm mẫu một lần → dùng lại" ──────────────────────────────────────────────────
@@ -1750,20 +1920,22 @@ export class LarkWebSession {
     this.timer = null;
   }
 
+  /** Đóng MỌI trang (đăng nhập lại / đăng xuất / đổi tài khoản): phiên đổi thì trang của mọi làn cũng hết hiệu lực. */
   private destroyWindow(): void {
     this.clearTimers(); // stop any in-flight connect() poll/timeout so it can't leak
     this.recorderArmed = false; // a fresh window has no in-page recorder until re-armed
     this.inspectArmed = false;
     this.loginPending = false;
-    this.cdp.bind(null);
-    if (this.win && !this.win.isDestroyed()) {
+    for (const [k, p] of [...this.pages]) {
+      this.pages.delete(k);
       try {
-        this.win.destroy();
+        p.cdp.bind(null);
+        if (!p.host.isDestroyed()) p.host.destroy();
       } catch {
         /* ignore */
       }
     }
-    this.win = null;
+    if (this.embedTarget) this.embedTarget.shown = DEFAULT_LANE;
   }
 
   /**
@@ -1771,8 +1943,36 @@ export class LarkWebSession {
    * root-relative path (e.g. `/space/api/bitable/…`). Returns the parsed `data` on Lark
    * `code === 0`; throws an actionable error on a login redirect / non-zero code.
    */
+  /**
+   * Fetch tương đối chạy theo origin HIỆN TẠI của trang. Trang lạc sang origin khác (trang đăng nhập,
+   * www.larksuite.com) — hay trang của một làn vừa mở, còn trống — thì cookie/csrf của tenant không áp →
+   * đưa về đúng tenant trước. Đang tải dở trang tenant thì chờ cho xong.
+   */
+  private async ensureTenantOrigin(win: LarkHost): Promise<void> {
+    if (!this.host || win.isDestroyed()) return;
+    const wc = win.webContents;
+    try {
+      // Khung CHÍNH đang tải (vd trang làn vừa mở) → chờ xong: getURL() lúc này đã là địa chỉ đích trong
+      // khi tài liệu vẫn là trang trống. Chỉ khung chính — iframe chạy nền của Lark không được làm chậm.
+      if (wc.isLoadingMainFrame()) {
+        await new Promise<void>((r) => {
+          const done = () => r();
+          wc.once('did-stop-loading', done);
+          setTimeout(done, 15_000);
+        });
+      }
+      if (safeOrigin(wc.getURL()) !== safeOrigin(this.host)) {
+        await win.loadURL(`${this.host}/drive/home/`, { userAgent: CHROME_UA });
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    } catch {
+      /* để fetch bên dưới báo lỗi thật */
+    }
+  }
+
   private async rawCall(path: string, method: string, body?: unknown): Promise<RawResult> {
     if (!this.win || this.win.isDestroyed()) return { error: 'Cửa sổ Lark đã đóng' };
+    await this.ensureTenantOrigin(this.win);
     // x-csrftoken cho MỌI phương thức (đúng như app Lark gửi) — xem pageFetchJs.
     const js = pageFetchJs(path, method, body);
     return (await this.win!.webContents.executeJavaScript(js, true)) as RawResult;
@@ -1912,22 +2112,7 @@ export class LarkWebSession {
       throw new Error('Chưa đăng nhập Lark web — mở "Tạo workflow" và đăng nhập Lark ngay trong khung bên phải.');
     }
     const wc = this.win.webContents;
-    // Fetch tương đối chạy theo origin HIỆN TẠI của trang. Trang lạc sang origin khác (trang đăng
-    // nhập, www.larksuite.com) thì cookie/csrf của tenant không áp → đưa về đúng tenant trước.
-    let cur = '';
-    try {
-      cur = wc.getURL();
-    } catch {
-      /* ignore */
-    }
-    if (safeOrigin(cur) !== safeOrigin(this.host)) {
-      try {
-        await this.win.loadURL(`${this.host}/drive/home/`, { userAgent: CHROME_UA });
-        await new Promise((r) => setTimeout(r, 1500));
-      } catch {
-        /* để fetch bên dưới báo lỗi thật */
-      }
-    }
+    await this.ensureTenantOrigin(this.win);
     const run = wc.executeJavaScript(pageFetchJs(path, method, body), true) as Promise<RawResult>;
     const res = await Promise.race([
       run.catch((e) => ({ error: String((e as Error)?.message || e) }) as RawResult),

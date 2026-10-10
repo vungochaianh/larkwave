@@ -42,7 +42,13 @@ export function LarkChatShell({
   frame,
   extraMenu,
   onBasesChange,
+  onActiveChange,
 }: {
+  /**
+   * Tab đang xem đổi (id hội thoại, null = màn chào) kèm Base đã biết của tab đó — màn cha đưa khung
+   * Lark sang TRANG riêng của hội thoại này và đặt nút "nhà" theo Base của nó.
+   */
+  onActiveChange?: (id: string | null, bases?: LarkBaseRef[]) => void;
   layout?: 'chat' | 'frame';
   frame?: LarkFrameCtl;
   extraMenu?: { items: NonNullable<MenuProps['items']>; onClick: (key: string) => void };
@@ -56,6 +62,14 @@ export function LarkChatShell({
 }) {
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Base mới nhất mỗi tab báo lên — đổi tab là màn cha biết ngay Base của tab đó (LarkChat chỉ báo khi
+  // Base của nó ĐỔI, không báo lại lúc được chọn).
+  const basesByTab = useRef<Record<string, LarkBaseRef[]>>({});
+  const onActiveChangeRef = useRef(onActiveChange);
+  onActiveChangeRef.current = onActiveChange;
+  useEffect(() => {
+    onActiveChangeRef.current?.(activeId, activeId ? basesByTab.current[activeId] : undefined);
+  }, [activeId]);
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [closed, setClosed] = useState<string[]>([]);
@@ -211,6 +225,9 @@ export function LarkChatShell({
       return next;
     });
     setClosed((c) => [...c, id]);
+    // Trang Lark riêng của hội thoại này không còn ai xem → trả RAM (đăng nhập giữ nguyên; mở lại tab
+    // là có trang mới). Lõi không đóng trang đang có lượt chạy.
+    void runtime.larkBrowserRelease?.(id).catch(() => undefined);
   };
 
   const filtered = useMemo(() => {
@@ -427,7 +444,10 @@ export function LarkChatShell({
               layout={layout}
               frame={frame}
               extraMenu={extraMenu}
-              onBasesChange={id === activeId ? onBasesChange : undefined}
+              onBasesChange={(bases, added) => {
+                basesByTab.current[id] = bases;
+                if (id === activeId) onBasesChange?.(bases, added);
+              }}
             />
           </div>
         ))}

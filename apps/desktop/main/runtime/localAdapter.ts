@@ -423,24 +423,27 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
     return this.lark.webReplayWorkflow(opts);
   }
   /** `win` = the window the request came from (background passes BrowserWindow.fromWebContents). */
-  async larkBrowserAttach(rect: LarkBrowserRect, win?: BrowserWindow): Promise<LarkBrowserState> {
-    if (!win) return this.lark.browserState();
-    return this.lark.browserAttach(win, rect);
+  async larkBrowserAttach(rect: LarkBrowserRect, lane?: string, win?: BrowserWindow): Promise<LarkBrowserState> {
+    if (!win) return this.lark.browserState(lane);
+    return this.lark.browserAttach(win, rect, lane);
   }
   async larkBrowserDetach(): Promise<void> {
     this.lark.browserDetach();
   }
-  async larkBrowserState(): Promise<LarkBrowserState> {
-    return this.lark.browserState();
+  async larkBrowserState(lane?: string): Promise<LarkBrowserState> {
+    return this.lark.browserState(lane);
   }
-  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
+  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm'; lane?: string }): Promise<LarkBrowserState> {
     return this.lark.browserNavigate(input);
   }
-  async larkBrowserStopAi(): Promise<LarkBrowserState> {
-    return this.lark.browserStopAi();
+  async larkBrowserStopAi(lane?: string): Promise<LarkBrowserState> {
+    return this.lark.browserStopAi(lane);
   }
-  async larkBrowserResumeAi(): Promise<LarkBrowserState> {
-    return this.lark.browserResumeAi();
+  async larkBrowserResumeAi(lane?: string): Promise<LarkBrowserState> {
+    return this.lark.browserResumeAi(lane);
+  }
+  async larkBrowserRelease(lane: string): Promise<void> {
+    this.lark.browserRelease(lane);
   }
   async larkUiTemplateList(): Promise<LarkUiTemplate[]> {
     return this.lark.uiTemplateList();

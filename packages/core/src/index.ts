@@ -156,6 +156,7 @@ export const IPC = {
   larkBrowserState: 'tw:larkBrowserState',
   larkBrowserNavigate: 'tw:larkBrowserNavigate',
   larkBrowserStopAi: 'tw:larkBrowserStopAi',
+  larkBrowserRelease: 'tw:larkBrowserRelease',
   larkBrowserResumeAi: 'tw:larkBrowserResumeAi',
   larkUiTemplateList: 'tw:larkUiTemplateList',
   larkUiTemplateSave: 'tw:larkUiTemplateSave',
