@@ -200,7 +200,11 @@ export function LarkChat({
   const [activeSkill, setActiveSkill] = useState<{ id: string; name: string } | null>(null);
   const activeSkillRef = useRef<{ id: string; name: string } | null>(null);
   const [sessionId, setSessionId] = useState('');
-  const blockedByOther = !!agentOwner && !busy && !!agentOwner.sessionId && agentOwner.sessionId === sessionId;
+  // Lõi cũ (≤0.1.2) chỉ có MỘT trang Lark chung → hai tab chạy cùng lúc vẫn giẫm lên nhau: giữ khoá cũ
+  // (mọi tab chờ lượt đang chạy). Lõi có trang riêng từng hội thoại — nhận ra qua kênh tài khoản Lark
+  // ra cùng bản — thì chỉ chặn khi chính hội thoại này đang có lượt khác.
+  const perConvPages = !!runtime.larkWebAccounts;
+  const blockedByOther = !!agentOwner && !busy && (perConvPages ? !!agentOwner.sessionId && agentOwner.sessionId === sessionId : true);
   const [sessions, setSessions] = useState<LarkSessionMeta[]>([]);
   // Collapsed answers — a per-machine view preference (see larkFold.ts for why it is
   // deliberately NOT stored on the message or in the shared session payload).
