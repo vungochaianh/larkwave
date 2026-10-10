@@ -210,8 +210,9 @@ export function FileCard({
           <PreviewTable head={rowsShown || []} />
           {(curSheet.head.length > 5 || curSheet.rows > curSheet.head.length) && (
             <Button type="link" size="small" style={{ padding: 0, height: 22 }} onClick={() => setExpanded((x) => !x)}>
-              {expanded ? 'Thu gọn' : `Xem ${Math.min(10, curSheet.rows)} dòng đầu`}
-              {curSheet.rows > 10 ? ` / ${curSheet.rows} dòng` : ''}
+              {/* Đếm DÒNG DỮ LIỆU (không tính hàng tiêu đề) — khớp tóm tắt "N dòng" ở trên và báo cáo xuất tệp. */}
+              {expanded ? 'Thu gọn' : `Xem ${Math.max(0, curSheet.head.length - 1)} dòng đầu`}
+              {!expanded && curSheet.rows - 1 > curSheet.head.length - 1 ? ` / ${curSheet.rows - 1} dòng dữ liệu` : ''}
             </Button>
           )}
         </div>

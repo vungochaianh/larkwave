@@ -261,7 +261,7 @@ export function LarkScreen({
           showIcon
           data-testid="lark-login-hint"
           message="Đăng nhập Lark để bắt đầu — không cần App ID"
-          description="Agent chạy bằng phiên Lark web của bạn (quét Base, hỏi đáp, tạo workflow). Muốn thêm tin nhắn/lịch/ghi bản ghi qua Open API thì kết nối custom app."
+          description="Agent chạy bằng phiên Lark web của bạn: quét Base, hỏi đáp, tạo workflow, ghi bản ghi + đính kèm, đưa tệp lên Drive / nhập thành Sheet hay Doc. Gửi tin nhắn, lịch và Open API thì cần kết nối custom app."
           action={
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <Button size="small" type="primary" icon={<LoginOutlined />} onClick={() => void runtime.larkWebConnect?.().finally(() => void refresh())}>

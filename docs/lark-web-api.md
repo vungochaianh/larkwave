@@ -3,7 +3,9 @@
 Đo trên tenant thật (`*.sg.larksuite.com`) ngày 09/10/2026, qua CDP Network trên trang Lark đã đăng nhập
 trong app (chế độ ẩn `LARKWAVE_HIDDEN=1`). Code: `apps/desktop/main/runtime/lark/larkWebApi.ts`
 (parser, có fixture ở `apps/desktop/test/fixtures/lark-web`), `larkWebSession.ts` (gọi),
-`webAutomation.ts` (chuyển thiết kế), `tools/larkWeb.ts` (tool cho agent).
+`webAutomation.ts` (chuyển thiết kế), `tools/larkWeb.ts` (tool cho agent). Mục 13–16 (đọc đủ / ghi bản ghi,
+tải lên, Drive, nhập Sheet/Doc — đo 10/10/2026): `webRecords.ts`, `bitableEncode.ts`, `webFiles.ts`,
+`tools/larkWebWrite.ts`, fixture `records-page.json`, `upload-import.json`.
 
 ## Cách gọi
 
@@ -334,3 +336,108 @@ bản gửi; mở canvas → `canvasSelfCheckScript` (bộ kiểm của chính t
   nhắn người phụ trách. 46 giây, 6 tool, lark_check đạt 5 bước.
 - «Larkwave DEMO — báo cáo thứ Hai» — khối `wkfaj244hiPGAKJC`, workflowID `7694693489674260200`: 8:30 thứ
   Hai hằng tuần → tìm «Công việc follow-up» Chưa làm → lặp → nhắn người phụ trách. 42 giây, lark_check đạt 4 bước.
+
+## 13. Đọc ĐỦ và ghi bản ghi qua phiên web (đo 10/10/2026) — `webRecords.ts`, `bitableEncode.ts`
+
+**Đọc theo trang** (thứ trang Lark gọi khi cuộn bảng):
+`GET /space/api/v1/bitable/:token/records?tableID=&viewID=&offset=&limit=&viewLazyLoad=true&removeFmlExtra=true`
+→ `data { encoding, records }`; `encoding 0` = gzip + base64, `17` = JSON thẳng. Giải ra
+`{ recordMap, groupList[0].recordIDList, tableRecordNum, viewRecordNum }`. `limit` ≤ 1000 (trang tự chia đôi
+khi lỗi). `readAllRecords` lặp `offset` tới khi đủ `tableRecordNum`; THIẾU là ném lỗi
+"Đọc thiếu dữ liệu: …" — không bao giờ im lặng trả nửa bảng. Trần an toàn 200 000 dòng (vượt thì báo rõ).
+
+**Đọc đúng id** (đọc lại sau khi ghi): `POST /space/api/v2/bitable/records/`
+`{ token, tableId, historyLevel: 0, payload: JSON.stringify({ <recId>: {} }), removeFmlExtra: true }` → `data.gzipRecords`.
+
+**Ghi** — không có endpoint HTTP (như mục 8): gọi lớp lệnh của chính trang trong `bitableConnectContexts`:
+
+```js
+to = ctx.operate.tableOperate
+if (!ctx.base.getTableById(tableId)?.tableLoaded) await to.getBaseOperate().fetchTable(tableId)  // BẮT BUỘC
+to.addRecords({ tableId, count })                       // → [{ recordId }] (dòng trống)
+to.setRecords({ tableId, data: { rec: { fld: { type, value } } } })   // result 2 = ghi, 0 = không đổi
+to.addSelectFieldOption({ tableId, fieldId, names })    // chỉ khi người dùng bảo tạo lựa chọn mới
+```
+
+Bẫy đo được: bảng chưa mở trên trang (`tableLoaded:false`) thì `setRecords` trả **0** cho bản ghi vừa thêm
+mà không báo lỗi → phải `fetchTable` trước; có thêm một lần thử lại. Mọi lần ghi đều ĐỌC LẠI bằng
+records-by-id và so từng ô (`compareWritten`) → tool trả `verified` + số ô khớp, lệch thì liệt kê.
+
+**Khuôn ô nội bộ** (`encodeCell`, đã ghi thật cả 14 loại và đọc lại khớp):
+
+| Loại (type) | value |
+|---|---|
+| chữ 1 | `[{ type: 'text', text }]` · email: `[{ type: 'url', text, link: 'mailto:…' }]` |
+| số / tiền tệ / phần trăm 2 | số (25% → `0.25`; nhận "1.234,5", "25%") |
+| chọn một 3 / chọn nhiều 4 | `'opt…'` / `['opt…']` — tên lạ thì báo lỗi kèm danh sách lựa chọn |
+| ngày 5 | ms; chuỗi ngày hiểu theo **múi giờ của Base** (vd Asia/Saigon), không theo máy |
+| ô tích 7 | `true/false` |
+| người 11 | `{ users: [{ userId, name, enName, notify: false }] }` (tên/email → tra danh bạ phiên web) |
+| điện thoại 13 | `{ fullPhoneNum }` |
+| liên kết URL 15 | `[{ type: 'url', text, link }]` |
+| đính kèm 17 | `[{ id, attachmentToken, name, text, size, mimeType, timeStamp }]` |
+| liên kết bản ghi 18 / 21 | `['rec…']` |
+| công thức, tra cứu, tự động, người/giờ tạo-sửa | chỉ đọc — tool từ chối |
+
+## 14. Tải lên, đính kèm, Drive và nhập thành Sheet/Doc — `webFiles.ts`
+
+**Tải lên** (cùng origin, chạy được trong trang):
+`POST /space/api/box/stream/upload/all/?name&size&checksum&mount_point&mount_node_token[&ext[extra]]&push_open_history_record=0`
+multipart trường `file`; header `x-csrftoken`, `biz-ua-type: Web`, `biz-scene: file_upload`;
+`checksum` = adler32 dạng thập phân. → `data.file_token`.
+
+| mount_point | mount_node_token | Dùng cho |
+|---|---|---|
+| `explorer` | token thư mục Drive | tệp thường trong Drive |
+| `bitable_file` / `bitable_image` | app_token của Base | ô đính kèm |
+| `ccm_import` | token thư mục | bước 1 của nhập; `ext[extra]={"obj_type":"sheet|docx","file_extension":"xlsx"}` |
+
+**Đính kèm** = tải lên `bitable_file` rồi `setRecords` với danh sách ô HIỆN CÓ (đọc từ máy chủ ngay trước)
++ tệp mới; chỉ thay cả ô khi người dùng bảo (`replace: true`). Tải tệp đính kèm về cần
+`?extra={"bitablePerm":{"tableId","attachments":{"<fld>":{"<rec>":["<token>"]}}}}`.
+
+**Nhập thành Sheet / Doc**: tải lên `ccm_import` →
+`POST /space/api/import/create/` JSON `{ file_token, type: 'sheet'|'docx', file_extension, point: { mount_type: 1, mount_key: <thư mục> }, event_source: 1, client_token, passback }`
+(thiếu `event_source` → code 2 "Parameter Error") → `ticket`; hỏi
+`GET /space/api/import/result/<ticket>/?token=<thư mục>` tới khi `job_status 0` (≥ 3 là hỏng; 129 =
+docx tối giản bị từ chối → `buildDocx` nay dựng đủ gói styles/settings/docProps/sectPr). Sau khi nhập, tool
+mở tài liệu mới và ĐỌC LẠI (Sheet: từng tab qua `?sheet=<id>`; Doc: tiêu đề từ
+`/space/api/meta/?token=&type=22` + các đoạn) rồi so với tệp nguồn.
+
+**Drive**: tạo thư mục `POST /space/api/explorer/v2/create/folder/` form `{ parent_token: '', name, source: 0 }`;
+con `GET /space/api/explorer/v2/children/list/?token=`; bỏ vào thùng rác `POST /space/api/explorer/v2/remove/`
+`token=`; xoá hẳn `POST /space/api/explorer/v2/trash/delete/` `token=`; thùng rác `GET /space/api/explorer/v2/trash/list/`;
+người dùng hiện tại `GET /space/api/user/`. Không chỉ thư mục thì tool dùng (hoặc tạo) thư mục «Larkwave».
+
+## 15. Sheet và Doc trong trang
+
+- Sheet: `window.spread.sheets[i]` — `getValue(r, c)`, `getFormula(r, c)`,
+  `setCellValue(r, c, v, autoFormat, segments, dontParseNumber)`; chuỗi ghi với `(false, undefined, true)`
+  để giữ "00123". **Chỉ tab đang mở có dữ liệu** (tab khác `loaded:false`) → đọc từng tab bằng cách mở
+  `?sheet=<id>`; ghi vào tab không mở vẫn được lưu. Tool ghi xong đọc lại vùng vừa ghi ngay trong trang và so
+  từng ô (đã kiểm thật: tải lại trang, dữ liệu vẫn còn).
+- Doc: đọc tiêu đề qua meta API (tiêu đề trong DOM có lúc chỉ là "Docs"), nội dung qua khối trong trang.
+
+## 16. Tool ghi qua phiên web và luật duyệt
+
+| Tool | Làm gì | Duyệt khi "Tự động" BẬT |
+|---|---|---|
+| `lark_web_read_records` | đọc ĐỦ bảng, báo `complete` + tổng | không hỏi (chỉ đọc) |
+| `lark_export_table_file` | đọc đủ → xlsx/csv, báo "N dòng nguồn → N dòng trong tệp"; lệch là lỗi | không hỏi |
+| `lark_web_write_records` | thêm bản ghi mới (đọc lại từng ô) | tự chạy (cộng thêm) |
+| `lark_web_update_records` | sửa bản ghi có sẵn | LUÔN hỏi |
+| `lark_web_attach_file` | thêm tệp vào ô đính kèm | tự chạy; `replace: true` thì hỏi |
+| `lark_web_drive_upload` | đưa tệp lên thư mục Drive | tự chạy |
+| `lark_web_import_as_sheet` / `_as_doc` | nhập xlsx/csv → Sheet, docx → Doc + đọc lại | tự chạy |
+| `lark_web_sheet_write_range` | ghi đè một vùng Sheet có sẵn | LUÔN hỏi |
+
+Luật ở `needsConfirmation` (larkToolExec.ts): cờ `additive` + `additiveWhen(input)` cho trường hợp phụ thuộc
+tham số. Phiên web chưa đăng nhập (hoặc ghi lỗi) mà có custom app thì xuất bảng / thêm bản ghi rơi về Open API. **Gửi tin nhắn** không
+có đường phiên web — chỉ qua custom app, và luôn hỏi. Tệp agent đọc lên Lark chỉ được nằm trong thư mục
+xuất của hội thoại / thư mục đính kèm (đường dẫn khác như `/etc/hosts` bị từ chối).
+
+**Đã kiểm thật** trên Base Test + thư mục Drive «Larkwave Test (tự xoá)» (10/10/2026; đã xoá sạch sau đó):
+ghi 2 bản ghi × 14 loại (17 ô khớp), sửa 4 ô, lựa chọn thiếu → lỗi rõ / `create_missing_options` → tạo +
+khớp, đọc đủ 21 dòng, tải lên Drive, xlsx 2 sheet → Sheet (4 + 2 dòng khớp), csv → Sheet (3 dòng), docx →
+Doc (tiêu đề + 4 đoạn), ghi vùng Sheet (giữ "00123" sau khi tải lại), agent Claude tự dựng xlsx → đính kèm
+(2 → 3 tệp) → xuất csv 21 → 21.
