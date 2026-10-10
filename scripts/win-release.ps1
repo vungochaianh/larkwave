@@ -1,8 +1,8 @@
 ﻿# Dựng và tải bản cài Windows, chạy TRÊN MÁY WINDOWS.
 #
-# Máy này cố ý KHÔNG có khoá Cloudflare và KHÔNG cập nhật manifest. Nó làm đúng một việc: dựng
-# .exe rồi tải lên GitLab package registry. Bước cập nhật manifest nằm ở máy chính — nhờ vậy máy
-# Windows chỉ cần một khoá hẹp (write_package_registry), thu hồi riêng được.
+# Nó làm đúng một việc: dựng .exe rồi tải lên GitLab package registry (gói larkwave-desktop).
+# Không có bước manifest: toolswave.net/api/apps-release/larkwave đọc thẳng registry, nên trang
+# tải tự nhận bản mới. Máy Windows chỉ cần một khoá hẹp (write_package_registry), thu hồi riêng được.
 #
 # Dùng:
 #   powershell -ExecutionPolicy Bypass -File scripts\win-release.ps1
@@ -56,7 +56,9 @@ Write-Host '==> đóng gói bản Windows' -ForegroundColor Cyan
 pnpm --filter desktop dist:win
 if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter desktop dist:win (mã $LASTEXITCODE)" }
 
-Write-Host '==> tải lên GitLab (KHÔNG đụng manifest)' -ForegroundColor Cyan
+Write-Host '==> tải lên GitLab' -ForegroundColor Cyan
+# push-installers chặn mặc định (nó PHÁT HÀNH lên registry công khai); chạy script này là đã chủ ý phát hành.
+$env:ALLOW_DEPLOY = '1'
 node scripts/push-installers.mjs --upload-only
 $uploadExit = $LASTEXITCODE
 
@@ -75,7 +77,7 @@ $uploadExit = $LASTEXITCODE
 #
 # Mã thoát nói dối theo cả hai chiều. Thứ duy nhất đáng tin là hỏi thẳng registry.
 $ver = (node -p "require('./apps/desktop/package.json').version")
-$pkgUrl = "https://gitlab.com/api/v4/projects/83700259/packages/generic/toolswave-desktop/$ver/Toolswave-$ver-win.exe"
+$pkgUrl = "https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/$ver/Larkwave-$ver-win.exe"
 Write-Host "==> xác minh trên registry: $pkgUrl" -ForegroundColor Cyan
 try {
   $head = Invoke-WebRequest -Uri $pkgUrl -Method Head -UseBasicParsing -TimeoutSec 120
@@ -86,8 +88,8 @@ try {
     Write-Host "    (lệnh tải lên thoát với mã $uploadExit, nhưng file CÓ trên registry — bỏ qua mã đó)" -ForegroundColor Yellow
   }
 } catch {
-  throw "KHÔNG thấy bản cài trên registry ($pkgUrl). Mã thoát của bước tải lên: $uploadExit. KHÔNG chạy bước manifest."
+  throw "KHÔNG thấy bản cài trên registry ($pkgUrl). Mã thoát của bước tải lên: $uploadExit."
 }
 
 Write-Host ''
-Write-Host 'Xong phần máy Windows. Chạy nốt lệnh in ở trên TRÊN MÁY CHÍNH để manifest trỏ tới bản này.' -ForegroundColor Green
+Write-Host 'Xong. toolswave.net/larkwave tự nhận bản này trong vòng ~5 phút (route đọc thẳng registry).' -ForegroundColor Green

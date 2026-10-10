@@ -55,7 +55,7 @@ const argPath = process.argv[2];
 const DEFAULT_ASAR =
   process.platform === 'win32'
     ? 'apps/desktop/dist/win-unpacked/resources/app.asar'
-    : 'apps/desktop/dist/mac-universal/Toolswave.app/Contents/Resources/app.asar';
+    : 'apps/desktop/dist/mac-universal/Larkwave.app/Contents/Resources/app.asar';
 let appDir = argPath || DEFAULT_ASAR;
 
 if (appDir.endsWith('.asar')) {
@@ -110,7 +110,7 @@ class FakeWindow {
 const electronMock = {
   app: {
     getPath: () => userData,
-    getName: () => 'Toolswave',
+    getName: () => 'Larkwave',
     getVersion: () => '0.0.0-smoke',
     getAppPath: () => appDir,
     // PHẢI resolve: `registerIpc(win)` nằm SAU `await app.whenReady()` (background.ts ~604).
