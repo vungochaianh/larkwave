@@ -1384,6 +1384,7 @@ export class LarkWebSession {
       canGoForward,
       loading,
       loginView: classifyLarkPage(url) === 'login' ? this.loginView : undefined,
+      loginSwitch: true,
       driver: this.cdp.attached ? 'cdp' : w ? 'legacy' : 'none',
       hidden: hiddenMode(),
       ai: { active: ai.active, stopped: ai.stopped, step: ai.step, actions: ai.actions, cap: ai.cap, startedAt: ai.startedAt, lastAt: ai.lastAt, saves: ai.saves },

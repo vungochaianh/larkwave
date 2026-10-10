@@ -499,6 +499,9 @@ export interface LarkBrowserState {
   /** Đang ở trang đăng nhập Lark: trang hiện mã QR hay ô email/SSO. Vắng = không ở trang đăng nhập
    *  (hoặc trang không có nút chuyển). Đổi bằng larkBrowserNavigate({action:'loginQr'|'loginForm'}). */
   loginView?: 'qr' | 'form';
+  /** Lõi biết tự bật QR + có action loginQr/loginForm (0.1.1+). Vắng = lõi cũ → giao diện đổi chế độ
+   *  bằng tham số URL `loginType` (xem packages/ui/.../larkLoginUrl.ts). */
+  loginSwitch?: boolean;
   driver: 'cdp' | 'legacy' | 'none';
   /** LARKWAVE_HIDDEN=1 dev mode (no window is ever shown). */
   hidden?: boolean;

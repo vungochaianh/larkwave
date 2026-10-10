@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn trỏ vào hạ tầng Toolswave. Phase deploy chưa làm — đặt ALLOW_DEPLOY=1 khi đã đổi đích.'); process.exit(1); }
+if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này đẩy GIAO DIỆN mới tới mọi bản Larkwave đã cài (Cloudflare Pages larkwave-desktop-renderer) — đặt ALLOW_DEPLOY=1 khi chắc chắn.'); process.exit(1); }
 /**
  * push-renderer.mjs — ONE command to ship a desktop renderer code-push.
  *
@@ -9,7 +9,9 @@ if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn
  *   2. builds the Next.js renderer static export (regenerates apps/desktop/app/),
  *   3. stages just the renderer files + writes a CORRECT release.json
  *      (renderer, minMain, rendererVersion, latestVersion, notice, downloads),
- *   4. deploys to Cloudflare Pages (project twd-desktop-renderer) via wrangler,
+ *   4. deploys to Cloudflare Pages (project larkwave-desktop-renderer) via wrangler,
+ *      — toolswave.net/api/apps-release/larkwave đọc release.json ở đó và chuyển tiếp
+ *        renderer/minMain/rendererVersion cho app (chính route đó là manifest app đọc),
  *   5. verifies the live manifest + /home are up and advertise the new version.
  *
  * Why this fixes "can't code-push / no version at the bottom":
@@ -32,7 +34,7 @@ if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn
  *   --notice <text>      Optional notice surfaced in the app's version modal.
  *   --mac <url>          Installer URL for macOS (.dmg). Preserved from the live manifest if omitted.
  *   --win <url>          Installer URL for Windows (.zip). Preserved from the live manifest if omitted.
- *   --project <name>     Cloudflare Pages project (default: twd-desktop-renderer).
+ *   --project <name>     Cloudflare Pages project (default: larkwave-desktop-renderer).
  *
  * Credentials for the deploy step (skip with --dry-run):
  *   Either run `wrangler login` once, OR export CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID
@@ -106,7 +108,10 @@ async function liveManifest() {
 }
 const prev = await liveManifest();
 
-let minMain = opt('min-main') || (flag('main-change') ? VERSION : prev.minMain) || '1.0.0';
+// Mặc định 0.1.0 = bản cài Larkwave đầu tiên (mọi bản cài đều nhận được). KHÔNG để '1.0.0' như bên
+// Toolswave: 0.1.0 < 1.0.0 nên lõi 0.1.0 sẽ coi giao diện là "cần lõi mới hơn" — vừa từ chối nhận,
+// vừa hiện thông báo bắt cài lại.
+let minMain = opt('min-main') || (flag('main-change') ? VERSION : prev.minMain) || '0.1.0';
 const notice = opt('notice', prev.notice ?? null);
 const downloads = {
   mac: opt('mac', prev?.downloads?.mac ?? null),

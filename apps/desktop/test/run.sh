@@ -34,7 +34,7 @@ test -f .test-build/tw-lark-runner/src/hosted.js || { echo "✗ không biên d�
 # Bộ rút nút hành động nằm ở packages/ui nhưng là hàm THUẦN (không import React) nên biên dịch
 # riêng được vào .test-build/ui — chỗ duy nhất trong bộ kiểm này chạm tới mã giao diện.
 npx tsc ../../packages/ui/src/components/lark/answerActions.ts ../../packages/ui/src/components/lark/larkDock.ts ../../packages/ui/src/components/lark/quickAsks.ts \
-  ../../packages/ui/src/components/lark/engineChip.ts ../../packages/ui/src/components/lark/larkLayout.ts ../../packages/ui/src/components/lark/larkConversations.ts \
+  ../../packages/ui/src/components/lark/engineChip.ts ../../packages/ui/src/components/lark/larkLayout.ts ../../packages/ui/src/components/lark/larkConversations.ts ../../packages/ui/src/components/lark/larkLoginUrl.ts \
   --outDir .test-build/ui --module commonjs --target es2020 --skipLibCheck
 # Lớp tương thích API Toolswave (thuần, không import) — biên dịch riêng để không đổi gốc thư mục ở trên.
 npx tsc ../../packages/ui/src/account/compat.ts --outDir .test-build/ui-account --module commonjs --target es2020 --skipLibCheck
@@ -48,7 +48,7 @@ test -f .test-build/runtime/lark/larkService.js || { echo "✗ không biên dị
 test -f .test-build/runtime/lark/tools/index.js || { echo "✗ không biên dịch được tools/index"; exit 1; }
 test -f .test-build/runtime/lark/systemPrompt.js || { echo "✗ không biên dịch được systemPrompt"; exit 1; }
 fail=0
-for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs test/larkWebWrite.cjs test/localFiles.cjs test/autoFiles.cjs test/skillsBuiltin.cjs test/skillLearning.cjs; do
+for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/larkLoginUrl.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs test/larkWebWrite.cjs test/localFiles.cjs test/autoFiles.cjs test/skillsBuiltin.cjs test/skillLearning.cjs; do
   echo "── $t"
   node "$t" || fail=1
 done

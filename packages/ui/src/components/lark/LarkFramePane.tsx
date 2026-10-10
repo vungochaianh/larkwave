@@ -7,6 +7,7 @@ import { BRAND, BRAND_GRADIENT, OK, WARN, ERR, V, tint } from '../../theme';
 import { EmptyState } from '../../kit';
 import { useI18n } from '../../i18n';
 import { dockDecision, overlayHitsPane, OVERLAY_SELECTOR, shouldAutoOpen, ZERO_RECT } from './larkDock';
+import { isLarkLoginPage, loginUrlFor, loginViewFromUrl, type LarkLoginView } from './larkLoginUrl';
 
 const { Text } = Typography;
 
@@ -137,6 +138,29 @@ export function LarkFramePane({
     });
   const nav = (input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) => run('nav', async () => setSt(await runtime.larkBrowserNavigate!(input)));
 
+  // Trang đăng nhập Lark: mặc định MÃ QR, có nút đổi sang email/SSO. Lõi 0.1.1+ (`loginSwitch`) tự bật
+  // QR và có action riêng. Lõi cũ (0.1.0) chỉ biết "mở URL Lark" → đổi bằng tham số URL (larkLoginUrl):
+  // đường duy nhất mà một bản code-push giao diện với tới được trên bản cài cũ.
+  const legacyLogin = !st?.loginSwitch && isLarkLoginPage(st?.url);
+  const loginView: LarkLoginView | undefined = st?.loginSwitch ? st.loginView : legacyLogin ? (loginViewFromUrl(st?.url) ?? 'form') : undefined;
+  const preferForm = useRef(false); // người dùng đã chọn email/SSO → không tự bật lại QR
+  const rewritten = useRef<string | null>(null);
+  useEffect(() => {
+    if (st?.connected) preferForm.current = false; // đăng nhập xong → lần sau lại mặc định QR
+  }, [st?.connected]);
+  useEffect(() => {
+    const url = st?.url;
+    if (!legacyLogin || st?.loading || !url || preferForm.current || loginViewFromUrl(url)) return;
+    if (rewritten.current === url) return; // mỗi URL một lần — không bao giờ tải lại vòng tròn
+    rewritten.current = url;
+    void runtime.larkBrowserNavigate?.({ url: loginUrlFor(url, 'qr') }).catch(() => undefined);
+  }, [legacyLogin, st?.url, st?.loading, runtime]);
+  const switchLogin = (to: LarkLoginView) => {
+    preferForm.current = to === 'form';
+    if (st?.loginSwitch) nav({ action: to === 'qr' ? 'loginQr' : 'loginForm' });
+    else if (st?.url) nav({ url: loginUrlFor(st.url, to) });
+  };
+
   const ai = st?.ai;
   const dead = st?.health === 'dead';
   const pill = st?.loginPending
@@ -172,10 +196,10 @@ export function LarkFramePane({
         </Tooltip>
         {/* Trang đăng nhập Lark: đổi giữa mã QR (mặc định) và email/SSO. Ở khung hẹp Lark giấu nút
             chuyển của chính nó, nên nút này là đường duy nhất để đổi. */}
-        {st?.loginView && (
+        {loginView && (
           <Tooltip
             title={
-              st.loginView === 'qr'
+              loginView === 'qr'
                 ? t('larkBrowser.loginFormTip', 'Đăng nhập bằng email, số điện thoại, SSO, Google hoặc Apple')
                 : t('larkBrowser.loginQrTip', 'Hiện mã QR để quét bằng app Lark trên điện thoại')
             }
@@ -183,11 +207,11 @@ export function LarkFramePane({
             <Button
               size="small"
               data-testid="wf-login-view"
-              icon={st.loginView === 'qr' ? <MailOutlined /> : <QrcodeOutlined />}
+              icon={loginView === 'qr' ? <MailOutlined /> : <QrcodeOutlined />}
               loading={busy === 'nav'}
-              onClick={() => nav({ action: st.loginView === 'qr' ? 'loginForm' : 'loginQr' })}
+              onClick={() => switchLogin(loginView === 'qr' ? 'form' : 'qr')}
             >
-              {st.loginView === 'qr' ? t('larkBrowser.loginForm', 'Email / SSO') : t('larkBrowser.loginQr', 'Quét mã QR')}
+              {loginView === 'qr' ? t('larkBrowser.loginForm', 'Email / SSO') : t('larkBrowser.loginQr', 'Quét mã QR')}
             </Button>
           </Tooltip>
         )}
