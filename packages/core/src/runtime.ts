@@ -1467,6 +1467,51 @@ export interface SkillInfo {
    * chứ không phải lúc vòng lặp đã dừng giữa chừng.
    */
   contract?: SkillContractFields;
+  /** Kỹ năng DỰNG SẴN của Larkwave (bộ "Tệp & dữ liệu") — phiên bản đang cài. */
+  builtin?: number;
+  /** Có bản dựng sẵn MỚI hơn nhưng người dùng đã sửa bản đang dùng → không tự cập nhật. */
+  builtinUpdate?: number;
+  /** Kỹ năng do AI TỰ HỌC (huy hiệu "AI tự học"). */
+  learned?: SkillLearnInfo;
+  /** Cụm từ gọi kỹ năng (VI/EN) — câu lệnh khớp thì kỹ năng được nạp đủ. */
+  triggers?: string[];
+}
+
+/** Nguồn gốc của một kỹ năng tự học. */
+export interface SkillLearnInfo {
+  /** explicit = người dùng dạy ("từ giờ…"); correction = người dùng sửa agent; experience = rút từ việc vừa làm; base = học từ một Base. */
+  origin: 'explicit' | 'correction' | 'experience' | 'base';
+  at: string;
+  /** Vì sao học (một câu). */
+  reason?: string;
+}
+
+/** Một phiên bản trong lịch sử của kỹ năng. */
+export interface SkillVersion {
+  at: string;
+  by: 'you' | 'ai';
+  what: string;
+}
+
+/** Đề xuất kỹ năng (từ kinh nghiệm / học từ Base) — chưa lưu cho tới khi người dùng bấm "Lưu kỹ năng". */
+export interface SkillProposal {
+  id: string;
+  name: string;
+  triggers: string[];
+  instructions: string;
+  origin: SkillLearnInfo['origin'];
+  reason?: string;
+  /** Kỹ năng đã có sẽ được CẬP NHẬT (trùng ý) thay vì tạo mới. */
+  updateId?: string;
+  updateName?: string;
+}
+
+/** Cài đặt "Tự học kỹ năng". */
+export interface SkillLearnSettings {
+  /** Bật tự học (mặc định BẬT). */
+  enabled: boolean;
+  /** Hỏi trước khi lưu kỹ năng học từ lời dạy trực tiếp (mặc định TẮT — đề xuất từ kinh nghiệm/Base luôn hỏi). */
+  askFirst: boolean;
 }
 
 /** A reference file attached to a skill (like a Claude Skills bundle file). Text content. */

@@ -103,5 +103,36 @@ const p = buildContractSuggestPrompt('Tra giá vốn','Tìm giá nhập từ b�
 eq('lời nhắc nêu khoá sẵn có', /gia_von, ten_hang/.test(p) && !/BAD KEY/.test(p), true);
 
 
+// ── 3. bộ kỹ năng DỰNG SẴN (apps/desktop/main/runtime/skills/builtinSkills.ts) ────────────────
+// Hợp đồng của từng kỹ năng phải ghi ra ↔ đọc lại y nguyên; ràng buộc biểu thức chỉ nhắc khoá của
+// chính nó; không hai kỹ năng dựng sẵn cùng sinh một khoá; không kỹ năng nào nối thành bộ với cái khác.
+{
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const out = mkdtempSync(join(tmpdir(), 'lw-builtin-'));
+  try {
+    execFileSync('npx', ['tsc', join(ROOT, 'apps/desktop/main/runtime/skills/builtinSkills.ts'), '--outDir', out, '--module', 'commonjs', '--target', 'ES2022', '--skipLibCheck'], { stdio: ['ignore', 'ignore', 'inherit'] });
+    const { createRequire } = await import('node:module');
+    const req = createRequire(import.meta.url);
+    const { BUILTIN_SKILLS } = req(join(out, 'builtinSkills.js'));
+    const { parseSkillContract, duplicateProducers, relatedSet } = await import(DIST);
+    eq('có 7 kỹ năng dựng sẵn', BUILTIN_SKILLS.length, 7);
+    const parsed = [];
+    for (const d of BUILTIN_SKILLS) {
+      trip(`dựng sẵn ${d.id}`, d.contract);
+      const c = parseSkillContract(d.id, d.name, md(d.contract));
+      const own = new Set([...d.contract.needs, ...d.contract.produces]);
+      eq(`${d.id}: ràng buộc chỉ nhắc khoá của mình`, c.checks.flatMap((x) => x.refs).every((r) => own.has(r)), true);
+      eq(`${d.id}: id có tiền tố lw-`, d.id.startsWith('lw-'), true);
+      parsed.push(c);
+    }
+    eq('không hai kỹ năng dựng sẵn cùng sinh một khoá', duplicateProducers(parsed), []);
+    eq('kỹ năng dựng sẵn không nối thành bộ', parsed.every((c) => relatedSet(parsed, c.id).length === 1), true);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+}
+
 console.log(`\n${pass} đạt, ${fail} hỏng`);
 if (fail) process.exit(1);

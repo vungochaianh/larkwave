@@ -2,7 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app, dialog, shell, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
-import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillLister } from './lark/skillBridge';
+import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillFullLister, setAgentSkillLister, setAgentSkillReader } from './lark/skillBridge';
+import { BUILTIN_SKILLS } from './skills/builtinSkills';
 import type { SkillContractFields, LarkPendingPrompts, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
 import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
@@ -27,6 +28,13 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   constructor(private readonly baseDir: string) {
     this.lark = new LarkService(baseDir);
     this.skills = new SkillHost(baseDir);
+    // Bộ kỹ năng dựng sẵn "Larkwave · Tệp & dữ liệu": cài/cập nhật mặc định (idempotent; không đụng kỹ
+    // năng của người dùng / nhập từ Toolswave; người dùng xoá thì không cài lại).
+    try {
+      this.skills.ensureBuiltins(BUILTIN_SKILLS);
+    } catch {
+      /* đĩa lỗi — kỹ năng dựng sẵn là phụ, không chặn khởi động */
+    }
     // Cho agent Lark tự tạo kỹ năng. Đăng ký Ở ĐÂY vì đây là nơi duy nhất giữ `SkillHost` — tầng
     // tool cố ý không import nó (xem skillBridge).
     setAgentSkillAuthor(async (input) => {
@@ -90,6 +98,36 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
         missingKeys: [...new Set(after.flatMap((x) => x.contract?.needs ?? []))].filter((k) => !produced.has(k)),
       };
     });
+    setAgentSkillReader(async (id) => {
+      const e = this.skills.list().find((x) => x.id === id);
+      if (!e) throw new Error(`Không có kỹ năng nào id "${id}". Gọi skill_list để lấy id đúng.`);
+      const r = this.skills.read(id);
+      return {
+        id,
+        name: e.name,
+        description: e.description,
+        instructions: r.instructions,
+        enabled: e.enabled,
+        ...(e.command ? { command: e.command } : {}),
+        ...(e.triggers?.length ? { triggers: e.triggers } : {}),
+        ...(e.builtin ? { builtin: e.builtin } : {}),
+        ...(e.learned ? { learned: e.learned } : {}),
+      };
+    });
+    setAgentSkillFullLister(async () =>
+      this.skills.list().map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        enabled: s.enabled,
+        ...(s.command ? { command: s.command } : {}),
+        ...(s.triggers?.length ? { triggers: s.triggers } : {}),
+        ...(s.builtin ? { builtin: s.builtin } : {}),
+        ...(s.learned ? { learned: { origin: s.learned.origin, at: s.learned.at } } : {}),
+        needs: s.contract?.needs ?? [],
+        produces: s.contract?.produces ?? [],
+      })),
+    );
     setAgentSkillLister(async () =>
       this.skills.list().map((s) => ({
         id: s.id,

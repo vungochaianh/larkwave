@@ -45,6 +45,41 @@ export const automationTools: LarkToolDef[] = [
             'Mặc định false = lịch được GHI dữ liệu (thực thi). Đặt true CHỈ KHI việc đó thuần đọc ' +
             '(vd báo cáo số liệu rồi gửi tin nhắn) — lúc đó lịch sẽ không ghi được gì.',
         },
+        input_files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Việc ĐỌC TỆP: đường dẫn các tệp trong hội thoại (người dùng đã gửi) → chép vào "Tệp nguồn" của quy tắc; mỗi lần chạy đọc thư mục đó.',
+        },
+        sources: {
+          type: 'array',
+          description: 'Nguồn Lark tải MỚI mỗi lần chạy: [{kind:"drive"|"sheet"|"attachment", url, field? (cột đính kèm), table?, record_id?}].',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['kind', 'url'],
+            properties: {
+              kind: { type: 'string', enum: ['drive', 'sheet', 'attachment'] },
+              url: str('Link Drive …/file/<token> | Lark Sheets …/sheets/<token> | Base …/base/<token>?table=…'),
+              field: str('attachment: TÊN cột Tệp đính kèm'),
+              table: str('attachment: tên bảng / table_id (bỏ trống = theo ?table= trong link)'),
+              record_id: str('attachment: chỉ tệp của bản ghi này'),
+            },
+          },
+        },
+        only_new_files: { type: 'boolean', description: 'Chỉ xử lý tệp MỚI (theo nội dung) — mặc định true khi có tệp nguồn/nguồn Lark.' },
+        keep_outputs: { type: 'number', description: 'Giữ kết quả N lần chạy gần nhất (mặc định 10).' },
+        permissions: {
+          type: 'object',
+          additionalProperties: false,
+          description: 'Quyền khi chạy tự động — CHỈ bật thứ người dùng đã đồng ý rõ ràng. Thao tác cộng thêm không cần quyền.',
+          properties: {
+            overwrite_cells: { type: 'boolean', description: 'Sửa bản ghi có sẵn / ghi theo khoá có dòng phải sửa.' },
+            replace_attachments: { type: 'boolean', description: 'Đính thay tệp (xoá tệp cũ).' },
+            send_messages: { type: 'boolean', description: 'Gửi tin / tệp vào nhóm.' },
+            delete_records: { type: 'boolean', description: 'Xoá bản ghi/bảng/cột.' },
+          },
+        },
+        run_on: { type: 'string', enum: ['auto', 'desktop'], description: '"desktop" = chỉ chạy ở app trên máy này (cần phiên Lark web / tệp trên máy). Mặc định "desktop" khi có tệp nguồn.' },
       },
     },
     gated: true,
@@ -65,6 +100,30 @@ export const automationTools: LarkToolDef[] = [
         saveConversation: true,
         notify: true,
         mode2: input.readOnly === true ? 'ask' : 'build',
+        ...(() => {
+          const inputFiles = Array.isArray(input.input_files) ? input.input_files.map(String).filter(Boolean).slice(0, 20) : [];
+          const sources = Array.isArray(input.sources)
+            ? (input.sources as Record<string, unknown>[])
+                .filter((x) => x && typeof x.url === 'string' && ['drive', 'sheet', 'attachment'].includes(String(x.kind)))
+                .slice(0, 10)
+                .map((x, k) => ({
+                  id: `src${k + 1}`,
+                  kind: String(x.kind) as 'drive' | 'sheet' | 'attachment',
+                  url: String(x.url),
+                  ...(x.field ? { field: String(x.field) } : {}),
+                  ...(x.table ? { table: String(x.table) } : {}),
+                  ...(x.record_id ? { recordId: String(x.record_id) } : {}),
+                }))
+            : [];
+          const fileDriven = inputFiles.length > 0 || sources.length > 0;
+          const p = (input.permissions ?? {}) as Record<string, unknown>;
+          return {
+            inputFiles,
+            files: { sources, onlyNewFiles: input.only_new_files !== undefined ? input.only_new_files === true : fileDriven, keepOutputs: typeof input.keep_outputs === 'number' ? input.keep_outputs : 10 },
+            permissions: { overwriteCells: p.overwrite_cells === true, replaceAttachments: p.replace_attachments === true, sendMessages: p.send_messages === true, deleteRecords: p.delete_records === true },
+            runOn: input.run_on === 'auto' ? ('auto' as const) : input.run_on === 'desktop' || fileDriven ? ('desktop' as const) : ('auto' as const),
+          };
+        })(),
       });
     },
   },

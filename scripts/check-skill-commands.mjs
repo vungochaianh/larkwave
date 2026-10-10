@@ -84,6 +84,19 @@ try {
   const code = '/sieu-ba sửa hộ\n\n```\nif (x) {\n    doIt();\n}\n```';
   eq(parse(code, known).stripped, 'sửa hộ\n\n```\nif (x) {\n    doIt();\n}\n```', 'code indentation survives stripping');
   eq(strip('/bao-cao\n/sieu-ba x', ['sieu-ba']), '/bao-cao\nx', 'strip removes only the commands it was given');
+
+  // Built-in skills (apps/desktop/main/runtime/skills/builtinSkills.ts): every shortcut must already be a
+  // canonical slug, unique, and never a reserved word — otherwise SkillHost silently re-slugs it.
+  execFileSync('npx', ['tsc', 'apps/desktop/main/runtime/skills/builtinSkills.ts', '--outDir', out, '--module', 'commonjs', '--target', 'ES2022', '--skipLibCheck'], {
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  const { createRequire } = await import('node:module');
+  const { BUILTIN_SKILLS } = createRequire(import.meta.url)(join(out, 'builtinSkills.js'));
+  const { isReservedSkillCommand } = await import(join(out, 'skillCommand.js'));
+  const cmds = BUILTIN_SKILLS.map((d) => d.command);
+  check(cmds.every((c) => slug(c) === c), 'built-in skill commands are canonical slugs', cmds.join(', '));
+  check(new Set(cmds).size === cmds.length, 'built-in skill commands are unique', cmds.join(', '));
+  check(!cmds.some((c) => isReservedSkillCommand(c)), 'no built-in skill uses a reserved command', cmds.join(', '));
 } finally {
   rmSync(out, { recursive: true, force: true });
 }

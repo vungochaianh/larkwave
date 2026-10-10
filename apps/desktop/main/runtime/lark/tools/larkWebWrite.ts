@@ -580,6 +580,75 @@ export const larkWebWriteTools: LarkToolDef[] = [
     },
   },
   {
+    name: 'lark_web_download_attachments',
+    gated: false,
+    description:
+      'TẢI VỀ + ĐỌC các tệp trong một cột Tệp đính kèm của Bitable qua phiên Lark web (không cần App ID): mọi bản ghi, hoặc một `record_id`. ' +
+      'Tệp lưu vào thư mục hội thoại (đường dẫn trong kết quả); Excel/Word/CSV/text trả kèm CHỮ đã trích; ảnh/PDF thì dùng Read với `path`. ' +
+      'Dùng khi người dùng muốn đọc/tóm tắt/trích số liệu từ tệp đính kèm trong Base.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ...TABLE_PROPS,
+        field: str('TÊN (hoặc id) cột Tệp đính kèm'),
+        record_id: str('Chỉ tệp của bản ghi này (tuỳ chọn)'),
+        max_files: { type: 'integer', description: 'Tối đa số tệp tải (mặc định 20, tối đa 50)' },
+      },
+      required: ['app_token', 'table', 'field'],
+    },
+    exec: async (i) => {
+      if (!webReady()) throw new Error('Chưa đăng nhập Lark web — tải tệp đính kèm qua phiên web cần đăng nhập khung Lark (có custom app thì dùng lark_read_attachment).');
+      const out = getFileOutDir();
+      if (!out) throw new Error('Chưa có thư mục ghi tệp cho lượt này.');
+      const token = tokenOf(i);
+      const t = await tableFor(token, String(i.table ?? ''));
+      const f = resolveField(t.fields, String(i.field ?? ''));
+      if (!f) throw new Error(`Không có cột «${i.field}». Cột có: ${t.fields.map((x) => x.name).join(' | ')}.`);
+      if (f.type !== 17) throw new Error(`Cột «${f.name}» không phải cột Tệp đính kèm.`);
+      const recMap: Record<string, Record<string, J>> = i.record_id ? await web().webRecordsById(token, t.tableId, [String(i.record_id)]) : (await web().webReadAllRecords(token, t.tableId)).recordMap;
+      const all: { recordId: string; token: string; name: string; mime: string }[] = [];
+      for (const [rid, row] of Object.entries(recMap || {})) {
+        const list: J[] = Array.isArray(cellVal(row?.[f.id])) ? cellVal(row[f.id]) : [];
+        for (const a of list) if (a?.attachmentToken) all.push({ recordId: rid, token: String(a.attachmentToken), name: String(a.name || a.attachmentToken), mime: String(a.mimeType || '') });
+      }
+      const max = Math.max(1, Math.min(50, Number(i.max_files) || 20));
+      const files: J[] = [];
+      const failed: J[] = [];
+      let textBudget = 60_000;
+      for (const a of all.slice(0, max)) {
+        try {
+          const r = await web().webDownload(a.token, { mountPoint: /^image\//.test(a.mime) ? 'bitable_image' : 'bitable_file', extra: { bitablePerm: { tableId: t.tableId, attachments: { [f.id]: { [a.recordId]: [a.token] } } } } });
+          const dir = join(out, '.lark-files', a.recordId);
+          await mkdir(dir, { recursive: true });
+          const name = safeFileName(a.name.replace(/\.[^.]+$/, ''), 'tep') + (extname(a.name) || '');
+          const path = join(dir, name);
+          await writeFile(path, r.bytes);
+          let text = '';
+          const kind = /\.(xlsx|docx|pptx)$/i.test(name) ? (extname(name).slice(1).toLowerCase() as 'xlsx' | 'docx' | 'pptx') : null;
+          if (kind) text = extractOfficeText(r.bytes, kind);
+          else if (/\.(csv|txt|md|json|tsv)$/i.test(name)) text = r.bytes.toString('utf8').replace(/^\uFEFF/, '');
+          const take = Math.max(0, Math.min(text.length, Math.min(12_000, textBudget)));
+          textBudget -= take;
+          files.push({ record_id: a.recordId, name: a.name, path, bytes: r.bytes.length, mime: r.mime || a.mime, ...(take ? { text: text.slice(0, take), text_truncated: text.length > take } : {}) });
+        } catch (e) {
+          failed.push({ record_id: a.recordId, name: a.name, error: String((e as Error)?.message || e).slice(0, 200) });
+        }
+      }
+      return {
+        ok: files.length > 0 || all.length === 0,
+        table: t.tableName,
+        field: f.name,
+        total_files: all.length,
+        downloaded: files.length,
+        files,
+        ...(failed.length ? { failed } : {}),
+        ...(all.length > max ? { note: `Cột có ${all.length} tệp — mới tải ${max}. Gọi lại với max_files lớn hơn (≤ 50) hoặc theo record_id.` } : {}),
+        next: 'Ảnh/PDF: dùng Read với `path`. Báo người dùng đã đọc bao nhiêu tệp / tổng số tệp.',
+      };
+    },
+  },
+  {
     name: 'lark_web_write_records',
     gated: true,
     additive: true,

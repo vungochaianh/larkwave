@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { mergeSession, mergeSpec, SCHED_ITEM_CAP, type StoredSession } from './larkMerge';
 import { Notification } from 'electron';
-import { APIA_BASE, parseSkillCommands, shouldPersistSession, stripSkillCommands } from '@larkwave/core';
+import { APIA_BASE, matchTriggers, parseSkillCommands, shouldPersistSession, stripSkillCommands } from '@larkwave/core';
 import { hasContract, parseSkillContract, relatedSet, rowsToWrite, type LarkSkillSet, type SkillContract, type SkillSetRun, type SkillTarget } from '@larkwave/core';
 import { runSkillSet, type SkillRunEvent, type SkillRunResult } from './skillRun';
 
@@ -160,6 +160,11 @@ interface SkillRegistryEntry {
   tags?: string[];
   /** Slash-command shortcut WITHOUT the leading "/" (absent/empty = no shortcut). */
   command?: string;
+  /** Kỹ năng dựng sẵn (phiên bản) — chỉ nạp đủ thân khi câu lệnh khớp `triggers`. */
+  builtin?: number;
+  triggers?: string[];
+  description?: string;
+  learned?: { origin: string; at: string; reason?: string };
 }
 
 // ── Skill slash-commands ("/sieu-ba") ───────────────────────────────────────
@@ -183,7 +188,7 @@ import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
 import { newFilesSince, snapshotDir } from './fileBuild';
 import { canMakePdf, htmlToPdf } from './filePdf';
-import { setLocalFileEnv, withTurnFiles, type TurnFileContext } from './fileContext';
+import { resolveToolFile, setLocalFileEnv, withTurnFiles, type TurnFileContext } from './fileContext';
 import { clearSources, ensureAutomationFolder, extractForAgent, listInputFiles, listRunOutputs, markProcessed, newRunDir, pendingFiles, pruneRuns, readAutoState, saveSourceFile, addInputFile, removeInputFile, automationRoot, folderFor, type AutoFolder } from './automationFiles';
 import { effectivePerms, excludedFromUnattended, PERM_LABEL, unattendedDecision, type UnattendedPerms } from './unattendedPolicy';
 import { reportLine, wrapToolsForReport } from './autoRunRecorder';
@@ -439,8 +444,11 @@ export class LarkService {
           saveConversation: i.saveConversation !== false,
           notify: i.notify !== false,
         },
-        // Lịch mới: KHÔNG cấp sẵn quyền ghi đè/xoá/gửi — người dùng tự cấp ở "Quyền khi chạy tự động".
-        permissions: {},
+        // Quyền: CHỈ những gì người dùng đồng ý trong hội thoại (công cụ đặt lịch luôn hỏi duyệt, hộp
+        // xác nhận hiện đủ quyền). Không nêu = không cấp gì.
+        permissions: i.permissions ?? {},
+        ...(i.files ? { files: i.files } : {}),
+        ...(i.runOn ? { runOn: i.runOn } : {}),
       });
       // KHÔNG lấy phần tử cuối: `upsert` nay gộp lịch trùng vào mục có sẵn (xem chống trùng ở
       // AutomationEngine.upsert), nên mục vừa tạo/cập nhật có thể nằm ở giữa danh sách. Lấy cuối
@@ -453,7 +461,28 @@ export class LarkService {
         i.mode === 'interval'
           ? `mỗi ${Math.round((i.intervalSec || 3600) / 60)} phút`
           : `mỗi ngày ${String(i.atHour ?? 9).padStart(2, '0')}:${String(i.atMinute ?? 0).padStart(2, '0')}`;
-      return { id: created?.id || '', name: created?.name || i.name || 'Lịch AI', when };
+      // Tệp người dùng gửi trong hội thoại → "Tệp nguồn" của quy tắc (qua bộ phân giải: chỉ tệp trong
+      // thư mục hội thoại / đính kèm / bản chép từ Toolswave).
+      const inputs: string[] = [];
+      const inputErrors: string[] = [];
+      let folder: string | undefined;
+      if (created?.id && (i.inputFiles?.length || i.files)) {
+        const f = await ensureAutomationFolder(this.baseDir, created.id);
+        folder = f.root;
+        for (const p of i.inputFiles ?? []) {
+          const r = await resolveToolFile(p);
+          if (r.ok === false) {
+            inputErrors.push(`${p}: ${r.reason}`);
+            continue;
+          }
+          try {
+            inputs.push((await addInputFile(f, r.path.split(/[\\/]/).pop() || 'tep', await readFile(r.path))).name);
+          } catch (e) {
+            inputErrors.push(`${p}: ${String((e as Error)?.message || e)}`);
+          }
+        }
+      }
+      return { id: created?.id || '', name: created?.name || i.name || 'Lịch AI', when, ...(folder ? { folder } : {}), ...(inputs.length ? { inputs } : {}), ...(inputErrors.length ? { inputErrors } : {}) };
     });
     // CMS Bitable sync: the desktop keeps the connector session (cookies/csrf) fresh so the
     // user never has to re-capture it via the browser extension.
@@ -1718,6 +1747,8 @@ export class LarkService {
     const bodies = new Map<string, string>();
     const off = new Set<string>();
     for (const e of await this.readSkillRegistry()) {
+      // Kỹ năng DỰNG SẴN là hướng dẫn dùng công cụ (khoá riêng, không nối với ai) — không hiện/chạy như bộ.
+      if (e.builtin) continue;
       if (!e.enabled) {
         if (!includeDisabled) continue;
         off.add(e.id);
@@ -4132,10 +4163,16 @@ export class LarkService {
         (activeBases || []).map((b) => (b.name || '').trim().toLowerCase()).filter(Boolean),
       );
       const blocks: string[] = [];
+      /** Kỹ năng dựng sẵn KHÔNG khớp câu lệnh: chỉ một dòng mục lục (đọc đủ bằng skill_get khi cần). */
+      const index: string[] = [];
       let total = 0;
       for (const e of reg) {
         if (!e.enabled || !Array.isArray(e.scope) || !e.scope.includes(target)) continue;
         if (skipIds?.includes(e.id)) continue; // already inlined by its "/" command — don't send it twice
+        if (e.builtin && !matchTriggers(turnPrompt || '', e.triggers || [])) {
+          index.push(`- «${e.name}» (id ${e.id}${e.command ? `, lệnh /${e.command}` : ''}): ${e.description || ''}`);
+          continue;
+        }
         const tags: string[] = Array.isArray(e.tags) ? e.tags.map((t: unknown) => String(t).trim().toLowerCase()) : [];
         const baseTags = tags.filter((t) => baseNames.has(t));
         if (baseTags.length && !baseTags.some((t) => activeNames.has(t))) continue; // scoped to a non-active Base
@@ -4146,8 +4183,14 @@ export class LarkService {
         blocks.push(block);
         total += block.length;
       }
-      if (!blocks.length) return '';
+      const indexBlock = index.length
+        ? '\n\n=== KỸ NĂNG DỰNG SẴN (Larkwave · Tệp & dữ liệu) — mục lục ===\n' +
+          'Việc khớp một kỹ năng dưới đây mà các bước chưa có trong prompt → gọi `skill_get` {id} để đọc ĐỦ các bước rồi làm đúng theo đó.\n' +
+          index.join('\n')
+        : '';
+      if (!blocks.length) return indexBlock;
       return (
+        indexBlock +
         '\n\n=== KỸ NĂNG (SKILLS) DO NGƯỜI DÙNG ĐỊNH NGHĨA ===\n' +
         'Dưới đây là các quy trình người dùng đã lưu. Khi người dùng yêu cầu chạy/áp dụng một kỹ năng theo TÊN ' +
         '(vd "chạy PBTTCN"), hãy LÀM THEO ĐÚNG các bước của kỹ năng tương ứng bằng các tool Lark. Nếu một bước cần ' +
@@ -4285,7 +4328,7 @@ export class LarkService {
     // Inject the user's ENABLED skills scoped to THIS turn's runner (their full instructions) into
     // the prompt. The CLI only knows skill NAMES in `-p` mode — not their bodies — so "chạy PBTTCN"
     // wouldn't do anything; this makes the model actually FOLLOW the skill when asked by name.
-    const skillsBlock = await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds);
+    const skillsBlock = await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds, input.prompt);
     // Cho agent biết bản cài đang chạy có cũ không. Chỉ thêm ở lượt TRÒ CHUYỆN (có người đang đọc);
     // lượt tóm tắt nội bộ và tác vụ định kỳ thì không cần và chỉ làm bẩn kết quả.
     const versionLine = versionPromptLine();

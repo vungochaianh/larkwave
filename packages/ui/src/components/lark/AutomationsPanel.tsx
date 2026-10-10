@@ -249,7 +249,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
     // là dựng một lịch chạy xong không ra gì, mà lý do thì nằm ở màn hình khác.
     runtime
       .listSkills?.()
-      .then((list) => setSkillSets(list.filter((x) => x.enabled && !!x.contract)))
+      .then((list) => setSkillSets(list.filter((x) => x.enabled && !!x.contract && !x.builtin)))
       .catch(() => setSkillSets([]));
   }, [supported, refresh, runtime]);
 

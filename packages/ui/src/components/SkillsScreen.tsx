@@ -229,8 +229,10 @@ export function SkillsScreen({
   );
 
   /** Kỹ năng có khai hợp đồng hay không — đây là ranh giới giữa hai mục. */
+  // Kỹ năng DỰNG SẴN (bộ "Larkwave · Tệp & dữ liệu") khai hợp đồng chỉ để tự kiểm — chúng là hướng dẫn
+  // dùng công cụ, nằm ở danh sách kỹ năng thường chứ không ở "Kỹ năng chéo".
   const hasContract = (s: SkillInfo) =>
-    !!(s.contract?.needs?.length || s.contract?.produces?.length || s.contract?.checks?.length || s.contract?.target?.table);
+    !s.builtin && !!(s.contract?.needs?.length || s.contract?.produces?.length || s.contract?.checks?.length || s.contract?.target?.table);
 
   const shown = useMemo(
     () =>
@@ -871,6 +873,12 @@ export function SkillsScreen({
                       <span style={{ fontWeight: 600, fontSize: 15, color: V.text }}>{sk.name}</span>
                       <EnabledPill on={sk.enabled} />
                       {sk.command && <span style={CMD_CHIP}>/{sk.command}</span>}
+                      {!!sk.builtin && (
+                        <Tooltip title={t('skills.builtinTip', 'Kỹ năng dựng sẵn của Larkwave — tự cập nhật khi bạn chưa sửa; sửa rồi thì giữ bản của bạn.')}>
+                          <span style={BRAND_CHIP}>{t('skills.builtin', 'Dựng sẵn')}</span>
+                        </Tooltip>
+                      )}
+                      {!!sk.builtinUpdate && <span style={{ ...CHIP, background: '#fff7e6', color: '#d46b08' }}>{t('skills.builtinUpdate', 'Có bản mới')}</span>}
                     </div>
                     {sk.description && (
                       <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12.5 }} ellipsis={{ rows: 2 }}>

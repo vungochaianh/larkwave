@@ -211,7 +211,56 @@ export function dataQuickAsks(bases: QuickBase[], appConnected: boolean, dev = f
       { k: 'kanban', label: '📌 Tạo Kanban pipeline', prompt: 'Tạo một view Kanban theo cột trạng thái/giai đoạn cho bảng chính của base đang chọn để làm pipeline.' },
       { k: 'sampleData', label: '🌱 Nhập dữ liệu mẫu', prompt: 'Tạo và nhập một vài bản ghi mẫu hợp lý vào các bảng của base đang chọn để minh hoạ.' },
     );
+  out.push(...fileQuickAsks(b0));
   return out;
+}
+
+/** Khoá các nút "Tệp & dữ liệu" (bộ kỹ năng dựng sẵn). */
+export const FILE_ASK_KEYS = ['fileExport', 'fileImport', 'fileAttach', 'fileReadAttach', 'autoFromFiles'] as const;
+
+/**
+ * Nút "Tệp & dữ liệu" — mỗi nút gọi đúng một kỹ năng dựng sẵn (Larkwave · Tệp & dữ liệu). Chạy được chỉ
+ * với phiên Lark web (công cụ lark_web_*).
+ */
+export function fileQuickAsks(b: QuickBase): QuickAsk[] {
+  const B = baseRef(b);
+  return [
+    {
+      k: 'fileExport',
+      label: '📤 Xuất bảng ra Excel',
+      prompt:
+        `Xuất TOÀN BỘ một bảng của ${B} ra Excel theo kỹ năng «Xuất bảng ra Excel/CSV đầy đủ» (lark_export_table_file — đọc đủ mọi trang, báo "N dòng nguồn → N dòng trong tệp"). ` +
+        'Base có nhiều bảng thì hỏi tôi bảng nào (ask_user với tên các bảng).',
+    },
+    {
+      k: 'fileImport',
+      label: '📥 Nhập Excel/CSV vào bảng',
+      prompt:
+        `Tôi muốn nhập một tệp Excel/CSV vào một bảng của ${B}. Làm theo kỹ năng «Nhập Excel/CSV vào bảng»: đọc tệp tôi gửi (chưa có thì nhắc tôi kéo tệp vào hội thoại), đọc cấu trúc bảng, ` +
+        'đề xuất ghép cột theo tên và hỏi tôi xác nhận, chọn cột khoá để ghi theo khoá (match_by) không tạo dòng trùng, chỉ tạo lựa chọn mới khi tôi đồng ý, rồi báo "N dòng vào → mới · sửa · không đổi".',
+    },
+    {
+      k: 'fileAttach',
+      label: '📎 Đính tệp vào ô',
+      prompt:
+        `Đính tệp vào ô Tệp đính kèm của một bản ghi trong ${B} theo kỹ năng «Đính tệp vào ô Bitable» (prepare_local_file → lark_web_attach_file, GHI THÊM không xoá tệp cũ, đọc lại xác minh). ` +
+        'Chưa rõ tệp nào / bản ghi nào / cột nào thì hỏi tôi.',
+    },
+    {
+      k: 'fileReadAttach',
+      label: '🔎 Đọc tệp đính kèm',
+      prompt:
+        `Đọc các tệp đính kèm trong ${B} rồi tổng hợp theo kỹ năng «Đọc tệp đính kèm trong Base và tổng hợp» (lark_web_download_attachments). ` +
+        'Base có nhiều cột đính kèm thì hỏi tôi bảng/cột nào; nêu rõ đã đọc bao nhiêu tệp / tổng số tệp.',
+    },
+    {
+      k: 'autoFromFiles',
+      label: '⏰ Tự động đọc tệp → ghi Base',
+      prompt:
+        `Giúp tôi dựng một quy tắc TỰ ĐỘNG đọc tệp rồi ghi vào bảng của ${B} theo kỹ năng «Tự động hoá: đọc tệp → ghi Base»: hỏi tôi nguồn tệp, bảng đích + cột khoá, lịch chạy và quyền khi chạy tự động; ` +
+        'chạy thử một lần với tệp hiện có rồi mới tạo lịch (schedule_agent_job kèm tệp nguồn, only_new_files, permissions). KHÔNG cấp quyền tôi chưa đồng ý.',
+    },
+  ];
 }
 
 /** (Tên cũ) bộ nút của hội thoại thường = bộ hợp nhất ở bố cục chat. */
@@ -231,8 +280,9 @@ export function buildQuickAsks(ctx: QuickAskCtx): QuickAsk[] {
   if (!bases.length) return layout === 'frame' ? [] : CHAT_EXAMPLES;
   const wf = workflowQuickAsks(bases[0]);
   const data = dataQuickAsks(bases, ctx.appConnected, !!ctx.dev);
-  if (layout === 'frame') return [...wf, ...data.filter((c) => c.k !== 'design')];
-  const order = ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData', 'debugEndpoint'];
+  // Bố cục frame (Tạo workflow) giữ đúng bộ nút workflow + dữ liệu — nút tệp ở bố cục chat.
+  if (layout === 'frame') return [...wf, ...data.filter((c) => c.k !== 'design' && !(FILE_ASK_KEYS as readonly (string | undefined)[]).includes(c.k))];
+  const order = ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData', ...FILE_ASK_KEYS, 'debugEndpoint'];
   const all = [...data, ...wf.filter((c) => c.k !== 'wfStruct')];
   return order.map((k) => all.find((c) => c.k === k)).filter((c): c is QuickAsk => !!c);
 }

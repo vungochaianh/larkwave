@@ -1,6 +1,6 @@
 import type { LarkToolDef } from './types';
 import { str } from './types';
-import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillLister } from '../skillBridge';
+import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillFullLister, getAgentSkillLister, getAgentSkillReader } from '../skillBridge';
 
 /**
  * Cho agent TỰ TẠO kỹ năng — cả kỹ năng thường lẫn bộ kỹ năng có hợp đồng (kiểm chéo).
@@ -12,6 +12,47 @@ import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillLister } from '.
  * nhau ngay (`gia_von` ở bước này thành `giaVon` ở bước kia, và hai cái đó không bao giờ nối được).
  */
 export const skillTools: LarkToolDef[] = [
+  {
+    name: 'skill_list',
+    description:
+      'LIỆT KÊ kỹ năng trên máy (của người dùng, AI tự học, và bộ dựng sẵn "Larkwave · Tệp & dữ liệu"): id, tên, mô tả, từ khoá gọi, lệnh "/". ' +
+      'Gọi TRƯỚC khi lưu kỹ năng mới (`skill_save`) để CẬP NHẬT kỹ năng đã có thay vì tạo bản trùng, hoặc khi người dùng hỏi "có kỹ năng gì".',
+    gated: false,
+    inputSchema: { type: 'object', additionalProperties: false, properties: { query: str('Lọc theo chữ trong tên/mô tả/từ khoá (tuỳ chọn).') } },
+    exec: async (input) => {
+      const list = getAgentSkillFullLister();
+      if (!list) throw new Error('Chức năng đọc kỹ năng chưa sẵn sàng.');
+      const q = String(input.query || '').trim().toLowerCase();
+      const items = (await list()).filter((s) => !q || [s.name, s.description, ...(s.triggers ?? [])].join(' ').toLowerCase().includes(q));
+      return {
+        count: items.length,
+        skills: items.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          enabled: s.enabled,
+          ...(s.command ? { command: `/${s.command}` } : {}),
+          ...(s.triggers?.length ? { triggers: s.triggers } : {}),
+          kind: s.builtin ? 'dựng sẵn' : s.learned ? 'AI tự học' : 'người dùng',
+        })),
+      };
+    },
+  },
+  {
+    name: 'skill_get',
+    description:
+      'ĐỌC ĐỦ các bước của một kỹ năng theo `id` (lấy từ mục lục kỹ năng trong prompt hoặc `skill_list`). Gọi khi việc người dùng nhờ khớp một kỹ năng mà các bước chưa có sẵn trong prompt — rồi làm ĐÚNG theo các bước đó.',
+    gated: false,
+    inputSchema: { type: 'object', additionalProperties: false, required: ['id'], properties: { id: str('Id kỹ năng (vd "lw-xuat-bang").') } },
+    exec: async (input) => {
+      const read = getAgentSkillReader();
+      if (!read) throw new Error('Chức năng đọc kỹ năng chưa sẵn sàng.');
+      const id = String(input.id || '').trim();
+      if (!id) throw new Error('Thiếu id kỹ năng.');
+      const r = await read(id);
+      return { ...r, kind: r.builtin ? 'dựng sẵn' : r.learned ? 'AI tự học' : 'người dùng' };
+    },
+  },
   {
     name: 'list_skills',
     description:

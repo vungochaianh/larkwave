@@ -21,6 +21,13 @@ export interface ScheduleAgentInput {
   notify?: boolean;
   /** Chế độ chạy mỗi lần tới lịch: 'build' (thực thi — mặc định) hoặc 'ask' (chỉ đọc, cho lịch báo cáo). */
   mode2?: 'ask' | 'build';
+  /** Thư mục/nguồn tệp của quy tắc (việc đọc tệp → ghi Base). */
+  files?: { sources?: { id: string; kind: 'drive' | 'sheet' | 'attachment'; url: string; table?: string; field?: string; recordId?: string; label?: string }[]; onlyNewFiles?: boolean; keepOutputs?: number };
+  /** Đường dẫn tệp trong hội thoại → chép vào "Tệp nguồn" (inputs/) của quy tắc. */
+  inputFiles?: string[];
+  /** Quyền khi chạy tự động — CHỈ những gì người dùng đồng ý (công cụ đặt lịch luôn hỏi duyệt). */
+  permissions?: { overwriteCells?: boolean; replaceAttachments?: boolean; sendMessages?: boolean; deleteRecords?: boolean };
+  runOn?: 'auto' | 'desktop';
 }
 
 export interface ScheduleAgentResult {
@@ -28,6 +35,10 @@ export interface ScheduleAgentResult {
   name: string;
   /** Human-readable cadence, e.g. "mỗi ngày 09:00". */
   when: string;
+  /** Thư mục của quy tắc + tệp nguồn đã chép vào. */
+  folder?: string;
+  inputs?: string[];
+  inputErrors?: string[];
 }
 
 type Creator = (input: ScheduleAgentInput) => Promise<ScheduleAgentResult>;

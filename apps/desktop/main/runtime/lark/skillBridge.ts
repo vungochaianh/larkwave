@@ -75,3 +75,45 @@ export function setAgentSkillEditor(fn: Editor | null): void {
 export function getAgentSkillEditor(): Editor | null {
   return editor;
 }
+
+/** Một kỹ năng đọc đủ (cho `skill_get`). */
+export interface ReadSkillResult {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  command?: string;
+  triggers?: string[];
+  builtin?: number;
+  learned?: { origin: string; at: string; reason?: string };
+  enabled: boolean;
+}
+/** Một mục danh sách kỹ năng (cho `skill_list`). */
+export interface ListSkillItem {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  command?: string;
+  triggers?: string[];
+  builtin?: number;
+  learned?: { origin: string; at: string };
+  needs: string[];
+  produces: string[];
+}
+type Reader = (id: string) => Promise<ReadSkillResult>;
+type FullLister = () => Promise<ListSkillItem[]>;
+let reader: Reader | null = null;
+let fullLister: FullLister | null = null;
+export function setAgentSkillReader(fn: Reader | null): void {
+  reader = fn;
+}
+export function getAgentSkillReader(): Reader | null {
+  return reader;
+}
+export function setAgentSkillFullLister(fn: FullLister | null): void {
+  fullLister = fn;
+}
+export function getAgentSkillFullLister(): FullLister | null {
+  return fullLister;
+}

@@ -1,9 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, cpSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { contractFieldsFrom, serializeContract, slugifySkillCommand, uniqueSkillCommand } from '@larkwave/core';
-import type { SkillContractFields } from '@larkwave/core';
+import type { SkillContractFields, SkillLearnInfo } from '@larkwave/core';
 import type { SkillInfo } from '@larkwave/core';
+import type { BuiltinSkill } from './builtinSkills';
 
 interface SkillEntry {
   id: string;
@@ -18,6 +20,12 @@ interface SkillEntry {
    *  chat composer forces this skill for that turn. Absent/empty = no shortcut. */
   command?: string;
   source?: string;
+  /** Kỹ năng DỰNG SẴN của Larkwave: phiên bản đang cài (ensureBuiltins). */
+  builtin?: number;
+  /** Kỹ năng do AI TỰ HỌC — nguồn gốc (huy hiệu "AI tự học"). */
+  learned?: SkillLearnInfo;
+  /** Cụm từ gọi (VI/EN) — câu lệnh khớp thì kỹ năng được nạp đủ thân. */
+  triggers?: string[];
 }
 
 /** Runner ids that consume the SKILL.md "Agent Skills" standard via ~/.<cli>/skills. */
@@ -74,9 +82,12 @@ function buildFrontmatter(
   description: string,
   command: string | undefined,
   contract?: SkillContractFields,
+  triggers?: string[],
 ): string {
   const lines = [`name: ${id}`, `description: ${description}`];
   if (command) lines.push(`command: ${command}`);
+  // Cụm từ gọi — một dòng, ngăn bởi " | " (không phải YAML đầy đủ; bộ đọc ở parseSkillMd).
+  if (triggers?.length) lines.push(`triggers: ${triggers.map((t) => t.replace(/[|\n]/g, ' ').trim()).filter(Boolean).join(' | ')}`);
   // Phần hợp đồng do CORE ghi, cạnh chính bộ đọc nó — xem `serializeContract`. Chép lại luật ghi
   // ở đây là mở đường cho hai nửa của một định dạng trôi lệch nhau trong im lặng.
   lines.push(...serializeContract(contract));
@@ -253,6 +264,10 @@ export class SkillHost {
       tags: normTags(e.tags),
       command: e.command || undefined,
       source: e.source,
+      ...(e.builtin ? { builtin: e.builtin } : {}),
+      ...(e.builtin && this.builtinState().pending[e.id] ? { builtinUpdate: this.builtinState().pending[e.id] } : {}),
+      ...(e.learned ? { learned: e.learned } : {}),
+      ...(e.triggers?.length ? { triggers: e.triggers } : {}),
       // Hợp đồng nằm trong SKILL.md chứ không trong sổ đăng ký — đọc ở đây để danh sách hiện được
       // huy hiệu "có hợp đồng" và cảnh báo trùng khoá TRƯỚC khi người dùng bấm Chạy. Một lần đọc
       // file mỗi kỹ năng; danh sách chỉ vài chục mục nên không đáng để dựng thêm lớp đệm.
@@ -341,6 +356,103 @@ export class SkillHost {
     return this.list();
   }
 
+  // ── Kỹ năng DỰNG SẴN (bộ "Larkwave · Tệp & dữ liệu") ─────────────────────────────────────────
+
+  private builtinStatePath(): string {
+    return join(this.stateDir, 'builtins.json');
+  }
+  /** installed: phiên bản + băm SKILL.md lúc cài; removed: người dùng đã xoá (không cài lại); pending: có bản mới nhưng người dùng đã sửa. */
+  private builtinState(): { installed: Record<string, { version: number; hash: string }>; removed: string[]; pending: Record<string, number> } {
+    try {
+      const j = JSON.parse(readFileSync(this.builtinStatePath(), 'utf8'));
+      return { installed: j?.installed ?? {}, removed: Array.isArray(j?.removed) ? j.removed : [], pending: j?.pending ?? {} };
+    } catch {
+      return { installed: {}, removed: [], pending: {} };
+    }
+  }
+  private writeBuiltinState(st: { installed: Record<string, { version: number; hash: string }>; removed: string[]; pending: Record<string, number> }): void {
+    writeFileSync(this.builtinStatePath(), JSON.stringify(st, null, 2));
+  }
+
+  /**
+   * Cài / cập nhật kỹ năng dựng sẵn. Idempotent; CHỈ đụng id trong danh sách dựng sẵn:
+   *  - chưa có → cài (bật, dùng chung mọi model, nhãn "Larkwave · Tệp & dữ liệu");
+   *  - người dùng đã xoá → không cài lại;
+   *  - có bản mới mà bản đang dùng CHƯA bị sửa (băm khớp lúc cài) → chụp bản lưu rồi lên bản mới;
+   *  - đã bị sửa → giữ nguyên bản của người dùng, chỉ ghi "có bản mới" (pending);
+   *  - trùng id với một kỹ năng KHÔNG phải dựng sẵn (vd nhập từ Toolswave) → không đụng.
+   */
+  ensureBuiltins(defs: readonly BuiltinSkill[]): { installed: string[]; updated: string[]; kept: string[] } {
+    const st = this.builtinState();
+    const reg = this.readRegistry();
+    const out = { installed: [] as string[], updated: [] as string[], kept: [] as string[] };
+    let changed = false;
+    for (const d of defs) {
+      if (st.removed.includes(d.id)) continue;
+      const e = reg.find((x) => x.id === d.id);
+      if (e && !e.builtin) {
+        out.kept.push(d.id);
+        continue;
+      }
+      const md = (cmd: string | undefined) => `${buildFrontmatter(d.id, d.description, cmd, d.contract, d.triggers)}\n\n# ${d.name}\n\n${d.body.trim()}\n`;
+      if (!e) {
+        const cmd = this.resolveCommand(d.command) || undefined;
+        const text = md(cmd);
+        mkdirSync(this.libPath(d.id), { recursive: true });
+        writeFileSync(join(this.libPath(d.id), 'SKILL.md'), text);
+        reg.push({ id: d.id, name: d.name, description: d.description, enabled: true, scope: [...ALL_RUNNERS], tags: [...BUILTIN_TAG_LIST], command: cmd, source: 'larkwave-builtin', builtin: d.version, triggers: normTriggers(d.triggers) });
+        st.installed[d.id] = { version: d.version, hash: sha(text) };
+        out.installed.push(d.id);
+        changed = true;
+        continue;
+      }
+      const cur = st.installed[d.id];
+      if (cur && cur.version >= d.version) continue;
+      let now = '';
+      try {
+        now = readFileSync(join(this.libPath(d.id), 'SKILL.md'), 'utf8');
+      } catch {
+        now = '';
+      }
+      if (cur && now && sha(now) !== cur.hash) {
+        // Người dùng đã sửa bản đang dùng — không ghi đè; báo có bản mới.
+        if (st.pending[d.id] !== d.version) {
+          st.pending[d.id] = d.version;
+          changed = true;
+        }
+        out.kept.push(d.id);
+        continue;
+      }
+      this.snapshot(d.id, 'ai', `Cập nhật kỹ năng dựng sẵn lên phiên bản ${d.version}`);
+      const text = md(e.command);
+      mkdirSync(this.libPath(d.id), { recursive: true });
+      writeFileSync(join(this.libPath(d.id), 'SKILL.md'), text);
+      e.name = d.name;
+      e.description = d.description;
+      e.builtin = d.version;
+      e.triggers = normTriggers(d.triggers);
+      st.installed[d.id] = { version: d.version, hash: sha(text) };
+      delete st.pending[d.id];
+      out.updated.push(d.id);
+      changed = true;
+    }
+    if (changed) {
+      this.writeRegistry(reg);
+      this.writeBuiltinState(st);
+      this.sync();
+    }
+    return out;
+  }
+
+  /** Cài lại các kỹ năng dựng sẵn người dùng đã xoá. */
+  restoreBuiltins(defs: readonly BuiltinSkill[]): SkillInfo[] {
+    const st = this.builtinState();
+    st.removed = [];
+    this.writeBuiltinState(st);
+    this.ensureBuiltins(defs);
+    return this.list();
+  }
+
   setEnabled(id: string, enabled: boolean): SkillInfo[] {
     const reg = this.readRegistry();
     const e = reg.find((x) => x.id === id);
@@ -419,6 +531,10 @@ export class SkillHost {
       contract?: SkillContractFields;
       /** Ai sửa — chỉ dùng để ghi vào bản lưu, giúp người dùng biết lùi về đâu. */
       by?: 'you' | 'ai';
+      /** Cụm từ gọi mới (thay toàn bộ). */
+      triggers?: string[];
+      /** Ghi chú cho bản lưu (vì sao đổi) — thay câu "Đổi …" mặc định. */
+      why?: string;
     },
   ): SkillInfo[] {
     const reg = this.readRegistry();
@@ -434,21 +550,24 @@ export class SkillHost {
     }
     if (patch.tags !== undefined) e.tags = normTags(patch.tags);
     if (patch.command !== undefined) e.command = this.resolveCommand(patch.command, id) || undefined;
+    const triggersChanged = patch.triggers !== undefined;
+    if (triggersChanged) e.triggers = normTriggers(patch.triggers);
 
     // Rewrite SKILL.md when the body changed, OR when only the name/command changed (keep the
     // # title + frontmatter in sync — the frontmatter is what an exported folder carries to
     // another machine). `instr` is ALWAYS the pure body WITHOUT the auto heading — we add
     // exactly one "# <name>" back, so headings never accumulate across edits.
     const nameChanged = patch.name !== undefined;
-    if (patch.instructions !== undefined || nameChanged || patch.command !== undefined || patch.contract !== undefined) {
+    if (patch.instructions !== undefined || nameChanged || patch.command !== undefined || patch.contract !== undefined || triggersChanged) {
       // Chụp TRƯỚC khi ghi đè — sau khi ghi thì không còn gì để chụp.
       const changed = [
         patch.name !== undefined ? 'tên' : '',
         patch.instructions !== undefined ? 'nội dung' : '',
         patch.command !== undefined ? 'lệnh gọi' : '',
         patch.contract !== undefined ? 'hợp đồng' : '',
+        triggersChanged ? 'từ khoá gọi' : '',
       ].filter(Boolean);
-      this.snapshot(id, patch.by ?? 'you', `Đổi ${changed.join(', ')}`);
+      this.snapshot(id, patch.by ?? 'you', patch.why || `Đổi ${changed.join(', ')}`);
       let instr: string;
       if (patch.instructions !== undefined) {
         instr = patch.instructions.trim();
@@ -473,7 +592,7 @@ export class SkillHost {
           keep = undefined;
         }
       }
-      const front = `${buildFrontmatter(id, e.description, e.command, keep)}\n\n# ${e.name}\n\n${instr}\n`;
+      const front = `${buildFrontmatter(id, e.description, e.command, keep, e.triggers)}\n\n# ${e.name}\n\n${instr}\n`;
       mkdirSync(this.libPath(id), { recursive: true });
       writeFileSync(join(this.libPath(id), 'SKILL.md'), front);
     }
@@ -483,6 +602,15 @@ export class SkillHost {
   }
 
   delete(id: string): SkillInfo[] {
+    // Kỹ năng dựng sẵn bị xoá → nhớ lại để KHÔNG tự cài lại lần khởi động sau (người dùng đã chọn bỏ).
+    const was = this.readRegistry().find((x) => x.id === id);
+    if (was?.builtin) {
+      const st = this.builtinState();
+      if (!st.removed.includes(id)) st.removed.push(id);
+      delete st.installed[id];
+      delete st.pending[id];
+      this.writeBuiltinState(st);
+    }
     // Remove our copies from every runner dir + the library, then forget it.
     for (const r of FOLDER_RUNNERS) rmSync(this.runnerSkillPath(r, id), { recursive: true, force: true });
     rmSync(this.libPath(id), { recursive: true, force: true });
@@ -707,4 +835,26 @@ function slug(s: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
     .replace(/-+$/, ''); // chỗ cắt có thể để lại gạch nối cuối
+}
+
+/** Nhãn của kỹ năng dựng sẵn (trùng BUILTIN_TAGS ở builtinSkills — chép để SkillHost không cần import giá trị). */
+const BUILTIN_TAG_LIST = ['Larkwave', 'Tệp & dữ liệu'];
+
+function sha(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+/** Cụm từ gọi: cắt khoảng trắng, bỏ rỗng/trùng (không phân biệt hoa thường), tối đa 16 cụm × 60 ký tự. */
+function normTriggers(t: unknown): string[] {
+  if (!Array.isArray(t)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of t) {
+    const v = String(x ?? '').replace(/[|\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!v || seen.has(v.toLowerCase())) continue;
+    seen.add(v.toLowerCase());
+    out.push(v);
+    if (out.length >= 16) break;
+  }
+  return out;
 }
