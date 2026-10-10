@@ -63,6 +63,7 @@ import {
   workflowCreateBody,
   workflowDetailPath,
 } from './workflowBlock';
+import { deleteBlocksScript, refusalText, verifyDeleted, type DeleteCatalog, type DeletePlan } from './webDelete';
 
 /** Hạn giờ cho một lần hỏi "tôi là ai" (xem whoami()). */
 const WHOAMI_TIMEOUT_MS = 6000;
@@ -2015,6 +2016,11 @@ export class LarkWebSession {
     let automations: WebAutomation[] = [];
     try {
       automations = parseAutomationList(await this.webJson(`${bit(token)}/automation/list`), names);
+      // Workflow nằm dưới một KHỐI Workflow mà lọt vào automation/list (gặp thật 10/10/2026 với workflow
+      // tạo bằng automation/create bizType 2) thì KHÔNG phải automation: báo nó là "Automation" làm agent
+      // đem workflow id của khối đi xoá như một automation, còn automation thật cùng tên thì sót.
+      const blockWorkflowIds = new Set(meta.workflowBlocks.map((b) => b.workflowId));
+      automations = automations.filter((a) => !blockWorkflowIds.has(a.workflowId));
     } catch (e) {
       errors.push(`Danh sách automation: ${(e as Error)?.message || e}`);
     }
@@ -2177,6 +2183,65 @@ export class LarkWebSession {
     const r = await this.runBaseStructure(token, deleteWorkflowBlockScript({ token, blockId, workflowID }));
     const d = await this.webJson(`${bit(token)}/workflow/disable`, 'POST', { workflowID, bizType: '2' }).catch((e) => ({ error: String(e) }));
     return { block: r, disable: d };
+  }
+
+  /**
+   * Danh mục để XOÁ (chỉ đọc): MỌI bảng kèm số bản ghi (khi đọc được), automation, khối Workflow. Dùng
+   * `meta` (đủ mọi bảng/khối) thay vì giới hạn 20 bảng / 10 khối của bản quét để không sót thứ gì.
+   */
+  async deleteCatalog(token: string): Promise<DeleteCatalog> {
+    const r = await this.scanWebBase(token, { samples: 0, maxTables: 200 });
+    const counts = new Map(r.tables.map((t) => [t.id, t.recordCount]));
+    return {
+      tables: r.meta.tables.map((t) => ({ id: t.id, name: t.name, ...(counts.get(t.id) !== undefined ? { records: counts.get(t.id) } : {}) })),
+      automations: r.automations.filter((a) => a.kind !== 'workflow').map((a) => ({ workflowId: a.workflowId, title: a.title, enabled: a.enabled })),
+      workflows: r.meta.workflowBlocks.map((b) => ({ blockId: b.blockId, workflowId: b.workflowId, name: b.name })),
+    };
+  }
+
+  /**
+   * XOÁ theo kế hoạch người dùng ĐÃ DUYỆT (tool `lark_web_delete`, luôn qua hộp xác nhận). Thứ tự:
+   * automation (thường trỏ vào bảng) → khối Workflow (+ workflow/disable) → bảng. Xong thì đọc lại
+   * từ máy chủ — chỉ báo đã xoá khi thứ đó thật sự biến mất. Bảng và khối Workflow vào thùng rác
+   * của Base (khôi phục được); automation xoá hẳn.
+   */
+  async deleteWebItems(token: string, plan: DeletePlan): Promise<J> {
+    const out: { automations: J[]; workflows: J[]; tables: J[] } = { automations: [], workflows: [], tables: [] };
+    for (const a of plan.automations) {
+      const r = await this.webJson('/space/api/bitable/automation/delete', 'POST', { token, workflowID: a.workflowId }).catch((e) => ({ code: -1, msg: String((e as Error)?.message || e) }));
+      out.automations.push({ title: a.title, workflow_id: a.workflowId, ok: r?.code === 0, ...(r?.code === 0 ? {} : { error: `Lark báo ${r?.code}: ${r?.msg || ''}` }) });
+    }
+    const blocks = [
+      ...plan.workflows.map((w) => ({ id: w.blockId, kind: 'workflow' as const, workflowId: w.workflowId })),
+      ...plan.tables.map((t) => ({ id: t.id, kind: 'table' as const })),
+    ];
+    const br: J = blocks.length ? await this.runBaseStructure(token, deleteBlocksScript({ token, blocks })) : { results: [] };
+    const resOf = (id: string) => (Array.isArray(br?.results) ? br.results.find((x: J) => x.id === id) : null) ?? { ok: false, error: br?.error || 'not-run', hint: br?.hint };
+    for (const w of plan.workflows) {
+      const r = resOf(w.blockId);
+      if (r.ok) await this.webJson(`${bit(token)}/workflow/disable`, 'POST', { workflowID: w.workflowId, bizType: '2' }).catch(() => undefined);
+      out.workflows.push({ name: w.name, block_id: w.blockId, ok: !!r.ok, ...(r.ok ? {} : { error: r.hint || refusalText(r) }) });
+    }
+    for (const t of plan.tables) {
+      const r = resOf(t.id);
+      out.tables.push({ name: t.name, table_id: t.id, ok: !!r.ok, ...(r.ok ? {} : { error: r.hint || refusalText(r) }) });
+    }
+    // ĐỌC LẠI từ máy chủ (không tin kết quả trong trang suông).
+    let after = { tableIds: [] as string[], workflowBlockIds: [] as string[], automationIds: [] as string[] };
+    let readBackError: string | undefined;
+    try {
+      const cv = await this.webJson(clientVarsPath(token, undefined, 0));
+      if (cv?.code !== 0) throw new Error(`clientvars ${cv?.code}`);
+      const meta = parseBaseMeta(decodeLarkGz(cv.data?.base));
+      const al = await this.webJson(`${bit(token)}/automation/list`);
+      const wl: J[] = (al?.data?.workflowList as J[]) || [];
+      after = { tableIds: meta.tables.map((t) => t.id), workflowBlockIds: meta.workflowBlocks.map((b) => b.blockId), automationIds: wl.map((w) => String(w.workflowID ?? w.workflowId ?? '')) };
+    } catch (e) {
+      readBackError = String((e as Error)?.message || e);
+    }
+    const v = readBackError ? { verified: false, stillThere: [] as string[] } : verifyDeleted(plan, after);
+    const allOk = [...out.automations, ...out.workflows, ...out.tables].every((x) => x.ok);
+    return { ok: allOk && v.verified, verified: v.verified, still_there: v.stillThere, ...(readBackError ? { read_back_error: readBackError } : {}), deleted: out };
   }
 
   /** Đưa khung Lark tới Base (để người dùng/AI thấy ngay automation vừa tạo). Chỉ host Lark. */

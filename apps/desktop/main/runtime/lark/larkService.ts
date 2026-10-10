@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
 /** Đọc đồng bộ, lỗi → Buffer rỗng (chỉ dùng cho xem trước). */
@@ -209,7 +209,7 @@ import { runLarkMaicAgent } from './larkMaicAgent';
 import { getActiveKey } from '../claudeKeyStore';
 import { getProviderKey } from '../runners/runnerTokenStore';
 import { resolveTool } from './tools';
-import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases } from './systemPrompt';
+import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildTurnContextBlock, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases } from './systemPrompt';
 import { versionPromptLine } from '../versionHint';
 import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
@@ -267,7 +267,7 @@ export class LarkService {
    */
   private readonly turnState = new Map<
     string,
-    { agentSessionId: string | null; started: boolean; runner: string; model?: string }
+    { agentSessionId: string | null; started: boolean; runner: string; model?: string; promptPrint?: string }
   >();
   /** Stable conversation id for the local Claude session; null = next turn starts fresh. */
   private chatSessionId: string | null = null;
@@ -1001,11 +1001,31 @@ export class LarkService {
    * chung. Đây là bản thay cho việc gọi `larkSwitchSession` giữa lượt: hàm đó ghi vào state toàn
    * cục nên chỉ đúng khi có duy nhất một lượt.
    */
+  /**
+   * Dấu vân tay LUẬT + CÔNG CỤ của một lượt Lark (Claude CLI). Dựng lời nhắc với ngữ cảnh CHUẨN HOÁ
+   * (không Base, không tên, Tự động bật, không dòng phiên bản) nên chỉ đổi khi chính luật đổi (bản
+   * app mới), khi nối/ngắt custom app hay đổi trạng thái đăng nhập/quyền Bitable của nó, hoặc khi bộ
+   * công cụ đổi (tool mới, plugin). Ngữ cảnh từng lượt đi qua buildTurnContextBlock, không vào đây.
+   */
+  private promptFingerprint(withOpenApi: boolean, mode: LarkChatMode): string {
+    const rules = buildAgentSystemPrompt({
+      bases: [],
+      auto: true,
+      layout: 'chat',
+      openApi: withOpenApi
+        ? { tenantName: '', bases: [], userLoggedIn: this.userLoggedIn(), userBitableScopeMissing: this.userBitableScopeMissing() }
+        : undefined,
+    });
+    const tools = [...agentTools({ withOpenApi, mode }), ...this.plugins.collectTools()].map((t) => t.name).sort();
+    return createHash('sha1').update(rules).update('\n').update(tools.join(',')).digest('hex').slice(0, 20);
+  }
+
   private async loadTurnState(convId: string): Promise<{
     agentSessionId: string | null;
     started: boolean;
     runner: string;
     model?: string;
+    promptPrint?: string;
   }> {
     const cached = this.turnState.get(convId);
     if (cached) return cached;
@@ -1015,6 +1035,7 @@ export class LarkService {
       started: !!s,
       runner: s?.runner || this.store.getSettings().defaultRunner || 'claude',
       model: s?.model ?? this.store.getSettings().defaultModel,
+      promptPrint: s?.promptPrint,
     };
     this.turnState.set(convId, st);
     return st;
@@ -1083,6 +1104,7 @@ export class LarkService {
       // AI quên sạch. turnState cũng là nơi giữ id mới sau khi đổi runner / nén phiên.
       claudeSessionId: existing?.claudeSessionId || this.turnState.get(id)?.agentSessionId || this.chatSessionId || randomUUID(),
       agentSessionId: this.turnState.get(id)?.agentSessionId || existing?.agentSessionId || this.chatSessionId || randomUUID(),
+      ...(this.turnState.get(id)?.promptPrint || existing?.promptPrint ? { promptPrint: this.turnState.get(id)?.promptPrint || existing?.promptPrint } : {}),
       runner: this.activeRunner || existing?.runner || 'claude',
       model: this.activeModel ?? existing?.model,
       title: existing?.title || this.deriveTitle(items),
@@ -4442,6 +4464,19 @@ export class LarkService {
       ts.started = false;
     }
 
+    // Claude CLI ĐÓNG BĂNG lời nhắc hệ thống + bộ công cụ của một phiên ở lượt đầu (đo thật — xem
+    // buildTurnContextBlock). Luật hay công cụ đã đổi so với lúc phiên được tạo (cập nhật app, hội
+    // thoại chép từ Toolswave, nối/ngắt custom app) ⇒ `--resume` sẽ chạy bằng luật CŨ: đúng lỗi
+    // "đang ở chế độ Hỏi đáp" và "không có công cụ xoá". Khi đó mở PHIÊN MỚI và mồi lại lịch sử
+    // (`transcript` ở trên), thay vì nối vào ảnh chụp cũ.
+    if (!general && runner === 'claude') {
+      const print = this.promptFingerprint(!!client, input.mode);
+      if (ts.started && ts.promptPrint !== print) {
+        ts.agentSessionId = randomUUID();
+        ts.started = false;
+      }
+      ts.promptPrint = print;
+    }
     const session = general
       ? { id: input.sessionId || randomUUID(), resume: !!input.resume }
       : { id: ts.agentSessionId!, resume: ts.started };
@@ -4488,7 +4523,14 @@ export class LarkService {
                   userBitableScopeMissing: this.userBitableScopeMissing(),
                 }
               : undefined,
-          })) + skillsBlock;
+          }));
+    // Mọi thứ đổi theo lượt (Base, Tự động, tài khoản, kỹ năng) đi ở ĐẦU TIN NHẮN của lượt — lời nhắc
+    // hệ thống chỉ tới model ở lượt đầu của phiên (xem buildTurnContextBlock).
+    turnPrompt = general
+      ? skillsBlock.trim()
+        ? `${skillsBlock.trim()}\n\n[Yêu cầu của người dùng]\n${turnPrompt}`
+        : turnPrompt
+      : `${buildTurnContextBlock({ bases: turnBases, me: wfMe ? { name: wfMe.name } : undefined, auto: this.workflowAutoOn(), layout: input.layout, versionLine, skills: skillsBlock })}\n\n${turnPrompt}`;
     // When auto-approve is on, writes run without the per-tool confirm prompt.
     // Tạo workflow: KHÔNG dùng "Tự động duyệt" chung (nó mở cả thao tác xoá). Thay vào đó công tắc
     // riêng của màn này ("Tự động (không hỏi lại)", mặc định BẬT) chỉ tự duyệt tool có cờ `additive`

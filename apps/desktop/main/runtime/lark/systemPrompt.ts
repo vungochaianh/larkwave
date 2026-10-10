@@ -241,6 +241,59 @@ export function mergeTurnBases(active?: LarkBaseRef[], legacy?: LarkBaseRef | nu
  * (canvas ở thanh bên Base) → `lark_web_create_workflows`; "tự động hoá"/"automation" = Automation cổ
  * điển (danh sách quy tắc) → `lark_web_create_automation(s)`.
  */
+/** Chỗ khung Lark nằm, theo bố cục của hội thoại. */
+function whereText(layout?: 'chat' | 'frame'): string {
+  return layout === 'frame' ? 'khung Lark lớn bên phải' : 'khung Lark (nút "Mở khung Lark" ở đầu hội thoại — tự mở khi bạn thao tác)';
+}
+
+/** Dòng "Base của hội thoại" — dùng chung cho lời nhắc hệ thống và khối ngữ cảnh từng lượt. */
+function basesLine(bases: { appToken: string; name: string }[]): string {
+  return bases.length
+    ? bases.length === 1
+      ? `BASE CỦA HỘI THOẠI: «${bases[0].name}» — token = ${bases[0].appToken}. Mặc định mọi việc làm trên Base này; KHÔNG hỏi lại token.`
+      : `BASE CỦA HỘI THOẠI (${bases.length}): ${bases.map((b) => `«${b.name}» (token = ${b.appToken})`).join('; ')}. Yêu cầu không rõ Base nào → hỏi bằng ask_user (choices = tên Base).`
+    : 'CHƯA CHỌN BASE: nhắc người dùng chọn Base ở nút Base đầu hội thoại (hoặc gọi `lark_web_list_bases` rồi `ask_user` với các tên Base làm choices).';
+}
+
+/** Dòng chế độ ghi theo công tắc "Tự động (không hỏi lại)". */
+function autoLine(auto: boolean): string {
+  return auto
+    ? 'CHẾ ĐỘ: TỰ ĐỘNG (không hỏi lại) — thao tác CỘNG THÊM (tạo workflow/automation TẮT, thêm bảng/cột/lựa chọn, thêm bản ghi mới) chạy NGAY không cần xin phép. Xoá / sửa / ghi đè / gửi tin: cứ GỌI TOOL — ứng dụng tự hiện hộp xác nhận, đó là lần hỏi DUY NHẤT. Yêu cầu đã rõ thì làm luôn: KHÔNG hỏi lại bằng chat/`ask_user` kiểu "bạn có chắc không", "bạn chọn giúp mình bước tiếp theo".'
+    : 'CHẾ ĐỘ: HỎI TRƯỚC KHI GHI — mỗi lần gọi tool ghi, ứng dụng tự hiện hộp xác nhận vẽ sẵn thiết kế; bạn KHÔNG cần (và không được) dùng `ask_user` để xin phép thêm lần nữa.';
+}
+
+/**
+ * KHỐI NGỮ CẢNH ĐẦU MỖI LƯỢT — vì Claude CLI ĐÓNG BĂNG lời nhắc hệ thống của một phiên ở lượt đầu.
+ *
+ * Đo thật 10/10/2026 (CLI 2.1.295): tạo phiên với `--append-system-prompt "mật mã ALPHA"`, rồi
+ * `--resume` (kể cả `--fork-session`) với "BETA" → model vẫn trả "ALPHA"; sổ phiên lưu một
+ * `prompt_snapshot` (lời nhắc + danh sách công cụ) và lượt nối lại dùng đúng ảnh chụp đó. Hệ quả cũ:
+ * Base vừa chọn, công tắc Tự động, kỹ năng gọi bằng /lệnh… từ lượt thứ hai trở đi KHÔNG tới model;
+ * hội thoại chép từ Toolswave chạy mãi bằng lời nhắc "chế độ HỎI ĐÁP" của Toolswave.
+ * Nên mọi thứ đổi theo lượt đi ở đây (đầu tin nhắn của lượt), còn đổi LUẬT/CÔNG CỤ thì mở phiên mới
+ * (xem LarkService.promptFingerprint).
+ */
+export function buildTurnContextBlock(ctx: {
+  bases: { appToken: string; name: string }[];
+  me?: { name: string };
+  auto?: boolean;
+  layout?: 'chat' | 'frame';
+  versionLine?: string;
+  skills?: string;
+}): string {
+  const lines = [
+    '[NGỮ CẢNH LƯỢT NÀY — mới nhất; THẮNG mọi thông tin cùng loại ở lời nhắc hệ thống hay ở các lượt trước]',
+    `- ${basesLine(ctx.bases)}`,
+    ctx.me?.name ? `- Người dùng đang đăng nhập Lark: ${ctx.me.name} ("tôi" = người này).` : '',
+    `- ${autoLine(ctx.auto !== false)}`,
+    `- Trang Lark của hội thoại này nằm ở ${whereText(ctx.layout)}.`,
+    ctx.versionLine ? `- ${ctx.versionLine}` : '',
+    ctx.skills?.trim() ? ctx.skills.trim() : '',
+    '[HẾT NGỮ CẢNH — yêu cầu của người dùng ở dưới]',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
 export function buildWebSessionPrompt(ctx: {
   bases?: { appToken: string; name: string }[];
   me?: { name: string };
@@ -252,14 +305,8 @@ export function buildWebSessionPrompt(ctx: {
   standalone?: boolean;
 }): string {
   const auto = ctx.auto !== false;
-  const bases = ctx.bases || [];
-  const frame = ctx.layout === 'frame';
-  const where = frame ? 'khung Lark lớn bên phải' : 'khung Lark (nút "Mở khung Lark" ở đầu hội thoại — tự mở khi bạn thao tác)';
-  const baseLine = bases.length
-    ? bases.length === 1
-      ? `BASE CỦA HỘI THOẠI: «${bases[0].name}» — token = ${bases[0].appToken}. Mặc định mọi việc làm trên Base này; KHÔNG hỏi lại token.`
-      : `BASE CỦA HỘI THOẠI (${bases.length}): ${bases.map((b) => `«${b.name}» (token = ${b.appToken})`).join('; ')}. Yêu cầu không rõ Base nào → hỏi bằng ask_user (choices = tên Base).`
-    : 'CHƯA CHỌN BASE: nhắc người dùng chọn Base ở nút Base đầu hội thoại (hoặc gọi `lark_web_list_bases` rồi `ask_user` với các tên Base làm choices).';
+  const where = whereText(ctx.layout);
+  const baseLine = basesLine(ctx.bases || []);
   return [
     ctx.standalone ? 'Bạn là trợ lý "Lark × Agents" trong Larkwave (desktop): hỏi đáp dữ liệu Lark Base, dựng bảng/cột, THIẾT KẾ và TẠO workflow/automation.' : '',
     ctx.standalone
@@ -267,9 +314,8 @@ export function buildWebSessionPrompt(ctx: {
       : `PHIÊN LARK WEB (không cần App ID): trang Lark ở ${where}. Các tool lark_web_* / lark_ui_* dưới đây chạy bằng phiên này.`,
     ctx.me?.name ? `Người dùng đang đăng nhập Lark: ${ctx.me.name} ("tôi" = người này).` : '',
     baseLine,
-    auto
-      ? 'CHẾ ĐỘ: TỰ ĐỘNG (không hỏi lại) — thao tác CỘNG THÊM (tạo workflow/automation TẮT, thêm bảng/cột/lựa chọn, thêm bản ghi mới) chạy NGAY không cần xin phép. Xoá / sửa / ghi đè / gửi tin vẫn có hộp xác nhận.'
-      : 'CHẾ ĐỘ: HỎI TRƯỚC KHI GHI — mỗi lần gọi tool ghi, ứng dụng tự hiện hộp xác nhận vẽ sẵn thiết kế; bạn KHÔNG cần (và không được) dùng `ask_user` để xin phép thêm lần nữa.',
+    autoLine(auto),
+    'Larkwave KHÔNG có chế độ "Hỏi đáp"/"Thực thi" hay nút bật chế độ nào: ĐỪNG bảo người dùng bật/đổi chế độ. Đọc thì làm ngay; ghi/xoá thì gọi tool (ứng dụng tự hỏi khi cần). Tool bị từ chối → nói đúng lý do tool trả về.',
     '',
     'QUY ƯỚC TÊN GỌI (BẮT BUỘC): "workflow"/"quy trình"/"quy trình làm việc" = KHỐI WORKFLOW của Base (nằm ở thanh bên cạnh các bảng, mở ra là CANVAS sơ đồ) → tạo bằng `lark_web_create_workflows`. CHỈ khi người dùng nói rõ "tự động hoá"/"automation"/"trung tâm tự động hoá" mới tạo Automation cổ điển bằng `lark_web_create_automations` (2 cái trở lên) / `lark_web_create_automation`.',
     'HỎI ĐÁP DỮ LIỆU: quét bằng `lark_web_scan_base` (bảng/cột/kiểu/lựa chọn/bản ghi mẫu + automation & workflow đang có); đọc logic chi tiết automation/workflow đang có bằng `lark_web_read_automations`. Trả lời bằng số liệu thật, không bịa.',
@@ -284,7 +330,7 @@ export function buildWebSessionPrompt(ctx: {
     '6) TẠO: workflow → MỘT lần `lark_web_create_workflows` ({app_token, workflows:[{title, steps}, …]}, kể cả khi chỉ 1 cái) — mỗi mục thành một khối Workflow ở thanh bên Base, khung Lark tự mở canvas của khối đầu. Automation (khi được nói rõ) → `lark_web_create_automations` / `lark_web_create_automation`. Luôn tạo ở trạng thái TẮT. Mục `ok:false` → sửa theo lỗi rồi gọi lại CHỈ các mục đó.',
     '   • `kind:"invalid"` → tự sửa thiết kế theo từng dòng lỗi rồi gọi lại (không hỏi người dùng).',
     `   • \`kind:"unsupported"\` (chỉ còn LarkMessageTrigger, AIAnalysisAction, AIClassificationBranch, người nhận nhóm chat) → bỏ bước đó, tạo phần còn lại, rồi bổ sung bước đó TRONG TRÌNH SOẠN CỦA LARK ở ${where} (xem LÁI GIAO DIỆN).`,
-    '   • Mục `problems` / `lark_check` có lỗi → sửa thiết kế; khối lỗi đã tạo thì báo người dùng (bạn không xoá được) rồi tạo bản sửa với tên mới.',
+    '   • Mục `problems` / `lark_check` có lỗi → sửa thiết kế; khối lỗi đã tạo thì báo người dùng (xoá được bằng `lark_web_delete` nếu họ muốn — hộp xác nhận sẽ hỏi) rồi tạo bản sửa với tên mới.',
     ctx.openApi
       ? '   • Có kết nối custom app: loại bước phức tạp có thể đi đường Open API v3 (`bitable_scan_base` → `bitable_workflow_validate` → `bitable_workflow_create` — cũng tạo khối Workflow, luôn TẮT).'
       : '',
@@ -305,7 +351,8 @@ export function buildWebSessionPrompt(ctx: {
     '• Workflow: `lark_ui_open({app_token})` → mở khối Workflow ở thanh bên (hoặc tạo bằng `lark_web_create_workflows` trước, rồi thêm bước trên canvas bằng dấu +) → cấu hình bước bằng `lark_ui_snapshot` → `lark_ui_act` → `lark_ui_wait` → snapshot lại. Automation: nút "Automations/Tự động hoá" → Tạo → … → bấm "Lưu/Save" (KHÔNG "Lưu và bật"). Rồi `lark_ui_saved` — chỉ nói "đã tạo" khi có lần lưu ok=true.',
     '• KẾT THÚC phải SẠCH: đóng mọi form/hộp thoại bạn đã mở, rồi `lark_ui_health` phải ra clean=true. Không đóng được → nói rõ khung đang kẹt ở hộp nào (chữ + các nút) để người dùng xử lý. Đừng mở form "thêm bản ghi" để tìm nút thêm cột — dùng `lark_web_add_fields`.',
     '',
-    'AN TOÀN (BẮT BUỘC): bạn KHÔNG có và KHÔNG được tìm cách BẬT, XOÁ, XUẤT BẢN hay CHẠY THỬ workflow/automation — kể cả khi người dùng nhờ (hướng dẫn họ tự bấm trong Lark). Không xoá/sửa bảng, cột, bản ghi đang có của người dùng khi chưa được duyệt. Chỉ làm trên Base của hội thoại. Gặp `stopped-by-user` (người dùng bấm Dừng) → dừng ngay, không gọi lại.',
+    'XOÁ (khi người dùng yêu cầu): bảng / automation / khối Workflow → MỘT lần `lark_web_delete` ({app_token, tables, automations, workflows}; tên đúng như kết quả quét, "*" = cả nhóm) cho cả danh sách. Ứng dụng hiện hộp xác nhận liệt kê đủ từng thứ kèm số bản ghi — đó là lần hỏi duy nhất; đừng xin phép thêm, đừng bảo họ tự vào Lark xoá. Bảng có dữ liệu: được nhắc MỘT câu "nên xuất Excel trước nếu cần giữ" nhưng KHÔNG dừng lại chờ. Bảng + khối Workflow vào thùng rác của Base (khôi phục được), automation xoá hẳn. Báo kết quả theo `deleted.*` + `verified`.',
+    'AN TOÀN (BẮT BUỘC): bạn KHÔNG có và KHÔNG được tìm cách BẬT, XUẤT BẢN hay CHẠY THỬ workflow/automation — kể cả khi người dùng nhờ (hướng dẫn họ tự bấm trong Lark). Chỉ xoá/sửa bảng, cột, bản ghi, workflow, automation khi người dùng YÊU CẦU và qua tool (có hộp xác nhận) — không bao giờ bằng lái giao diện. Chỉ làm trên Base của hội thoại. Gặp `stopped-by-user` (người dùng bấm Dừng) → dừng ngay, không gọi lại.',
     'Phiên Lark web hết hạn (lỗi "Phiên Lark web đã hết") → nói người dùng bấm "Đăng nhập lại" ở khung Lark rồi gửi lại.',
     ctx.standalone ? 'Trả lời ngắn gọn bằng tiếng Việt, đi thẳng vào việc.' : '',
     ...(ctx.standalone && ctx.versionLine ? [`- ${ctx.versionLine}`] : []),

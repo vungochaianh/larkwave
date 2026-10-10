@@ -50,7 +50,9 @@ export function ConfirmToolModal({
   const wf = !batch && pending && WORKFLOW_TOOLS.has(pending.name) ? workflowView(pending.input, names) : null;
   // Tạo nháp TẮT / thêm cấu trúc (cộng thêm) → cho "nhớ trong hội thoại này". Sửa workflow ĐANG CÓ
   // (bitable_workflow_update) thì không: thay toàn bộ bước của thứ người dùng làm, phải duyệt tận mắt.
-  const canRemember = !(wf?.update) && pending?.name !== 'bitable_workflow_update';
+  const del = pending?.name === 'lark_web_delete' ? deleteViewOf(pending.preview) : null;
+  // XOÁ không bao giờ được "nhớ": mỗi lần xoá phải là một lần người dùng nhìn danh sách và bấm.
+  const canRemember = !(wf?.update) && pending?.name !== 'bitable_workflow_update' && !/delete|remove/.test(pending?.name || '');
 
   return (
     <Modal
@@ -59,7 +61,7 @@ export function ConfirmToolModal({
       title={
         <span>
           <WarningFilled style={{ color: '#F59E0B', marginRight: 8 }} />
-          {t('chat.confirmWriteTitle', 'Xác nhận thao tác ghi lên Lark')}
+          {del ? t('chat.confirmDeleteTitle', 'Xác nhận XOÁ trên Lark') : t('chat.confirmWriteTitle', 'Xác nhận thao tác ghi lên Lark')}
         </span>
       }
       okText={t('chat.allow', 'Cho phép')}
@@ -75,7 +77,9 @@ export function ConfirmToolModal({
           <Paragraph style={{ marginBottom: 8 }}>
             {t('chat.claudeWantsToRun', 'Claude muốn chạy:')} <Text code>{pending.name}</Text>
           </Paragraph>
-          {batch ? (
+          {del ? (
+            <DeletePlanView view={del} />
+          ) : batch ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 460, overflowY: 'auto' }}>
               <Alert type="info" showIcon style={{ padding: '6px 10px' }} message={t('chat.wfBatchNote', `${batch.length} automation, tạo lần lượt ở trạng thái TẮT. Bạn mở Lark kiểm tra rồi tự bật.`)} />
               {batch.map((v, k) => (
@@ -105,6 +109,61 @@ export function ConfirmToolModal({
         </>
       )}
     </Modal>
+  );
+}
+
+interface DeleteView {
+  tables: string[];
+  automations: string[];
+  workflows: string[];
+  records: number;
+  errors?: string[];
+}
+
+function deleteViewOf(preview: unknown): DeleteView | null {
+  const p = preview && typeof preview === 'object' ? (preview as { deletePlan?: DeleteView; deleteErrors?: string[] }) : null;
+  if (p?.deletePlan) return p.deletePlan;
+  if (p?.deleteErrors) return { tables: [], automations: [], workflows: [], records: 0, errors: p.deleteErrors };
+  return null;
+}
+
+/** Hộp xác nhận XOÁ: từng nhóm một danh sách, nói rõ cái nào khôi phục được. */
+function DeletePlanView({ view }: { view: DeleteView }) {
+  const { t } = useI18n();
+  if (view.errors?.length) return <Alert type="error" showIcon message={view.errors.join(' ')} />;
+  const group = (title: string, items: string[], note: string) =>
+    items.length ? (
+      <div>
+        <Text strong>
+          {title} ({items.length})
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {' '}
+          · {note}
+        </Text>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 20, maxHeight: 180, overflowY: 'auto' }}>
+          {items.map((x, k) => (
+            <li key={k}>{x}</li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+  return (
+    <div data-testid="confirm-delete-plan" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <Alert
+        type="warning"
+        showIcon
+        style={{ padding: '6px 10px' }}
+        message={
+          view.records > 0
+            ? t('chat.delWarnRecords', 'Sẽ xoá {n} bản ghi cùng các bảng. Cần giữ dữ liệu thì Từ chối và xuất Excel trước.', { n: view.records.toLocaleString('vi-VN') })
+            : t('chat.delWarn', 'Kiểm kỹ danh sách trước khi cho phép.')
+        }
+      />
+      {group(t('chat.delTables', 'Bảng'), view.tables, t('chat.delTablesNote', 'vào thùng rác của Base, khôi phục được trong Lark'))}
+      {group(t('chat.delWorkflows', 'Workflow'), view.workflows, t('chat.delWorkflowsNote', 'vào thùng rác của Base'))}
+      {group(t('chat.delAutomations', 'Automation'), view.automations, t('chat.delAutomationsNote', 'xoá hẳn, không khôi phục được'))}
+    </div>
   );
 }
 

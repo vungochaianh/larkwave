@@ -28,6 +28,7 @@ import { compositeKey, openApiUpsert, openApiUpsertPlan, planSummary, planUpsert
 import { extractOfficeText } from '../ooxml';
 import { resolveToolFile } from '../fileContext';
 import { getFileOutDir } from './files';
+import { describePlan, resolveDeleteTargets, type DeletePlan } from '../webDelete';
 import { enc, str, type LarkToolDef } from './types';
 import type { LarkClient } from '../larkClient';
 
@@ -39,6 +40,24 @@ const MAX_SHEET_CELLS = 5000;
 
 const web = () => getLarkWebSession();
 const webReady = () => !!web().webHost();
+
+/**
+ * Kế hoạch XOÁ đã tính cho một input (preflight → hộp xác nhận → exec dùng chung, tối đa 15 phút).
+ * Exec xoá đúng thứ người dùng đã thấy trong hộp xác nhận — không quét lại rồi tự mở rộng.
+ */
+const approvedPlans = new Map<string, { at: number; plan: DeletePlan }>();
+const PLAN_TTL = 15 * 60_000;
+const planKey = (i: J) => JSON.stringify([tokenOf(i), i?.tables ?? null, i?.automations ?? null, i?.workflows ?? null]);
+async function planDelete(i: J): Promise<{ ok: true; plan: DeletePlan } | { ok: false; errors: string[] }> {
+  const key = planKey(i);
+  const hit = approvedPlans.get(key);
+  if (hit && Date.now() - hit.at < PLAN_TTL) return { ok: true, plan: hit.plan };
+  const token = tokenOf(i);
+  if (!token) return { ok: false, errors: ['Thiếu app_token (token hoặc URL của Base).'] };
+  const r = resolveDeleteTargets(i ?? {}, await web().deleteCatalog(token));
+  if (!('errors' in r)) approvedPlans.set(key, { at: Date.now(), plan: r.plan });
+  return r;
+}
 
 const MIME: Record<string, string> = {
   ...Object.fromEntries(Object.entries(FORMAT_META).map(([k, v]) => [k, v.mime])),
@@ -931,6 +950,56 @@ export const larkWebWriteTools: LarkToolDef[] = [
         ...((r.failed || []).length ? { failed_cells: r.failed.slice(0, 20), protected_sheet: !!r.protectedSheet } : {}),
         url: `${host}/sheets/${token}`,
         note: cmp.ok ? `ĐÃ GHI ${r.written} ô vào sheet «${r.sheet}» và đọc lại khớp.` : 'Có ô đọc lại không khớp — báo người dùng, KHÔNG nói đã ghi xong.',
+      };
+    },
+  },
+  {
+    name: 'lark_web_delete',
+    gated: true,
+    description:
+      'XOÁ bảng / automation / khối Workflow của một Base qua phiên Lark web — MỘT lần gọi cho cả danh sách người dùng muốn xoá. ' +
+      'Ứng dụng LUÔN hiện hộp xác nhận liệt kê đủ từng thứ (cả khi công tắc "Tự động" đang bật): đó là lần hỏi DUY NHẤT — KHÔNG xin phép thêm bằng chat hay ask_user, KHÔNG bảo người dùng tự vào Lark xoá. ' +
+      'Nêu theo TÊN đúng như trong Lark hoặc id (bảng tbl…; automation = workflow id số; workflow = block id wkf… hoặc workflow id); "*" = cả nhóm đó (vd tables:["*"] = mọi bảng). Quét trước bằng lark_web_scan_base. ' +
+      'Bảng và khối Workflow vào THÙNG RÁC của Base (khôi phục được trong Lark); automation XOÁ HẲN. Tự đọc lại sau khi xoá — chỉ nói "đã xoá" với thứ có trong deleted.* ok:true và verified:true; còn sót (still_there) thì nói rõ. ' +
+      'Không dùng để xoá bản ghi hay cột.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        app_token: str('Token hoặc URL của Base'),
+        tables: { type: 'array', items: { type: 'string' }, description: 'Tên hoặc id các BẢNG cần xoá; ["*"] = mọi bảng của Base' },
+        automations: { type: 'array', items: { type: 'string' }, description: 'Tên hoặc workflow id các AUTOMATION cần xoá; ["*"] = mọi automation' },
+        workflows: { type: 'array', items: { type: 'string' }, description: 'Tên, block id (wkf…) hoặc workflow id các khối WORKFLOW cần xoá; ["*"] = mọi khối Workflow' },
+      },
+      required: ['app_token'],
+    },
+    preflight: async (i) => {
+      if (!webReady()) return { ok: false, kind: 'error', error: 'Chưa đăng nhập Lark web — xoá qua phiên web cần đăng nhập trong khung Lark.' };
+      try {
+        const r = await planDelete(i);
+        return !('errors' in r) ? null : { ok: false, kind: 'invalid', errors: r.errors, hint: 'Sửa danh sách theo lỗi (tên phải đúng như trong Base — quét lại bằng lark_web_scan_base) rồi gọi lại.' };
+      } catch (e) {
+        return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
+      }
+    },
+    preview: async (i) => {
+      const r = await planDelete(i);
+      return 'errors' in r ? { deleteErrors: r.errors } : { deletePlan: describePlan(r.plan) };
+    },
+    exec: async (i) => {
+      // Xoá ĐÚNG danh sách đã hiện trong hộp xác nhận (planDelete nhớ kế hoạch theo input), không quét lại
+      // rồi tự mở rộng — "*" lúc duyệt là 15 bảng thì lúc chạy cũng chỉ 15 bảng đó.
+      const r = await planDelete(i);
+      if ('errors' in r) return { ok: false, kind: 'invalid', errors: r.errors };
+      const token = tokenOf(i);
+      const res = await web().deleteWebItems(token, r.plan);
+      approvedPlans.delete(planKey(i));
+      const d = describePlan(r.plan);
+      return {
+        ...res,
+        note: res.ok
+          ? `ĐÃ XOÁ và đọc lại khớp: ${d.tables.length} bảng (vào thùng rác của Base — khôi phục được trong Lark), ${d.automations.length} automation (xoá hẳn), ${d.workflows.length} workflow (vào thùng rác).`
+          : 'CHƯA xoá được hết — báo người dùng đúng thứ nào còn (still_there / deleted.*.error), KHÔNG nói đã xoá xong.',
       };
     },
   },

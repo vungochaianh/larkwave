@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.2',
+    date: '2026-10-10',
+    items: [
+      "Lark × Agents XOÁ được bảng, automation và khối Workflow khi bạn yêu cầu — một hộp xác nhận liệt kê đủ từng thứ (kèm số bản ghi), bảng và workflow vào thùng rác của Base nên khôi phục được; xoá xong tự đọc lại để kiểm.",
+      "Sửa lỗi hội thoại cũ (nhất là hội thoại chép từ Toolswave) cứ nói \"đang ở chế độ Hỏi đáp\" và không dùng được công cụ mới: khi luật hay công cụ của app đổi, hội thoại tự chuyển sang phiên mới mà vẫn giữ lịch sử.",
+      "Model bạn chọn (vd Haiku) giờ được dùng thật cho Lark × Agents — trước đây luôn chạy model mặc định.",
+      "Chế độ Tự động không hỏi lại trong chat nữa: xoá/sửa/ghi đè chỉ hỏi đúng một lần qua hộp xác nhận.",
+    ],
+  },
+  {
     version: '0.1.1',
     date: '2026-10-10',
     items: [

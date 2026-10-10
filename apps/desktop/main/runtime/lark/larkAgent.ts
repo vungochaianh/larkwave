@@ -3,6 +3,7 @@ import { writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { claudeModelArgs } from './cliModel';
 import type { LarkChatEvent, LarkChatMode } from '@larkwave/core';
 import { contextUsageFromResult } from '../contextBudget';
 import type { LarkClient } from './larkClient';
@@ -58,12 +59,11 @@ function friendlyRunnerError(errText: string): string {
  * tool call in-process — streaming tool-call events to the UI and pausing gated
  * writes for confirmation. Text from Claude is forwarded as it arrives.
  *
- * Model: Ask mode forces `sonnet` (cheap Q&A); Build mode leaves the model to the
- * CLI default (the user's strongest available) so we never request a model their
- * plan lacks.
+ * Model: the user's pick (`deps.model`) always wins. With no pick, Ask mode forces `sonnet`
+ * (cheap Q&A) and Build mode leaves the model to the CLI default (the user's strongest
+ * available) so we never request a model their plan lacks.
  */
 
-const ASK_MODEL = 'sonnet';
 
 export interface LarkAgentDeps {
   /** The Lark client — required for Lark turns; omitted for generalMode (no Lark bridge). */
@@ -353,8 +353,8 @@ export async function* runLarkChat(
         '--append-system-prompt',
         deps.systemPrompt,
       ];
-  if (mode === 'ask' && !generalMode) baseArgs.push('--model', ASK_MODEL);
-  if (generalMode && deps.model) baseArgs.push('--model', deps.model);
+  // Model người dùng chọn luôn thắng (xem cliModel.ts — lỗi cũ: lượt Lark bỏ qua nó, chạy Sonnet).
+  baseArgs.push(...claudeModelArgs({ mode, generalMode, model: deps.model }));
 
   let streamedChars = 0; // text already streamed for the in-flight message (dedup)
   let cliModel: string | undefined; // model id from the stream-json init event → context window

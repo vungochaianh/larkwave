@@ -68,6 +68,8 @@ const NEVER = new Set([
   'skill_save',
   'cms_create_bitable_sync',
   'lark_ui_template_apply',
+  // Xoá cả BẢNG / automation / khối Workflow: chỉ khi có người bấm duyệt — không quyền nào của quy tắc mở được.
+  'lark_web_delete',
 ]);
 
 /**

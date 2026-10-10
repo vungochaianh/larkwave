@@ -294,11 +294,16 @@ const test = async (name, fn) => {
   });
 
   // ── Chế độ Tạo workflow: bộ công cụ + chốt ghi ─────────────────────────────────────────────
-  await test('workflowModeTools: chỉ công cụ web/schema/UI; create có gate; không có tool bật/xoá/ghi bản ghi', () => {
+  await test('workflowModeTools: chỉ công cụ web/schema/UI; create có gate; không có tool bật/xuất bản; xoá CHỈ qua lark_web_delete (luôn hỏi)', () => {
     const tools = require(join(B, 'tools', 'index.js'));
     const names = tools.workflowModeTools(false).map((t) => t.name);
     for (const n of ['lark_web_list_bases', 'lark_web_scan_base', 'lark_web_create_automation', 'bitable_workflow_schema', 'lark_ui_open', 'lark_ui_act', 'lark_ui_saved']) assert.ok(names.includes(n), n);
-    for (const n of names) assert.ok(!/enable|delete|publish|_record$|send_message/i.test(n), n);
+    // 10/10/2026 người dùng yêu cầu xoá được bảng/automation/workflow khi họ cho phép → có ĐÚNG MỘT tool
+    // xoá, luôn qua hộp xác nhận (gated, không bao giờ additive → công tắc "Tự động" không tự duyệt).
+    for (const n of names) assert.ok(n === 'lark_web_delete' || !/enable|delete|publish|_record$|send_message/i.test(n), n);
+    assert.ok(names.includes('lark_web_delete'));
+    assert.strictEqual(tools.isWriteTool('lark_web_delete'), true, 'xoá phải có hộp xác nhận');
+    assert.strictEqual(tools.isAdditiveTool('lark_web_delete'), false, 'xoá không bao giờ được tự duyệt');
     assert.ok(!names.includes('bitable_workflow_create'));
     assert.ok(tools.workflowModeTools(true).map((t) => t.name).includes('bitable_workflow_create'));
     assert.strictEqual(tools.isWriteTool('lark_web_create_automation'), true);

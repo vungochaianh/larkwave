@@ -12,6 +12,9 @@ export interface StoredSession {
   claudeSessionId: string;
   /** Agent session id (Claude --resume; others: logical id + UI transcript). */
   agentSessionId?: string;
+  /** Dấu vân tay LUẬT + CÔNG CỤ mà phiên CLI `agentSessionId` được tạo cùng (Claude CLI đóng băng lời
+   *  nhắc hệ thống ở lượt đầu — xem LarkService.promptFingerprint). Khác dấu ⇒ lượt sau mở phiên mới. */
+  promptPrint?: string;
   runner?: string;
   model?: string;
   title: string;
