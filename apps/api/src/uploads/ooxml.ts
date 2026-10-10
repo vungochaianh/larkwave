@@ -355,6 +355,12 @@ function extractXlsx(buf: Buffer, entries: ZipEntry[]): string {
             val = dk ? serialToDate(Number(raw), dk) : numText(raw);
           }
         }
+        // Ô công thức CHƯA có giá trị tính sẵn (<f> mà không <v> — tệp tự dựng, chưa ai mở bằng Excel):
+        // hiện chính công thức thay vì để trống, nếu không cột "Thành tiền" trông như mất dữ liệu.
+        if (!val) {
+          const f = inner.match(/<f\b[^>]*>([\s\S]*?)<\/f>/);
+          if (f && f[1].trim()) val = `=${decodeXmlEntities(f[1].trim())}`;
+        }
         // Tab là dấu phân cột, xuống dòng là dấu phân hàng — ô chứa chúng sẽ phá vỡ bảng.
         if (val) cells[col] = val.replace(/[\t\r\n]+/g, ' ').trim();
       }
