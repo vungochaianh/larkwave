@@ -46,6 +46,9 @@ import {
   sheetWriteScript,
   uploadQuery,
   uploadScript,
+  downloadPaths,
+  downloadScript,
+  filenameFromDisposition,
   WEB_UPLOAD_MAX_BYTES,
   type MountPoint,
 } from './webFiles';
@@ -2353,6 +2356,23 @@ export class LarkWebSession {
     return { fileToken: p.fileToken, ...(p.nodeToken ? { nodeToken: p.nodeToken } : {}) };
   }
 
+  /**
+   * TẢI XUỐNG một tệp (Drive / ô đính kèm Base) qua phiên web. `extra` cho tệp trong Base có quyền nâng
+   * cao (bitablePerm). Trả bytes + tên (từ Content-Disposition) + kiểu.
+   */
+  async webDownload(fileToken: string, o: { mountPoint?: 'explorer' | 'bitable_file' | 'bitable_image'; extra?: Record<string, unknown>; maxBytes?: number } = {}): Promise<{ bytes: Buffer; name: string; mime: string }> {
+    if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web — đăng nhập trong khung Lark trước.');
+    await this.webJson('/space/api/user/'); // đưa trang về đúng origin tenant
+    const max = Math.min(o.maxBytes ?? 100 * 1024 * 1024, 200 * 1024 * 1024);
+    const run = this.win.webContents.executeJavaScript(downloadScript(downloadPaths(this.host, fileToken, o), max), true) as Promise<J>;
+    const res = await Promise.race([run.catch((e) => ({ error: String((e as Error)?.message || e) })), new Promise<J>((r) => setTimeout(() => r({ error: 'quá 180 giây không trả lời' }), 180_000))]);
+    if (!res?.ok) {
+      if (res?.error === 'too-big') throw new Error(`Tệp ${Math.round((res.bytes || 0) / 1048576)} MB vượt trần tải về.`);
+      throw new Error(`Không tải được tệp ${fileToken} qua phiên web (${res?.error || 'không rõ'}${res?.tried ? `: ${res.tried.join(' | ')}` : ''}).`);
+    }
+    return { bytes: Buffer.from(String(res.b64), 'base64'), name: filenameFromDisposition(String(res.disposition || '')), mime: String(res.mime || '') };
+  }
+
   /** Tạo thư mục Drive (bỏ trống parent = "Không gian của tôi"). */
   async webCreateFolder(name: string, parent = ''): Promise<{ token: string; url?: string }> {
     if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web.');
@@ -2448,6 +2468,22 @@ export class LarkWebSession {
     for (const sh of sheets.slice(0, 12)) {
       if (sh.loaded || !sh.id) continue;
       const one = await this.runOnDoc(`${base}?sheet=${enc(String(sh.id))}`, sheetReadScript(), 90_000, true);
+      const got = Array.isArray(one?.sheets) ? one.sheets.find((x: J) => x.id === sh.id && x.loaded) : null;
+      if (got) Object.assign(sh, { rows: got.rows, cols: got.cols, head: got.head, loaded: true });
+    }
+    return { ...r, sheets, title: await this.webDocTitle(token, 3) };
+  }
+
+  /** Như webReadSheet nhưng lấy TOÀN BỘ dữ liệu từng sheet (tối đa 20 000 dòng × 200 cột) — nguồn tệp của tự động hoá. */
+  async webReadSheetFull(token: string): Promise<J> {
+    const base = `${this.host}/sheets/${enc(token)}`;
+    const full = sheetReadScript({ maxRows: 20_000, maxCols: 200, scanRows: 20_000 });
+    const r = await this.runOnDoc(base, full, 120_000);
+    if (!r?.ok || !Array.isArray(r.sheets)) return r;
+    const sheets: J[] = r.sheets;
+    for (const sh of sheets.slice(0, 12)) {
+      if (sh.loaded || !sh.id) continue;
+      const one = await this.runOnDoc(`${base}?sheet=${enc(String(sh.id))}`, full, 120_000, true);
       const got = Array.isArray(one?.sheets) ? one.sheets.find((x: J) => x.id === sh.id && x.loaded) : null;
       if (got) Object.assign(sh, { rows: got.rows, cols: got.cols, head: got.head, loaded: true });
     }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { LarkAutoCondition, LarkAutomationInput, LarkAutomationRun, LarkAutomationRunResult } from '@larkwave/core';
+import type { LarkAutoCondition, LarkAutomationInput, LarkAutomationRun, LarkAutomationRunResult, LarkAutoRunReport } from '@larkwave/core';
 import type { LarkClient } from './larkClient';
 import type { StoredAutomation } from './secretStore';
 
@@ -109,7 +109,10 @@ export class AutomationEngine {
       run: (
         prompt: string,
         mode: 'ask' | 'build',
-        stats: { tools: number; writes: number },
+        /** `report` do nơi chạy điền (đọc gì / ghi gì / đọc lại / bỏ qua / tệp kết quả) — vào lịch sử chạy. */
+        stats: { tools: number; writes: number; report?: LarkAutoRunReport },
+        /** Quy tắc đang chạy: thư mục tệp, quyền khi chạy tự động, nguồn Lark… */
+        rule: StoredAutomation,
       ) => Promise<string>;
       /** `ruleId` để mọi lần chạy của MỘT lịch gom vào MỘT hội thoại, thay vì đẻ một cái mới mỗi lần. */
       save?: (ruleId: string, ruleName: string, prompt: string, result: string) => Promise<void>;
@@ -140,7 +143,19 @@ export class AutomationEngine {
         },
       ) => Promise<{ summary: string; writes: number }>;
     },
+    /**
+     * Môi trường chạy. `env:'hosted'` (máy chạy hộ trên VM) BỎ QUA quy tắc `runOn:'desktop'` (cần phiên
+     * Lark web / thư mục trên máy người dùng); app desktop thì chạy chúng KỂ CẢ khi không giữ quyền chạy
+     * lịch (máy chạy hộ đã bỏ qua nên không thể chạy trùng). `canRunWithoutClient`: chưa kết nối custom
+     * app vẫn chạy được việc "Chạy AI agent" theo giờ bằng phiên Lark web.
+     */
+    private readonly opts: { env?: 'desktop' | 'hosted'; canRunWithoutClient?: () => boolean } = {},
   ) {}
+
+  /** Quy tắc chạy được KHÔNG cần custom app: lịch theo giờ chạy AI agent (công cụ phiên Lark web). */
+  private static clientless(rule: StoredAutomation): boolean {
+    return rule.triggerType === 'schedule' && rule.action?.type === 'run_agent';
+  }
 
   private ensure(): StoredAutomation[] {
     if (!this.rules) {
@@ -188,9 +203,18 @@ export class AutomationEngine {
       fireExisting: !!input.fireExisting,
       triggerType: (isSchedule ? 'schedule' : 'record') as 'schedule' | 'record',
       schedule: isSchedule ? input.schedule : undefined,
+      // Thư mục/nguồn tệp + quyền khi chạy tự động + nơi chạy. `permissions` chỉ ghi khi giao diện gửi lên
+      // (không gửi = giữ nguyên, kể cả trạng thái "quy tắc cũ" — xem unattendedPolicy.effectivePerms).
+      ...(input.files ? { files: input.files } : {}),
+      ...(input.permissions ? { permissions: input.permissions } : {}),
+      ...(input.runOn ? { runOn: input.runOn } : {}),
     };
     if (input.id) {
       const idx = list.findIndex((r) => r.id === input.id);
+      if (idx < 0 && /^[A-Za-z0-9_-]{6,64}$/.test(input.id)) {
+        // Id do giao diện sinh trước (để thêm tệp nguồn trước khi lưu lần đầu) — tạo mới với đúng id đó.
+        list.push({ ...clean, id: input.id, seeded: clean.fireExisting, runCount: 0, createdAt: new Date().toISOString(), firedRecordIds: [] });
+      }
       if (idx >= 0) {
         const prev = list[idx];
         // Changing the target table/condition invalidates the baseline → re-seed.
@@ -266,18 +290,25 @@ export class AutomationEngine {
 
   private async tick(): Promise<void> {
     const client = this.getClient();
-    if (!client) return;
+    const webOnly = !client && !!this.opts.canRunWithoutClient?.();
+    if (!client && !webOnly) return;
+    const env = this.opts.env ?? 'desktop';
     // CHỦ CHẠY LỊCH. Lịch có thể chạy ở hai nơi — máy này và một máy chạy nền (VM). Không hỏi
     // trước thì mỗi lịch chạy hai lần, và với lịch GHI dữ liệu đó là hai bản ghi trùng trong Base
     // thật của khách, lặp lại mỗi chu kỳ. Không trả lời được (mất mạng) thì CỨ CHẠY: thà trùng
     // một lúc còn hơn lịch của người dùng đứng im vì một lời gọi phụ hỏng.
-    if (this.isRunner && (await this.isRunner()) === false) return;
+    // Quy tắc 'desktop' thì máy chạy hộ luôn bỏ qua → app desktop chạy chúng kể cả khi không giữ quyền.
+    const mine = !this.isRunner || (await this.isRunner()) !== false;
     const nowMs = Date.now();
     for (const rule of this.ensure()) {
       if (!rule.enabled || this.running.has(rule.id)) continue;
+      const desktopOnly = rule.runOn === 'desktop';
+      if (env === 'hosted' && desktopOnly) continue;
+      if (!mine && !(env === 'desktop' && desktopOnly)) continue;
+      if (webOnly && !AutomationEngine.clientless(rule)) continue;
       const due = rule.triggerType === 'schedule' ? this.scheduleDue(rule, nowMs) : this.recordDue(rule, nowMs);
       if (!due) continue;
-      void this.execute(rule.id, client);
+      void this.execute(rule.id, client ?? undefined);
     }
   }
 
@@ -335,12 +366,21 @@ export class AutomationEngine {
 
   /** Run a rule once now (scheduler tick OR a manual "test" from the UI). */
   async execute(id: string, client?: LarkClient): Promise<LarkAutomationRunResult> {
-    const c = client ?? this.getClient();
-    if (!c) return { matched: 0, fired: 0, error: 'Chưa kết nối Lark.' };
-    if (this.running.has(id)) return { matched: 0, fired: 0, error: 'Quy tắc đang chạy.' };
     const list = this.ensure();
     const rule = list.find((r) => r.id === id);
     if (!rule) return { matched: 0, fired: 0, error: 'Không tìm thấy quy tắc.' };
+    const c = client ?? this.getClient();
+    // Chưa có custom app: chỉ việc "Chạy AI agent" theo giờ chạy được (bằng phiên Lark web).
+    if (!c && !(AutomationEngine.clientless(rule) && this.opts.canRunWithoutClient?.())) {
+      return {
+        matched: 0,
+        fired: 0,
+        error: AutomationEngine.clientless(rule)
+          ? 'Chưa đăng nhập Lark web (và chưa kết nối custom app) — mở khung Lark, đăng nhập rồi chạy lại.'
+          : 'Chưa kết nối Lark (quy tắc theo bảng / gửi tin cần custom app).',
+      };
+    }
+    if (this.running.has(id)) return { matched: 0, fired: 0, error: 'Quy tắc đang chạy.' };
 
     this.running.add(id);
     let matched = 0;
@@ -350,7 +390,7 @@ export class AutomationEngine {
     try {
       // Time-schedule rule: no Base record — just fire the action once with the static template.
       if (rule.triggerType === 'schedule') {
-        await this.runAction(rule, { record_id: 'schedule', fields: {} }, c);
+        await this.runAction(rule, { record_id: 'schedule', fields: {} }, c as LarkClient);
         matched = 1;
         fired = 1;
         rule.lastRunAt = new Date().toISOString();
@@ -359,7 +399,7 @@ export class AutomationEngine {
         this.flush();
         return { matched, fired };
       }
-      const recs = await this.matchingRecords(rule, c);
+      const recs = await this.matchingRecords(rule, c as LarkClient);
       matched = recs.length;
       const firedSet = new Set(rule.firedRecordIds ?? []);
       if (!rule.seeded) {
@@ -368,7 +408,7 @@ export class AutomationEngine {
       } else {
         for (const r of recs) {
           if (firedSet.has(r.record_id)) continue;
-          await this.runAction(rule, r, c);
+          await this.runAction(rule, r, c as LarkClient);
           firedSet.add(r.record_id);
           fired++;
         }
@@ -387,12 +427,15 @@ export class AutomationEngine {
       rule.runCount = (rule.runCount ?? 0) + 1;
       // Lần HỎNG cũng phải vào lịch sử — đó mới là lúc người ta mở ra xem. Ghi ở đây chứ không ở
       // runAction: lỗi có thể xảy ra trước khi runAction kịp chạy (mất kết nối Lark chẳng hạn).
-      this.recordRun(rule, {
-        at: new Date(beganMs).toISOString(),
-        ms: Date.now() - beganMs,
-        ok: false,
-        summary: error.slice(0, 300),
-      });
+      // (Nhánh "Chạy AI agent" đã tự ghi kèm biên bản thì không ghi lần hai.)
+      if (!(e as { __recorded?: boolean })?.__recorded) {
+        this.recordRun(rule, {
+          at: new Date(beganMs).toISOString(),
+          ms: Date.now() - beganMs,
+          ok: false,
+          summary: error.slice(0, 300),
+        });
+      }
       this.flush();
     } finally {
       this.running.delete(id);
@@ -487,11 +530,38 @@ export class AutomationEngine {
       // không làm được. Lịch cũ (chưa có trường này) cũng lên thực thi — chúng vốn được đặt ra
       // với kỳ vọng ấy, và suốt thời gian qua chỉ chạy chỉ-đọc một cách im lặng.
       const runMode: 'ask' | 'build' = a.mode === 'ask' ? 'ask' : 'build';
-      const stats = { tools: 0, writes: 0 };
+      const stats: { tools: number; writes: number; report?: LarkAutoRunReport } = { tools: 0, writes: 0 };
       const startedMs = Date.now();
-      const text = (await this.agent.run(a.prompt, runMode, stats)) || '(agent không trả về nội dung)';
-      this.recordRun(rule, { at: new Date(startedMs).toISOString(), ms: Date.now() - startedMs, ok: true, mode: runMode, tools: stats.tools, writes: stats.writes, summary: text.slice(0, 300) });
-      if (a.postToChatId) {
+      let text: string;
+      try {
+        text = (await this.agent.run(a.prompt, runMode, stats, rule)) || '(agent không trả về nội dung)';
+      } catch (e) {
+        // Lần hỏng vẫn mang BIÊN BẢN (đã đọc gì, thao tác nào bị bỏ qua…) — đó là lúc người ta cần nó nhất.
+        this.recordRun(rule, {
+          at: new Date(startedMs).toISOString(),
+          ms: Date.now() - startedMs,
+          ok: false,
+          mode: runMode,
+          tools: stats.tools,
+          writes: stats.writes,
+          summary: String((e as Error)?.message || e).slice(0, 300),
+          ...(stats.report ? { report: stats.report } : {}),
+        });
+        throw Object.assign(e instanceof Error ? e : new Error(String(e)), { __recorded: true });
+      }
+      this.recordRun(rule, {
+        at: new Date(startedMs).toISOString(),
+        ms: Date.now() - startedMs,
+        ok: true,
+        mode: runMode,
+        tools: stats.tools,
+        writes: stats.writes,
+        summary: text.slice(0, 300),
+        ...(stats.report ? { report: stats.report } : {}),
+      });
+      // Gửi báo cáo vào nhóm: người dùng đã đặt rõ nhóm nhận ở quy tắc (đó là sự cho phép gửi). Cần
+      // custom app — chạy bằng phiên web (không có client) thì bỏ qua và ghi chú vào biên bản.
+      if (a.postToChatId && client) {
         const tool = this.resolveTool?.('messaging_send_message');
         if (tool) {
           await tool.exec(
@@ -499,6 +569,8 @@ export class AutomationEngine {
             client,
           );
         }
+      } else if (a.postToChatId && stats.report) {
+        stats.report.note = [stats.report.note, 'Chưa gửi báo cáo vào nhóm: cần kết nối custom app (Lark Bot).'].filter(Boolean).join(' ');
       }
       if (a.saveConversation) await this.agent.save?.(rule.id, rule.name, a.prompt, text);
       if (a.notify) this.agent.notify?.(rule.name, text.slice(0, 220));

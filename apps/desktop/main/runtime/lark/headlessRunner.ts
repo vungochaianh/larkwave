@@ -2,12 +2,13 @@ import { LarkClient } from './larkClient';
 import { AutomationEngine } from './automationEngine';
 import { createToolBridge } from './toolBridge';
 import { findHeadlessTool, headlessReadOnlyTools, headlessTools } from './tools/headless';
-import { setFileOutDir } from './tools/files';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { LarkChatEvent, LarkChatMode } from '@larkwave/core';
+import type { LarkAutoRunReport, LarkChatEvent, LarkChatMode } from '@larkwave/core';
 import type { StoredAutomation } from './secretStore';
+import { effectivePerms, excludedFromUnattended, unattendedDecision } from './unattendedPolicy';
+import { reportLine, wrapToolsForReport } from './autoRunRecorder';
+import { listRunOutputs, runStamp } from './automationFiles';
 
 /**
  * Bộ chạy lịch tự động hoá Lark KHÔNG CẦN GIAO DIỆN — dùng cho một máy chạy nền (VM), giống cách
@@ -56,13 +57,16 @@ export class HeadlessRunner {
       },
       () => this.amRunner(),
       {
-        run: (prompt, mode, stats) => this.runTurn(prompt, mode, stats),
+        run: (prompt, mode, stats, rule) => this.runTurn(prompt, mode, stats, rule),
         // Máy nền KHÔNG lưu hội thoại và KHÔNG bắn thông báo: không ai ngồi đó đọc, và hội thoại
         // của lịch đã có bản trên máy desktop qua đồng bộ sao lưu.
         notify: () => {},
       },
       // Bộ headless: KHÔNG đi qua tools/index.ts, nếu không electron lọt vào bundle cho VM.
       (name) => findHeadlessTool(name),
+      undefined,
+      // Máy chạy hộ: BỎ QUA quy tắc "chỉ chạy trên máy này" (cần phiên Lark web / thư mục trên máy người dùng).
+      { env: 'hosted' },
     );
   }
 
@@ -137,26 +141,46 @@ export class HeadlessRunner {
   private async runTurn(
     prompt: string,
     mode: LarkChatMode,
-    stats: { tools: number; writes: number },
+    stats: { tools: number; writes: number; report?: LarkAutoRunReport },
+    rule: StoredAutomation,
   ): Promise<string> {
-    // Nơi `create_file` ghi tệp. Máy chạy nền KHÔNG có thư mục hội thoại như bản desktop, nên
-    // dùng một thư mục tạm riêng cho mỗi lượt. Tệp ở đây chỉ là bước trung gian: người dùng không
-    // ngồi trước máy này, nên thứ có nghĩa là `send_file` đẩy nó lên Lark. Không dọn ngay sau lượt
-    // vì `send_file` chạy ở lượt sau đó của cùng phiên; hệ điều hành dọn thư mục tạm.
-    setFileOutDir(mkdtempSync(join(tmpdir(), 'tw-lark-out-')));
+    // Nơi `create_file` ghi tệp: thư mục RIÊNG của quy tắc trên VM (`automations/<id>/outputs/<lần>`),
+    // cùng bố cục với app desktop. Tệp ở đây chỉ là bước trung gian (không ai ngồi trước máy này) —
+    // thứ có nghĩa là `send_file`/đính vào Base đẩy nó lên Lark. Ngữ cảnh tệp đi theo TỪNG lần thực thi
+    // công cụ (fileContext), không phải biến module.
+    const report: LarkAutoRunReport = {};
+    stats.report = report;
+    const root = join(process.cwd(), 'automations', String(rule.id || 'x').replace(/[^A-Za-z0-9_-]/g, '') || 'x');
+    const outDir = join(root, 'outputs', runStamp());
+    mkdirSync(outDir, { recursive: true });
+    const { perms } = effectivePerms(rule);
     const queue: LarkChatEvent[] = [];
+    const base = (m: LarkChatMode) => (m === 'ask' ? headlessReadOnlyTools() : headlessTools()).filter((t) => !excludedFromUnattended(t.name));
     const { registry, execTool } = createToolBridge(
       mode,
       {
         client: this.client,
-        // Máy nền: bộ công cụ headless, tiêm vào để KHÔNG kéo tools/index.ts (→ electron).
-        baseTools: (m) => (m === 'ask' ? headlessReadOnlyTools() : headlessTools()),
+        // Máy nền: bộ công cụ headless (KHÔNG kéo tools/index.ts → electron), bọc để ghi biên bản.
+        baseTools: (m) => wrapToolsForReport(base(m), report),
         // Máy nền không có khái niệm "bản cài đã cũ" — và versionNote kéo theo codePush → electron.
         versionNote: async () => '',
-        // Không có ai ngồi xác nhận. Chế độ thực thi là sự cho phép người dùng đã cho khi đặt lịch.
-        autoApprove: mode === 'build',
-        awaitConfirm: async () => mode === 'build',
+        // Không có ai ngồi xác nhận: CỘNG THÊM tự chạy; ghi đè/thay tệp/gửi/xoá chỉ khi quy tắc được
+        // cấp đúng quyền (unattendedPolicy) — không thì bỏ qua + ghi biên bản.
+        autoApprove: false,
+        autoApproveTool: (name) => {
+          const t = findHeadlessTool(name);
+          return !!(t?.gated && t.additive);
+        },
+        awaitConfirm: async (_id, name, input) => {
+          if (mode !== 'build') return false;
+          const t = findHeadlessTool(name);
+          if (!t) return false;
+          const d = unattendedDecision(t, (input ?? {}) as Record<string, unknown>, perms);
+          if (!d.allow) (report.skipped ??= []).push({ tool: name, category: d.category, reason: d.reason || '' });
+          return d.allow;
+        },
         allowVersionHint: false,
+        files: { outDir, attachDir: root, extraRoots: [root] },
       },
       (e) => queue.push(e),
     );
@@ -173,7 +197,7 @@ export class HeadlessRunner {
         'content-type': 'application/json',
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ prompt: prompt.slice(0, 100_000), tools }),
+      body: JSON.stringify({ prompt: `${UNATTENDED_NOTE}\n\n${prompt}`.slice(0, 100_000), tools }),
     });
     if (!res.ok || !res.body) {
       const t = await res.text().catch(() => '');
@@ -221,6 +245,10 @@ export class HeadlessRunner {
         }
       }
     }
+    const outs = await listRunOutputs(outDir).catch(() => []);
+    if (outs.length) report.outputs = outs;
+    const line = reportLine(report);
+    if (line) report.note = line;
     return out.trim() || '(agent không trả về nội dung)';
   }
 
@@ -237,6 +265,11 @@ export class HeadlessRunner {
     return this.rules.filter((r) => r.enabled).length;
   }
 }
+
+/** Dặn ngắn cho lượt không người trông trên máy chạy hộ (đường MAIC không có system prompt riêng). */
+const UNATTENDED_NOTE =
+  '[LƯỢT TỰ ĐỘNG trên máy chạy hộ — không ai trông, không ai bấm "Cho phép". Thao tác cộng thêm tự chạy; ghi đè/xoá/gửi chỉ chạy khi quy tắc được cấp quyền, bị từ chối thì KHÔNG thử lại, ghi vào báo cáo. ' +
+  'Ghi dòng vào bảng: dùng match_by (cột định danh) để chạy lại KHÔNG tạo trùng. Cuối lượt báo cáo: đã đọc gì, đã ghi gì (số dòng + link), đọc lại khớp chưa, bị bỏ qua gì.]';
 
 function findWrite(registry: Map<string, { gated?: boolean }>, name: string): boolean {
   return !!registry.get(name)?.gated;

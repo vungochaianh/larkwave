@@ -24,6 +24,7 @@ import { addOptionsScript, attachScript, attachmentItem, compareWritten, mergeAt
 import { compareSheetBack, driveFileUrl, folderTokenFrom, importTargetFor, parseA1, sheetTokenFrom } from '../webFiles';
 import { buildCsv, buildDocx, buildXlsx, FORMAT_META, safeFileName } from '../fileBuild';
 import { buildFilePreview } from '../filePreview';
+import { compositeKey, openApiUpsert, openApiUpsertPlan, planSummary, planUpsert, type UpsertPlan } from '../upsertPlan';
 import { extractOfficeText } from '../ooxml';
 import { resolveToolFile } from '../fileContext';
 import { getFileOutDir } from './files';
@@ -91,7 +92,7 @@ async function baseMeta(token: string) {
 }
 
 /** Bảng theo id hoặc TÊN → cấu trúc tươi (cột/kiểu/lựa chọn) + múi giờ của Base. */
-async function tableFor(token: string, key: string): Promise<{ tableId: string; tableName: string; fields: EncField[]; timezone?: string; baseName: string }> {
+export async function tableFor(token: string, key: string): Promise<{ tableId: string; tableName: string; fields: EncField[]; timezone?: string; baseName: string }> {
   const k = String(key ?? '').trim();
   if (!k) throw new Error('Thiếu `table` (tên bảng hoặc table_id).');
   let tableId = /^tbl[A-Za-z0-9]{6,}$/.test(k) ? k : '';
@@ -149,6 +150,9 @@ interface Prepared {
   token: string;
   tableId: string;
   tableName: string;
+  timezone?: string;
+  /** Giá trị THÔ người dùng/model gửi lên của từng dòng (để tính khoá ghi-theo-khoá). */
+  raw: Record<string, unknown>[];
   fields: EncField[];
   creates: Record<string, { type: number; value: unknown }>[];
   updates: { recordId: string; cells: Record<string, { type: number; value: unknown }> }[];
@@ -196,6 +200,8 @@ async function prepareWrite(i: J, mode: 'create' | 'update'): Promise<Prepared |
     token,
     tableId: t.tableId,
     tableName: t.tableName,
+    timezone: t.timezone,
+    raw: recs.map((r) => r.fields),
     fields: t.fields,
     creates,
     updates,
@@ -203,10 +209,38 @@ async function prepareWrite(i: J, mode: 'create' | 'update'): Promise<Prepared |
   };
 }
 
+/** Cột khoá của ghi-theo-khoá (`match_by`): mảng tên cột, hoặc một chuỗi. */
+export function normMatchBy(v: unknown): string[] {
+  const list = Array.isArray(v) ? v : typeof v === 'string' && v.trim() ? [v] : [];
+  return [...new Set(list.map((x) => String(x ?? '').trim()).filter(Boolean))].slice(0, 5);
+}
+
+const cellVal = (c: J) => (c && typeof c === 'object' && 'value' in c ? c.value : c);
+
+/** Kế hoạch ghi theo khoá trên phiên web — đọc ĐỦ bảng (không ghi gì). */
+async function webUpsertPlan(p: Prepared, matchBy: string[]): Promise<{ plan: UpsertPlan } | J> {
+  const keyFields = matchBy.map((n) => resolveField(p.fields, n));
+  const bad = matchBy.filter((_, k) => !keyFields[k]);
+  if (bad.length) return { ok: false, kind: 'invalid', error: `Cột khoá không có trong bảng «${p.tableName}»: ${bad.join(', ')}. Cột có: ${p.fields.map((x) => x.name).join(' | ')}.` };
+  const kf = keyFields as EncField[];
+  const all = await web().webReadAllRecords(p.token, p.tableId);
+  const rawFor = (row: Record<string, unknown>, f: EncField) => Object.entries(row || {}).find(([k]) => resolveField(p.fields, k)?.id === f.id)?.[1];
+  const plan = planUpsert(
+    all.ids.map((id) => ({ id, key: compositeKey(kf.map((f) => simpleValue(f, cellVal(all.recordMap[id]?.[f.id]), { timezone: p.timezone }))) })),
+    p.raw.map((row, n) => ({ key: compositeKey(kf.map((f) => rawFor(row, f))), fields: Object.keys(p.creates[n] || {}) })),
+    (n, recId, fid) => {
+      const f = p.fields.find((x) => x.id === fid);
+      return !!f && cellMatches(f, p.creates[n][fid]?.value, cellVal(all.recordMap[recId]?.[fid]));
+    },
+  );
+  return { plan };
+}
+
 /** Ghi (đã qua prepare) → đọc lại TỪNG ô từ máy chủ → kết quả có số liệu kiểm chứng. */
 async function execWrite(i: J, mode: 'create' | 'update'): Promise<J> {
   let p = await prepareWrite(i, mode);
   if (!p.ok) return p;
+  const matchBy = mode === 'create' ? normMatchBy(i.match_by) : [];
   if (p.needOptions.length) {
     const r = await web().webRunInBase(p.token, addOptionsScript({ token: p.token, tableId: p.tableId, adds: p.needOptions.map((x: J) => ({ fieldId: x.fieldId, names: x.names })) }));
     if (!r?.ok) return { ok: false, error: `Không thêm được lựa chọn mới (${r?.error || JSON.stringify(r?.steps || '').slice(0, 200)}). CHƯA ghi bản ghi nào.` };
@@ -222,9 +256,38 @@ async function execWrite(i: J, mode: 'create' | 'update'): Promise<J> {
     const missingIds = p.updates.map((u: J) => u.recordId).filter((id: string) => !exist[id]);
     if (missingIds.length) return { ok: false, error: `Không thấy bản ghi: ${missingIds.slice(0, 10).join(', ')} trong bảng «${p.tableName}». CHƯA ghi gì.` };
   }
-  const r = await web().webRunInBase(p.token, writeRecordsScript({ token: p.token, tableId: p.tableId, creates: p.creates, updates: p.updates }));
+  // GHI THEO KHOÁ: dòng có khoá đã có → sửa đúng các ô khác; giống hệt → bỏ qua; chưa có → thêm.
+  let plan: UpsertPlan | null = null;
+  let creates = p.creates;
+  let updates = p.updates;
+  if (matchBy.length) {
+    const pl = await webUpsertPlan(p, matchBy);
+    if (!pl.plan) return pl;
+    plan = pl.plan as UpsertPlan;
+    creates = plan.creates.map((n) => p.creates[n]);
+    updates = plan.updates.map((u) => ({ recordId: u.recordId, cells: Object.fromEntries(u.fields.map((fid) => [fid, p.creates[u.index][fid]])) }));
+    if (!creates.length && !updates.length) {
+      return {
+        ok: !plan.rejected.length,
+        via: 'web',
+        table: p.tableName,
+        table_id: p.tableId,
+        match_by: matchBy,
+        created: 0,
+        updated: 0,
+        unchanged: plan.unchanged.length,
+        ...(plan.rejected.length ? { rejected: plan.rejected.slice(0, 40) } : {}),
+        verified: true,
+        url: tableUrl(p.token, p.tableId),
+        note: `GHI THEO KHOÁ (${matchBy.join(' + ')}): ${planSummary(plan)} — không có gì cần ghi.`,
+      };
+    }
+  }
+  const r = await web().webRunInBase(p.token, writeRecordsScript({ token: p.token, tableId: p.tableId, creates, updates }));
   if (!r || r.error === 'no-context' || r.error === 'base-not-ready') return { ok: false, error: r?.hint || r?.error || 'Trang Base chưa sẵn sàng trong khung Lark.' };
-  const wrote = mode === 'create' ? (r.created || []).map((id: string, n: number) => ({ recordId: id, cells: p.creates[n] })) : p.updates.filter((u: J) => (r.updated || []).includes(u.recordId));
+  const wroteCreates = (r.created || []).map((id: string, n: number) => ({ recordId: id, cells: creates[n] }));
+  const wroteUpdates = updates.filter((u: J) => (r.updated || []).includes(u.recordId));
+  const wrote = mode === 'create' ? [...wroteCreates, ...wroteUpdates] : p.updates.filter((u: J) => (r.updated || []).includes(u.recordId));
   // Đọc lại từ MÁY CHỦ (không tin mô hình trong trang). Đồng bộ trễ vài giây → thử lại.
   let cmp = compareWritten(p.fields, wrote, {}, cellMatches);
   for (let k = 0; k < 8; k++) {
@@ -233,14 +296,18 @@ async function execWrite(i: J, mode: 'create' | 'update'): Promise<J> {
     cmp = compareWritten(p.fields, wrote, back, cellMatches);
     if (!cmp.mismatches.length && !cmp.missing.length) break;
   }
-  const verified = !cmp.mismatches.length && !cmp.missing.length && wrote.length === (mode === 'create' ? p.creates.length : p.updates.length);
+  const want = mode === 'create' ? creates.length + updates.length : p.updates.length;
+  const verified = !cmp.mismatches.length && !cmp.missing.length && wrote.length === want;
   return {
-    ok: !!r.ok && verified,
+    ok: !!r.ok && verified && !plan?.rejected.length,
     via: 'web',
     table: p.tableName,
     table_id: p.tableId,
     written: wrote.length,
-    ...(mode === 'create' ? { created_record_ids: wrote.map((w: J) => w.recordId) } : { updated_record_ids: wrote.map((w: J) => w.recordId) }),
+    ...(mode === 'create'
+      ? { created_record_ids: wroteCreates.map((w: J) => w.recordId), ...(plan ? { updated_record_ids: wroteUpdates.map((w: J) => w.recordId) } : {}) }
+      : { updated_record_ids: wrote.map((w: J) => w.recordId) }),
+    ...(plan ? { match_by: matchBy, created: wroteCreates.length, updated: wroteUpdates.length, unchanged: plan.unchanged.length, ...(plan.rejected.length ? { rejected: plan.rejected.slice(0, 40) } : {}) } : {}),
     cells_checked: cmp.checked,
     verified,
     ...(cmp.mismatches.length ? { mismatches: cmp.mismatches.slice(0, 20) } : {}),
@@ -249,7 +316,7 @@ async function execWrite(i: J, mode: 'create' | 'update'): Promise<J> {
     ...(p.needOptions.length ? { options_created: p.needOptions.map((x: J) => `${x.fieldName}: ${x.names.join(' | ')}`) } : {}),
     url: tableUrl(p.token, p.tableId),
     note: verified
-      ? `ĐÃ GHI VÀ ĐỌC LẠI KHỚP ${cmp.checked} ô của ${wrote.length} bản ghi. Trả lời người dùng kèm link bảng và số dòng/ô đã ghi.`
+      ? `ĐÃ GHI VÀ ĐỌC LẠI KHỚP ${cmp.checked} ô của ${wrote.length} bản ghi${plan ? ` (theo khoá ${matchBy.join(' + ')}: ${planSummary(plan)})` : ''}. Trả lời người dùng kèm link bảng và số dòng/ô đã ghi.`
       : 'CHƯA xác minh được — KHÔNG được nói "đã ghi". Báo người dùng các ô lệch/thiếu ở trên.',
   };
 }
@@ -523,29 +590,74 @@ export const larkWebWriteTools: LarkToolDef[] = [
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: { ...TABLE_PROPS, records: RECORDS_SCHEMA(false), create_missing_options: { type: 'boolean', description: 'CHỈ khi người dùng yêu cầu: tạo lựa chọn còn thiếu (cộng thêm)' } },
+      properties: {
+        ...TABLE_PROPS,
+        records: RECORDS_SCHEMA(false),
+        create_missing_options: { type: 'boolean', description: 'CHỈ khi người dùng yêu cầu: tạo lựa chọn còn thiếu (cộng thêm)' },
+        match_by: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'GHI THEO KHOÁ (chống TRÙNG khi chạy lại / nhập lại cùng tệp): tên cột khoá, vd ["Mã đơn"]. Dòng có khoá chưa có → THÊM; khoá đã có và ô giống hệt → bỏ qua; khoá đã có nhưng ô khác → SỬA đúng các ô đó (ghi đè → cần duyệt). Bỏ trống = luôn thêm mới.',
+        },
+      },
       required: ['app_token', 'table', 'records'],
+    },
+    // Thêm mới thuần = cộng thêm. Có `match_by` thì phải xem dữ liệu mới biết có dòng nào cần SỬA không.
+    additiveWhen: (i) => !normMatchBy(i?.match_by).length,
+    additiveCheck: async (i, client) => {
+      const matchBy = normMatchBy(i?.match_by);
+      if (!matchBy.length) return undefined;
+      if (webReady()) {
+        const p = await prepareWrite(i, 'create');
+        if (!p.ok || p.needOptions.length) return undefined;
+        const pl = await webUpsertPlan(p, matchBy);
+        return pl.plan ? (pl.plan as UpsertPlan).updates.length === 0 : undefined;
+      }
+      if (!client) return undefined;
+      const table = String(i.table ?? i.table_id ?? '');
+      if (!/^tbl/.test(table)) return undefined;
+      const { plan } = await openApiUpsertPlan(client, tokenOf(i), table, (Array.isArray(i.records) ? i.records : []).map((r: J) => ({ fields: r?.fields || {} })), matchBy);
+      return plan.updates.length === 0;
     },
     preflight: async (i) => {
       if (!webReady()) return null; // để exec chọn đường Open API (hoặc báo lỗi rõ)
       try {
         const p = await prepareWrite(i, 'create');
-        return p.ok ? null : p;
+        if (!p.ok) return p;
+        const matchBy = normMatchBy(i?.match_by);
+        const missing = matchBy.filter((n) => !resolveField(p.fields, n));
+        return missing.length ? { ok: false, kind: 'invalid', error: `Cột khoá không có trong bảng «${p.tableName}»: ${missing.join(', ')}.` } : null;
       } catch (e) {
         return { ok: false, kind: 'error', error: String((e as Error)?.message || e) };
       }
     },
+    preview: async (i) => {
+      const matchBy = normMatchBy(i?.match_by);
+      if (!matchBy.length || !webReady()) return undefined;
+      const p = await prepareWrite(i, 'create');
+      if (!p.ok) return undefined;
+      const pl = await webUpsertPlan(p, matchBy);
+      return pl.plan ? { upsert: planSummary(pl.plan as UpsertPlan), match_by: matchBy } : undefined;
+    },
     exec: async (i, client) => {
+      const matchBy = normMatchBy(i?.match_by);
+      const viaOpenApi = (c: LarkClient) => {
+        if (!matchBy.length) return openApiCreate(c, i);
+        const table = String(i.table ?? i.table_id ?? '');
+        if (!/^tbl/.test(table)) throw new Error('Đường Open API cần `table` là table_id (tbl…).');
+        return openApiUpsert(c, tokenOf(i), table, (Array.isArray(i.records) ? i.records : []).map((r: J) => ({ fields: r?.fields || {} })), matchBy);
+      };
       if (webReady()) {
         try {
           return await execWrite(i, 'create');
         } catch (e) {
           if (!client) throw e;
-          const r = await openApiCreate(client, i);
+          const r = await viaOpenApi(client);
           return { ...r, web_error: String((e as Error)?.message || e) };
         }
       }
-      if (client) return openApiCreate(client, i);
+      if (client) return viaOpenApi(client);
       throw new Error('Chưa đăng nhập Lark web — đăng nhập trong khung Lark (hoặc kết nối custom app) rồi thử lại.');
     },
   },

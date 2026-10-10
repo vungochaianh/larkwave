@@ -661,6 +661,69 @@ export type LarkAutoAction =
       notify?: boolean;
     };
 
+/**
+ * Một NGUỒN Lark mà mỗi lần chạy tải TƯƠI vào thư mục của quy tắc (khác "Tệp nguồn" chép sẵn vào inputs/).
+ *   - drive: link tệp Drive (…/file/<token>)
+ *   - sheet: link Lark Sheets — xuất thành .xlsx mỗi lần chạy
+ *   - attachment: mọi tệp trong một cột Tệp đính kèm của một bảng (tuỳ chọn: chỉ một bản ghi)
+ */
+export interface LarkAutoFileSource {
+  id: string;
+  kind: 'drive' | 'sheet' | 'attachment';
+  /** Link Drive / Sheets / Base (…/base/<token>?table=…). */
+  url: string;
+  /** attachment: tên bảng hoặc table_id (bỏ trống = lấy từ ?table= trong link). */
+  table?: string;
+  /** attachment: TÊN cột Tệp đính kèm. */
+  field?: string;
+  /** attachment: chỉ lấy tệp của bản ghi này (bỏ trống = mọi bản ghi, tối đa 50 tệp). */
+  recordId?: string;
+  label?: string;
+}
+
+/** Thư mục + nguồn tệp của một quy tắc (`userData/lark/automations/<id>/{inputs,outputs,sources}`). */
+export interface LarkAutoFiles {
+  sources?: LarkAutoFileSource[];
+  /** "Chỉ xử lý tệp mới": bỏ tệp có nội dung (sha256) đã xử lý ở lần chạy thành công trước. */
+  onlyNewFiles?: boolean;
+  /** Giữ kết quả của N lần chạy gần nhất (mặc định 10). */
+  keepOutputs?: number;
+}
+
+/**
+ * "Quyền khi chạy tự động": không ai bấm "Cho phép" trong lượt tự động, nên thao tác có thể phá dữ liệu
+ * hay đi ra ngoài chỉ chạy khi được cấp ở đây; không có thì BỎ QUA và ghi vào lịch sử chạy. Thao tác cộng
+ * thêm (thêm bản ghi, đính tệp ghi thêm, tải lên Drive…) không cần quyền.
+ */
+export interface LarkAutoPermissions {
+  overwriteCells?: boolean;
+  replaceAttachments?: boolean;
+  sendMessages?: boolean;
+  deleteRecords?: boolean;
+}
+
+/** Biên bản một lần chạy: đọc gì, ghi gì, đọc lại ra sao, bỏ qua gì, tệp kết quả. */
+export interface LarkAutoRunReport {
+  /** Tệp đầu vào lượt này xử lý (đã lọc "chỉ tệp mới"). */
+  inputs?: { name: string; bytes?: number; rows?: number; from?: 'inputs' | 'sources' }[];
+  /** Tệp đầu vào bỏ qua vì đã xử lý ở lần trước. */
+  skippedInputs?: number;
+  /** Lỗi khi tải nguồn Lark (vẫn chạy tiếp với phần tải được). */
+  sourceErrors?: string[];
+  /** Dữ liệu Lark đã đọc (bảng + số dòng, tệp đính kèm…). */
+  read?: { what: string; rows?: number; url?: string }[];
+  /** Đã ghi gì vào Lark. */
+  written?: { tool: string; target?: string; created?: number; updated?: number; unchanged?: number; count?: number; url?: string; verified?: boolean }[];
+  /** Kết quả đọc lại (mọi tool ghi tự đọc lại): số lần khớp / lệch. */
+  verify?: { ok: number; failed: number };
+  /** Thao tác GHI bị bỏ qua vì chưa được cấp quyền (hoặc không bao giờ chạy tự động). */
+  skipped?: { tool: string; category: string; reason: string }[];
+  /** Tệp lượt này dựng ra (thư mục outputs/<lần chạy>/). */
+  outputs?: { name: string; path: string; bytes: number; mime: string }[];
+  /** Ghi chú ngắn (vd "Không có tệp mới — không chạy agent"). */
+  note?: string;
+}
+
 /** Một lần chạy đã ghi lại của quy tắc tự động hoá (lịch sử thực thi). */
 export interface LarkAutomationRun {
   /** Thời điểm bắt đầu (ISO). */
@@ -676,6 +739,8 @@ export interface LarkAutomationRun {
   writes?: number;
   /** Vài dòng đầu của kết quả, hoặc câu lỗi. */
   summary?: string;
+  /** Biên bản chi tiết (đọc / ghi / đọc lại / bỏ qua / tệp kết quả). */
+  report?: LarkAutoRunReport;
 }
 /** Time schedule for a triggerType==='schedule' rule (fires without a Base record). */
 export interface LarkAutoSchedule {
@@ -708,6 +773,21 @@ export interface LarkAutomationInput {
   triggerType?: 'record' | 'schedule';
   /** Time schedule config (used when triggerType==='schedule'). */
   schedule?: LarkAutoSchedule;
+  /** Thư mục + nguồn tệp (việc "Chạy AI agent"). */
+  files?: LarkAutoFiles;
+  /** Quyền khi chạy tự động. Không có trường này + chế độ thực thi = quy tắc cũ (giữ sự đồng ý cũ). */
+  permissions?: LarkAutoPermissions;
+  /**
+   * Chạy ở đâu: 'auto' (máy nào đang giữ quyền chạy lịch — kể cả máy chạy hộ) | 'desktop' (CHỈ app trên
+   * máy này: cần phiên Lark web hoặc thư mục tệp trên máy). Máy chạy hộ bỏ qua quy tắc 'desktop'.
+   */
+  runOn?: 'auto' | 'desktop';
+}
+/** Thư mục của một quy tắc tự động hoá (màn sửa quy tắc hiển thị). */
+export interface LarkAutomationFolderInfo {
+  root: string;
+  inputs: { name: string; bytes: number; mtime: string; processed: boolean }[];
+  processedCount: number;
 }
 /** A persisted rule (input + engine runtime state, read-only in the UI). */
 export interface LarkAutomation extends LarkAutomationInput {
@@ -1862,6 +1942,15 @@ export interface RuntimeAdapter {
   larkSetAutomationEnabled?(id: string, on: boolean): Promise<LarkAutomation[]>;
   /** Run a rule once now (for testing) — returns how many records matched/fired. */
   larkRunAutomation?(id: string): Promise<LarkAutomationRunResult>;
+  /** Thư mục của quy tắc (tệp nguồn đã thêm + số tệp đã xử lý). */
+  larkAutomationFolder?(id: string): Promise<LarkAutomationFolderInfo>;
+  /** Thêm "Tệp nguồn" (chép vào inputs/). */
+  larkAutomationAddInput?(id: string, file: { name: string; dataBase64: string }): Promise<LarkAutomationFolderInfo>;
+  larkAutomationRemoveInput?(id: string, name: string): Promise<LarkAutomationFolderInfo>;
+  /** Mở thư mục của quy tắc trong Finder/Explorer (chỉ khi người dùng bấm). */
+  larkAutomationRevealFolder?(id: string): Promise<void>;
+  /** "Quên" các tệp đã xử lý (lần sau xử lý lại tất cả). */
+  larkAutomationResetProcessed?(id: string): Promise<LarkAutomationFolderInfo>;
   /** List the tables of a Base (for the automation form's table picker). */
   larkListTables?(appToken: string): Promise<LarkTableRef[]>;
   /** Tên các CỘT của một bảng — form tạo kỹ năng dùng để gợi ý khoá từ thứ người dùng nhìn thấy. */

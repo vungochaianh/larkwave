@@ -350,3 +350,44 @@ export function buildAgentSystemPrompt(ctx: {
   });
   return `${head}\n\n=== PHIÊN LARK WEB · WORKFLOW & AUTOMATION (ưu tiên hơn đường Open API ở trên khi phiên web đã đăng nhập) ===\n${buildWebSessionPrompt({ ...web, standalone: false })}`;
 }
+
+/**
+ * Khối dặn riêng cho LƯỢT CHẠY TỰ ĐỘNG (không người trông) của một quy tắc tự động hoá: thư mục tệp,
+ * luật duyệt (cộng thêm tự chạy; ghi đè/thay tệp/gửi/xoá chỉ khi quy tắc được cấp quyền), chống trùng
+ * khi chạy lặp lại (ghi theo khoá), và mẫu báo cáo cuối lượt.
+ */
+export function buildUnattendedBlock(ctx: {
+  ruleName: string;
+  folderRoot: string;
+  runDir: string;
+  inputs: string[];
+  skippedInputs?: number;
+  onlyNew?: boolean;
+  allowed: string[];
+  denied: string[];
+  legacy?: boolean;
+  mode: 'ask' | 'build';
+  webOnly?: boolean;
+  sourceErrors?: string[];
+}): string {
+  return [
+    `=== LƯỢT CHẠY TỰ ĐỘNG của quy tắc «${ctx.ruleName}» — KHÔNG có ai trông, KHÔNG ai bấm "Cho phép" ===`,
+    `THƯ MỤC CỦA QUY TẮC: ${ctx.folderRoot} (inputs/ = tệp nguồn người dùng thêm, sources/ = tệp vừa tải TƯƠI từ Lark). Tệp bạn dựng (create_file / fill_xlsx / lark_export_table_file) tự ghi vào thư mục của LẦN CHẠY NÀY: ${ctx.runDir} — đặt tên có ngày (vd "Báo cáo 2026-10-10").`,
+    ctx.inputs.length
+      ? `TỆP ĐẦU VÀO LẦN NÀY (${ctx.inputs.length}): ${ctx.inputs.join(', ')}.${ctx.onlyNew ? ' (Chế độ "chỉ xử lý tệp mới": đây là các tệp CHƯA xử lý ở lần trước.)' : ''}${ctx.skippedInputs ? ` ${ctx.skippedInputs} tệp khác đã xử lý ở lần trước nên KHÔNG đưa vào.` : ''} Đọc bằng Read (tệp Office: đọc bản ".txt" trong .extract/) hoặc prepare_local_file.`
+      : 'Không có tệp đầu vào trong thư mục (việc này chỉ dùng dữ liệu Lark).',
+    ...(ctx.sourceErrors?.length ? [`LỖI TẢI NGUỒN LARK (nêu trong báo cáo): ${ctx.sourceErrors.join(' | ')}`] : []),
+    ctx.mode === 'ask'
+      ? 'CHẾ ĐỘ CHỈ ĐỌC: không ghi gì vào Lark — chỉ đọc, tổng hợp, dựng tệp báo cáo.'
+      : 'LUẬT GHI: thao tác CỘNG THÊM (thêm bản ghi mới, đính tệp GHI THÊM, tải lên Drive, nhập thành Sheet/Doc, thêm cột/lựa chọn) tự chạy. ' +
+        `Quy tắc ĐƯỢC CẤP thêm: ${ctx.allowed.length ? ctx.allowed.join('; ') : '(không có)'}.` +
+        (ctx.denied.length ? ` CHƯA được cấp: ${ctx.denied.join('; ')} — gọi các thao tác đó sẽ bị TỪ CHỐI: đừng thử lại, đừng tìm đường vòng, ghi rõ trong báo cáo là cần cấp quyền ở mục "Quyền khi chạy tự động".` : '') +
+        (ctx.legacy ? ' (Quy tắc tạo trước khi có mục quyền — đang giữ sự cho phép cũ.)' : ''),
+    'CHẠY LẶP LẠI KHÔNG ĐƯỢC TẠO TRÙNG: ghi dòng vào bảng thì dùng `lark_web_write_records` kèm `match_by` = cột định danh (mã đơn / mã KH / số hoá đơn / email…) — dòng đã có và giống hệt sẽ được bỏ qua, dòng đổi được sửa (nếu được cấp quyền ghi đè), dòng mới được thêm. Không có cột định danh nào → nói rõ trong báo cáo thay vì thêm mù. Đính tệp báo cáo: đọc bản ghi trước, ô đã có tệp CÙNG TÊN thì không đính lại.',
+    ctx.webOnly ? 'KHÔNG có custom app: chỉ dùng công cụ lark_web_* (phiên Lark web) — gửi tin nhắn vào nhóm không làm được, ghi chú điều đó nếu việc cần.' : '',
+    'XÁC MINH + BÁO CÁO CUỐI LƯỢT (bắt buộc, ngắn gọn, tiếng Việt): (1) ĐÃ ĐỌC: tệp/bảng + số dòng; (2) ĐÃ GHI: bảng/ô + số dòng mới / sửa / không đổi + LINK; (3) ĐỌC LẠI: khớp hay lệch (chỉ nói "đã ghi" khi kết quả có verified:true); (4) BỊ BỎ QUA: thao tác nào và vì sao; (5) TỆP KẾT QUẢ: tên tệp.',
+    'KHÔNG đặt lịch mới, KHÔNG tạo/sửa kỹ năng, KHÔNG hỏi lại người dùng — tự chọn phương án hợp lý theo dữ liệu và ghi giả định vào báo cáo.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}

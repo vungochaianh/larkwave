@@ -488,6 +488,11 @@ function registerIpc(win: BrowserWindow) {
     runtime.larkSetAutomationEnabled(id, on),
   );
   ipcMain.handle(IPC.larkRunAutomation, (_e, id: string) => runtime.larkRunAutomation(id));
+  ipcMain.handle(IPC.larkAutomationFolder, (_e, id: string) => runtime.larkAutomationFolder(id));
+  ipcMain.handle(IPC.larkAutomationAddInput, (_e, id: string, file: { name: string; dataBase64: string }) => runtime.larkAutomationAddInput(id, file));
+  ipcMain.handle(IPC.larkAutomationRemoveInput, (_e, id: string, name: string) => runtime.larkAutomationRemoveInput(id, name));
+  ipcMain.handle(IPC.larkAutomationResetProcessed, (_e, id: string) => runtime.larkAutomationResetProcessed(id));
+  ipcMain.handle(IPC.larkAutomationRevealFolder, (_e, id: string) => runtime.larkAutomationRevealFolder(id));
   ipcMain.handle(IPC.larkListTables, (_e, appToken: string) => runtime.larkListTables(appToken));
   ipcMain.handle(IPC.larkConfirmTool, (_e, callId: string, decision: 'allow' | 'deny') =>
     runtime.larkConfirmTool(callId, decision),

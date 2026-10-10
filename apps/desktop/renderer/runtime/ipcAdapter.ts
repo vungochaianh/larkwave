@@ -63,6 +63,7 @@ import type {
   LarkWebBase,
   LarkUiTemplate,
   LarkUiTemplateApplyResult,
+  LarkAutomationFolderInfo,
 } from '@larkwave/core';
 
 /** Shape of the bridge exposed by preload.ts via contextBridge. */
@@ -175,6 +176,11 @@ interface Bridge {
   larkDeleteAutomation(id: string): Promise<LarkAutomation[]>;
   larkSetAutomationEnabled(id: string, on: boolean): Promise<LarkAutomation[]>;
   larkRunAutomation(id: string): Promise<LarkAutomationRunResult>;
+  larkAutomationFolder(id: string): Promise<LarkAutomationFolderInfo>;
+  larkAutomationAddInput(id: string, file: { name: string; dataBase64: string }): Promise<LarkAutomationFolderInfo>;
+  larkAutomationRemoveInput(id: string, name: string): Promise<LarkAutomationFolderInfo>;
+  larkAutomationResetProcessed(id: string): Promise<LarkAutomationFolderInfo>;
+  larkAutomationRevealFolder(id: string): Promise<void>;
   larkListTables(appToken: string): Promise<LarkTableRef[]>;
   larkConfirmTool(callId: string, decision: 'allow' | 'deny'): Promise<void>;
   larkAnswerAsk(callId: string, answer: string): Promise<void>;
@@ -598,6 +604,21 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   larkRunAutomation(id: string): Promise<LarkAutomationRunResult> {
     return this.bridge.larkRunAutomation(id);
+  }
+  larkAutomationFolder(id: string): Promise<LarkAutomationFolderInfo> {
+    return this.bridge.larkAutomationFolder(id);
+  }
+  larkAutomationAddInput(id: string, file: { name: string; dataBase64: string }): Promise<LarkAutomationFolderInfo> {
+    return this.bridge.larkAutomationAddInput(id, file);
+  }
+  larkAutomationRemoveInput(id: string, name: string): Promise<LarkAutomationFolderInfo> {
+    return this.bridge.larkAutomationRemoveInput(id, name);
+  }
+  larkAutomationResetProcessed(id: string): Promise<LarkAutomationFolderInfo> {
+    return this.bridge.larkAutomationResetProcessed(id);
+  }
+  larkAutomationRevealFolder(id: string): Promise<void> {
+    return this.bridge.larkAutomationRevealFolder(id);
   }
   larkListTables(appToken: string): Promise<LarkTableRef[]> {
     return this.bridge.larkListTables(appToken);

@@ -9,6 +9,8 @@ import { useI18n } from '../../i18n';
 import { V } from '../../theme';
 import { HostedRunnerCard } from './HostedRunnerCard';
 import { HowItWorks } from '../../kit';
+import { AutomationFilesSection, RunReportView, type AutoFilesValue } from './AutomationFiles';
+import { accountApi } from '../../account/api';
 
 const { Text, Paragraph } = Typography;
 
@@ -80,7 +82,22 @@ interface FormModel {
   atHour: number;
   atMinute: number;
   schedDays: number[];
+  /** Thư mục/nguồn tệp + quyền khi chạy tự động + nơi chạy (việc "Chạy AI agent"). */
+  files: AutoFilesValue;
+  /** Quy tắc cũ chưa có mục quyền (đang giữ sự cho phép cũ). */
+  legacyPerms: boolean;
+  /** Id sinh sẵn cho quy tắc MỚI — để thêm tệp nguồn trước khi lưu lần đầu. */
+  draftId?: string;
 }
+
+const FILES_DEFAULT: AutoFilesValue = { sources: [], onlyNewFiles: false, keepOutputs: 10, perms: {}, runOn: 'auto' };
+const newDraftId = (): string => {
+  try {
+    return globalThis.crypto.randomUUID();
+  } catch {
+    return `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
+};
 
 /**
  * "Tự động hoá (Larkwave)" — a rule engine that works AROUND Lark's missing
@@ -97,11 +114,15 @@ interface FormModel {
 function RunHistory({
   runs,
   tr,
+  runtime,
 }: {
   runs: NonNullable<LarkAutomation['runs']>;
   tr: (key: string, fallback: string) => string;
+  runtime: RuntimeAdapter;
 }) {
   const [open, setOpen] = useState(false);
+  /** Lần chạy đang mở biên bản (đọc gì / ghi gì / đọc lại / bỏ qua / tệp kết quả). */
+  const [detail, setDetail] = useState<string | null>(null);
   // Mới nhất lên đầu: đó là thứ người ta mở ra để xem.
   const list = [...runs].reverse();
   const shown = open ? list : list.slice(0, 3);
@@ -109,7 +130,8 @@ function RunHistory({
     <div style={{ marginTop: 4 }}>
       <Space direction="vertical" size={2} style={{ width: '100%' }}>
         {shown.map((x, i) => (
-          <div key={`${x.at}-${i}`} style={{ fontSize: 10.5, color: V.textFaint, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div key={`${x.at}-${i}`}>
+          <div style={{ fontSize: 10.5, color: V.textFaint, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ color: x.ok ? undefined : '#cf1322' }}>{x.ok ? '✓' : '✕'}</span>
             <span>{new Date(x.at).toLocaleString('vi-VN')}</span>
             <span>· {Math.round(x.ms / 1000)}s</span>
@@ -126,6 +148,14 @@ function RunHistory({
                 — {x.summary}
               </span>
             )}
+            {!!x.report?.skipped?.length && <span style={{ color: '#d46b08' }}>· {x.report.skipped.length} bị bỏ qua</span>}
+            {x.report && (
+              <Button type="link" size="small" style={{ padding: 0, height: 16, fontSize: 10.5 }} onClick={() => setDetail((d) => (d === x.at ? null : x.at))}>
+                {detail === x.at ? 'Ẩn biên bản' : 'Biên bản'}
+              </Button>
+            )}
+          </div>
+          {detail === x.at && x.report && <RunReportView report={x.report} runtime={runtime} />}
           </div>
         ))}
       </Space>
@@ -183,6 +213,14 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
   const [form, setForm] = useState<FormModel | null>(null);
   const [busy, setBusy] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
+  /** Đã bật "Để Larkwave chạy lịch hộ" — để cảnh báo việc cần phiên web/thư mục trên máy. */
+  const [hostedOn, setHostedOn] = useState(false);
+  useEffect(() => {
+    accountApi
+      .larkHostedStatus()
+      .then((st) => setHostedOn(!!st?.enabled))
+      .catch(() => setHostedOn(false));
+  }, []);
   // Mục nào đang trùng mục khác (cùng câu lệnh + cùng nhịp)? Máy chủ nay tự gộp khi tạo, nhưng
   // những mục đã nhân bản từ trước vẫn còn tới khi người dùng cài bản mới — và họ cần THẤY để
   // xoá. Bỏ qua mục đầu tiên của mỗi nhóm: đó là mục thật, chỉ các bản sao mới bị đánh dấu.
@@ -290,6 +328,9 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
       atHour: 9,
       atMinute: 0,
       schedDays: [1, 2, 3, 4, 5],
+      files: { ...FILES_DEFAULT },
+      legacyPerms: false,
+      draftId: newDraftId(),
     });
     loadTables(appToken);
   };
@@ -331,6 +372,20 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
       atHour: r.schedule?.atHour ?? 9,
       atMinute: r.schedule?.atMinute ?? 0,
       schedDays: r.schedule?.days ?? [1, 2, 3, 4, 5],
+      ...(() => {
+        // Quy tắc cũ (chưa có mục quyền) ở chế độ thực thi: hiện ĐÚNG sự cho phép đang có hiệu lực.
+        const legacy = !r.permissions && r.action.type === 'run_agent' && r.action.mode !== 'ask';
+        return {
+          legacyPerms: legacy,
+          files: {
+            sources: r.files?.sources ?? [],
+            onlyNewFiles: !!r.files?.onlyNewFiles,
+            keepOutputs: r.files?.keepOutputs ?? 10,
+            perms: legacy ? { overwriteCells: true, replaceAttachments: true, sendMessages: true, deleteRecords: true } : { ...(r.permissions ?? {}) },
+            runOn: r.runOn === 'desktop' ? 'desktop' : 'auto',
+          } as AutoFilesValue,
+        };
+      })(),
     });
     loadTables(r.appToken);
   };
@@ -375,6 +430,20 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
     return { type: 'webhook', url: f.webhookUrl.trim() };
   };
 
+  /** Phần tệp/quyền/nơi chạy — chỉ việc "Chạy AI agent" có. */
+  const agentExtras = (f: FormModel): Partial<LarkAutomationInput> =>
+    f.actionType === 'run_agent'
+      ? {
+          files: {
+            sources: f.files.sources.filter((x) => x.url.trim()).map((x) => ({ ...x, url: x.url.trim(), ...(x.field ? { field: x.field.trim() } : {}) })),
+            onlyNewFiles: f.files.onlyNewFiles,
+            keepOutputs: f.files.keepOutputs,
+          },
+          permissions: f.files.perms,
+          runOn: f.files.runOn,
+        }
+      : {};
+
   const buildInput = (f: FormModel): LarkAutomationInput | string => {
     // Time-schedule rule: no Base/table/condition — fire the action on a clock.
     if (f.triggerType === 'schedule') {
@@ -386,7 +455,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
           ? { mode: 'daily', atHour: f.atHour, atMinute: f.atMinute, days: f.schedDays }
           : { mode: 'interval' };
       return {
-        id: f.id,
+        id: f.id ?? f.draftId,
         name: f.name.trim() || tr('chat.ruleDefault', 'Quy tắc'),
         enabled: f.enabled,
         appToken: '',
@@ -395,6 +464,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
         intervalSec: Math.max(30, Math.floor(f.intervalSec || 60)),
         triggerType: 'schedule',
         schedule,
+        ...agentExtras(f),
       };
     }
     if (!f.appToken) return tr('chat.selectBaseMsg', 'Chọn Base.');
@@ -405,7 +475,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
     const action = buildAction(f);
     if (typeof action === 'string') return action;
     return {
-      id: f.id,
+      id: f.id ?? f.draftId,
       name: f.name.trim() || 'Quy tắc',
       enabled: f.enabled,
       appToken: f.appToken,
@@ -415,6 +485,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
       intervalSec: Math.max(30, Math.floor(f.intervalSec || 60)),
       fireExisting: f.fireExisting,
       triggerType: 'record',
+      ...agentExtras(f),
     };
   };
 
@@ -607,7 +678,7 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
                         tr('chat.notRun', 'Chưa chạy')
                       )}
                     </Text>
-                    {!!r.runs?.length && <RunHistory runs={r.runs} tr={tr} />}
+                    {!!r.runs?.length && <RunHistory runs={r.runs} tr={tr} runtime={runtime} />}
                   </Space>
                 }
               />
@@ -916,10 +987,20 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
                     {form.agentWrite
                       ? tr(
                           'chat.agentWriteHint',
-                          'Lịch chạy ở chế độ THỰC THI: agent được thêm/sửa/xoá dữ liệu Lark. Vì chạy tự động nên KHÔNG hỏi xác nhận từng thao tác — mỗi lần chạy đều được ghi vào lịch sử kèm số thao tác ghi để bạn rà lại.',
+                          'Lịch chạy ở chế độ THỰC THI: thao tác cộng thêm (thêm bản ghi, đính tệp ghi thêm, tải lên Drive…) chạy ngay; ghi đè / thay tệp / gửi / xoá chỉ chạy khi được bật ở "Quyền khi chạy tự động" bên dưới. Mỗi lần chạy có biên bản (đọc gì, ghi gì, đọc lại, bị bỏ qua) trong lịch sử.',
                         )
                       : tr('chat.agentReadHint', 'Lịch chỉ ĐỌC: agent đọc dữ liệu và báo cáo, không thay đổi gì trong Lark.')}
                   </Text>
+                  <AutomationFilesSection
+                    runtime={runtime}
+                    ruleId={form.id ?? form.draftId ?? ''}
+                    value={form.files}
+                    onChange={(files) => patch({ files, legacyPerms: form.legacyPerms && JSON.stringify(files.perms) === JSON.stringify(form.files.perms) })}
+                    legacy={form.legacyPerms}
+                    hostedOn={hostedOn}
+                    prompt={form.agentPrompt}
+                    writeMode={form.agentWrite}
+                  />
                 </Space>
               )}
             </div>

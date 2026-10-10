@@ -75,6 +75,71 @@ export function uploadScript(o: { path: string; b64: string; name: string; mime:
 })()`;
 }
 
+/**
+ * Đường TẢI XUỐNG một tệp Drive / tệp đính kèm Base qua phiên web (đo 10/10/2026, xem docs/lark-web-api.md
+ * mục 17). Tệp ở ô đính kèm của Base bật quyền nâng cao cần `extra={"bitablePerm":{tableId, attachments:
+ * {<fld>:{<rec>:[<token>]}}}}` (CHUỖI JSON) — cùng bẫy với đường Open API.
+ */
+export function downloadPaths(host: string, fileToken: string, o: { mountPoint?: 'explorer' | 'bitable_file' | 'bitable_image'; extra?: Record<string, unknown> } = {}): string[] {
+  const q = new URLSearchParams();
+  if (o.mountPoint && o.mountPoint !== 'explorer') q.set('mount_point', o.mountPoint);
+  if (o.extra) q.set('extra', JSON.stringify(o.extra));
+  const qs = q.toString() ? `?${q}` : '';
+  const rel = `/space/api/box/stream/download/all/${encodeURIComponent(fileToken)}/${qs}`;
+  const out = [rel];
+  // Lark web tải tệp qua tên miền luồng riêng của vùng (vd internal-api-drive-stream-sg.larksuite.com);
+  // cùng cookie phiên (CORS có credentials). Thử sau đường cùng origin.
+  const m = /^https:\/\/[^/]+\.(sg\.|jp\.|us\.)?(larksuite\.com|feishu\.cn)/i.exec(host || '');
+  if (m) {
+    const region = m[1] ? `-${m[1].replace('.', '')}` : '';
+    out.push(`https://internal-api-drive-stream${region}.${m[2]}${rel}`);
+  }
+  return out;
+}
+
+/** Đoạn chạy trong trang: GET nhị phân (cookie + csrf), trả base64 + kiểu + tên tệp từ Content-Disposition. */
+export function downloadScript(paths: string[], maxBytes: number): string {
+  return `(async () => {
+  var m = document.cookie.match(/(?:^|; )_csrf_token=([^;]+)/);
+  var tried = [];
+  for (var k = 0; k < ${JSON.stringify(paths)}.length; k++) {
+    var url = ${JSON.stringify(paths)}[k];
+    try {
+      var r = await fetch(url, { credentials: 'include', headers: { 'x-csrftoken': m ? decodeURIComponent(m[1]) : '' } });
+      var ct = r.headers.get('content-type') || '';
+      if (!r.ok || /json|html/i.test(ct)) { var t = ''; try { t = (await r.text()).slice(0, 200); } catch (e) {} tried.push(url.split('?')[0].slice(0, 90) + ' → HTTP ' + r.status + ' ' + t); continue; }
+      var buf = await r.arrayBuffer();
+      if (buf.byteLength > ${maxBytes}) return { error: 'too-big', bytes: buf.byteLength };
+      var u8 = new Uint8Array(buf), bin = '', CH = 0x8000;
+      for (var i = 0; i < u8.length; i += CH) bin += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+      return { ok: true, b64: btoa(bin), mime: ct, disposition: r.headers.get('content-disposition') || '', via: url.split('?')[0] };
+    } catch (e) { tried.push(url.split('?')[0].slice(0, 90) + ' → ' + String(e && e.message || e)); }
+  }
+  return { error: 'all-failed', tried: tried };
+})()`;
+}
+
+/** Tên tệp từ Content-Disposition (filename*=UTF-8''… hoặc filename="…"). */
+export function filenameFromDisposition(d: string): string {
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(d || '');
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      /* rơi xuống */
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/.exec(d || '');
+  if (plain) {
+    try {
+      return decodeURIComponent(plain[1].trim());
+    } catch {
+      return plain[1].trim();
+    }
+  }
+  return '';
+}
+
 export function parseUploadResponse(res: J): { ok: true; fileToken: string; nodeToken?: string } | { ok: false; error: string } {
   if (res?.error) return { ok: false, error: `tải lên lỗi: ${res.error}` };
   const j = res?.json;

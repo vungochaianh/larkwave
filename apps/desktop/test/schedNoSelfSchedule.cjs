@@ -21,12 +21,17 @@ const svc = doc('larkService.ts');
 const i = svc.indexOf('async runScheduledAgentTurn(');
 assert.ok(i > 0, 'không tìm thấy runScheduledAgentTurn');
 // Chỉ soi trong thân hàm đó, để một chỗ khác có lọc không làm bài kiểm này đạt oan.
-const than = svc.slice(i, i + 6000);
+const than = svc.slice(i, i + 9000);
 assert.ok(
-  /toolsOverride:[\s\S]{0,200}schedule_agent_job/.test(than),
-  'runScheduledAgentTurn phải truyền toolsOverride loại bỏ schedule_agent_job',
+  /agentTools\(\{[^}]*\}\)\.filter\(\(t\) => !excludedFromUnattended\(t\.name\)\)/.test(than) && /toolsOverride: turnTools/.test(than),
+  'runScheduledAgentTurn phải truyền toolsOverride đã lọc qua excludedFromUnattended',
 );
-console.log('✓ lượt chạy theo lịch không cầm được công cụ đặt lịch');
+// Luật lọc là HÀM THẬT (unattendedPolicy) — kiểm chính nó, kể cả bản chạy nền trên VM dùng chung.
+const { excludedFromUnattended } = require(join(__dirname, '..', '.test-build', 'runtime', 'lark', 'unattendedPolicy.js'));
+for (const n of ['schedule_agent_job', 'create_skill', 'update_skill', 'skill_save', 'lark_ui_act']) assert.ok(excludedFromUnattended(n), n);
+for (const n of ['lark_web_write_records', 'lark_web_attach_file', 'create_file']) assert.ok(!excludedFromUnattended(n), n);
+assert.ok(/excludedFromUnattended\(t\.name\)/.test(doc('headlessRunner.ts')), 'máy chạy hộ cũng phải lọc');
+console.log('✓ lượt chạy theo lịch không cầm được công cụ đặt lịch / tạo kỹ năng / lái giao diện (cả trên VM)');
 
 // ── 2. Nếu thêm công cụ đặt lịch MỚI, bộ lọc một-tên ở trên là chưa đủ ─────────────────
 const names = [...doc('tools/automation.ts').matchAll(/name: '([^']+)'/g)].map((m) => m[1]);

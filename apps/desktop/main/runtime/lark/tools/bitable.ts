@@ -2,6 +2,13 @@ import { type LarkToolDef, enc, uuid, str } from './types';
 import { noteBitableContext } from './attachments';
 import type { LarkClient } from '../larkClient';
 import { resolveBaseInput } from './workflowsV3';
+import { openApiUpsert, openApiUpsertPlan } from '../upsertPlan';
+
+/** Cột khoá của ghi-theo-khoá (`match_by`). */
+const matchByOf = (i: Record<string, any>): string[] =>
+  [...new Set((Array.isArray(i?.match_by) ? i.match_by : typeof i?.match_by === 'string' ? [i.match_by] : []).map((x: unknown) => String(x ?? '').trim()).filter(Boolean))].slice(0, 5) as string[];
+const recordsOf = (i: Record<string, any>): { fields: Record<string, unknown> }[] =>
+  (Array.isArray(i?.records) ? i.records : []).map((r: any) => ({ fields: r?.fields && typeof r.fields === 'object' ? r.fields : {} }));
 
 const apps = (appToken: string) => `/open-apis/bitable/v1/apps/${enc(appToken)}`;
 
@@ -426,6 +433,9 @@ export const bitableTools: LarkToolDef[] = [
       required: ['app_token', 'table_id', 'fields'],
     },
     gated: true,
+    // Tạo MỚI = cộng thêm (không phá gì đang có) — cùng luật với ADDITIVE_OPEN_API ở tools/index, khai ngay
+    // ở đây để bộ công cụ của máy chạy nền (không qua tools/index) cũng biết.
+    additive: true,
     exec: (i, c) =>
       c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records`, {
         params: { client_token: uuid() },
@@ -490,6 +500,9 @@ export const bitableTools: LarkToolDef[] = [
       required: ['app_token', 'name'],
     },
     gated: true,
+    // Tạo MỚI = cộng thêm (không phá gì đang có) — cùng luật với ADDITIVE_OPEN_API ở tools/index, khai ngay
+    // ở đây để bộ công cụ của máy chạy nền (không qua tools/index) cũng biết.
+    additive: true,
     exec: (i, c) => {
       const fields = normFields(i.fields);
       return c.request('POST', `${apps(i.app_token)}/tables`, {
@@ -518,6 +531,9 @@ export const bitableTools: LarkToolDef[] = [
       required: ['app_token', 'table_id', 'field_name', 'type'],
     },
     gated: true,
+    // Tạo MỚI = cộng thêm (không phá gì đang có) — cùng luật với ADDITIVE_OPEN_API ở tools/index, khai ngay
+    // ở đây để bộ công cụ của máy chạy nền (không qua tools/index) cũng biết.
+    additive: true,
     exec: (i, c) =>
       c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/fields`, {
         data: { field_name: i.field_name, type: i.type, ...(i.property ? { property: i.property } : {}), ...fieldDesc(i.description) },
@@ -584,15 +600,32 @@ export const bitableTools: LarkToolDef[] = [
         app_token: str('app_token'),
         table_id: str('table_id'),
         records: { type: 'array', description: 'Mảng [{ fields: { tên cột → giá trị } }]', items: { type: 'object' } },
+        match_by: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'GHI THEO KHOÁ (chống trùng khi chạy lại): tên cột khoá, vd ["Mã đơn"]. Khoá chưa có → thêm; khoá có + giống hệt → bỏ qua; khoá có + khác → sửa ô khác (ghi đè → hỏi).',
+        },
       },
       required: ['app_token', 'table_id', 'records'],
     },
     gated: true,
-    exec: (i, c) =>
-      c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records/batch_create`, {
+    additive: true,
+    additiveWhen: (i) => !matchByOf(i).length,
+    additiveCheck: async (i, c) => {
+      const m = matchByOf(i);
+      if (!m.length || !c) return undefined;
+      const { plan } = await openApiUpsertPlan(c, String(i.app_token), String(i.table_id), recordsOf(i), m);
+      return plan.updates.length === 0;
+    },
+    exec: (i, c) => {
+      const m = matchByOf(i);
+      if (m.length) return openApiUpsert(c, String(i.app_token), String(i.table_id), recordsOf(i), m);
+      return c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records/batch_create`, {
         params: { client_token: uuid() },
         data: { records: i.records },
-      }),
+      });
+    },
   },
   {
     name: 'bitable_batch_update_records',
@@ -663,6 +696,9 @@ export const bitableTools: LarkToolDef[] = [
       required: ['app_token', 'table_id', 'view_name', 'view_type'],
     },
     gated: true,
+    // Tạo MỚI = cộng thêm (không phá gì đang có) — cùng luật với ADDITIVE_OPEN_API ở tools/index, khai ngay
+    // ở đây để bộ công cụ của máy chạy nền (không qua tools/index) cũng biết.
+    additive: true,
     exec: (i, c) =>
       c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/views`, {
         data: { view_name: i.view_name, view_type: i.view_type },

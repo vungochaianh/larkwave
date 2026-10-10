@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+
+/** Đọc đồng bộ, lỗi → Buffer rỗng (chỉ dùng cho xem trước). */
+const readFileSyncSafe = (p: string): Buffer => {
+  try {
+    return readFileSync(p);
+  } catch {
+    return Buffer.alloc(0);
+  }
+};
 import { homedir, hostname } from 'node:os';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -167,14 +176,18 @@ const MAIC_PROMPT_MAX = 20000;
 import { agentTools, allTools, isAdditiveCall, isAdditiveTool, isClientlessTool, isWriteTool, readOnlyTools } from './tools';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { buildApiHistory as buildApiHistoryMsgs, buildTranscript as buildTranscriptText } from './transcript';
-import { importAsDoc, importAsSheet, readLocalFile, uploadToDrive } from './tools/larkWebWrite';
+import { importAsDoc, importAsSheet, readLocalFile, tableFor, uploadToDrive } from './tools/larkWebWrite';
 import { buildFilePreview } from './filePreview';
 import { transcriptBudgetTokens } from '../contextBudget';
 import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
 import { newFilesSince, snapshotDir } from './fileBuild';
 import { canMakePdf, htmlToPdf } from './filePdf';
-import { setLocalFileEnv, withTurnFiles } from './fileContext';
+import { setLocalFileEnv, withTurnFiles, type TurnFileContext } from './fileContext';
+import { clearSources, ensureAutomationFolder, extractForAgent, listInputFiles, listRunOutputs, markProcessed, newRunDir, pendingFiles, pruneRuns, readAutoState, saveSourceFile, addInputFile, removeInputFile, automationRoot, folderFor, type AutoFolder } from './automationFiles';
+import { effectivePerms, excludedFromUnattended, PERM_LABEL, unattendedDecision, type UnattendedPerms } from './unattendedPolicy';
+import { reportLine, wrapToolsForReport } from './autoRunRecorder';
+import { buildXlsx } from './fileBuild';
 import { toolswaveDataDirCandidates } from './filePaths';
 import type { LarkToolDef } from './tools/types';
 import { claudeAvailable, hasInjectedCredential } from '../claudeRunner';
@@ -191,13 +204,13 @@ import { runLarkMaicAgent } from './larkMaicAgent';
 import { getActiveKey } from '../claudeKeyStore';
 import { getProviderKey } from '../runners/runnerTokenStore';
 import { resolveTool } from './tools';
-import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, mergeTurnBases } from './systemPrompt';
+import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases } from './systemPrompt';
 import { versionPromptLine } from '../versionHint';
 import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo } from '@larkwave/core';
 
 /**
  * Owns the connected Lark custom app in the main process: credential storage,
@@ -353,13 +366,15 @@ export class LarkService {
         // giữa một công việc bình thường, không phải cắt một lượt chạy loạn. Lấy 900s cho có
         // biên, vì lịch 9h sáng không có ai ngồi chờ; và từ nay hết giờ là cắt thật nên trần
         // rộng KHÔNG còn đồng nghĩa với việc để một lượt hỏng chạy mãi.
-        run: (prompt, mode, stats) => this.runScheduledAgentTurn(prompt, mode, stats, undefined, undefined, 900_000),
+        run: (prompt, mode, stats, rule) => this.runAutomationAgent(prompt, mode, stats, rule),
         save: (ruleId, ruleName, prompt, result) => this.saveScheduledResult(ruleId, ruleName, prompt, result),
         notify: (title, body) => this.notifyScheduled(title, body),
       },
       // App desktop có đủ bộ công cụ (kể cả lark_ui_* cần trình duyệt). Máy nền dùng bộ headless.
       (name) => resolveTool(name),
       { runSet: (skillId, seedFacts, o) => this.runSkillSetForAutomation(skillId, seedFacts, o) },
+      // Chưa có custom app vẫn chạy được lịch "Chạy AI agent" bằng phiên Lark web.
+      { env: 'desktop', canRunWithoutClient: () => !!getLarkWebSession().webHost() },
     );
     // PDF chỉ dựng được ở nơi có Electron. Đăng ký một lần lúc khởi động; bản chạy nền trên VM
     // không chạy qua đây nên `create_file` ở đó tự báo là chưa dựng được PDF và gợi ý .docx —
@@ -424,6 +439,8 @@ export class LarkService {
           saveConversation: i.saveConversation !== false,
           notify: i.notify !== false,
         },
+        // Lịch mới: KHÔNG cấp sẵn quyền ghi đè/xoá/gửi — người dùng tự cấp ở "Quyền khi chạy tự động".
+        permissions: {},
       });
       // KHÔNG lấy phần tử cuối: `upsert` nay gộp lịch trùng vào mục có sẵn (xem chống trùng ở
       // AutomationEngine.upsert), nên mục vừa tạo/cập nhật có thể nằm ở giữa danh sách. Lấy cuối
@@ -1297,20 +1314,50 @@ export class LarkService {
      * 240s là vừa đủ để bị cắt ngang giữa lúc đang đọc trang cuối.
      */
     timeoutMs = 240_000,
+    /**
+     * Ngữ cảnh của lượt TỰ ĐỘNG HOÁ (việc "Chạy AI agent" của một quy tắc): thư mục tệp riêng của quy
+     * tắc, luật duyệt không người trông (cộng thêm tự chạy; ghi đè/thay tệp/gửi/xoá theo quyền đã cấp),
+     * biên bản, khối dặn riêng, và kỹ năng của người dùng. Không có = đường cũ (lượt kỹ năng/trích xuất).
+     */
+    ctx?: {
+      files: TurnFileContext;
+      cwd?: string;
+      decide: (tool: LarkToolDef, input: Record<string, unknown>) => boolean;
+      wrap?: (tools: LarkToolDef[]) => LarkToolDef[];
+      extraSystem?: string;
+      withSkills?: boolean;
+    },
   ): Promise<string> {
     const text = String(prompt || '').trim();
     if (!text) throw new Error('Prompt trống');
     const client = this.ensureClient();
-    if (!client) throw new Error('Chưa kết nối Lark trên máy chủ');
+    const webAlive = !!getLarkWebSession().webHost();
+    // Chưa có custom app nhưng phiên Lark web còn sống → chạy bằng công cụ phiên web (như chat).
+    if (!client && !webAlive) throw new Error('Chưa kết nối Lark: chưa đăng nhập Lark web và chưa có custom app (Lark Bot).');
     const scoped = this.basesForPrompt(text);
-    const systemPrompt = buildSystemPrompt({
-      tenantName: this.tenantName,
-      // Chỉ nêu Base việc này dùng tới. Cấp cả kho cho một lượt chạy không ai trông, ở chế độ được
-      // GHI, là mở ra đúng số chỗ nó có thể ghi nhầm — xem basesForPrompt.
-      bases: scoped.length ? scoped : this.store.getBases(),
-      mode,
-      userLoggedIn: this.userLoggedIn(),
-    });
+    let systemPrompt: string;
+    if (ctx) {
+      // Cùng prompt hợp nhất như lượt chat (phiên web + Open API khi có), cộng khối dặn không người trông.
+      systemPrompt =
+        buildAgentSystemPrompt({
+          bases: scoped,
+          auto: true,
+          openApi: client ? { tenantName: this.tenantName, bases: scoped.length ? scoped : this.store.getBases(), userLoggedIn: this.userLoggedIn(), userBitableScopeMissing: this.userBitableScopeMissing() } : undefined,
+        }) +
+        (ctx.extraSystem ? `\n\n${ctx.extraSystem}` : '') +
+        (ctx.withSkills ? await this.collectSkillsPrompt(scoped, 'claude', undefined, text) : '');
+    } else if (client) {
+      systemPrompt = buildSystemPrompt({
+        tenantName: this.tenantName,
+        // Chỉ nêu Base việc này dùng tới. Cấp cả kho cho một lượt chạy không ai trông, ở chế độ được
+        // GHI, là mở ra đúng số chỗ nó có thể ghi nhầm — xem basesForPrompt.
+        bases: scoped.length ? scoped : this.store.getBases(),
+        mode,
+        userLoggedIn: this.userLoggedIn(),
+      });
+    } else {
+      systemPrompt = buildWebSessionPrompt({ bases: scoped, auto: true, standalone: true });
+    }
     let out = '';
     let timedOut = false;
     /**
@@ -1345,14 +1392,20 @@ export class LarkService {
      * Trùng tên giữa hai lịch thì lịch chạy sau ghi đè — đúng ý: báo cáo hôm nay thay báo cáo
      * hôm qua, chứ không phải xếp chồng vô hạn.
      */
-    const outDir = await this.chatWorkDir('sched-files').catch(() => undefined);
-    setFileOutDir(outDir ?? null);
+    const outDir = ctx ? undefined : await this.chatWorkDir('sched-files').catch(() => undefined);
+    if (!ctx) setFileOutDir(outDir ?? null);
+    // Bộ công cụ HỢP NHẤT như lượt chat (phiên web; + Open API khi có custom app), bỏ các công cụ lượt
+    // không người trông không được cầm (tạo lịch / kỹ năng = tự nhân bản; lái giao diện).
+    const baseTools = agentTools({ withOpenApi: !!client, mode }).filter((t) => !excludedFromUnattended(t.name));
+    const turnTools = ctx?.wrap ? ctx.wrap(baseTools) : baseTools;
     try {
       for await (const ev of runLarkAgent(text.slice(0, maxChars), mode, {
-        client,
+        client: client ?? undefined,
         systemPrompt,
         runner: 'claude',
         signal: stopper.signal,
+        fileContext: ctx?.files ?? { outDir: outDir ?? null },
+        ...(ctx?.cwd ? { cwd: ctx.cwd } : {}),
         /**
          * MỘT LỊCH KHÔNG ĐƯỢC TẠO THÊM LỊCH.
          *
@@ -1368,14 +1421,20 @@ export class LarkService {
          * Bỏ đúng một công cụ là chặn vòng tự nhân bản ấy ngay tại gốc. Người dùng vẫn đặt lịch
          * được như cũ trong hội thoại thường — chỗ có người ngồi đọc câu xác nhận.
          */
-        toolsOverride: (mode === 'ask' ? readOnlyTools() : allTools()).filter(
-          (t) => t.name !== 'schedule_agent_job',
-        ),
+        toolsOverride: turnTools,
         session: { id: randomUUID(), resume: false },
         ...(attach?.names.length ? { attachDir: attach.dir, attachNames: attach.names } : {}),
-        // Chế độ thực thi: tự duyệt (xem chú thích trên). Chế độ chỉ-đọc: từ chối như cũ —
-        // ở đó một lời xin ghi là dấu hiệu prompt sai, không phải việc cần cho qua.
-        awaitConfirm: async () => mode === 'build',
+        // Lượt tự động hoá: thao tác CỘNG THÊM tự chạy (như công tắc "Tự động"); thao tác khác hỏi
+        // `ctx.decide` — chỉ cho qua khi quy tắc đã cấp đúng quyền, không thì bỏ qua + ghi biên bản.
+        // Đường cũ (lượt kỹ năng): chế độ thực thi tự duyệt; chế độ chỉ-đọc từ chối — ở đó một lời xin
+        // ghi là dấu hiệu prompt sai, không phải việc cần cho qua.
+        ...(ctx ? { autoApproveTool: (name: string) => isAdditiveTool(name) } : {}),
+        awaitConfirm: async (_callId: string, name: string, input: unknown) => {
+          if (!ctx) return mode === 'build';
+          if (mode === 'ask') return false;
+          const tool = turnTools.find((t) => t.name === name);
+          return tool ? ctx.decide(tool, (input ?? {}) as Record<string, unknown>) : false;
+        },
         awaitAsk: async () => NO_ONE_TO_ASK,
       })) {
         if (timedOut) break;
@@ -1427,6 +1486,213 @@ export class LarkService {
       throw new Error(`Claude đã hết lượt dùng — chưa chạy được gì. CLI trả về: ${answer}`);
     }
     return answer;
+  }
+
+  // ── Tự động hoá: thư mục tệp, nguồn Lark, luật không người trông, biên bản ──────────────────
+
+  /**
+   * MỘT lần chạy việc "Chạy AI agent" của một quy tắc tự động hoá.
+   *
+   *  1. Thư mục riêng `lark/automations/<id>/`: tải TƯƠI các nguồn Lark (Drive / ô đính kèm / Sheets) vào
+   *     sources/, gom tệp nguồn (inputs/ + sources/), lọc "chỉ tệp mới" (sha256 đã xử lý). Không có tệp mới
+   *     mà quy tắc làm việc theo tệp → KHÔNG chạy agent (không tốn lượt AI), ghi rõ vào lịch sử.
+   *  2. Lượt agent dùng bộ công cụ hợp nhất như chat, thư mục ghi = outputs/<lần chạy>/, thư mục đọc = thư
+   *     mục quy tắc; thao tác cộng thêm tự chạy, ghi đè/thay tệp/gửi/xoá chỉ khi quy tắc được cấp quyền —
+   *     không thì bỏ qua và ghi vào biên bản. Trần giờ 900s cắt THẬT (xem runScheduledAgentTurn).
+   *  3. Biên bản (đọc / ghi / đọc lại / bỏ qua / tệp kết quả) vào `stats.report` → lịch sử chạy. Lượt
+   *     thành công mới đánh dấu tệp đã xử lý; giữ N lần chạy gần nhất.
+   */
+  private async runAutomationAgent(
+    prompt: string,
+    mode: 'ask' | 'build',
+    stats: { tools: number; writes: number; report?: LarkAutoRunReport },
+    rule: StoredAutomation,
+  ): Promise<string> {
+    const report: LarkAutoRunReport = {};
+    stats.report = report;
+    const folder = await ensureAutomationFolder(this.baseDir, rule.id);
+    const cfg = rule.files ?? {};
+    if (cfg.sources?.length) {
+      await clearSources(folder);
+      for (const src of cfg.sources.slice(0, 10)) {
+        try {
+          await this.fetchAutoSource(folder, src);
+        } catch (e) {
+          (report.sourceErrors ??= []).push(`${src.label || src.kind}: ${String((e as Error)?.message || e).slice(0, 200)}`);
+        }
+      }
+    }
+    const all = await listInputFiles(folder);
+    const state = await readAutoState(folder);
+    const { todo, already } = pendingFiles(all, state, !!cfg.onlyNewFiles);
+    report.inputs = todo.map((f) => {
+      let rows: number | undefined;
+      try {
+        const pv = /\.(xlsx|csv)$/i.test(f.name) ? buildFilePreview(f.name, readFileSyncSafe(f.path)) : null;
+        rows = pv?.sheets?.reduce((n, sh) => n + (sh.rows || 0), 0);
+      } catch {
+        rows = undefined;
+      }
+      return { name: f.rel, bytes: f.bytes, from: f.from, ...(rows !== undefined ? { rows } : {}) };
+    });
+    if (already.length) report.skippedInputs = already.length;
+    const fileDriven = all.length > 0 || !!cfg.sources?.length;
+    if (cfg.onlyNewFiles && fileDriven && !todo.length) {
+      report.note = report.sourceErrors?.length ? 'Không có tệp mới (nguồn Lark lỗi — xem trên) — không chạy agent.' : 'Không có tệp mới kể từ lần chạy trước — không chạy agent.';
+      return `Không có tệp mới kể từ lần chạy trước (${already.length} tệp đã xử lý) — bỏ qua lượt này, không tốn lượt AI.`;
+    }
+    const runDir = await newRunDir(folder);
+    const attachNames = todo.length ? await extractForAgent(folder, todo) : [];
+    const { perms, legacy } = effectivePerms(rule);
+    const PERM_KEYS: [keyof UnattendedPerms, keyof typeof PERM_LABEL][] = [
+      ['overwriteCells', 'overwrite'],
+      ['replaceAttachments', 'replace_attachment'],
+      ['sendMessages', 'send'],
+      ['deleteRecords', 'delete'],
+    ];
+    const extraSystem = buildUnattendedBlock({
+      ruleName: rule.name,
+      folderRoot: folder.root,
+      runDir,
+      inputs: todo.map((f) => f.rel),
+      skippedInputs: already.length,
+      onlyNew: !!cfg.onlyNewFiles,
+      allowed: PERM_KEYS.filter(([k]) => perms[k]).map(([, c]) => PERM_LABEL[c]),
+      denied: PERM_KEYS.filter(([k]) => !perms[k]).map(([, c]) => PERM_LABEL[c]),
+      legacy,
+      mode,
+      webOnly: !this.ensureClient(),
+      sourceErrors: report.sourceErrors,
+    });
+    let ok = false;
+    try {
+      const text = await this.runScheduledAgentTurn(
+        // Tệp đầu vào được nêu trong khối dặn + câu "đọc trước" của đường đính kèm.
+        prompt,
+        mode,
+        stats,
+        12_000,
+        attachNames.length ? { dir: folder.root, names: attachNames } : undefined,
+        900_000,
+        {
+          files: { outDir: runDir, attachDir: folder.root, extraRoots: [folder.root] },
+          cwd: folder.root,
+          decide: (tool, input) => {
+            const d = unattendedDecision(tool, input, perms);
+            if (!d.allow) (report.skipped ??= []).push({ tool: tool.name, category: d.category, reason: d.reason || '' }), (report.skipped = report.skipped.slice(-40));
+            return d.allow;
+          },
+          wrap: (tools) => wrapToolsForReport(tools, report),
+          extraSystem,
+          withSkills: true,
+        },
+      );
+      ok = true;
+      return text;
+    } finally {
+      const outs = await listRunOutputs(runDir).catch(() => []);
+      if (outs.length) report.outputs = outs;
+      else await rm(runDir, { recursive: true, force: true }).catch(() => undefined);
+      await pruneRuns(folder, cfg.keepOutputs ?? 10).catch(() => 0);
+      // Chỉ lượt THÀNH CÔNG mới tính là đã xử lý tệp — lượt hỏng/hết giờ thì lần sau xử lý lại.
+      if (ok && todo.length) await markProcessed(folder, todo).catch(() => undefined);
+      const line = reportLine(report);
+      if (line && !report.note) report.note = line;
+    }
+  }
+
+  /** Tải TƯƠI một nguồn Lark vào sources/<id>/ (phiên web; Drive/đính kèm có đường Open API dự phòng). */
+  private async fetchAutoSource(folder: AutoFolder, src: LarkAutoFileSource): Promise<void> {
+    const web = getLarkWebSession();
+    const client = this.ensureClient();
+    const url = String(src.url || '').trim();
+    if (src.kind === 'drive') {
+      const tok = /\/file\/([A-Za-z0-9]+)/.exec(url)?.[1] || (/^[A-Za-z0-9]{16,}$/.test(url) ? url : '');
+      if (!tok) throw new Error('link Drive phải dạng …/file/<token>');
+      if (web.webHost()) {
+        const r = await web.webDownload(tok, { mountPoint: 'explorer' });
+        await saveSourceFile(folder, src.id, r.name || src.label || tok, r.bytes);
+        return;
+      }
+      if (!client) throw new Error('cần đăng nhập Lark web (hoặc custom app) để tải tệp Drive');
+      const r = await client.downloadBinary(`/open-apis/drive/v1/files/${encodeURIComponent(tok)}/download`);
+      await saveSourceFile(folder, src.id, r.fileName || src.label || tok, r.bytes);
+      return;
+    }
+    if (src.kind === 'sheet') {
+      const tok = /\/sheets\/([A-Za-z0-9]+)/.exec(url)?.[1] || (/^[A-Za-z0-9]{16,}$/.test(url) ? url : '');
+      if (!tok) throw new Error('link Lark Sheets phải dạng …/sheets/<token>');
+      if (!web.webHost()) throw new Error('đọc Lark Sheets cần phiên Lark web');
+      const back = await web.webReadSheetFull(tok);
+      if (!back?.ok || !Array.isArray(back.sheets)) throw new Error(`không đọc được bảng tính (${back?.error || 'không rõ'})`);
+      const sheets = back.sheets.filter((sh: { loaded?: boolean }) => sh.loaded !== false).map((sh: { name?: string; head?: unknown[][] }, k: number) => ({ name: String(sh.name || `Sheet${k + 1}`).slice(0, 31), rows: (sh.head || []) as (string | number | null)[][] }));
+      if (!sheets.length) throw new Error('bảng tính không có sheet nào đọc được');
+      await saveSourceFile(folder, src.id, `${(back.title || src.label || 'Lark Sheets').replace(/[\\/]/g, '_')}.xlsx`, buildXlsx(sheets));
+      return;
+    }
+    if (src.kind === 'attachment') {
+      const base = /\/base\/([A-Za-z0-9]+)/.exec(url)?.[1] || '';
+      const table = String(src.table || /[?&]table=([A-Za-z0-9]+)/.exec(url)?.[1] || '');
+      if (!base || !table || !src.field) throw new Error('cần link Base (…/base/<token>?table=…), bảng và TÊN cột Tệp đính kèm');
+      if (!web.webHost()) throw new Error('tải tệp đính kèm cần phiên Lark web');
+      const files = await this.webAttachmentFiles(base, table, src.field, src.recordId);
+      for (const f of files.slice(0, 50)) {
+        const r = await web.webDownload(f.token, { mountPoint: f.image ? 'bitable_image' : 'bitable_file', extra: { bitablePerm: { tableId: f.tableId, attachments: { [f.fieldId]: { [f.recordId]: [f.token] } } } } });
+        await saveSourceFile(folder, src.id, f.name || r.name || f.token, r.bytes);
+      }
+      return;
+    }
+    throw new Error(`loại nguồn "${(src as { kind?: string }).kind}" không hỗ trợ`);
+  }
+
+  /** Mọi tệp trong một cột Tệp đính kèm (của mọi bản ghi, hoặc một bản ghi) — qua phiên web. */
+  private async webAttachmentFiles(base: string, tableKey: string, fieldKey: string, recordId?: string): Promise<{ token: string; name: string; image: boolean; tableId: string; fieldId: string; recordId: string }[]> {
+    const web = getLarkWebSession();
+    const t = await tableFor(base, tableKey);
+    const tableId = t.tableId;
+    const fld = t.fields.find((f) => f.id === fieldKey || f.name === fieldKey);
+    if (!fld) throw new Error(`không có cột «${fieldKey}» trong bảng «${t.tableName}»`);
+    if (fld.type !== 17) throw new Error(`cột «${fld.name}» không phải cột Tệp đính kèm`);
+    const recMap = recordId ? await web.webRecordsById(base, tableId, [recordId]) : (await web.webReadAllRecords(base, tableId)).recordMap;
+    const out: { token: string; name: string; image: boolean; tableId: string; fieldId: string; recordId: string }[] = [];
+    for (const [rid, row] of Object.entries(recMap || {})) {
+      const cell = (row as Record<string, { value?: unknown }>)[fld.id];
+      const list = Array.isArray(cell?.value) ? (cell!.value as { attachmentToken?: string; name?: string; mimeType?: string }[]) : [];
+      for (const a of list) if (a?.attachmentToken) out.push({ token: a.attachmentToken, name: String(a.name || ''), image: /^image\//.test(String(a.mimeType || '')), tableId, fieldId: fld.id, recordId: rid });
+    }
+    return out;
+  }
+
+  /** Thư mục của quy tắc (cho màn sửa quy tắc). */
+  async automationFolderInfo(id: string): Promise<LarkAutomationFolderInfo> {
+    const folder = folderFor(automationRoot(this.baseDir, id));
+    const st = await readAutoState(folder);
+    const files = await listInputFiles(folder).catch(() => []);
+    return {
+      root: folder.root,
+      inputs: files.filter((f) => f.from === 'inputs').map((f) => ({ name: f.rel.replace(/^inputs\//, ''), bytes: f.bytes, mtime: new Date(f.mtimeMs).toISOString(), processed: !!st.processed[f.sha256] })),
+      processedCount: Object.keys(st.processed).length,
+    };
+  }
+  async automationAddInput(id: string, file: { name: string; dataBase64: string }): Promise<LarkAutomationFolderInfo> {
+    const bytes = Buffer.from(String(file?.dataBase64 || ''), 'base64');
+    if (!bytes.length) throw new Error('Tệp rỗng.');
+    if (bytes.length > 200 * 1024 * 1024) throw new Error('Tệp quá lớn (> 200 MB).');
+    await addInputFile(await ensureAutomationFolder(this.baseDir, id), String(file?.name || 'tep'), bytes);
+    return this.automationFolderInfo(id);
+  }
+  async automationRemoveInput(id: string, name: string): Promise<LarkAutomationFolderInfo> {
+    await removeInputFile(folderFor(automationRoot(this.baseDir, id)), name);
+    return this.automationFolderInfo(id);
+  }
+  async automationResetProcessed(id: string): Promise<LarkAutomationFolderInfo> {
+    const folder = folderFor(automationRoot(this.baseDir, id));
+    await rm(folder.statePath, { force: true }).catch(() => undefined);
+    return this.automationFolderInfo(id);
+  }
+  /** Đường dẫn thư mục của quy tắc (để mở bằng Finder — chỉ khi người dùng bấm). */
+  async automationFolderPath(id: string): Promise<string> {
+    return (await ensureAutomationFolder(this.baseDir, id)).root;
   }
 
   // ── Bộ kỹ năng có hợp đồng: chạy và kiểm chéo liên tục ───────────────────────────────
@@ -2007,6 +2273,15 @@ export class LarkService {
   private basesForPrompt(prompt: string): LarkBaseRef[] {
     const all = this.store.getBases();
     const hit = all.filter((b) => b.appToken && prompt.includes(b.appToken));
+    // Larkwave mặc định chạy bằng phiên Lark web — Base của lịch thường KHÔNG nằm trong danh sách Base
+    // của custom app. Nhận thêm token nêu rõ trong câu lệnh (link …/base/<token> hoặc app_token=<token>).
+    const seen = new Set(hit.map((b) => b.appToken));
+    for (const m of prompt.matchAll(/(?:\/base\/|app_token\s*[=:]\s*["'«]?)([A-Za-z0-9]{16,40})/g)) {
+      const tok = m[1];
+      if (seen.has(tok)) continue;
+      seen.add(tok);
+      hit.push({ appToken: tok, name: tok } as LarkBaseRef);
+    }
     return hit;
   }
 
@@ -3841,6 +4116,8 @@ export class LarkService {
     activeBases?: LarkBaseRef[],
     runner?: string,
     skipIds?: readonly string[],
+    /** Câu lệnh của lượt — kỹ năng dựng sẵn chỉ mang ĐỦ thân khi câu lệnh khớp từ khoá của nó. */
+    turnPrompt?: string,
   ): Promise<string> {
     try {
       const reg = await this.readSkillRegistry();

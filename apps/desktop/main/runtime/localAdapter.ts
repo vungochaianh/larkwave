@@ -1,10 +1,10 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { app, dialog, BrowserWindow } from 'electron';
+import { app, dialog, shell, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
 import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillLister } from './lark/skillBridge';
 import type { SkillContractFields, LarkPendingPrompts, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
-import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase } from '@larkwave/core';
+import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
@@ -415,6 +415,21 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   }
   larkRunAutomation(id: string): Promise<LarkAutomationRunResult> {
     return this.lark.runAutomation(id);
+  }
+  async larkAutomationFolder(id: string): Promise<LarkAutomationFolderInfo> {
+    return this.lark.automationFolderInfo(id);
+  }
+  async larkAutomationAddInput(id: string, file: { name: string; dataBase64: string }): Promise<LarkAutomationFolderInfo> {
+    return this.lark.automationAddInput(id, file);
+  }
+  async larkAutomationRemoveInput(id: string, name: string): Promise<LarkAutomationFolderInfo> {
+    return this.lark.automationRemoveInput(id, name);
+  }
+  async larkAutomationResetProcessed(id: string): Promise<LarkAutomationFolderInfo> {
+    return this.lark.automationResetProcessed(id);
+  }
+  async larkAutomationRevealFolder(id: string): Promise<void> {
+    await shell.openPath(await this.lark.automationFolderPath(id));
   }
   larkListTables(appToken: string): Promise<LarkTableRef[]> {
     return this.lark.listTables(appToken);
