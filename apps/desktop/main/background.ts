@@ -480,6 +480,10 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkBrowserStopAi, (_e, lane?: string) => runtime.larkBrowserStopAi(laneArg(lane)));
   ipcMain.handle(IPC.larkBrowserResumeAi, (_e, lane?: string) => runtime.larkBrowserResumeAi(laneArg(lane)));
   ipcMain.handle(IPC.larkBrowserRelease, (_e, lane?: string) => runtime.larkBrowserRelease(laneArg(lane) || ''));
+  ipcMain.handle(IPC.larkWebAccounts, () => runtime.larkWebAccounts());
+  ipcMain.handle(IPC.larkWebSwitchAccount, (_e, id?: string) => runtime.larkWebSwitchAccount(String(id ?? '').slice(0, 40)));
+  ipcMain.handle(IPC.larkWebAddAccount, () => runtime.larkWebAddAccount());
+  ipcMain.handle(IPC.larkWebLogout, () => runtime.larkWebLogout());
   ipcMain.handle(IPC.larkUiTemplateList, () => runtime.larkUiTemplateList());
   ipcMain.handle(IPC.larkUiTemplateSave, (_e, input: { name: string; description?: string }) => runtime.larkUiTemplateSave(input));
   ipcMain.handle(IPC.larkUiTemplateDelete, (_e, id: string) => runtime.larkUiTemplateDelete(String(id || '')));

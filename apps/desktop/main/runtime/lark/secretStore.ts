@@ -33,6 +33,16 @@ export type StoredUserAuth = LarkUserTokens & { userName?: string };
  * plain JSON file. The short-lived `tenant_access_token` is kept in memory only
  * (see LarkClient) — never persisted.
  */
+/**
+ * Một tài khoản LARK web đã đăng nhập trên máy này (trong một tài khoản Larkwave). `id` = khe kho cookie
+ * ('' = kho gốc). Cookie chỉ có trên máy này nên danh sách nằm ở machine-prefs, không đi theo sao lưu.
+ */
+export interface WebAccountEntry {
+  id: string;
+  name?: string;
+  host?: string;
+}
+
 export class SecretStore {
   /** `${userData}/lark` — holds the per-account config subfolders + legacy flat files. */
   private readonly larkRoot: string;
@@ -248,7 +258,7 @@ export class SecretStore {
     return join(this.dir, 'machine-prefs.json');
   }
   /** `workflowAuto`: chế độ Tạo workflow tự ghi phần cộng-thêm không hỏi (mặc định BẬT). */
-  getMachinePrefs(): { workflowAuto?: boolean; runnerId?: string } {
+  getMachinePrefs(): { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string } {
     try {
       const s = JSON.parse(readFileSync(this.machinePrefsPath(), 'utf8'));
       return s && typeof s === 'object' ? s : {};
@@ -256,7 +266,7 @@ export class SecretStore {
       return {};
     }
   }
-  setMachinePrefs(p: { workflowAuto?: boolean; runnerId?: string }): void {
+  setMachinePrefs(p: { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string }): void {
     writeFileSync(this.machinePrefsPath(), JSON.stringify({ ...this.getMachinePrefs(), ...p }, null, 2));
   }
 

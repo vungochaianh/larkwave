@@ -480,6 +480,21 @@ export interface LarkUiSave {
 }
 
 /** Live state of the "Trình duyệt Lark" screen (the embedded Lark web view + AI driver). */
+/** Một tài khoản LARK web đã đăng nhập trên máy này (trong tài khoản Larkwave đang dùng). */
+export interface LarkWebAccount {
+  /** Khe kho cookie ('' = kho gốc). */
+  id: string;
+  /** Tên người dùng Lark (đọc sau khi đăng nhập). */
+  name?: string;
+  /** Tenant, vd https://abc.sg.larksuite.com. Vắng = chưa đăng nhập. */
+  host?: string;
+  active: boolean;
+}
+export interface LarkWebAccounts {
+  active: string;
+  accounts: LarkWebAccount[];
+}
+
 export interface LarkBrowserState {
   connected: boolean;
   /** From the session health probe: alive | dead (hết phiên) | unknown. */
@@ -1968,6 +1983,11 @@ export interface RuntimeAdapter {
   larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
   /** Hội thoại đóng tab → giải phóng TRANG Lark riêng của nó (`lane` = id hội thoại). Đăng nhập không đổi. */
   larkBrowserRelease?(lane: string): Promise<void>;
+  /** Tài khoản Lark web trên máy này: liệt kê / chuyển / thêm (mở trang đăng nhập) / đăng xuất cái đang dùng. */
+  larkWebAccounts?(): Promise<LarkWebAccounts>;
+  larkWebSwitchAccount?(id: string): Promise<LarkWebAccounts>;
+  larkWebAddAccount?(): Promise<LarkWebAccounts>;
+  larkWebLogout?(): Promise<LarkWebAccounts>;
   larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
   larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
   larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;

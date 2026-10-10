@@ -60,6 +60,7 @@ import type {
   LarkReloginEntry,
   LarkBrowserRect,
   LarkBrowserState,
+  LarkWebAccounts,
   LarkWebBase,
   LarkUiTemplate,
   LarkUiTemplateApplyResult,
@@ -170,6 +171,10 @@ interface Bridge {
   larkBrowserStopAi?(lane?: string): Promise<LarkBrowserState>;
   larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
   larkBrowserRelease?(lane: string): Promise<void>;
+  larkWebAccounts?(): Promise<LarkWebAccounts>;
+  larkWebSwitchAccount?(id: string): Promise<LarkWebAccounts>;
+  larkWebAddAccount?(): Promise<LarkWebAccounts>;
+  larkWebLogout?(): Promise<LarkWebAccounts>;
   larkUiTemplateList?(): Promise<LarkUiTemplate[]>;
   larkUiTemplateSave?(input: { name: string; description?: string }): Promise<LarkUiTemplate>;
   larkUiTemplateDelete?(id: string): Promise<LarkUiTemplate[]>;
@@ -297,6 +302,8 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
       if (!b.suggestSkillContract) (this as Record<string, unknown>).suggestSkillContract = undefined;
       // "Trình duyệt Lark" (nav item is feature-detected on larkBrowserAttach).
       if (!b.larkBrowserAttach) (this as Record<string, unknown>).larkBrowserAttach = undefined;
+      // Menu tài khoản Lark (đăng xuất / thêm / chuyển) chỉ hiện khi lõi có các kênh này.
+      if (!b.larkWebAccounts) for (const k of ['larkWebAccounts', 'larkWebSwitchAccount', 'larkWebAddAccount', 'larkWebLogout']) (this as Record<string, unknown>)[k] = undefined;
       if (!b.larkUiTemplateList) (this as Record<string, unknown>).larkUiTemplateList = undefined;
     }
   }
@@ -583,6 +590,22 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   /** Lõi cũ (một trang Lark chung) không có kênh này → không có gì để giải phóng. */
   larkBrowserRelease(lane: string): Promise<void> {
     return this.bridge.larkBrowserRelease ? this.bridge.larkBrowserRelease(lane) : Promise.resolve();
+  }
+  larkWebAccounts(): Promise<LarkWebAccounts> {
+    if (!this.bridge.larkWebAccounts) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));
+    return this.bridge.larkWebAccounts();
+  }
+  larkWebSwitchAccount(id: string): Promise<LarkWebAccounts> {
+    if (!this.bridge.larkWebSwitchAccount) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));
+    return this.bridge.larkWebSwitchAccount(id);
+  }
+  larkWebAddAccount(): Promise<LarkWebAccounts> {
+    if (!this.bridge.larkWebAddAccount) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));
+    return this.bridge.larkWebAddAccount();
+  }
+  larkWebLogout(): Promise<LarkWebAccounts> {
+    if (!this.bridge.larkWebLogout) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));
+    return this.bridge.larkWebLogout();
   }
   larkUiTemplateList(): Promise<LarkUiTemplate[]> {
     return this.bridge.larkUiTemplateList ? this.bridge.larkUiTemplateList() : Promise.resolve([]);

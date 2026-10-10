@@ -1,6 +1,5 @@
 import { app, session, type BrowserWindow } from 'electron';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { currentTurnFiles } from './fileContext';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LarkBrowserState, LarkReloginEntry, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebInfo } from '@larkwave/core';
@@ -66,6 +65,7 @@ import {
   workflowDetailPath,
 } from './workflowBlock';
 import { deleteBlocksScript, refusalText, verifyDeleted, type DeleteCatalog, type DeletePlan } from './webDelete';
+import { currentTurnFiles } from './fileContext';
 
 /** Hạn giờ cho một lần hỏi "tôi là ai" (xem whoami()). */
 const WHOAMI_TIMEOUT_MS = 6000;
@@ -109,6 +109,8 @@ const PARTITION_PREFIX = 'persist:tw-lark-web-';
 const CHROME_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36';
 const LOGIN_MARKERS = /\/(accounts|passport|login|sso|suite\/passport)/i;
+/** Trang đăng nhập Lark (quốc tế). Đăng nhập xong Lark chuyển về messenger → connect() nhận ra tenant. */
+const LARK_LOGIN_URL = 'https://accounts.larksuite.com/accounts/page/login?app_id=1001&no_trap=1&redirect_uri=' + encodeURIComponent('https://www.larksuite.com/next/messenger');
 
 // Recognise any internal workflow/automation request across the two service prefixes Lark uses
 // (`/space/api/bitable`, `/space/api/base`, `/base/api`) and the several resource names the
@@ -712,8 +714,37 @@ export class LarkWebSession {
     return w.domain ? `https://${w.domain}` : safeOrigin(url);
   }
 
+  /** Tài khoản Lark web đang dùng trong tài khoản Larkwave này ('' = kho cookie gốc, giữ phiên cũ). */
+  private accountSlot = '';
+
   private partitionName(): string {
-    return PARTITION_PREFIX + this.scope;
+    return PARTITION_PREFIX + this.scope + (this.accountSlot ? `~${this.accountSlot}` : '');
+  }
+
+  /** Quên mọi thứ gắn với kho cookie hiện tại (đổi tài khoản Larkwave / tài khoản Lark). */
+  private resetPartition(): void {
+    this.destroyWindow();
+    this.host = null;
+    this.capturedPaths = [];
+    this.capturedOther = [];
+    this.capturedHostId = '';
+    this.capturedHostType = '';
+    this.capturedCsrf = '';
+    this.capturedWfPayload = null;
+  }
+
+  /**
+   * Đổi sang tài khoản LARK khác trong cùng tài khoản Larkwave: mỗi tài khoản Lark một kho cookie
+   * (`…~<slot>`), nên nhiều tài khoản cùng đăng nhập sẵn, chuyển qua lại không phải đăng nhập lại.
+   * Như setScope: đóng mọi trang, quên tenant; gọi reconnect(host) sau đó để mở lại phiên đã nhớ.
+   */
+  setAccountSlot(slot: string): void {
+    const s = String(slot || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+    if (s === this.accountSlot) return;
+    this.resetPartition();
+    this.accountSlot = s;
+    this.listenerReady = false;
+    this.installSniffer();
   }
 
   /**
@@ -725,15 +756,9 @@ export class LarkWebSession {
   setScope(scope: string): void {
     const s = scope || '_local';
     if (s === this.scope) return;
-    this.destroyWindow();
-    this.host = null;
-    this.capturedPaths = [];
-    this.capturedOther = [];
-    this.capturedHostId = '';
-    this.capturedHostType = '';
-    this.capturedCsrf = '';
-    this.capturedWfPayload = null;
+    this.resetPartition();
     this.scope = s;
+    this.accountSlot = ''; // tài khoản Lark của tài khoản Larkwave mới do LarkService đặt lại
     this.listenerReady = false;
     this.installSniffer();
   }
@@ -1056,7 +1081,11 @@ export class LarkWebSession {
    * window for reuse. `startUrl` should be any URL from the user's Lark workspace (base/wiki).
    */
   async connect(startUrl?: string): Promise<LarkWebInfo> {
-    const origin = safeOrigin(startUrl) || 'https://www.larksuite.com';
+    // Biết tenant (đăng nhập lại) → mở tenant: cookie còn hạn thì vào thẳng, hết hạn Lark tự chuyển sang
+    // trang đăng nhập. CHƯA biết (máy mới / "Thêm tài khoản Lark") → mở thẳng TRANG ĐĂNG NHẬP — trước đây
+    // mở www.larksuite.com rồi dừng ở trang giới thiệu, người dùng phải tự tìm nút "Log in".
+    const known = safeOrigin(startUrl);
+    const origin = known && classifyLarkPage(known) !== 'public' ? known : LARK_LOGIN_URL;
     // Fresh window each connect attempt (reuse the persisted partition).
     this.destroyWindow();
     const win = this.makeWindow(true);

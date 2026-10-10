@@ -5,7 +5,7 @@ import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/c
 import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillFullLister, setAgentSkillLearner, setAgentSkillLister, setAgentSkillReader } from './lark/skillBridge';
 import { BUILTIN_SKILLS } from './skills/builtinSkills';
 import type { SkillContractFields, LarkPendingPrompts, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
-import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo, SkillLearnSettings, SkillProposal } from '@larkwave/core';
+import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkWebAccounts, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo, SkillLearnSettings, SkillProposal } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
@@ -444,6 +444,18 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   }
   async larkBrowserRelease(lane: string): Promise<void> {
     this.lark.browserRelease(lane);
+  }
+  larkWebAccounts(): Promise<LarkWebAccounts> {
+    return this.lark.webAccounts();
+  }
+  larkWebSwitchAccount(id: string): Promise<LarkWebAccounts> {
+    return this.lark.webSwitchAccount(id);
+  }
+  larkWebAddAccount(): Promise<LarkWebAccounts> {
+    return this.lark.webAddAccount();
+  }
+  larkWebLogout(): Promise<LarkWebAccounts> {
+    return this.lark.webLogout();
   }
   async larkUiTemplateList(): Promise<LarkUiTemplate[]> {
     return this.lark.uiTemplateList();

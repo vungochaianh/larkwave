@@ -199,7 +199,7 @@ import { claudeAvailable, hasInjectedCredential } from '../claudeRunner';
 import { tryAcquire, release, currentOwner, isBusy, maxConcurrent, type Lease } from '../agentLock';
 import { PluginHost } from '../plugins/pluginHost';
 import { AutomationEngine } from './automationEngine';
-import { SecretStore, type StoredAutomation, type StoredUserAuth } from './secretStore';
+import { SecretStore, type StoredAutomation, type StoredUserAuth, type WebAccountEntry } from './secretStore';
 import { LarkApiError, LarkClient, LarkNetworkError } from './larkClient';
 import { exchangeCode, fetchUserName, LarkOAuthError, refreshTokens } from './larkOAuth';
 import { runLarkAgent } from './larkAgent';
@@ -215,7 +215,7 @@ import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo, SkillProposal } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebAccounts, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo, SkillProposal } from '@larkwave/core';
 import { getAgentSkillLearner } from './skillBridge';
 
 /**
@@ -693,7 +693,10 @@ export class LarkService {
       void this.initBot();
       // Remember the Lark web login: if this account connected before, silently restore it
       // from its persisted cookies (hidden window; gives up quietly if they expired).
-      const savedHost = this.store.getSettings().webHost;
+      // Tài khoản Lark đang dùng (máy này) của tài khoản Larkwave này → đúng kho cookie trước khi mở lại.
+      const { list: webList, active: webActive } = this.webAccountList();
+      getLarkWebSession().setAccountSlot(webActive);
+      const savedHost = webList.find((a) => a.id === webActive)?.host ?? this.store.getSettings().webHost;
       if (savedHost) void getLarkWebSession().reconnect(savedHost).catch(() => undefined);
       // Switching identity: drop the in-memory open conversation so the UI starts clean.
       this.activeSessionId = null;
@@ -3558,8 +3561,92 @@ export class LarkService {
     const target = url || this.store.getSettings().webHost || undefined;
     const info = await getLarkWebSession().connect(target);
     // Remember a successful login for THIS account so it auto-restores next time.
-    if (info.connected && info.host) this.store.setSettings({ webHost: info.host });
+    if (info.connected && info.host) {
+      this.store.setSettings({ webHost: info.host });
+      await this.rememberWebAccount(info.host).catch(() => undefined);
+    }
     return info;
+  }
+
+  // ── Tài khoản LARK web (nhiều tài khoản trong một tài khoản Larkwave) ──────────────────────────────
+  // Mỗi tài khoản Lark một kho cookie (larkWebSession.setAccountSlot) → nhiều tài khoản cùng đăng nhập
+  // sẵn, đổi qua lại không phải quét QR lại. Danh sách ở machine-prefs (cookie chỉ có trên máy này).
+  // Đổi tài khoản áp dụng cho MỌI tab: trang Lark của các tab đóng lại và mở lại bằng tài khoản mới.
+
+  private webAccountList(): { list: WebAccountEntry[]; active: string } {
+    const p = this.store.getMachinePrefs();
+    let list = Array.isArray(p.webAccounts) ? p.webAccounts.filter((a) => a && typeof a.id === 'string') : [];
+    // Máy chưa có danh sách (bản cũ): một tài khoản ở kho gốc, đúng phiên đang đăng nhập.
+    if (!list.length) list = [{ id: '', host: this.store.getSettings().webHost ?? undefined }];
+    const active = list.some((a) => a.id === p.webAccountActive) ? (p.webAccountActive as string) : list[0].id;
+    return { list, active };
+  }
+
+  private saveWebAccounts(list: WebAccountEntry[], active: string): void {
+    this.store.setMachinePrefs({ webAccounts: list, webAccountActive: active });
+    // `webHost` (đồng bộ theo tài khoản) = tenant của tài khoản Lark đang dùng — nơi mở lại phiên.
+    this.store.setSettings({ webHost: list.find((a) => a.id === active)?.host ?? null });
+  }
+
+  /** Đăng nhập xong → nhớ tenant + tên người dùng Lark cho tài khoản đang dùng. */
+  private async rememberWebAccount(host: string): Promise<void> {
+    const { list, active } = this.webAccountList();
+    const me = await getLarkWebSession().webMe().catch(() => null);
+    const next = list.map((a) => (a.id === active ? { ...a, host, ...(me?.name ? { name: me.name.slice(0, 80) } : {}) } : a));
+    this.saveWebAccounts(next, active);
+  }
+
+  async webAccounts(): Promise<LarkWebAccounts> {
+    let { list, active } = this.webAccountList();
+    // Đăng nhập ngay trong khung (không qua nút) → chưa kịp nhớ tên: đọc bù khi được hỏi.
+    const host = getLarkWebSession().webHost();
+    const cur = list.find((a) => a.id === active);
+    if (host && cur && (!cur.name || cur.host !== host)) {
+      await this.rememberWebAccount(host).catch(() => undefined);
+      ({ list, active } = this.webAccountList());
+    }
+    return { active, accounts: list.map((a) => ({ id: a.id, ...(a.name ? { name: a.name } : {}), ...(a.host ? { host: a.host } : {}), active: a.id === active })) };
+  }
+
+  async webSwitchAccount(id: string): Promise<LarkWebAccounts> {
+    const { list, active } = this.webAccountList();
+    const to = list.find((a) => a.id === id);
+    if (!to) throw new Error('Không thấy tài khoản Lark này trên máy.');
+    if (id !== active) {
+      this.saveWebAccounts(list, id);
+      const s = getLarkWebSession();
+      s.setAccountSlot(id);
+      if (to.host) await s.reconnect(to.host).catch(() => undefined);
+    }
+    return this.webAccounts();
+  }
+
+  /** Thêm tài khoản: khe cookie mới, chuyển sang đó và mở trang đăng nhập (QR) ngay trong khung. */
+  async webAddAccount(): Promise<LarkWebAccounts> {
+    const { list } = this.webAccountList();
+    const id = randomUUID().replace(/-/g, '').slice(0, 10);
+    const next = [...list, { id }];
+    this.saveWebAccounts(next, id);
+    getLarkWebSession().setAccountSlot(id);
+    void this.webConnect().catch(() => undefined); // trang đăng nhập hiện trong khung; xong thì tự nhớ
+    return this.webAccounts();
+  }
+
+  /**
+   * Đăng xuất tài khoản Lark ĐANG DÙNG khỏi máy này: xoá cookie của nó, bỏ khỏi danh sách, rồi chuyển
+   * sang tài khoản còn lại (nếu có). Hết tài khoản → về kho gốc, chưa đăng nhập.
+   */
+  async webLogout(): Promise<LarkWebAccounts> {
+    const { list, active } = this.webAccountList();
+    getLarkWebSession().disconnect(); // xoá cookie của khe đang dùng
+    let rest = list.filter((a) => a.id !== active);
+    if (!rest.length) rest = [{ id: '' }];
+    const next = rest[0];
+    this.saveWebAccounts(rest, next.id);
+    const s = getLarkWebSession();
+    s.setAccountSlot(next.id);
+    if (next.host) await s.reconnect(next.host).catch(() => undefined);
+    return this.webAccounts();
   }
   webStatus(): LarkWebInfo {
     const s = getLarkWebSession();

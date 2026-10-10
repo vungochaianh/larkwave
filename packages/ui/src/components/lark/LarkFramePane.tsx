@@ -8,6 +8,7 @@ import { EmptyState } from '../../kit';
 import { useI18n } from '../../i18n';
 import { dockDecision, overlayHitsPane, OVERLAY_SELECTOR, shouldAutoOpen, ZERO_RECT } from './larkDock';
 import { isLarkLoginPage, loginUrlFor, loginViewFromUrl, type LarkLoginView } from './larkLoginUrl';
+import { LarkAccountMenu } from './LarkAccountMenu';
 
 const { Text } = Typography;
 
@@ -223,6 +224,7 @@ export function LarkFramePane({
             </Button>
           </Tooltip>
         )}
+        <LarkAccountMenu runtime={runtime} connected={!!st?.connected && !dead} host={st?.host} onChanged={() => void refresh()} />
         {needLogin && (
           <Button size="small" type="primary" icon={<LoginOutlined />} loading={busy === 'login'} onClick={relogin} style={{ background: BRAND_GRADIENT, border: 'none' }}>
             {t('larkBrowser.login', 'Đăng nhập Lark')}

@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.3',
+    date: '2026-10-11',
+    items: [
+      "Mỗi tab (hội thoại) có TRANG Lark riêng trong khung: hai tab làm hai Base khác nhau chạy song song không còn giẫm lên nhau; đổi tab là khung đổi sang Base của tab đó.",
+      "Tab khác đang chạy không còn khoá nút Gửi; mở tab mới gửi câu hỏi không còn tự từ chối hộp xác nhận đang chờ ở tab kia.",
+      "Tài khoản Lark trên thanh khung Lark: xem ai đang đăng nhập, chuyển nhanh giữa nhiều tài khoản (không phải quét lại), Thêm tài khoản Lark, Đăng xuất.",
+      "Đăng nhập lần đầu / thêm tài khoản mở thẳng trang đăng nhập Lark có mã QR, không còn dừng ở trang giới thiệu.",
+    ],
+  },
+  {
     version: '0.1.2',
     date: '2026-10-10',
     items: [
