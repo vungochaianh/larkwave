@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import type { DesktopUpdateInfo } from '@larkwave/core';
 import { useRuntime } from './RuntimeProvider';
 
-/** Nơi manifest phát hành nằm — trùng với manifestUrl() phía main process. */
 /**
- * Manifest phát hành của CHÍNH app này. Larkwave chưa có kênh phát hành riêng (phase deploy) →
- * để trống = không kiểm tra gì, không báo "có bản mới". TUYỆT ĐỐI không trỏ về manifest của Toolswave:
- * bản 1.0.x bên đó luôn "mới hơn" 0.x ở đây, và nút tải sẽ tải bộ cài của sản phẩm khác.
- * Khi có kênh riêng: đặt URL ở đây (cùng giá trị với biến LARKWAVE_RELEASE_URL phía main).
+ * Manifest phát hành của CHÍNH app này: route trên toolswave.net đọc registry công khai (gói
+ * larkwave-desktop), cùng giá trị với manifestUrl() phía main. TUYỆT ĐỐI không trỏ về manifest của
+ * Toolswave: bản 1.0.x bên đó luôn "mới hơn" 0.x ở đây, và nút tải sẽ tải bộ cài của sản phẩm khác.
  */
-export const RELEASE_URL: string = '';
+export const RELEASE_URL: string = 'https://toolswave.net/api/apps-release/larkwave';
 
 /** So sánh phiên bản kiểu semver rút gọn (so SỐ, để 1.0.9 < 1.0.10). */
 export function cmpVer(a: string, b: string): number {

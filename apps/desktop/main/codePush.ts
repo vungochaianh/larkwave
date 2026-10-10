@@ -141,7 +141,9 @@ async function reachable(url: string, ms: number): Promise<boolean> {
 /** Where the release manifest lives. Default = a static file co-hosted with the
  *  pushed renderer on Cloudflare Pages (override with LARKWAVE_RELEASE_URL). */
 export function manifestUrl(): string {
-  return process.env.LARKWAVE_RELEASE_URL || '';
+  // Kênh phát hành của Larkwave: route trên toolswave.net đọc registry công khai (gói larkwave-desktop).
+  // Không trả rendererVersion → app luôn dùng giao diện đóng gói; chỉ báo khi có bản cài mới hơn.
+  return process.env.LARKWAVE_RELEASE_URL || 'https://toolswave.net/api/apps-release/larkwave';
 }
 
 export async function fetchManifest(): Promise<ReleaseManifest | null> {

@@ -22,7 +22,7 @@
  *             không ai còn đọc nữa. Một cổng luôn đỏ là một cổng đã tắt.
  *
  * Dùng:
- *   node scripts/check-dist-mac.mjs [đường/dẫn/tới/Toolswave.app]
+ *   node scripts/check-dist-mac.mjs [đường/dẫn/tới/Larkwave.app]
  *   node scripts/check-dist-mac.mjs --strict        # coi cả thiếu notarization là lỗi
  *
  * Mặc định lấy bản vừa dựng ở apps/desktop/dist/mac-universal/.
@@ -36,7 +36,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const STRICT = args.includes('--strict');
 const appArg = args.find((a) => !a.startsWith('--'));
-const APP = appArg || join(ROOT, 'apps/desktop/dist/mac-universal/Toolswave.app');
+const APP = appArg || join(ROOT, 'apps/desktop/dist/mac-universal/Larkwave.app');
 
 const c = { red: '\x1b[31m', yellow: '\x1b[33m', green: '\x1b[32m', dim: '\x1b[2m', off: '\x1b[0m' };
 const die = (m) => {

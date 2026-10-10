@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn trỏ vào hạ tầng Toolswave. Phase deploy chưa làm — đặt ALLOW_DEPLOY=1 khi đã đổi đích.'); process.exit(1); }
+if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này PHÁT HÀNH bản cài Larkwave lên registry công khai — đặt ALLOW_DEPLOY=1 khi chắc chắn.'); process.exit(1); }
 /**
  * push-installers.mjs — upload the built desktop installers (.dmg / .zip|.exe) to the
  * GitLab generic package registry, then publish the renderer + manifest so the website's
@@ -8,8 +8,8 @@ if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn
  * Flow:
  *   1. read VERSION from apps/desktop/package.json,
  *   2. find apps/desktop/dist/*.dmg + the Windows *.exe (or *.zip),
- *   3. PUT each to gitlab.com/.../packages/generic/toolswave-desktop/<VERSION>/<canonical-name>,
- *   4. invoke push-renderer.mjs with --main-change + the new download URLs, so release.json's
+ *   3. PUT each to gitlab.com/.../packages/generic/larkwave-desktop/<VERSION>/<canonical-name>,
+ *   4. (Larkwave) no manifest step — toolswave.net/api/apps-release/larkwave reads the registry; the old
  *      latestVersion + minMain + downloads.{mac,win} all point at this version.
  *
  * Build the installers first:
@@ -19,11 +19,11 @@ if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn
  * Credentials:
  *   GITLAB_TOKEN      (required) — a token with `api`/`write_package_registry` scope.
  *   GITLAB_PROJECT_ID (optional) — defaults to 83700259 (matches the live manifest).
- *   Plus Cloudflare auth for the manifest step (see push-renderer.mjs) — unless --dry-run.
+ *   (No Cloudflare/manifest step for Larkwave.)
  *
  * Usage:
  *   node scripts/push-installers.mjs [--dry-run] [--project-id <id>]
- *     --dry-run   show what WOULD upload + the push-renderer command; no upload/deploy.
+ *     --dry-run   show what WOULD upload; no upload.
  */
 import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
@@ -48,7 +48,9 @@ const DRY = argv.includes('--dry-run');
 const UPLOAD_ONLY = argv.includes('--upload-only');
 const projIdx = argv.indexOf('--project-id');
 const PROJECT_ID = projIdx >= 0 ? argv[projIdx + 1] : process.env.GITLAB_PROJECT_ID || '83700259';
-const PKG = 'toolswave-desktop';
+// Gói RIÊNG của Larkwave trên registry — trang toolswave.net/larkwave và kênh báo bản mới của app
+// (toolswave.net/api/apps-release/larkwave) đọc đúng tên gói này. KHÔNG dùng 'toolswave-desktop'.
+const PKG = 'larkwave-desktop';
 
 const log = (m) => console.log(`\x1b[36m▸\x1b[0m ${m}`);
 const ok = (m) => console.log(`\x1b[32m✓\x1b[0m ${m}`);
@@ -77,11 +79,11 @@ if (!macLocal && !winLocal) die(`No .dmg or .exe/.zip found in ${DIST}.`);
 // Canonical names the manifest/website link to (stable scheme, regardless of arch suffix).
 const targets = [];
 // Universal .dmg (arm64 + x64) → name it honestly so an Intel-Mac user isn't scared off by "arm64".
-if (macLocal) targets.push({ local: macLocal, name: `Toolswave-${VERSION}-universal.dmg`, plat: 'mac' });
+if (macLocal) targets.push({ local: macLocal, name: `Larkwave-${VERSION}-universal.dmg`, plat: 'mac' });
 if (winLocal)
   targets.push({
     local: winLocal,
-    name: winLocal.toLowerCase().endsWith('.exe') ? `Toolswave-${VERSION}-win.exe` : `Toolswave-${VERSION}-win.zip`,
+    name: winLocal.toLowerCase().endsWith('.exe') ? `Larkwave-${VERSION}-win.exe` : `Larkwave-${VERSION}-win.zip`,
     plat: 'win',
   });
 
@@ -103,7 +105,7 @@ for (const t of targets) {
 // notarization là trạng thái đã biết của dự án — nó chỉ NHẮC, không chặn. Cố ý như vậy: một cổng
 // lúc nào cũng đỏ sẽ bị bỏ qua theo thói quen, và lúc có sai lệch thật thì không ai còn đọc.
 if (targets.find((t) => t.plat === 'mac') && process.platform === 'darwin') {
-  const macApp = path.join(DIST, 'mac-universal', 'Toolswave.app');
+  const macApp = path.join(DIST, 'mac-universal', 'Larkwave.app');
   if (existsSync(macApp)) {
     try {
       execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'check-dist-mac.mjs'), macApp], {
@@ -115,20 +117,13 @@ if (targets.find((t) => t.plat === 'mac') && process.platform === 'darwin') {
   }
 }
 
-const macUrl = targets.find((t) => t.plat === 'mac') ? urlFor(`Toolswave-${VERSION}-universal.dmg`) : null;
+const macUrl = targets.find((t) => t.plat === 'mac') ? urlFor(`Larkwave-${VERSION}-universal.dmg`) : null;
 const winName = targets.find((t) => t.plat === 'win')?.name;
 const winUrl = winName ? urlFor(winName) : null;
 
 if (DRY) {
-  ok('dry-run: would upload the above, then run:');
-  // PHẢI tôn trọng --upload-only. Trước đây nhánh này gắn cứng --main-change và chạy TRƯỚC nhánh
-  // UPLOAD_ONLY, nên chạy thử khô chỉ một đằng còn chạy thật chỉ một nẻo — mà cái nó chỉ sai đúng
-  // là cờ đẩy latestVersion lên. Một bản Windows bắt kịp phiên bản ĐÃ phát hành mà dùng cờ đó thì
-  // mọi người dùng macOS bị nhắc cài lại đúng bản họ đang chạy.
-  const flags = UPLOAD_ONLY ? [] : ['--main-change'];
-  if (macUrl) flags.push('--mac', macUrl);
-  if (winUrl) flags.push('--win', winUrl);
-  console.log(`   node scripts/push-renderer.mjs ${flags.join(' ')}`);
+  ok('dry-run: sẽ tải các tệp trên lên registry (gói ' + PKG + '). Không có bước manifest:');
+  console.log('   trang toolswave.net/larkwave + /api/apps-release/larkwave tự đọc bản mới nhất từ registry.');
   process.exit(0);
 }
 
@@ -182,28 +177,10 @@ for (const t of targets) {
   ok(`uploaded ${t.name}`);
 }
 
-if (UPLOAD_ONLY) {
-  ok('đã tải lên xong. KHÔNG đụng manifest (đúng ý --upload-only).');
-  console.log('\nTrên MÁY CHÍNH, chạy lệnh này để manifest trỏ tới bản vừa tải:');
-  const parts = ['node scripts/push-renderer.mjs'];
-  if (winUrl) parts.push('--win', winUrl);
-  if (macUrl) parts.push('--mac', macUrl);
-  // KHÔNG gợi ý --main-change: bản Windows bắt kịp một phiên bản đã phát hành thì không được
-  // đẩy latestVersion lên, nếu không người dùng macOS lại bị nhắc cài lại bản họ đang chạy.
-  console.log(`   ${parts.join(' ')}`);
-  process.exit(0);
-}
-
-// Publish the manifest (latestVersion = VERSION; download URLs) + the renderer.
-// --main-change advances latestVersion (the reinstall BANNER). By default it also sets
-// minMain = VERSION (a HARD reinstall gate) — but a backward-compatible / feature-detected
-// renderer must NOT hard-gate old-main users, so forward an explicit --min-main to keep the
-// floor low (non-blocking): `node scripts/push-installers.mjs --min-main 1.0.193`.
-const flags = ['--main-change'];
-const mmIdx = argv.indexOf('--min-main');
-if (mmIdx >= 0 && argv[mmIdx + 1]) flags.push('--min-main', argv[mmIdx + 1]);
-if (macUrl) flags.push('--mac', macUrl);
-if (winUrl) flags.push('--win', winUrl);
-log(`publishing manifest + renderer: push-renderer ${flags.join(' ')}`);
-execFileSync('node', [path.join(ROOT, 'scripts', 'push-renderer.mjs'), ...flags], { cwd: ROOT, stdio: 'inherit' });
-ok(`release v${VERSION} live. /download now links the new ${macUrl ? '.dmg' : ''}${macUrl && winUrl ? ' + ' : ''}${winUrl ? 'Windows' : ''}.`);
+// Larkwave KHÔNG có bước manifest/renderer riêng: toolswave.net/api/apps-release/larkwave đọc thẳng
+// registry công khai (bản cao nhất có tệp cho từng nền tảng), nên tải lên xong là trang tải về và kênh
+// báo bản mới của app đã cài tự thấy bản này (bộ nhớ đệm ~5 phút).
+ok(`release v${VERSION} đã nằm trên registry (gói ${PKG}).`);
+if (macUrl) console.log(`   mac: ${macUrl}`);
+if (winUrl) console.log(`   win: ${winUrl}`);
+console.log('   Trang: https://toolswave.net/larkwave  ·  manifest: https://toolswave.net/api/apps-release/larkwave');
