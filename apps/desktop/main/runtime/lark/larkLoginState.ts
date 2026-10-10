@@ -69,3 +69,48 @@ export function canProbeLogin(url: string | null | undefined): boolean {
   const k = classifyLarkPage(url);
   return k === 'app' || k === 'public';
 }
+
+/** Trang đăng nhập Lark đang hiện mã QR hay ô email/SSO. */
+export type LarkLoginView = 'qr' | 'form';
+
+/**
+ * Đoạn mã chạy TRONG trang đăng nhập Lark (`webContents.executeJavaScript`) để chuyển sang mã QR
+ * (`want='qr'`), về ô email/SSO (`'form'`), hoặc chỉ đọc chế độ hiện tại (`'probe'`). Trả về
+ * `'qr' | 'form'`, hoặc `''` khi trang không có nút chuyển (trang SSO, trang đã đổi giao diện…).
+ *
+ * Vì sao cần: trang mở mặc định ở ô email, và nút "Scan QR Code" ở góc thẻ đăng nhập bị Lark GIẤU
+ * khi trang hẹp dưới ~600px — đúng bề rộng của khung Lark gắn cạnh màn chat. Đo thật 10/10/2026:
+ * ở 480px phần tử `.switch-login-mode-box` vẫn nằm trong DOM (kích thước 0×0), bấm bằng mã thì mã
+ * QR (canvas 184px) hiện đầy đủ. Luồng "đăng nhập lại từ điện thoại" chụp trang này gửi lên, nên
+ * thiếu bước này thì điện thoại nhận về ô email chứ không phải mã để quét.
+ *
+ * Nhận biết QR bằng canvas VUÔNG đủ lớn — không dựa vào chữ, vì chữ đổi theo ngôn ngữ. Kích thước
+ * thôi thì chưa đủ: bảng QR và bảng email nằm CHỒNG lên nhau, chuyển bằng hiệu ứng mờ, và canvas QR
+ * vẫn giữ nguyên 184px khi bảng email đè lên (đo thật: đo theo cỡ thì sau "về email" vẫn báo 'qr').
+ * Nên hỏi phần tử TRÊN CÙNG tại tâm mã QR có thuộc khối quét mã không — đúng ở mọi mẫu, kể cả lúc
+ * đang chuyển. Nút chuyển là công tắc (bấm lần nữa là quay lại), nên chỉ bấm khi chế độ KHÁC ý muốn.
+ */
+export function loginViewScript(want: LarkLoginView | 'probe'): string {
+  return `(async (want) => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const isQr = () => [...document.querySelectorAll('canvas')].some((c) => {
+    const r = c.getBoundingClientRect();
+    if (r.width < 120 || Math.abs(r.width - r.height) >= 12) return false;
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return true; // ngoài khung nhìn: không hỏi được
+    const hit = document.elementFromPoint(x, y);
+    const box = c.closest('[class*="scan" i]') || c.parentElement;
+    return !!hit && (hit === c || !!(box && box.contains(hit)));
+  });
+  const sw = () => document.querySelector('.login-qr-switch-box .switch-login-mode-box') || document.querySelector('.switch-login-mode-box');
+  for (let i = 0; i < 20 && !sw(); i++) await sleep(250); // trang tự vẽ sau khi tải xong
+  const s = sw();
+  if (!s) return isQr() ? 'qr' : '';
+  if (want !== 'probe' && (want === 'qr') !== isQr()) {
+    s.click();
+    for (let i = 0; i < 16 && (want === 'qr') !== isQr(); i++) await sleep(250);
+  }
+  return isQr() ? 'qr' : 'form';
+})(${JSON.stringify(want)})`;
+}

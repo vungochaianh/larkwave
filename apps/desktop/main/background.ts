@@ -474,7 +474,7 @@ function registerIpc(win: BrowserWindow) {
   });
   ipcMain.handle(IPC.larkBrowserDetach, () => runtime.larkBrowserDetach());
   ipcMain.handle(IPC.larkBrowserState, () => runtime.larkBrowserState());
-  ipcMain.handle(IPC.larkBrowserNavigate, (_e, input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }) => runtime.larkBrowserNavigate(input || {}));
+  ipcMain.handle(IPC.larkBrowserNavigate, (_e, input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) => runtime.larkBrowserNavigate(input || {}));
   ipcMain.handle(IPC.larkBrowserStopAi, () => runtime.larkBrowserStopAi());
   ipcMain.handle(IPC.larkBrowserResumeAi, () => runtime.larkBrowserResumeAi());
   ipcMain.handle(IPC.larkUiTemplateList, () => runtime.larkUiTemplateList());

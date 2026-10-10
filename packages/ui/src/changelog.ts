@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.1',
+    date: '2026-10-10',
+    items: [
+      "Đăng nhập Lark mặc định hiện MÃ QR để quét bằng app Lark trên điện thoại — kể cả trong khung Lark hẹp cạnh màn chat, nơi trang của Lark tự giấu nút quét mã.",
+      "Nút \"Quét mã QR\" / \"Email / SSO\" trên thanh của khung Lark để đổi cách đăng nhập (email, số điện thoại, SSO, Google, Apple).",
+      "\"Đăng nhập lại từ điện thoại\" giờ gửi lên đúng mã QR thay vì ảnh ô nhập email.",
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-10-07',
     items: [

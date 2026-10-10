@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { App, Button, Tooltip, Typography } from 'antd';
-import { ArrowLeftOutlined, ReloadOutlined, LoginOutlined, StopOutlined, RobotOutlined, CaretRightOutlined, GlobalOutlined, CloseOutlined, HomeOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ReloadOutlined, LoginOutlined, StopOutlined, RobotOutlined, CaretRightOutlined, GlobalOutlined, CloseOutlined, HomeOutlined, QrcodeOutlined, MailOutlined } from '@ant-design/icons';
 import type { LarkBrowserState, RuntimeAdapter } from '@larkwave/core';
 import { BRAND, BRAND_GRADIENT, OK, WARN, ERR, V, tint } from '../../theme';
 import { EmptyState } from '../../kit';
@@ -135,7 +135,7 @@ export function LarkFramePane({
       if (info.connected) message.success(t('larkBrowser.loggedIn', 'Đã đăng nhập Lark.'));
       else if (info.error) message.warning(info.error);
     });
-  const nav = (input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }) => run('nav', async () => setSt(await runtime.larkBrowserNavigate!(input)));
+  const nav = (input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }) => run('nav', async () => setSt(await runtime.larkBrowserNavigate!(input)));
 
   const ai = st?.ai;
   const dead = st?.health === 'dead';
@@ -170,6 +170,27 @@ export function LarkFramePane({
             {st?.title ? `${st.title}` : crumb(st?.url)}
           </Text>
         </Tooltip>
+        {/* Trang đăng nhập Lark: đổi giữa mã QR (mặc định) và email/SSO. Ở khung hẹp Lark giấu nút
+            chuyển của chính nó, nên nút này là đường duy nhất để đổi. */}
+        {st?.loginView && (
+          <Tooltip
+            title={
+              st.loginView === 'qr'
+                ? t('larkBrowser.loginFormTip', 'Đăng nhập bằng email, số điện thoại, SSO, Google hoặc Apple')
+                : t('larkBrowser.loginQrTip', 'Hiện mã QR để quét bằng app Lark trên điện thoại')
+            }
+          >
+            <Button
+              size="small"
+              data-testid="wf-login-view"
+              icon={st.loginView === 'qr' ? <MailOutlined /> : <QrcodeOutlined />}
+              loading={busy === 'nav'}
+              onClick={() => nav({ action: st.loginView === 'qr' ? 'loginForm' : 'loginQr' })}
+            >
+              {st.loginView === 'qr' ? t('larkBrowser.loginForm', 'Email / SSO') : t('larkBrowser.loginQr', 'Quét mã QR')}
+            </Button>
+          </Tooltip>
+        )}
         {needLogin && (
           <Button size="small" type="primary" icon={<LoginOutlined />} loading={busy === 'login'} onClick={relogin} style={{ background: BRAND_GRADIENT, border: 'none' }}>
             {t('larkBrowser.login', 'Đăng nhập Lark')}

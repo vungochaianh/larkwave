@@ -7,7 +7,7 @@ import { LarkCdpDriver } from './larkCdp';
 import { SENSITIVE_UI, isLarkHost } from './larkUiCore';
 import { extractTemplate, fillTemplate, loadTemplates, saveTemplates, templateSummary, SAFE_ID, type UiTemplate } from './larkTemplates';
 import { hiddenMode } from '../../hiddenMode';
-import { canProbeLogin, classifyLarkPage, classifyWhoami, WHOAMI_PATH, type LarkWhoami } from './larkLoginState';
+import { canProbeLogin, classifyLarkPage, classifyWhoami, loginViewScript, WHOAMI_PATH, type LarkLoginView, type LarkWhoami } from './larkLoginState';
 import {
   pageFetchJs,
   recentListPath,
@@ -430,6 +430,10 @@ export class LarkWebSession {
   private embedTarget: { win: BrowserWindow; rect: { x: number; y: number; width: number; height: number } } | null = null;
   /** A visible-login connect() is waiting for the user (so a detach must re-show the popup). */
   private loginPending = false;
+  /** Trang đăng nhập đang hiện mã QR hay ô email/SSO (xem loginViewScript); vắng = chưa biết. */
+  private loginView: LarkLoginView | undefined;
+  /** Người dùng đã bấm "Email / SSO" → không tự bật lại QR cho tới khi đăng nhập xong. */
+  private preferLoginForm = false;
   /** The main window: the Lark page PARKS there off-screen so it keeps painting (see larkHost.ts). */
   private parkingWin: BrowserWindow | null = null;
   private host: string | null = null; // e.g. https://lsgav2gopb4m.sg.larksuite.com
@@ -882,6 +886,20 @@ export class LarkWebSession {
     win.webContents.on('did-finish-load', () => {
       if (this.recorderArmed) win.webContents.executeJavaScript(RECORDER_JS, true).catch(() => undefined);
       if (this.inspectArmed) win.webContents.executeJavaScript(APP_HEALTH_HOOK, true).catch(() => undefined);
+      // Trang đăng nhập → mặc định hiện MÃ QR. Lark mở ở ô email, và ở khung hẹp còn giấu luôn nút
+      // chuyển sang QR (xem loginViewScript). Mọi cửa sổ phiên đều đi qua đây: khung gắn trong app,
+      // cửa sổ đăng nhập, và cửa sổ ẩn mà luồng điện thoại chụp gửi lên.
+      let kind: ReturnType<typeof classifyLarkPage> = 'other';
+      try {
+        kind = classifyLarkPage(win.webContents.getURL());
+      } catch {
+        /* destroyed */
+      }
+      if (kind === 'login') void this.applyLoginView(win.webContents, this.preferLoginForm ? 'probe' : 'qr');
+      else {
+        this.loginView = undefined;
+        if (kind === 'app') this.preferLoginForm = false; // đã vào được workspace → lần sau lại mặc định QR
+      }
     });
     // App-inspect main-process capture: console errors + hard load failures from time-zero (before
     // any in-page hook could run). Gated on inspectArmed so it's inert outside an inspect.
@@ -1314,6 +1332,16 @@ export class LarkWebSession {
       });
   }
 
+  /** Chạy loginViewScript trên trang hiện tại và nhớ kết quả cho thanh công cụ. */
+  private async applyLoginView(wc: Electron.WebContents, want: LarkLoginView | 'probe'): Promise<void> {
+    try {
+      const r = await wc.executeJavaScript(loginViewScript(want), true);
+      this.loginView = r === 'qr' || r === 'form' ? r : undefined;
+    } catch {
+      this.loginView = undefined; // trang đổi giữa chừng / view đã huỷ
+    }
+  }
+
   browserState(): LarkBrowserState {
     const w = this.win && !this.win.isDestroyed() ? this.win : null;
     const wc = w?.webContents;
@@ -1355,6 +1383,7 @@ export class LarkWebSession {
       canGoBack,
       canGoForward,
       loading,
+      loginView: classifyLarkPage(url) === 'login' ? this.loginView : undefined,
       driver: this.cdp.attached ? 'cdp' : w ? 'legacy' : 'none',
       hidden: hiddenMode(),
       ai: { active: ai.active, stopped: ai.stopped, step: ai.step, actions: ai.actions, cap: ai.cap, startedAt: ai.startedAt, lastAt: ai.lastAt, saves: ai.saves },
@@ -1363,7 +1392,7 @@ export class LarkWebSession {
   }
 
   /** Toolbar navigation. Pasted URLs must be Lark hosts (this page holds the user's Lark login). */
-  async browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+  async browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
     const w = this.win && !this.win.isDestroyed() ? this.win : null;
     if (!w) throw new Error('Chưa có phiên Lark web — bấm "Đăng nhập Lark" trước.');
     const wc = w.webContents;
@@ -1376,6 +1405,12 @@ export class LarkWebSession {
     else if (input.action === 'reload') wc.reload();
     else if (input.action === 'stop') wc.stop();
     else if (input.action === 'home') await wc.loadURL((this.host || 'https://www.larksuite.com') + '/', { userAgent: CHROME_UA }).catch(() => undefined);
+    else if (input.action === 'loginQr' || input.action === 'loginForm') {
+      if (classifyLarkPage(wc.getURL()) !== 'login') throw new Error('Trang hiện tại không phải trang đăng nhập Lark.');
+      const want: LarkLoginView = input.action === 'loginQr' ? 'qr' : 'form';
+      this.preferLoginForm = want === 'form';
+      await this.applyLoginView(wc, want);
+    }
     return this.browserState();
   }
 

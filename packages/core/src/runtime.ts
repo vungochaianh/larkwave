@@ -496,6 +496,9 @@ export interface LarkBrowserState {
   canGoBack: boolean;
   canGoForward: boolean;
   loading: boolean;
+  /** Đang ở trang đăng nhập Lark: trang hiện mã QR hay ô email/SSO. Vắng = không ở trang đăng nhập
+   *  (hoặc trang không có nút chuyển). Đổi bằng larkBrowserNavigate({action:'loginQr'|'loginForm'}). */
+  loginView?: 'qr' | 'form';
   driver: 'cdp' | 'legacy' | 'none';
   /** LARKWAVE_HIDDEN=1 dev mode (no window is ever shown). */
   hidden?: boolean;
@@ -1956,7 +1959,7 @@ export interface RuntimeAdapter {
   /** Leave the screen — the page goes back to the hidden window (session stays warm). */
   larkBrowserDetach?(): Promise<void>;
   larkBrowserState?(): Promise<LarkBrowserState>;
-  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState>;
+  larkBrowserNavigate?(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState>;
   /** "Dừng" — abort the running AI UI automation. */
   larkBrowserStopAi?(): Promise<LarkBrowserState>;
   larkBrowserResumeAi?(): Promise<LarkBrowserState>;

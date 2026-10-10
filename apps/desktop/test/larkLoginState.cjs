@@ -6,7 +6,8 @@
  *   bash apps/desktop/test/run.sh
  */
 const assert = require('node:assert');
-const { classifyLarkPage, classifyWhoami, canProbeLogin } = require('../.test-build/runtime/lark/larkLoginState.js');
+const vm = require('node:vm');
+const { classifyLarkPage, classifyWhoami, canProbeLogin, loginViewScript } = require('../.test-build/runtime/lark/larkLoginState.js');
 
 const KINDS = [
   ['https://www.larksuite.com/en_sg/', 'public'],
@@ -51,3 +52,41 @@ assert.strictEqual(canProbeLogin('https://www.larksuite.com/en_sg/'), true);
 assert.strictEqual(canProbeLogin('https://www.larksuite.com/accounts/page/login'), false, 'đang ở trang đăng nhập → chờ, không kết luận');
 assert.strictEqual(canProbeLogin('https://evil.com/'), false);
 console.log('✓ canProbeLogin: chỉ hỏi Lark khi ở trang Lark và không phải trang đăng nhập');
+
+// ── loginViewScript: bật mã QR trên trang đăng nhập (nút của Lark bị giấu khi khung hẹp) ──────────
+// DOM giả: công tắc ĐẢO chế độ mỗi lần bấm, đúng như nút thật — nên bấm thừa một lần là tắt mất QR.
+function fakeLoginPage({ qr = false, hasSwitch = true, lateSwitchMs = 0 } = {}) {
+  const st = { qr, clicks: 0, t0: Date.now(), everQr: qr };
+  const sw = { click: () => { st.clicks++; st.qr = !st.qr; st.everQr = st.everQr || st.qr; } };
+  // Như trang thật: canvas QR (184px) có từ lần đầu bật QR và GIỮ NGUYÊN cỡ khi bảng email đè lên;
+  // chỉ phần tử trên cùng tại tâm nó mới cho biết bảng nào đang hiện.
+  const scanBox = { contains: (el) => el === qrCanvas };
+  const qrCanvas = { getBoundingClientRect: () => ({ left: 148, top: 243, width: 184, height: 184 }), closest: () => scanBox };
+  const formField = {};
+  const icon = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 24, height: 24 }), closest: () => null };
+  const document = {
+    querySelector: (sel) => (hasSwitch && Date.now() - st.t0 >= lateSwitchMs && /switch-login-mode-box/.test(sel) ? sw : null),
+    querySelectorAll: () => [icon, ...(st.everQr ? [qrCanvas] : [])],
+    elementFromPoint: () => (st.qr ? qrCanvas : formField),
+  };
+  return { st, run: (want) => vm.runInNewContext(loginViewScript(want), { document, setTimeout, innerWidth: 480, innerHeight: 900 }) };
+}
+(async () => {
+  let p = fakeLoginPage();
+  assert.strictEqual(await p.run('qr'), 'qr', 'ô email → bật QR');
+  assert.strictEqual(p.st.clicks, 1);
+  assert.strictEqual(await p.run('qr'), 'qr', 'đã ở QR → giữ nguyên');
+  assert.strictEqual(p.st.clicks, 1, 'đã ở QR thì KHÔNG bấm (bấm là công tắc, sẽ tắt QR)');
+  assert.strictEqual(await p.run('form'), 'form', 'QR → về ô email/SSO (canvas QR vẫn còn nguyên cỡ, bị bảng email đè)');
+  assert.strictEqual(p.st.clicks, 2);
+  assert.strictEqual(await p.run('form'), 'form', 'đã ở email → giữ nguyên');
+  assert.strictEqual(p.st.clicks, 2, 'canvas QR còn trong DOM không được làm nó tưởng đang ở QR rồi bấm');
+  assert.strictEqual(await p.run('probe'), 'form', 'probe chỉ đọc');
+  assert.strictEqual(p.st.clicks, 2, 'probe không bấm');
+  p = fakeLoginPage({ hasSwitch: false });
+  assert.strictEqual(await p.run('qr'), '', 'trang không có nút chuyển (SSO…) → rỗng, không đoán');
+  p = fakeLoginPage({ lateSwitchMs: 600 });
+  assert.strictEqual(await p.run('qr'), 'qr', 'nút chuyển hiện SAU khi trang tải xong → vẫn chờ được');
+  assert.strictEqual(p.st.clicks, 1);
+  console.log('✓ loginViewScript: bật/tắt QR đúng một lần, probe không bấm, chờ nút vẽ muộn, trang không có nút → rỗng');
+})();

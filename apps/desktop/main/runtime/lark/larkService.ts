@@ -3583,7 +3583,7 @@ export class LarkService {
   browserState(): LarkBrowserState {
     return getLarkWebSession().browserState();
   }
-  browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+  browserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
     return getLarkWebSession().browserNavigate(input);
   }
   browserStopAi(): LarkBrowserState {

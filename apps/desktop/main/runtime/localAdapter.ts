@@ -433,7 +433,7 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   async larkBrowserState(): Promise<LarkBrowserState> {
     return this.lark.browserState();
   }
-  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' }): Promise<LarkBrowserState> {
+  larkBrowserNavigate(input: { url?: string; action?: 'back' | 'forward' | 'reload' | 'home' | 'stop' | 'loginQr' | 'loginForm' }): Promise<LarkBrowserState> {
     return this.lark.browserNavigate(input);
   }
   async larkBrowserStopAi(): Promise<LarkBrowserState> {
