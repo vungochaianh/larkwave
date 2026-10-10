@@ -1225,6 +1225,23 @@ export type LarkChatEvent =
       /** Xem trước thật của nội dung (sheet/dòng/cột/vài dòng đầu, đoạn đầu, số trang) — main dựng. */
       preview?: LarkFilePreview;
     }
+  /**
+   * AI vừa TỰ HỌC một kỹ năng (người dùng dạy "từ giờ…" / sửa agent): hiện một dòng "Đã học: «tên» —
+   * Hoàn tác" trong hội thoại.
+   */
+  | {
+      type: 'skill_learned';
+      id: string;
+      name: string;
+      action: 'create' | 'update';
+      origin: SkillLearnInfo['origin'];
+      /** Kỹ năng dựng sẵn mà kỹ năng mới bổ sung (không sửa kỹ năng dựng sẵn). */
+      supplementOf?: string;
+      removedSecrets?: string[];
+      removedGrants?: string[];
+    }
+  /** Đề xuất kỹ năng (từ việc đã làm / học từ Base / khi bật "hỏi trước") — thẻ "Lưu kỹ năng" / "Bỏ qua". */
+  | { type: 'skill_proposal'; proposal: SkillProposal }
   | {
       type: 'tool_call';
       callId: string;
@@ -1729,6 +1746,21 @@ export interface RuntimeAdapter {
    * để dám cho AI viết lại kỹ năng: không có chỗ lùi thì không ai bấm nút đó.
    */
   skillSnapshots?(id: string): Promise<{ at: string; by: 'you' | 'ai'; what: string }[]>;
+  /** Nội dung một phiên bản + bản hiện tại (xem khác biệt). */
+  skillVersionText?(id: string, at: string): Promise<{ before: string; current: string }>;
+  /** Cài đặt "Tự học kỹ năng". */
+  skillLearnSettings?(): Promise<SkillLearnSettings>;
+  setSkillLearnSettings?(patch: Partial<SkillLearnSettings>): Promise<SkillLearnSettings>;
+  /** Lưu một đề xuất kỹ năng (người dùng bấm "Lưu kỹ năng"). */
+  skillSaveProposal?(p: SkillProposal): Promise<SkillInfo[]>;
+  /** "Hoàn tác" lần tự học gần nhất của một kỹ năng (tạo → gỡ; cập nhật → về bản trước). */
+  skillUndoLearn?(id: string): Promise<SkillInfo[]>;
+  /** Lấy lại kỹ năng tự học vừa bị hoàn tác lần tạo. */
+  skillRestoreLearned?(id: string): Promise<SkillInfo[]>;
+  /** Cài lại các kỹ năng dựng sẵn đã xoá. */
+  restoreBuiltinSkills?(): Promise<SkillInfo[]>;
+  /** "Học từ Base": quét cấu trúc + automation + vài bản ghi → ĐỀ XUẤT kỹ năng nghiệp vụ (chưa lưu). */
+  larkLearnFromBase?(appToken: string, name?: string): Promise<SkillProposal[]>;
   /**
    * Đổi thứ tự một NHÓM kỹ năng trong sổ đăng ký (các kỹ năng khác giữ nguyên chỗ).
    *

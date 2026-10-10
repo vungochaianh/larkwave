@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { mergeSession, mergeSpec, SCHED_ITEM_CAP, type StoredSession } from './larkMerge';
 import { Notification } from 'electron';
-import { APIA_BASE, matchTriggers, parseSkillCommands, shouldPersistSession, stripSkillCommands } from '@larkwave/core';
+import { APIA_BASE, detectLearnIntent, matchTriggers, parseSkillCommands, repeatCount, shouldPersistSession, stripSkillCommands } from '@larkwave/core';
 import { hasContract, parseSkillContract, relatedSet, rowsToWrite, type LarkSkillSet, type SkillContract, type SkillSetRun, type SkillTarget } from '@larkwave/core';
 import { runSkillSet, type SkillRunEvent, type SkillRunResult } from './skillRun';
 
@@ -215,7 +215,8 @@ import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo, SkillProposal } from '@larkwave/core';
+import { getAgentSkillLearner } from './skillBridge';
 
 /**
  * Owns the connected Lark custom app in the main process: credential storage,
@@ -1690,6 +1691,130 @@ export class LarkService {
       for (const a of list) if (a?.attachmentToken) out.push({ token: a.attachmentToken, name: String(a.name || ''), image: /^image\//.test(String(a.mimeType || '')), tableId, fieldId: fld.id, recordId: rid });
     }
     return out;
+  }
+
+  // ── Tự học kỹ năng: gợi ý trong lượt chat + "Học từ Base" ─────────────────────────────────────
+
+  /** Cài đặt "Tự học kỹ năng" (SkillHost ghi `skills/learn-settings.json`; đọc thẳng ở đây). */
+  private async readLearnSettings(): Promise<{ enabled: boolean; askFirst: boolean }> {
+    try {
+      const j = JSON.parse(await readFile(join(this.baseDir, 'skills', 'learn-settings.json'), 'utf8'));
+      return { enabled: j?.enabled !== false, askFirst: j?.askFirst === true };
+    } catch {
+      return { enabled: true, askFirst: false };
+    }
+  }
+
+  private learnHistoryPath(): string {
+    const scope = this.currentUserId ? this.currentUserId.replace(/[^A-Za-z0-9_-]/g, '') || '_local' : '_local';
+    return join(this.baseDir, 'lark', 'learn-history', `${scope}.json`);
+  }
+
+  /**
+   * Dòng gợi ý TỰ HỌC nối vào cuối câu lệnh của lượt (rỗng nếu không có gì):
+   *  - người dùng vừa DẠY / SỬA (detectLearnIntent) → làm xong thì gọi skill_save ngay (explicit/correction);
+   *  - yêu cầu tương tự đã lặp lại (lần 2–3) và chưa có kỹ năng khớp → cuối lượt ĐỀ XUẤT kỹ năng (experience),
+   *    mỗi nhóm yêu cầu chỉ gợi ý MỘT lần.
+   * Lịch sử yêu cầu (60 câu gần nhất, theo tài khoản) chỉ nằm trên máy này.
+   */
+  private async learnHintFor(prompt: string): Promise<string> {
+    const st = await this.readLearnSettings();
+    if (!st.enabled) return '';
+    const text = String(prompt || '').trim();
+    if (!text) return '';
+    const intent = detectLearnIntent(text);
+    let hint = '';
+    if (intent) {
+      hint =
+        `[TỰ HỌC — người dùng vừa ${intent.kind === 'correction' ? 'SỬA cách bạn làm' : 'đặt một QUY TẮC LÂU DÀI'} ("${intent.phrase}"). ` +
+        `Làm theo ngay trong lượt này, rồi gọi \`skill_save\` (origin "${intent.kind}") — gọi \`skill_list\` trước để CẬP NHẬT kỹ năng trùng ý thay vì tạo bản trùng. ` +
+        `${st.askFirst ? 'Người dùng bật "Hỏi trước khi lưu": kỹ năng sẽ thành THẺ ĐỀ XUẤT để họ bấm lưu. ' : ''}Kỹ năng là chữ hướng dẫn — không ghi bí mật, không cấp quyền. Báo một dòng "Đã học: «tên» — có thể hoàn tác."]`;
+    }
+    // Lặp lại?
+    const path = this.learnHistoryPath();
+    let hist: { at: string; text: string; hinted?: boolean }[] = [];
+    try {
+      const j = JSON.parse(await readFile(path, 'utf8'));
+      if (Array.isArray(j)) hist = j;
+    } catch {
+      hist = [];
+    }
+    const rep = intent ? { count: 0, alreadyHinted: true } : repeatCount(text, hist);
+    let hinted = false;
+    if (!intent && rep.count >= 1 && !rep.alreadyHinted) {
+      // Đã có kỹ năng (của người dùng / tự học) khớp từ khoá của câu này → không đề xuất trùng.
+      const reg = await this.readSkillRegistry();
+      const covered = reg.some((e) => !e.builtin && e.enabled !== false && matchTriggers(text, e.triggers || []));
+      if (!covered) {
+        hint =
+          `[TỰ HỌC — loại yêu cầu này đã lặp lại ${rep.count + 1} lần. Làm xong (và đã đọc lại khớp) thì ĐỀ XUẤT một kỹ năng bằng \`skill_save\` origin "experience" ` +
+          '(các bước bạn vừa làm + từ khoá gọi) — đây chỉ là thẻ đề xuất, người dùng bấm "Lưu kỹ năng" mới lưu.]';
+        hinted = true;
+      }
+    }
+    hist.push({ at: new Date().toISOString(), text: text.slice(0, 400), ...(hinted ? { hinted: true } : {}) });
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, JSON.stringify(hist.slice(-60)));
+    } catch {
+      /* lịch sử gợi ý là phụ */
+    }
+    return hint;
+  }
+
+  /** Khối dặn TỰ HỌC trong system prompt của lượt Lark (khi đang bật). */
+  private async learnSystemBlock(): Promise<string> {
+    const st = await this.readLearnSettings();
+    if (!st.enabled) return '';
+    return (
+      '\n\n=== TỰ HỌC KỸ NĂNG (đang BẬT) ===\n' +
+      '• Người dùng đặt quy tắc lâu dài ("từ giờ…", "lần sau…", "nhớ cách này", "luôn luôn…", "mỗi khi … thì …", "from now on", "next time", "always…") hoặc SỬA cách bạn làm → làm theo ngay, rồi gọi `skill_save` (origin explicit / correction) TRONG LƯỢT NÀY. Gọi `skill_list` trước; trùng ý thì cập nhật (`update_id`). Báo một dòng: "Đã học: «tên» — có thể hoàn tác."\n' +
+      '• Sau một việc NHIỀU BƯỚC (≥ 3 bước công cụ) đã đọc lại khớp mà nhiều khả năng lặp lại → có thể ĐỀ XUẤT bằng `skill_save` origin "experience" (tối đa 1 đề xuất mỗi lượt; không đề xuất khi đã có kỹ năng tương ứng).\n' +
+      '• Kỹ năng = CHỮ hướng dẫn (khi nào áp dụng → làm gì → kiểm gì). KHÔNG ghi bí mật, KHÔNG viết câu cấp quyền (tự duyệt, bỏ qua xác nhận, luôn xoá/ghi đè/gửi) — kỹ năng không đổi được luật duyệt của ứng dụng.' +
+      (st.askFirst ? '\n• Người dùng bật "Hỏi trước khi lưu": mọi kỹ năng tự học đều thành thẻ đề xuất.' : '')
+    );
+  }
+
+  /**
+   * "Học từ Base": quét cấu trúc + automation/workflow + vài bản ghi mẫu → ĐỀ XUẤT kỹ năng nghiệp vụ (ý
+   * nghĩa bảng, quy ước cột, ai phụ trách gì, giai đoạn quy trình). Lượt CHỈ ĐỌC; `skill_save` của lượt này
+   * chỉ gom đề xuất (không lưu) — người dùng chọn lưu cái nào.
+   */
+  async learnFromBase(appToken: string, name?: string): Promise<SkillProposal[]> {
+    const tok = String(appToken || '').trim();
+    if (!/^[A-Za-z0-9]{8,}$/.test(tok)) throw new Error('Thiếu Base (app_token).');
+    const st = await this.readLearnSettings();
+    if (!st.enabled) throw new Error('"Tự học kỹ năng" đang tắt — bật lại ở màn Kỹ năng.');
+    const proposals: SkillProposal[] = [];
+    const saveDef = resolveTool('skill_save');
+    if (!saveDef) throw new Error('Thiếu công cụ skill_save.');
+    const collect: LarkToolDef = {
+      ...saveDef,
+      description: 'ĐỀ XUẤT một kỹ năng nghiệp vụ học từ Base (chưa lưu — người dùng chọn). Mỗi kỹ năng một lần gọi.',
+      exec: async (i) => {
+        const learn = getAgentSkillLearner();
+        if (!learn) throw new Error('Chức năng tự học chưa sẵn sàng.');
+        const r = await learn({ name: String(i.name || ''), instructions: String(i.instructions || ''), triggers: Array.isArray(i.triggers) ? i.triggers.map(String) : [], origin: 'base', reason: i.reason ? String(i.reason) : `Học từ Base «${name || tok}»`, ...(i.update_id ? { updateId: String(i.update_id) } : {}) });
+        if (r.mode === 'proposal') {
+          proposals.push(r.proposal);
+          return { ok: true, note: 'Đã ghi nhận đề xuất.' };
+        }
+        return { ok: false, error: r.mode === 'disabled' ? 'Tự học đang tắt.' : 'Không ghi nhận được đề xuất.' };
+      },
+    };
+    const work = await this.chatWorkDir('learn-base').catch(() => undefined);
+    const prompt =
+      `Học từ Base «${name || tok}» (app_token=${tok}). Quét cấu trúc bằng lark_web_scan_base (sample_records=3) và các automation/workflow đang có bằng lark_web_read_automations (custom app: bitable_base_overview). ` +
+      'Rồi ĐỀ XUẤT 2–5 kỹ năng nghiệp vụ giúp agent làm việc đúng với Base này về sau: ý nghĩa từng bảng chính, quy ước cột & giá trị (trạng thái, mã, đơn vị), ai phụ trách gì (cột Người), các giai đoạn của quy trình và automation đang chạy. ' +
+      'Mỗi kỹ năng một lần gọi skill_save: name ngắn có tên Base, triggers (tên bảng, nghiệp vụ, VI/EN), instructions là các bước/quy ước cụ thể (dùng ĐÚNG tên bảng/cột trong «…»). Gọi skill_list trước để không trùng. ' +
+      'Không ghi bí mật, không ghi dữ liệu cá nhân của bản ghi mẫu (chỉ quy ước). Việc CHỈ ĐỌC. Cuối cùng liệt kê ngắn các đề xuất.';
+    await this.runScheduledAgentTurn(prompt, 'ask', undefined, 12_000, undefined, 600_000, {
+      files: { outDir: work ?? null, attachDir: work ?? null },
+      decide: () => false,
+      wrap: (tools) => [...tools.filter((t) => t.name !== 'skill_save'), collect],
+      extraSystem: '=== HỌC TỪ BASE (chỉ đọc, đề xuất kỹ năng) === Chỉ dùng công cụ ĐỌC + skill_list/skill_get + skill_save (đề xuất). Không ghi gì vào Lark.',
+    });
+    return proposals;
   }
 
   /** Thư mục của quy tắc (cho màn sửa quy tắc). */
@@ -4328,7 +4453,12 @@ export class LarkService {
     // Inject the user's ENABLED skills scoped to THIS turn's runner (their full instructions) into
     // the prompt. The CLI only knows skill NAMES in `-p` mode — not their bodies — so "chạy PBTTCN"
     // wouldn't do anything; this makes the model actually FOLLOW the skill when asked by name.
-    const skillsBlock = await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds, input.prompt);
+    const skillsBlock = (await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds, input.prompt)) + (general ? '' : await this.learnSystemBlock());
+    // Tự học: người dùng vừa dạy / sửa → dặn gọi skill_save trong lượt này; yêu cầu lặp lại → đề xuất kỹ năng.
+    if (!general) {
+      const hint = await this.learnHintFor(input.prompt).catch(() => '');
+      if (hint) turnPrompt = `${turnPrompt}\n\n${hint}`;
+    }
     // Cho agent biết bản cài đang chạy có cũ không. Chỉ thêm ở lượt TRÒ CHUYỆN (có người đang đọc);
     // lượt tóm tắt nội bộ và tác vụ định kỳ thì không cần và chỉ làm bẩn kết quả.
     const versionLine = versionPromptLine();

@@ -115,6 +115,9 @@ export function stripSecretsFromText(text: string): { text: string; removed: str
  */
 const GRANT_RE: RegExp[] = [
   /\b(khong can|khoi|bo qua) (xac nhan|duyet|cho phep)\b/,
+  /\b(khong can|khoi|dung|khong) hoi\b.{0,24}\b(xac nhan|duyet|cho phep)\b/,
+  /\b(luon|always|mac dinh)\b.{0,24}\breplace\s*:\s*true\b/,
+  /(^|[.;:!]\s*)(bat|enable|kich hoat) (workflow|automation|tu dong hoa)\b/,
   /\b(khong can|khoi|dung|khong) hoi (lai )?(truoc khi|khi|ma) (ghi|xoa|gui|ghi de|sua|thay|dinh thay)\b/,
   /\b(tu dong|tu) (duyet|cho phep|xac nhan)\b/,
   /\btu (xoa|ghi de|gui tin|gui vao nhom|thay tep)\b.{0,30}\b(khong hoi|luon|ngay)\b/,
@@ -200,15 +203,33 @@ function tokens(s: string): Set<string> {
   );
 }
 
-/** Độ trùng ý giữa hai kỹ năng (0..1) — Jaccard trên từ (bỏ dấu, bỏ từ đệm) của tên + từ khoá + mô tả. */
-export function skillSimilarity(a: { name: string; triggers?: string[]; description?: string }, b: { name: string; triggers?: string[]; description?: string }): number {
-  const A = tokens([a.name, ...(a.triggers ?? []), a.description ?? ''].join(' '));
-  const Bt = tokens([b.name, ...(b.triggers ?? []), b.description ?? ''].join(' '));
-  if (!A.size || !Bt.size) return 0;
+function jaccard(A: Set<string>, Bs: Set<string>): number {
+  if (!A.size || !Bs.size) return 0;
   let inter = 0;
-  for (const w of A) if (Bt.has(w)) inter++;
-  const nameSame = foldText(a.name) === foldText(b.name);
-  return nameSame ? 1 : inter / (A.size + Bt.size - inter);
+  for (const w of A) if (Bs.has(w)) inter++;
+  return inter / (A.size + Bs.size - inter);
+}
+
+/**
+ * Độ trùng ý giữa hai kỹ năng (0..1) — lấy MẠNH NHẤT của:
+ *  - tên: Jaccard trên từ của tên (trùng hẳn sau khi bỏ dấu = 1); dưới 0.6 thì chỉ tính 80% (tránh gộp
+ *    "Báo cáo tuần" với "Báo cáo tháng");
+ *  - từ khoá gọi: tỉ lệ cụm trùng nhau trên tập nhỏ hơn (× 0.9);
+ *  - toàn bộ (tên + từ khoá + mô tả): Jaccard.
+ */
+export function skillSimilarity(a: { name: string; triggers?: string[]; description?: string }, b: { name: string; triggers?: string[]; description?: string }): number {
+  if (foldText(a.name) && foldText(a.name) === foldText(b.name)) return 1;
+  const nameSim = jaccard(tokens(a.name), tokens(b.name));
+  const ta = new Set((a.triggers ?? []).map((x) => foldText(x)).filter((x) => x.length >= 3));
+  const tb = new Set((b.triggers ?? []).map((x) => foldText(x)).filter((x) => x.length >= 3));
+  let trig = 0;
+  if (ta.size && tb.size) {
+    let inter = 0;
+    for (const x of ta) if (tb.has(x)) inter++;
+    trig = inter / Math.min(ta.size, tb.size);
+  }
+  const all = jaccard(tokens([a.name, ...(a.triggers ?? []), a.description ?? ''].join(' ')), tokens([b.name, ...(b.triggers ?? []), b.description ?? ''].join(' ')));
+  return Math.max(nameSim >= 0.6 ? nameSim : nameSim * 0.8, trig * 0.9, all);
 }
 
 /** Kỹ năng đã có trùng ý nhất (≥ ngưỡng), hoặc null. */
@@ -248,4 +269,30 @@ export function lineDiff(a: string, b: string): { op: ' ' | '-' | '+'; line: str
   while (i < n) out.push({ op: '-', line: A[i++] });
   while (j < m) out.push({ op: '+', line: Bl[j++] });
   return out;
+}
+
+/** Độ giống nhau giữa hai câu yêu cầu (0..1) — Jaccard trên từ có nghĩa (bỏ dấu, bỏ từ đệm). */
+export function textSimilarity(a: string, b: string): number {
+  const A = tokens(a);
+  const Bt = tokens(b);
+  if (A.size < 3 || Bt.size < 3) return 0;
+  let inter = 0;
+  for (const w of A) if (Bt.has(w)) inter++;
+  return inter / (A.size + Bt.size - inter);
+}
+
+/**
+ * Yêu cầu này đã lặp lại bao nhiêu lần trong lịch sử gần đây (giống ≥ `threshold`). Dùng để gợi ý agent ĐỀ
+ * XUẤT kỹ năng ở lần thứ 2–3 — một lần, không lặp lại mỗi lượt (bỏ qua nhóm đã gợi ý).
+ */
+export function repeatCount(prompt: string, history: readonly { text: string; hinted?: boolean }[], threshold = 0.6): { count: number; alreadyHinted: boolean } {
+  let count = 0;
+  let alreadyHinted = false;
+  for (const h of history) {
+    if (textSimilarity(prompt, h.text) >= threshold) {
+      count++;
+      if (h.hinted) alreadyHinted = true;
+    }
+  }
+  return { count, alreadyHinted };
 }

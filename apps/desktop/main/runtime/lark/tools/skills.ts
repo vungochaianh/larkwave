@@ -1,6 +1,6 @@
 import type { LarkToolDef } from './types';
 import { str } from './types';
-import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillFullLister, getAgentSkillLister, getAgentSkillReader } from '../skillBridge';
+import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillFullLister, getAgentSkillLearner, getAgentSkillLister, getAgentSkillReader } from '../skillBridge';
 
 /**
  * Cho agent TỰ TẠO kỹ năng — cả kỹ năng thường lẫn bộ kỹ năng có hợp đồng (kiểm chéo).
@@ -35,6 +35,67 @@ export const skillTools: LarkToolDef[] = [
           ...(s.triggers?.length ? { triggers: s.triggers } : {}),
           kind: s.builtin ? 'dựng sẵn' : s.learned ? 'AI tự học' : 'người dùng',
         })),
+      };
+    },
+  },
+  {
+    name: 'skill_save',
+    description:
+      'TỰ HỌC: lưu một KỸ NĂNG (chữ hướng dẫn cách làm) vào thư viện của người dùng để lần sau tự làm đúng như vậy — trong chat, lệnh "/" và lịch tự động.\n' +
+      'GỌI NGAY (origin "explicit") khi người dùng đặt quy tắc lâu dài: "từ giờ…", "lần sau…", "nhớ cách này", "luôn luôn…", "mỗi khi … thì …", "from now on", "next time", "always…". ' +
+      'GỌI (origin "correction") khi người dùng SỬA cách bạn làm ("không phải thế, phải là…") và cách đúng sẽ còn dùng lại. ' +
+      'ĐỀ XUẤT (origin "experience") sau một việc NHIỀU BƯỚC đã đọc lại khớp mà rất có thể lặp lại, hoặc khi cùng loại yêu cầu lặp lại lần 2–3 — thẻ đề xuất hiện ra để người dùng bấm "Lưu kỹ năng". ' +
+      'Học từ một Base → origin "base" (cũng là đề xuất).\n' +
+      'LUẬT: gọi `skill_list` TRƯỚC — trùng ý một kỹ năng đã có thì truyền `update_id` (tool cũng tự nhận ra và cập nhật thay vì tạo bản trùng). ' +
+      '`instructions` viết thành các bước rõ ràng (khi nào áp dụng → làm gì → kiểm gì), tự chứa; `triggers` 3–8 cụm từ gọi (VI + EN nếu được). ' +
+      'TUYỆT ĐỐI KHÔNG ghi bí mật (mật khẩu, khoá, token, cookie) và KHÔNG viết câu cấp quyền (tự duyệt, bỏ qua xác nhận, luôn xoá/ghi đè/gửi) — tool sẽ gỡ những phần đó. ' +
+      'Kỹ năng dựng sẵn (lw-*) không bị sửa: quy tắc riêng thành kỹ năng bổ sung. Xong thì nói MỘT dòng: "Đã học: «tên» — có thể hoàn tác."',
+    gated: false,
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'instructions', 'origin'],
+      properties: {
+        name: str('Tên kỹ năng ngắn, nói rõ việc — vd "Xuất Excel kèm dòng tổng".'),
+        instructions: str('Các bước hướng dẫn (markdown): khi nào áp dụng, làm gì (công cụ nào), kiểm gì, báo gì.'),
+        triggers: { type: 'array', items: { type: 'string' }, description: 'Cụm từ gọi kỹ năng (VI/EN), vd ["xuất excel", "export excel"].' },
+        origin: { type: 'string', enum: ['explicit', 'correction', 'experience', 'base'], description: 'explicit = người dùng dạy; correction = người dùng sửa; experience = rút từ việc vừa làm (đề xuất); base = học từ Base (đề xuất).' },
+        reason: str('Một câu: vì sao học (vd "Người dùng: từ giờ khi xuất Excel thì luôn thêm dòng tổng").'),
+        update_id: str('Id kỹ năng đã có cần cập nhật (từ skill_list) — bỏ trống để tool tự dò trùng ý.'),
+        mode: { type: 'string', enum: ['merge', 'replace'], description: 'Cập nhật: merge (mặc định) = nối thêm mục "Bổ sung"; replace = thay toàn bộ thân (chỉ khi bạn đã đọc kỹ năng cũ bằng skill_get và viết lại đầy đủ).' },
+      },
+    },
+    exec: async (input) => {
+      const learn = getAgentSkillLearner();
+      if (!learn) throw new Error('Chức năng tự học kỹ năng chưa sẵn sàng.');
+      const origin = ['explicit', 'correction', 'experience', 'base'].includes(String(input.origin)) ? (String(input.origin) as 'explicit') : 'experience';
+      const r = await learn({
+        name: String(input.name || ''),
+        instructions: String(input.instructions || ''),
+        triggers: Array.isArray(input.triggers) ? input.triggers.map(String) : [],
+        origin,
+        reason: input.reason ? String(input.reason) : undefined,
+        updateId: input.update_id ? String(input.update_id) : undefined,
+        mode: input.mode === 'replace' ? 'replace' : 'merge',
+      });
+      if (r.mode === 'disabled') return { ok: false, error: 'Người dùng đang TẮT "Tự học kỹ năng" (màn Kỹ năng). Không lưu — nếu cần, nhắc họ bật lại.' };
+      const cleaned = [
+        r.removedSecrets.length ? `đã gỡ bí mật (${r.removedSecrets.join(', ')})` : '',
+        r.removedGrants.length ? `đã gỡ ${r.removedGrants.length} câu cấp quyền` : '',
+      ].filter(Boolean);
+      if (r.mode === 'proposal') {
+        return {
+          ok: true,
+          proposal: r.proposal,
+          ...(cleaned.length ? { cleaned } : {}),
+          note: 'Đã gửi ĐỀ XUẤT kỹ năng thành thẻ trong hội thoại — người dùng bấm "Lưu kỹ năng" thì mới lưu. Nói một dòng giới thiệu đề xuất, đừng lặp lại toàn bộ nội dung.',
+        };
+      }
+      return {
+        ok: true,
+        learned: { id: r.id, name: r.name, action: r.action, origin, ...(r.supplementOf ? { supplementOf: r.supplementOf } : {}) },
+        ...(cleaned.length ? { cleaned } : {}),
+        note: `${r.action === 'create' ? 'ĐÃ HỌC' : 'ĐÃ CẬP NHẬT'} kỹ năng «${r.name}» (id ${r.id})${r.supplementOf ? ` — bổ sung cho kỹ năng dựng sẵn «${r.supplementOf}»` : ''}. Nói MỘT dòng: "Đã học: «${r.name}» — có thể hoàn tác." Áp dụng ngay từ lượt sau (chat, lệnh "/", lịch tự động).`,
       };
     },
   },

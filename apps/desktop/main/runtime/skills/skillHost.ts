@@ -2,8 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, cpSync, sta
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import { contractFieldsFrom, serializeContract, slugifySkillCommand, uniqueSkillCommand } from '@larkwave/core';
-import type { SkillContractFields, SkillLearnInfo } from '@larkwave/core';
+import { contractFieldsFrom, findOverlap, LEARNED_SKILL_GUARD, sanitizeLearnedSkill, serializeContract, slugifySkillCommand, uniqueSkillCommand } from '@larkwave/core';
+import type { SkillContractFields, SkillLearnInfo, SkillLearnSettings, SkillProposal } from '@larkwave/core';
 import type { SkillInfo } from '@larkwave/core';
 import type { BuiltinSkill } from './builtinSkills';
 
@@ -178,10 +178,25 @@ export class SkillHost {
     if (e) {
       const d = deriveDescription(skillInstructions(hit.md));
       if (d) e.description = d;
+      const tr = parseSkillMd(hit.md).triggers;
+      e.triggers = tr.length ? tr : undefined;
       this.writeRegistry(reg);
     }
     this.sync();
     return this.list();
+  }
+
+  /** Nội dung một bản lưu + bản hiện tại (màn "Lịch sử phiên bản" tự tính khác biệt). */
+  versionText(id: string, at: string): { before: string; current: string } {
+    const hit = (this.readSnapshots()[id] ?? []).find((x) => x.at === at);
+    if (!hit) throw new Error('Không tìm thấy bản lưu này.');
+    let current = '';
+    try {
+      current = readFileSync(join(this.libPath(id), 'SKILL.md'), 'utf8');
+    } catch {
+      current = '';
+    }
+    return { before: hit.md, current };
   }
 
   /**
@@ -318,6 +333,7 @@ export class SkillHost {
       // (re-slugged + de-duplicated against what this registry already hands out).
       command: importedCommand || undefined,
       source: srcDir,
+      ...(meta.triggers.length ? { triggers: meta.triggers } : {}),
     });
     this.sync();
     return this.list();
@@ -450,6 +466,195 @@ export class SkillHost {
     st.removed = [];
     this.writeBuiltinState(st);
     this.ensureBuiltins(defs);
+    return this.list();
+  }
+
+  // ── TỰ HỌC kỹ năng ─────────────────────────────────────────────────────────────────────────────
+
+  private learnPath(): string {
+    return join(this.stateDir, 'learned.json');
+  }
+  private learnSettingsPath(): string {
+    return join(this.stateDir, 'learn-settings.json');
+  }
+  /** Cài đặt "Tự học kỹ năng" (mặc định: bật; KHÔNG hỏi trước với lời dạy trực tiếp). */
+  getLearnSettings(): SkillLearnSettings {
+    try {
+      const j = JSON.parse(readFileSync(this.learnSettingsPath(), 'utf8'));
+      return { enabled: j?.enabled !== false, askFirst: j?.askFirst === true };
+    } catch {
+      return { enabled: true, askFirst: false };
+    }
+  }
+  setLearnSettings(patch: Partial<SkillLearnSettings>): SkillLearnSettings {
+    const next = { ...this.getLearnSettings(), ...(typeof patch?.enabled === 'boolean' ? { enabled: patch.enabled } : {}), ...(typeof patch?.askFirst === 'boolean' ? { askFirst: patch.askFirst } : {}) };
+    writeFileSync(this.learnSettingsPath(), JSON.stringify(next, null, 2));
+    return next;
+  }
+  /** Nhật ký học: mỗi lần AI tạo/cập nhật một kỹ năng (để "Hoàn tác" đúng lần đó) + thùng rác của lần tạo bị hoàn tác. */
+  private readLearnLog(): { log: { id: string; at: string; action: 'create' | 'update'; origin: string; reason?: string; prevAt?: string; undone?: boolean }[]; trash: Record<string, { entry: SkillEntry; md: string; at: string }> } {
+    try {
+      const j = JSON.parse(readFileSync(this.learnPath(), 'utf8'));
+      return { log: Array.isArray(j?.log) ? j.log : [], trash: j?.trash && typeof j.trash === 'object' ? j.trash : {} };
+    } catch {
+      return { log: [], trash: {} };
+    }
+  }
+  private writeLearnLog(d: ReturnType<SkillHost['readLearnLog']>): void {
+    d.log = d.log.slice(-200);
+    const keys = Object.keys(d.trash);
+    if (keys.length > 50) for (const k of keys.sort((a, b) => d.trash[a].at.localeCompare(d.trash[b].at)).slice(0, keys.length - 50)) delete d.trash[k];
+    writeFileSync(this.learnPath(), JSON.stringify(d, null, 2));
+  }
+
+  /**
+   * Lưu một kỹ năng TỰ HỌC. Kỹ năng chỉ là chữ hướng dẫn: gỡ bí mật + câu cấp quyền (sanitizeLearnedSkill),
+   * thêm dòng nhắc "không cấp quyền gì". Trùng ý với kỹ năng đã có (hoặc chỉ định `updateId`) → CẬP NHẬT
+   * (mặc định nối thêm mục "Bổ sung"; `mode:'replace'` thay thân) thay vì đẻ bản sao. Kỹ năng DỰNG SẴN
+   * không bao giờ bị sửa — tạo kỹ năng bổ sung riêng. Mọi thay đổi có bản lưu → "Hoàn tác" được.
+   */
+  saveLearned(input: {
+    name: string;
+    instructions: string;
+    triggers?: string[];
+    origin: SkillLearnInfo['origin'];
+    reason?: string;
+    updateId?: string;
+    mode?: 'merge' | 'replace';
+  }): { action: 'create' | 'update'; id: string; name: string; removedSecrets: string[]; removedGrants: string[]; supplementOf?: string } {
+    const clean = sanitizeLearnedSkill(input);
+    if (!clean.ok) throw new Error(clean.error || 'Kỹ năng không hợp lệ.');
+    const now = new Date().toISOString();
+    const reason = String(input.reason || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const why = `AI tự học (${input.origin === 'explicit' ? 'bạn dạy' : input.origin === 'correction' ? 'bạn sửa' : input.origin === 'experience' ? 'từ việc đã làm' : 'học từ Base'})${reason ? `: ${reason}` : ''}`;
+    const all = this.list();
+    const desc0 = clean.instructions.split('\n').find((l) => l.trim()) || '';
+    let target = input.updateId ? all.find((x) => x.id === input.updateId) : undefined;
+    if (!target) target = findOverlap({ name: clean.name, triggers: clean.triggers, description: desc0 }, all, 0.5)?.skill;
+    const log = this.readLearnLog();
+    let supplementOf: string | undefined;
+    let body = clean.instructions;
+    if (target?.builtin) {
+      // Không sửa kỹ năng dựng sẵn: tạo kỹ năng BỔ SUNG, nói rõ áp dụng cùng.
+      supplementOf = target.name;
+      body = `Áp dụng CÙNG với kỹ năng dựng sẵn «${target.name}» (id ${target.id}) — phần dưới đây là quy tắc riêng của người dùng, ưu tiên hơn khi khác:\n\n${body}`;
+      target = undefined;
+    }
+    if (!body.includes(LEARNED_SKILL_GUARD)) body = `${body}\n\n${LEARNED_SKILL_GUARD}`;
+    if (target) {
+      const cur = this.read(target.id);
+      const merged =
+        input.mode === 'replace'
+          ? body
+          : `${cur.instructions.replace(`\n\n${LEARNED_SKILL_GUARD}`, '').trim()}\n\n## Bổ sung (${now.slice(0, 10)} — ${why})\n${body.replace(`\n\n${LEARNED_SKILL_GUARD}`, '').trim()}\n\n${LEARNED_SKILL_GUARD}`;
+      const triggers = [...new Set([...(target.triggers ?? []), ...clean.triggers])];
+      this.update(target.id, { instructions: merged, triggers, by: 'ai', why });
+      const prevAt = this.snapshots(target.id)[0]?.at;
+      log.log.push({ id: target.id, at: now, action: 'update', origin: input.origin, ...(reason ? { reason } : {}), ...(prevAt ? { prevAt } : {}) });
+      this.writeLearnLog(log);
+      return { action: 'update', id: target.id, name: target.name, removedSecrets: clean.removedSecrets, removedGrants: clean.removedGrants };
+    }
+    const before = new Set(all.map((x) => x.id));
+    const after = this.create(clean.name, body, undefined, ['AI tự học'], undefined, undefined);
+    const made = after.find((x) => !before.has(x.id));
+    if (!made) throw new Error('Không tạo được kỹ năng.');
+    const reg = this.readRegistry();
+    const e = reg.find((x) => x.id === made.id);
+    if (e) {
+      e.learned = { origin: input.origin, at: now, ...(reason ? { reason } : {}) };
+      e.triggers = normTriggers(clean.triggers);
+      this.writeRegistry(reg);
+      // Ghi lại SKILL.md để frontmatter có `triggers:` (CLI đọc mô tả + từ khoá).
+      const instr = skillInstructions(readFileSync(join(this.libPath(made.id), 'SKILL.md'), 'utf8'));
+      writeFileSync(join(this.libPath(made.id), 'SKILL.md'), `${buildFrontmatter(made.id, e.description, e.command, undefined, e.triggers)}\n\n# ${e.name}\n\n${instr}\n`);
+      this.sync();
+    }
+    log.log.push({ id: made.id, at: now, action: 'create', origin: input.origin, ...(reason ? { reason } : {}) });
+    this.writeLearnLog(log);
+    return { action: 'create', id: made.id, name: made.name, removedSecrets: clean.removedSecrets, removedGrants: clean.removedGrants, ...(supplementOf ? { supplementOf } : {}) };
+  }
+
+  /**
+   * Quyết định của `skill_save`: lời dạy trực tiếp / lời sửa → LƯU NGAY (trừ khi bật "Hỏi trước khi lưu");
+   * rút từ kinh nghiệm / học từ Base → luôn là ĐỀ XUẤT (thẻ "Lưu kỹ năng"). Tắt "Tự học" → không lưu.
+   */
+  learnOrPropose(input: {
+    name: string;
+    instructions: string;
+    triggers?: string[];
+    origin: SkillLearnInfo['origin'];
+    reason?: string;
+    updateId?: string;
+    mode?: 'merge' | 'replace';
+  }):
+    | { mode: 'saved'; id: string; name: string; action: 'create' | 'update'; supplementOf?: string; removedSecrets: string[]; removedGrants: string[] }
+    | { mode: 'proposal'; proposal: SkillProposal; removedSecrets: string[]; removedGrants: string[] }
+    | { mode: 'disabled' } {
+    const st = this.getLearnSettings();
+    if (!st.enabled) return { mode: 'disabled' };
+    const proposalOnly = input.origin === 'experience' || input.origin === 'base' || st.askFirst;
+    if (!proposalOnly) return { mode: 'saved', ...this.saveLearned(input) };
+    const clean = sanitizeLearnedSkill(input);
+    if (!clean.ok) throw new Error(clean.error || 'Kỹ năng không hợp lệ.');
+    const all = this.list();
+    const desc = clean.instructions.split('\n').find((l) => l.trim()) || '';
+    const hit = input.updateId ? all.find((x) => x.id === input.updateId) : findOverlap({ name: clean.name, triggers: clean.triggers, description: desc }, all, 0.5)?.skill;
+    const upd = hit && !hit.builtin ? hit : undefined;
+    return {
+      mode: 'proposal',
+      proposal: {
+        id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+        name: clean.name,
+        triggers: clean.triggers,
+        instructions: clean.instructions,
+        origin: input.origin,
+        ...(input.reason ? { reason: String(input.reason).slice(0, 200) } : {}),
+        ...(upd ? { updateId: upd.id, updateName: upd.name } : {}),
+      },
+      removedSecrets: clean.removedSecrets,
+      removedGrants: clean.removedGrants,
+    };
+  }
+
+  /**
+   * "Hoàn tác" lần học GẦN NHẤT của một kỹ năng: lần TẠO → gỡ kỹ năng (cất vào thùng rác, khôi phục được);
+   * lần CẬP NHẬT → về đúng bản trước lần học đó.
+   */
+  undoLearn(id: string): { undone: 'create' | 'update'; id: string } {
+    const d = this.readLearnLog();
+    const last = [...d.log].reverse().find((x) => x.id === id && !x.undone);
+    if (!last) throw new Error('Không có lần tự học nào để hoàn tác cho kỹ năng này.');
+    if (last.action === 'create') {
+      const entry = this.readRegistry().find((x) => x.id === id);
+      let md = '';
+      try {
+        md = readFileSync(join(this.libPath(id), 'SKILL.md'), 'utf8');
+      } catch {
+        md = '';
+      }
+      if (entry) d.trash[id] = { entry, md, at: new Date().toISOString() };
+      this.delete(id);
+    } else {
+      if (!last.prevAt) throw new Error('Thiếu bản lưu trước lần học — không hoàn tác được.');
+      this.restore(id, last.prevAt);
+    }
+    last.undone = true;
+    this.writeLearnLog(d);
+    return { undone: last.action, id };
+  }
+
+  /** Lấy lại một kỹ năng tự học đã bị "Hoàn tác" lần tạo. */
+  restoreLearned(id: string): SkillInfo[] {
+    const d = this.readLearnLog();
+    const t = d.trash[id];
+    if (!t) throw new Error('Không còn bản của kỹ năng này trong thùng rác.');
+    if (this.readRegistry().some((x) => x.id === id)) throw new Error('Đã có kỹ năng cùng id.');
+    mkdirSync(this.libPath(id), { recursive: true });
+    writeFileSync(join(this.libPath(id), 'SKILL.md'), t.md);
+    this.writeRegistry([...this.readRegistry(), t.entry]);
+    delete d.trash[id];
+    this.writeLearnLog(d);
+    this.sync();
     return this.list();
   }
 
@@ -783,12 +988,15 @@ function deriveDescription(instr: string): string {
 }
 
 /** Parse a SKILL.md's YAML frontmatter for name + description + slash-command. */
-function parseSkillMd(text: string): { name: string; description: string; command: string } {
+function parseSkillMd(text: string): { name: string; description: string; command: string; triggers: string[] } {
   let name = '';
   let description = '';
   let command = '';
+  let triggers: string[] = [];
   const m = text.match(/^---\s*\n([\s\S]*?)\n---/);
   if (m) {
+    const tr = m[1].match(/^triggers:\s*(.+)$/m);
+    if (tr) triggers = normTriggers(tr[1].split('|'));
     const n = m[1].match(/^name:\s*(.+)$/m);
     if (n) name = n[1].trim().replace(/^["']|["']$/g, '');
     const d = m[1].match(/^description:\s*(.+)$/m);
@@ -800,7 +1008,7 @@ function parseSkillMd(text: string): { name: string; description: string; comman
     const h = text.match(/^#\s+(.+)$/m);
     if (h) name = h[1].trim();
   }
-  return { name, description, command };
+  return { name, description, command, triggers };
 }
 
 /** Set (or remove, when `command` is '') the frontmatter `command:` of a SKILL.md, leaving the

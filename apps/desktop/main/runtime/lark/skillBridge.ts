@@ -117,3 +117,26 @@ export function setAgentSkillFullLister(fn: FullLister | null): void {
 export function getAgentSkillFullLister(): FullLister | null {
   return fullLister;
 }
+
+/** `skill_save`: lưu ngay (đã học) hoặc thành đề xuất (người dùng bấm "Lưu kỹ năng"), theo nguồn + cài đặt. */
+export interface LearnSkillInput {
+  name: string;
+  instructions: string;
+  triggers?: string[];
+  origin: 'explicit' | 'correction' | 'experience' | 'base';
+  reason?: string;
+  updateId?: string;
+  mode?: 'merge' | 'replace';
+}
+export type LearnSkillResult =
+  | { mode: 'saved'; id: string; name: string; action: 'create' | 'update'; supplementOf?: string; removedSecrets: string[]; removedGrants: string[] }
+  | { mode: 'proposal'; proposal: import('@larkwave/core').SkillProposal; removedSecrets: string[]; removedGrants: string[] }
+  | { mode: 'disabled' };
+type Learner = (input: LearnSkillInput) => Promise<LearnSkillResult>;
+let learner: Learner | null = null;
+export function setAgentSkillLearner(fn: Learner | null): void {
+  learner = fn;
+}
+export function getAgentSkillLearner(): Learner | null {
+  return learner;
+}

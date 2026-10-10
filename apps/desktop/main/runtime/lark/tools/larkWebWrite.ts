@@ -361,6 +361,32 @@ async function openApiReadAll(c: LarkClient, token: string, table: string, view?
   return { header, rows: items.map((it) => header.map((h) => flat(it.fields?.[h]))), total: total ?? items.length };
 }
 
+/** Cột chữ cái của chỉ số cột (0 → A, 26 → AA). */
+function colLetter(n: number): string {
+  let s = '';
+  for (let k = n + 1; k > 0; k = Math.floor((k - 1) / 26)) s = String.fromCharCode(65 + ((k - 1) % 26)) + s;
+  return s;
+}
+
+/**
+ * Dòng TỔNG cuối bảng: cột đầu "Tổng", cột nào MỌI ô có giá trị đều là số thì cộng (xlsx: công thức =SUM để
+ * Excel tự tính lại; csv: số đã cộng). Cột không phải số để trống. Trả cả tên các cột đã cộng (để báo).
+ */
+export function totalRowFor(rows: unknown[][], format: 'xlsx' | 'csv'): { row: unknown[]; cols: string[] } {
+  const header = (rows[0] || []).map((h) => String(h ?? ''));
+  const body = rows.slice(1);
+  const row: unknown[] = header.map(() => null);
+  const cols: string[] = [];
+  header.forEach((name, c) => {
+    const vals = body.map((r) => r[c]).filter((v) => v !== null && v !== undefined && v !== '');
+    if (!vals.length || !vals.every((v) => typeof v === 'number')) return;
+    cols.push(name);
+    row[c] = format === 'xlsx' ? `=SUM(${colLetter(c)}2:${colLetter(c)}${body.length + 1})` : (vals as number[]).reduce((a, b) => a + b, 0);
+  });
+  if (header.length) row[0] = row[0] === null ? 'Tổng' : row[0];
+  return { row, cols };
+}
+
 async function writeLocalFile(name: string, format: 'xlsx' | 'csv', rows: unknown[][], sheetName: string): Promise<{ path: string; fileName: string; bytes: number; mime: string }> {
   const out = getFileOutDir();
   if (!out) throw new Error('Chưa có thư mục ghi tệp cho lượt này.');
@@ -539,6 +565,7 @@ export const larkWebWriteTools: LarkToolDef[] = [
         format: { type: 'string', enum: ['xlsx', 'csv'], description: 'Mặc định xlsx' },
         name: str('Tên tệp (không đuôi). Mặc định = tên bảng'),
         with_record_id: { type: 'boolean', description: 'Thêm cột record_id đầu tiên' },
+        total_row: { type: 'boolean', description: 'Thêm DÒNG TỔNG ở cuối: cột đầu "Tổng", mỗi cột số = tổng cột (xlsx: công thức =SUM, csv: số đã cộng). Không tính vào "N dòng nguồn → N dòng".' },
       },
       required: ['app_token', 'table'],
     },
@@ -564,7 +591,8 @@ export const larkWebWriteTools: LarkToolDef[] = [
       } else throw new Error('Chưa đăng nhập Lark web (và chưa kết nối custom app) — không đọc được bảng.');
       const fileRows = rows.length - 1;
       if (fileRows !== source) throw new Error(`Lệch số dòng: ${source} dòng nguồn → ${fileRows} dòng trong tệp. Không tạo tệp.`);
-      const f = await writeLocalFile(String(i.name || tableName), format, rows, tableName.slice(0, 31) || 'Sheet1');
+      const total = i.total_row === true ? totalRowFor(rows, format) : null;
+      const f = await writeLocalFile(String(i.name || tableName), format, total ? [...rows, total.row] : rows, tableName.slice(0, 31) || 'Sheet1');
       return {
         ok: true,
         via,
@@ -575,7 +603,8 @@ export const larkWebWriteTools: LarkToolDef[] = [
         source_rows: source,
         file_rows: fileRows,
         columns: (rows[0] || []).length,
-        note: `XONG: ${source} dòng nguồn → ${fileRows} dòng trong tệp «${f.fileName}» (${(rows[0] || []).length} cột). Thẻ tệp đã hiện trong hội thoại — nói rõ con số này với người dùng.`,
+        ...(total ? { total_row: { summed_columns: total.cols } } : {}),
+        note: `XONG: ${source} dòng nguồn → ${fileRows} dòng trong tệp «${f.fileName}» (${(rows[0] || []).length} cột)${total ? ` + 1 dòng TỔNG cuối (cộng các cột: ${total.cols.join(', ') || 'không có cột số'})` : ''}. Thẻ tệp đã hiện trong hội thoại — nói rõ con số này với người dùng.`,
       };
     },
   },

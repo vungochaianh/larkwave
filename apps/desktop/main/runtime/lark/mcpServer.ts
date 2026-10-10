@@ -11,7 +11,7 @@ import {
   tierForError,
   tierForPayload,
   versionNote,
-  withVersionNote, fileEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+  withVersionNote, fileEventFor, skillEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
 import { withTurnFiles, type TurnFileContext } from './fileContext';
 
 /**
@@ -262,6 +262,8 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       // thiếu ở mọi lượt chat Lark — dù `toolBridge` có phát đúng thì cũng không ai thấy.
       const fe = fileEventFor(name, data);
       if (fe && !isSelfDeclaredFailure(data)) ctx.emit(fe);
+      const se = skillEventFor(name, data);
+      if (se && !isSelfDeclaredFailure(data)) ctx.emit(se);
       // Thất bại tự khai báo (`{ok:false}`) cũng là thất bại — xem larkToolExec.
       return { content: [{ type: 'text', text: await withVersionNote(data, ctx.allowVersionHint) }] };
     } catch (e) {

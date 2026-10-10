@@ -216,7 +216,7 @@ export function dataQuickAsks(bases: QuickBase[], appConnected: boolean, dev = f
 }
 
 /** Khoá các nút "Tệp & dữ liệu" (bộ kỹ năng dựng sẵn). */
-export const FILE_ASK_KEYS = ['fileExport', 'fileImport', 'fileAttach', 'fileReadAttach', 'autoFromFiles'] as const;
+export const FILE_ASK_KEYS = ['fileExport', 'fileImport', 'fileAttach', 'fileReadAttach', 'autoFromFiles', 'learnBase'] as const;
 
 /**
  * Nút "Tệp & dữ liệu" — mỗi nút gọi đúng một kỹ năng dựng sẵn (Larkwave · Tệp & dữ liệu). Chạy được chỉ
@@ -259,6 +259,14 @@ export function fileQuickAsks(b: QuickBase): QuickAsk[] {
       prompt:
         `Giúp tôi dựng một quy tắc TỰ ĐỘNG đọc tệp rồi ghi vào bảng của ${B} theo kỹ năng «Tự động hoá: đọc tệp → ghi Base»: hỏi tôi nguồn tệp, bảng đích + cột khoá, lịch chạy và quyền khi chạy tự động; ` +
         'chạy thử một lần với tệp hiện có rồi mới tạo lịch (schedule_agent_job kèm tệp nguồn, only_new_files, permissions). KHÔNG cấp quyền tôi chưa đồng ý.',
+    },
+    {
+      k: 'learnBase',
+      label: '🎓 Học từ Base',
+      prompt:
+        `Học từ ${B}: quét cấu trúc (lark_web_scan_base với sample_records=3) và các automation/workflow đang có (lark_web_read_automations), rồi ĐỀ XUẤT 2–5 kỹ năng nghiệp vụ ` +
+        '(ý nghĩa từng bảng, quy ước cột/giá trị, ai phụ trách gì, các giai đoạn của quy trình) — mỗi kỹ năng một lần gọi skill_save với origin "base" (hiện thành thẻ đề xuất để tôi Lưu/Bỏ qua). ' +
+        'Gọi skill_list trước để cập nhật kỹ năng đã có thay vì tạo trùng. Việc CHỈ ĐỌC — không ghi gì vào Base.',
     },
   ];
 }

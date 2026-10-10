@@ -63,8 +63,7 @@ import type {
   LarkWebBase,
   LarkUiTemplate,
   LarkUiTemplateApplyResult,
-  LarkAutomationFolderInfo,
-} from '@larkwave/core';
+  LarkAutomationFolderInfo, SkillLearnSettings, SkillProposal } from '@larkwave/core';
 
 /** Shape of the bridge exposed by preload.ts via contextBridge. */
 interface Bridge {
@@ -133,6 +132,14 @@ interface Bridge {
   larkListSkillSets(): Promise<LarkSkillSet[]>;
   larkPendingPrompts?(convId: string): Promise<LarkPendingPrompts>;
   skillSnapshots?(id: string): Promise<{ at: string; by: 'you' | 'ai'; what: string }[]>;
+  skillVersionText?(id: string, at: string): Promise<{ before: string; current: string }>;
+  skillLearnSettings?(): Promise<SkillLearnSettings>;
+  setSkillLearnSettings?(patch: Partial<SkillLearnSettings>): Promise<SkillLearnSettings>;
+  skillSaveProposal?(p: SkillProposal): Promise<SkillInfo[]>;
+  skillUndoLearn?(id: string): Promise<SkillInfo[]>;
+  skillRestoreLearned?(id: string): Promise<SkillInfo[]>;
+  restoreBuiltinSkills?(): Promise<SkillInfo[]>;
+  larkLearnFromBase?(appToken: string, name?: string): Promise<SkillProposal[]>;
   restoreSkill?(id: string, at: string): Promise<SkillInfo[]>;
   reorderSkills?(ids: string[]): Promise<SkillInfo[]>;
   larkListFieldNames?(appToken: string, tableId: string): Promise<string[]>;
@@ -448,6 +455,30 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   skillSnapshots(id: string): Promise<{ at: string; by: 'you' | 'ai'; what: string }[]> {
     return this.bridge.skillSnapshots ? this.bridge.skillSnapshots(id) : Promise.resolve([]);
+  }
+  skillVersionText(id: string, at: string): Promise<{ before: string; current: string }> {
+    return this.bridge.skillVersionText ? this.bridge.skillVersionText(id, at) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  skillLearnSettings(): Promise<SkillLearnSettings> {
+    return this.bridge.skillLearnSettings ? this.bridge.skillLearnSettings() : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  setSkillLearnSettings(patch: Partial<SkillLearnSettings>): Promise<SkillLearnSettings> {
+    return this.bridge.setSkillLearnSettings ? this.bridge.setSkillLearnSettings(patch) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  skillSaveProposal(p: SkillProposal): Promise<SkillInfo[]> {
+    return this.bridge.skillSaveProposal ? this.bridge.skillSaveProposal(p) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  skillUndoLearn(id: string): Promise<SkillInfo[]> {
+    return this.bridge.skillUndoLearn ? this.bridge.skillUndoLearn(id) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  skillRestoreLearned(id: string): Promise<SkillInfo[]> {
+    return this.bridge.skillRestoreLearned ? this.bridge.skillRestoreLearned(id) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  restoreBuiltinSkills(): Promise<SkillInfo[]> {
+    return this.bridge.restoreBuiltinSkills ? this.bridge.restoreBuiltinSkills() : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
+  }
+  larkLearnFromBase(appToken: string, name?: string): Promise<SkillProposal[]> {
+    return this.bridge.larkLearnFromBase ? this.bridge.larkLearnFromBase(appToken, name) : Promise.reject(new Error("Bản cài chưa hỗ trợ — cài bản Larkwave mới hơn."));
   }
   larkListFieldNames(appToken: string, tableId: string): Promise<string[]> {
     return this.bridge.larkListFieldNames ? this.bridge.larkListFieldNames(appToken, tableId) : Promise.resolve([]);

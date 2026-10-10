@@ -96,6 +96,7 @@ const CLIENTLESS = new Set<string>([
   // Kỹ năng + lịch không cần custom app (chạy trên máy) — trước đây người chỉ dùng phiên web không có chúng.
   'skill_list',
   'skill_get',
+  'skill_save',
   'list_skills',
   'create_skill',
   'update_skill',

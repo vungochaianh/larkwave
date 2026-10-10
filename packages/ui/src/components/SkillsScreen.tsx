@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { Alert, App as AntApp, Button, Card, Input, Modal, Segmented, Select, Switch, Tag, Tooltip, Typography } from 'antd';
 import { SkillContractEditor, isEmptyContract } from './SkillContractEditor';
+import { LearnedBadge, SkillLearnToolbar, SkillVersionHistory } from './SkillLearnPanel';
 import { NodeIndexOutlined } from '@ant-design/icons';
 import { setLarkPrompt } from './lark/larkHandoff';
 import type { SkillContractFields } from '@larkwave/core';
@@ -661,6 +662,9 @@ export function SkillsScreen({
         )}
       </div>
 
+      {/* Tự học kỹ năng: công tắc + "Học từ Base" (ở mục kỹ năng rời). */}
+      {mode === 'plain' && <SkillLearnToolbar runtime={runtime} onChanged={load} />}
+
       {shownLinks.length > 0 && !isEmpty && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', marginBottom: 8 }}>
           {shownLinks.map((l) => (
@@ -879,6 +883,7 @@ export function SkillsScreen({
                         </Tooltip>
                       )}
                       {!!sk.builtinUpdate && <span style={{ ...CHIP, background: '#fff7e6', color: '#d46b08' }}>{t('skills.builtinUpdate', 'Có bản mới')}</span>}
+                      <LearnedBadge s={sk} />
                     </div>
                     {sk.description && (
                       <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12.5 }} ellipsis={{ rows: 2 }}>
@@ -1087,6 +1092,8 @@ export function SkillsScreen({
                 </Button>
               </div>
             )}
+            {/* Lịch sử phiên bản: ai/khi nào/vì sao (bạn hay AI tự học), khác biệt, khôi phục, hoàn tác lần tự học. */}
+            <SkillVersionHistory runtime={runtime} skill={editing} onChanged={load} />
           </>
         )}
       </Modal>

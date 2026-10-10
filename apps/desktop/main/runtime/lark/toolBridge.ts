@@ -8,7 +8,7 @@ import {
   isSelfDeclaredFailure,
   suspectAppBugError,
   tierForError,
-  tierForPayload, fileEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+  tierForPayload, fileEventFor, skillEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
 import { withTurnFiles, type TurnFileContext } from './fileContext';
 
 /**
@@ -98,6 +98,8 @@ export function createToolBridge(
       if (!failed) {
         const fe = fileEventFor(name, data);
         if (fe) push(fe);
+        const se = skillEventFor(name, data);
+        if (se) push(se);
       }
       // Ghi chú phiên bản dùng bộ lọc HẸP hơn: chỉ khi thất bại đáng ngờ là lỗi ứng dụng.
       if (isFailurePayload(data)) {

@@ -2,10 +2,10 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app, dialog, shell, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
-import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillFullLister, setAgentSkillLister, setAgentSkillReader } from './lark/skillBridge';
+import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillFullLister, setAgentSkillLearner, setAgentSkillLister, setAgentSkillReader } from './lark/skillBridge';
 import { BUILTIN_SKILLS } from './skills/builtinSkills';
 import type { SkillContractFields, LarkPendingPrompts, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
-import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo } from '@larkwave/core';
+import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase, LarkAutomationFolderInfo, SkillLearnSettings, SkillProposal } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
@@ -98,6 +98,11 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
         missingKeys: [...new Set(after.flatMap((x) => x.contract?.needs ?? []))].filter((k) => !produced.has(k)),
       };
     });
+    /**
+     * TỰ HỌC (`skill_save`): lời dạy trực tiếp / lời sửa → LƯU NGAY (trừ khi người dùng bật "Hỏi trước khi
+     * lưu"); rút từ kinh nghiệm / học từ Base → luôn là ĐỀ XUẤT (thẻ "Lưu kỹ năng"). Tắt "Tự học" → không lưu.
+     */
+    setAgentSkillLearner(async (input) => this.skills.learnOrPropose(input));
     setAgentSkillReader(async (id) => {
       const e = this.skills.list().find((x) => x.id === id);
       if (!e) throw new Error(`Không có kỹ năng nào id "${id}". Gọi skill_list để lấy id đúng.`);
@@ -180,6 +185,32 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   }
   async skillSnapshots(id: string): Promise<{ at: string; by: 'you' | 'ai'; what: string }[]> {
     return this.skills.snapshots(id);
+  }
+  async skillVersionText(id: string, at: string): Promise<{ before: string; current: string }> {
+    return this.skills.versionText(id, at);
+  }
+  async skillLearnSettings(): Promise<SkillLearnSettings> {
+    return this.skills.getLearnSettings();
+  }
+  async setSkillLearnSettings(patch: Partial<SkillLearnSettings>): Promise<SkillLearnSettings> {
+    return this.skills.setLearnSettings(patch);
+  }
+  async skillSaveProposal(p: SkillProposal): Promise<SkillInfo[]> {
+    this.skills.saveLearned({ name: p.name, instructions: p.instructions, triggers: p.triggers, origin: p.origin, reason: p.reason, updateId: p.updateId });
+    return this.skills.list();
+  }
+  async skillUndoLearn(id: string): Promise<SkillInfo[]> {
+    this.skills.undoLearn(id);
+    return this.skills.list();
+  }
+  async skillRestoreLearned(id: string): Promise<SkillInfo[]> {
+    return this.skills.restoreLearned(id);
+  }
+  async restoreBuiltinSkills(): Promise<SkillInfo[]> {
+    return this.skills.restoreBuiltins(BUILTIN_SKILLS);
+  }
+  async larkLearnFromBase(appToken: string, name?: string): Promise<SkillProposal[]> {
+    return this.lark.learnFromBase(appToken, name);
   }
   larkListFieldNames(appToken: string, tableId: string): Promise<string[]> {
     return this.lark.listFieldNames(appToken, tableId);

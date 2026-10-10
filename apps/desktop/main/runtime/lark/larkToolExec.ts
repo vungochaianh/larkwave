@@ -115,6 +115,12 @@ export async function executeLarkTool(
           }
         : { type: 'tool_result', callId, ok: true, summary: summarizeTool(name, data), memo: memoForTool(name, data) || undefined },
     );
+    if (!failed) {
+      const fe = fileEventFor(name, data);
+      if (fe) ctx.emit(fe);
+      const se = skillEventFor(name, data);
+      if (se) ctx.emit(se);
+    }
     // Tool có thể BÁO HỎNG bằng dữ liệu (`{ok:false, reason}`) chứ không ném — với người dùng thì
     // hai kiểu đó hỏng như nhau, nên ghi chú phiên bản phải gắn cho cả hai.
     // `ok` phải phản ánh THẬT: trả true cho một thất bại làm runner không-Claude mất lời nhắc thử lại.
@@ -502,6 +508,24 @@ export function toolsSchemaBlock(tools: LarkToolDef[]): string {
  * bảng vào chat hoặc tự đẩy lên Drive.
  */
 export const FILE_PRODUCING_TOOLS = new Set(['create_file', 'fill_xlsx', 'lark_export_table_file']);
+
+/** Thẻ "Đã học" / thẻ đề xuất kỹ năng từ kết quả `skill_save` — dùng chung cho cả 3 đường thực thi. */
+export function skillEventFor(name: string, data: unknown): LarkChatEvent | null {
+  if (name !== 'skill_save' || !data || typeof data !== 'object') return null;
+  const d = data as { learned?: { id?: string; name?: string; action?: string; origin?: string; supplementOf?: string }; proposal?: unknown; cleaned?: string[] };
+  if (d.learned?.id) {
+    return {
+      type: 'skill_learned',
+      id: String(d.learned.id),
+      name: String(d.learned.name || d.learned.id),
+      action: d.learned.action === 'update' ? 'update' : 'create',
+      origin: (['explicit', 'correction', 'experience', 'base'].includes(String(d.learned.origin)) ? d.learned.origin : 'explicit') as 'explicit',
+      ...(d.learned.supplementOf ? { supplementOf: String(d.learned.supplementOf) } : {}),
+    };
+  }
+  if (d.proposal && typeof d.proposal === 'object') return { type: 'skill_proposal', proposal: d.proposal as never };
+  return null;
+}
 
 export function fileEventFor(name: string, data: unknown): LarkChatEvent | null {
   if (!FILE_PRODUCING_TOOLS.has(name)) return null;

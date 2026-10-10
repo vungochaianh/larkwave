@@ -32,7 +32,7 @@ t('Bố cục frame (Tạo workflow): MỘT bộ hợp nhất — nút workflow 
 });
 t('Bố cục chat (Lark × Agents): cùng bộ nút, nút dữ liệu trước; không trùng vai (readWf/auditWf/suggestWf cũ đã gộp)', () => {
   const c = q.buildQuickAsks({ layout: 'chat', bases: [BASE, { name: 'B2', appToken: 'Tok2' }], appConnected: true });
-  assert.deepStrictEqual(c.map((x) => x.k), ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData', 'fileExport', 'fileImport', 'fileAttach', 'fileReadAttach', 'autoFromFiles']);
+  assert.deepStrictEqual(c.map((x) => x.k), ['tablesCols', 'summaryBase', 'evalBase', 'wfSuggest', 'wfRead', 'wfAudit', 'wfRemind', 'wfStatus', 'wfReport', 'wfOwner', 'permissions', 'design', 'kanban', 'sampleData', 'fileExport', 'fileImport', 'fileAttach', 'fileReadAttach', 'autoFromFiles', 'learnBase']);
   assert.strictEqual(new Set(c.map((x) => x.label)).size, c.length, 'nhãn duy nhất');
   assert.ok(!c.some((x) => ['readWf', 'auditWf', 'suggestWf'].includes(x.k)));
   assert.deepStrictEqual(q.chatQuickAsks([BASE], true).map((x) => x.k), q.buildQuickAsks({ layout: 'chat', bases: [BASE], appConnected: true }).map((x) => x.k));
@@ -100,6 +100,7 @@ t('Nút "Tệp & dữ liệu": mỗi nút gọi đúng kỹ năng dựng sẵn, 
   assert.ok(/lark_web_attach_file/.test(by.fileAttach) && /GHI THÊM/.test(by.fileAttach));
   assert.ok(/lark_web_download_attachments/.test(by.fileReadAttach));
   assert.ok(/schedule_agent_job/.test(by.autoFromFiles) && /KHÔNG cấp quyền/.test(by.autoFromFiles));
+  assert.ok(/skill_save/.test(by.learnBase) && /origin "base"/.test(by.learnBase) && /CHỈ ĐỌC/.test(by.learnBase), '"Học từ Base" chỉ đọc + đề xuất');
   const frame = q.buildQuickAsks({ layout: 'frame', bases: [BASE], appConnected: false }).map((x) => x.k);
   assert.ok(!frame.some((k) => q.FILE_ASK_KEYS.includes(k)), 'bố cục frame giữ nguyên bộ nút workflow');
 });

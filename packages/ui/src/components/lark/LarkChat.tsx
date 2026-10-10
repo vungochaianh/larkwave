@@ -26,6 +26,7 @@ import { clockTime, humanDuration } from '../../time';
 import { useSlashCommands, skillsToCommandItems, type SlashCommandItem } from '../SlashCommandMenu';
 import { ToolCallGroup, type ToolCallState } from './ToolCallCard';
 import { FileCard, type FileCardItem } from './FileCard';
+import { SkillLearnCard, type SkillLearnItem } from './SkillLearnCard';
 import { ConfirmToolModal, type PendingConfirm } from './ConfirmToolModal';
 import { AskUserModal, type PendingAsk } from './AskUserModal';
 import { findAnswer, isToolAllowed, rememberAnswer, rememberTool, type RememberScope } from './agentPrefs';
@@ -53,7 +54,9 @@ type ChatItem =
    * Tệp agent vừa dựng (create_file). Lưu vào lịch sử hội thoại như mọi mục khác, nên mở lại
    * hội thoại cũ vẫn thấy — tệp nằm trong thư mục hội thoại, không bị dọn theo lượt chạy.
    */
-  | FileCardItem;
+  | FileCardItem
+  /** Thẻ TỰ HỌC: "Đã học «…» — Hoàn tác" hoặc đề xuất kỹ năng ("Lưu kỹ năng" / "Bỏ qua"). */
+  | SkillLearnItem;
 
 const rid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -762,6 +765,13 @@ export function LarkChat({
           ...(ev.preview ? { preview: ev.preview } : {}),
           ts: Date.now(),
         },
+      ]);
+    } else if (ev.type === 'skill_learned' || ev.type === 'skill_proposal') {
+      setItems((prev) => [
+        ...prev,
+        ev.type === 'skill_learned'
+          ? { kind: 'skill', id: rid(), ts: Date.now(), learned: { id: ev.id, name: ev.name, action: ev.action, origin: ev.origin, ...(ev.supplementOf ? { supplementOf: ev.supplementOf } : {}) } }
+          : { kind: 'skill', id: rid(), ts: Date.now(), proposal: ev.proposal },
       ]);
     } else if (ev.type === 'tool_denied') {
       updateTool(ev.callId, (c) => ({ ...c, status: 'denied' }));
@@ -1655,6 +1665,19 @@ export function LarkChat({
                     })()}
                   />
                 )
+              ) : it.kind === 'skill' ? (
+                <SkillLearnCard
+                  key={it.id}
+                  item={it}
+                  runtime={runtime}
+                  onUpdate={(patch) =>
+                    setItems((cur) => {
+                      const next = cur.map((x) => (x.id === it.id && x.kind === 'skill' ? { ...x, ...patch } : x));
+                      if (loadedRef.current && sessionId && runtime.larkSaveSession) void runtime.larkSaveSession(sessionId, next as unknown[]);
+                      return next;
+                    })
+                  }
+                />
               ) : it.kind === 'file' ? (
                 <FileCard
                   key={it.id}

@@ -135,3 +135,41 @@ khởi động (localAdapter) — idempotent, CHỈ đụng id `lw-*`:
   hiện đủ quyền). Nút "Hỏi nhanh" mới: Xuất bảng ra Excel, Nhập Excel/CSV vào bảng, Đính tệp vào ô, Đọc tệp đính
   kèm, Tự động đọc tệp → ghi Base.
 - Kiểm: `test/skillsBuiltin.cjs`, `scripts/check-skill-contract.mjs` (mục 3), `scripts/check-skill-commands.mjs`.
+
+## 8. Larkwave tự học kỹ năng
+
+Kỹ năng tự học = CHỮ hướng dẫn trong thư viện kỹ năng (cùng chỗ với kỹ năng của người dùng, đồng bộ sang
+`~/.claude|.grok|.gemini/skills/larkwave-<id>` + khối Codex) — dùng ở chat, lệnh "/" và lịch tự động.
+
+**Ba đường học**
+
+| Đường | Khi nào | Lưu |
+|---|---|---|
+| Lời dạy / lời sửa (`origin: explicit / correction`) | `detectLearnIntent` (core `skillLearning.ts`) nhận ra "từ giờ…", "lần sau…", "nhớ cách này", "luôn luôn…", "mỗi khi … thì …", "from now on", "next time", "always…", "không phải thế, phải là…", "that's wrong, it should…" → dòng gợi ý nối vào câu lệnh của lượt + khối "TỰ HỌC" trong system prompt | NGAY (chế độ tự động), một dòng "Đã học: «tên» — Hoàn tác" trong hội thoại. Bật "Hỏi trước khi lưu" → thành thẻ đề xuất |
+| Kinh nghiệm (`experience`) | sau việc nhiều bước đã đọc lại khớp; hoặc yêu cầu tương tự lặp lại lần 2 (`repeatCount`, lịch sử 60 câu/tài khoản ở `lark/learn-history/`, mỗi nhóm gợi ý một lần, bỏ qua nếu đã có kỹ năng khớp từ khoá) | LUÔN là thẻ đề xuất: "Lưu kỹ năng" / "Bỏ qua" |
+| Học từ Base (`base`) | nút "Học từ Base" ở màn Kỹ năng (`larkLearnFromBase`, lượt CHỈ ĐỌC, `skill_save` chỉ gom đề xuất) và nút Hỏi nhanh "🎓 Học từ Base" | LUÔN là đề xuất (người dùng chọn lưu cái nào) |
+
+**Công cụ**: `skill_save` (không gated — lời dạy phải chạy ngay ở chế độ tự động), `skill_list`, `skill_get`. Thẻ
+"Đã học"/đề xuất phát ở cả 3 đường thực thi (`skillEventFor`). Lượt không người trông KHÔNG có `skill_save`.
+
+**Chốt an toàn** (`sanitizeLearnedSkill`, có test):
+- Gỡ bí mật: khoá riêng, JWT, Bearer, khoá API (`sk-…`), token GitHub/GitLab/AWS/Lark, `password|secret|token|cookie|…=…`,
+  cookie phiên, chuỗi bí mật dài ≥ 40 ký tự. Giữ định danh thường (mã đơn, token Base). Chỉ còn bí mật → không lưu.
+- Gỡ câu cấp quyền: "không cần hỏi xác nhận", "tự động duyệt", "cứ xoá…", "luôn dùng replace:true", "bật workflow…",
+  "always overwrite", "skip confirmation"… Mọi kỹ năng tự học kèm dòng "KHÔNG cấp quyền gì". Về cấu trúc, kỹ năng chỉ
+  là chữ trong prompt — luật duyệt (`needsConfirmation`, `unattendedPolicy`) không đọc kỹ năng.
+- Trùng ý (`findOverlap`: tên ≥ 0.6, từ khoá trùng, hoặc toàn văn) → CẬP NHẬT kỹ năng đã có (nối mục "Bổ sung",
+  hoặc `mode:'replace'`) thay vì tạo bản trùng. Kỹ năng DỰNG SẴN không bao giờ bị sửa → tạo kỹ năng bổ sung "áp dụng
+  CÙNG với …". Kỹ năng của người dùng / nhập từ Toolswave chỉ đổi qua một phiên bản có bản lưu (hoàn tác được).
+
+**Phiên bản & điều khiển**: mỗi thay đổi chụp bản lưu (`skills/snapshots.json`, 15 bản/kỹ năng: ai — "Bạn" / "AI tự
+học", khi nào, vì sao). Nhật ký học `skills/learned.json` → "Hoàn tác" đúng lần học gần nhất (tạo → gỡ, cất thùng
+rác để "Lấy lại"; cập nhật → về bản trước). Màn Kỹ năng: huy hiệu "AI tự học", công tắc "Tự học kỹ năng" (mặc định
+bật) + "Hỏi trước khi lưu kỹ năng tự học" (mặc định tắt; `skills/learn-settings.json`), "Học từ Base", và trong hộp
+sửa: "Lịch sử phiên bản" (Khác biệt — `lineDiff`, Khôi phục, Hoàn tác lần tự học gần nhất).
+
+**Ví dụ**: "từ giờ khi xuất Excel thì luôn thêm dòng tổng ở cuối" → kỹ năng bổ sung cho «Xuất bảng ra Excel/CSV đầy
+đủ»; lần xuất sau agent gọi `lark_export_table_file` với `total_row: true` (dòng "Tổng" cuối, cột số = `=SUM(...)`,
+không tính vào "N dòng nguồn → N dòng").
+
+Kiểm: `test/skillLearning.cjs` (12 ca).
