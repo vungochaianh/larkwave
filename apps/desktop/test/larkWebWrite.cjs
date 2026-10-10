@@ -346,6 +346,14 @@ const enc = (f, v, c = CTX) => E.encodeCell(f, v, c);
     const back = P.parseCsv(FB.buildCsv([['Mã'], ['007']]).toString('utf8'));
     assert.deepStrictEqual(back, [['Mã'], ['007']]);
   });
+  await t('xem trước đếm cả BẢN GHI RỖNG (dòng ",,," trong csv, dòng trống trong xlsx) — khớp "N dòng nguồn → N dòng trong tệp"', async () => {
+    const csv = FB.buildCsv([['A', 'B'], ['1', 'x'], [null, null], [null, null], ['4', 'y']]);
+    assert.strictEqual(P.buildFilePreview('a.csv', csv).sheets[0].rows, 5);
+    const x = FB.buildXlsx({ name: 'S', rows: [['A', 'B'], ['1', 'x'], [null, null], [null, null], ['4', 'y']] });
+    const pv = P.buildFilePreview('a.xlsx', x);
+    assert.strictEqual(pv.sheets[0].rows, 5);
+    assert.match(pv.summary, /4 dòng × 2 cột/);
+  });
   await t('xem trước pdf: số trang (đếm /Type /Page, không tính /Pages, đối chiếu /Count)', async () => {
     const pdf = '%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >> endobj\n3 0 obj << /Type /Page >> endobj\n4 0 obj << /Type/Page >> endobj\n5 0 obj << /Type /Page /Parent 2 0 R >> endobj\n%%EOF';
     const pv = P.buildFilePreview('a.pdf', Buffer.from(pdf, 'latin1'));

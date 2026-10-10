@@ -284,7 +284,7 @@ export function FileCard({
           if (a) void act({ action: a.action, path: item.path, folder: folder.trim() || undefined });
         }}
       >
-        <div style={{ fontSize: 13, marginBottom: 6 }}>Thư mục Drive đích (dán link …/drive/folder/…). Bỏ trống = "Không gian của tôi".</div>
+        <div style={{ fontSize: 13, marginBottom: 6 }}>Thư mục Drive đích (dán link …/drive/folder/…). Bỏ trống = thư mục «Larkwave» trong "Không gian của tôi" (tự tạo nếu chưa có).</div>
         <Input placeholder="https://…/drive/folder/…" value={folder} onChange={(ev) => setFolder(ev.target.value)} />
         <div style={{ fontSize: 12, color: V.textSub, marginTop: 8 }}>
           Chạy bằng phiên Lark web đang đăng nhập; xong sẽ đọc lại để kiểm và hiện link ngay trên thẻ này.

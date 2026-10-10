@@ -118,7 +118,25 @@ const CTX_JS = `
   var c = null;
   for (var i = 0; i < ctxs.length; i++) { try { if (ctxs[i].base && ctxs[i].base.getToken && ctxs[i].base.getToken() === OP.token) c = ctxs[i]; } catch (e) {} }
   if (!c) return { ok: false, error: 'no-context', hint: 'Trang Lark chưa mở đúng Base này.' };
-  var to = c.operate.tableOperate;`;
+  var to = c.operate.tableOperate;
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  // BẢNG PHẢI ĐƯỢC TẢI trước khi ghi. Đo 10/10/2026: bảng đích không phải bảng đang mở thì addRecords
+  // vẫn tạo dòng nhưng setRecords ngay sau trả 0 (không đổi gì) vì trang đang tải bảng chen giữa —
+  // dòng mới bị trống. Tải bảng trước (fetchTable, đúng việc loadRecords của Lark làm) thì ghi đủ.
+  var mt0 = to.base.getTableById(OP.tableId);
+  if (!mt0) return { ok: false, error: 'no-table', hint: 'Base không có bảng ' + OP.tableId };
+  if (!mt0.tableLoaded) { try { await to.getBaseOperate().fetchTable(OP.tableId); } catch (e) {} }
+  for (var w = 0; w < 40 && !(to.base.getTableById(OP.tableId) || {}).tableLoaded; w++) await sleep(250);
+  var allNull = function (cells) { return Object.keys(cells).every(function (k) { return cells[k] && (cells[k].value === null || cells[k].value === undefined); }); };
+  var setWithRetry = async function (data, okWhenZero) {
+    var r = null;
+    for (var t = 0; t < 4; t++) {
+      r = await to.setRecords({ tableId: OP.tableId, data: data }, {});
+      if (r && (r.result === 2 || (r.result === 0 && okWhenZero))) return r;
+      await sleep(700);
+    }
+    return r;
+  };`;
 
 /**
  * Ghi bản ghi: tạo MỚI (`creates`, theo lô 100: addRecords rồi setRecords) và/hoặc sửa ô của bản ghi
@@ -134,18 +152,19 @@ export function writeRecordsScript(op: { token: string; tableId: string; creates
       var part = OP.creates.slice(s, s + BATCH);
       var ra = await to.addRecords({ tableId: OP.tableId, count: part.length }, {});
       if (!ra || ra.result !== 2 || !Array.isArray(ra.data) || ra.data.length !== part.length) { out.ok = false; out.errors.push({ step: 'addRecords', at: s, result: ra && ra.result, reason: ra && ra.reason }); break; }
-      var data = {};
-      for (var k = 0; k < part.length; k++) data[ra.data[k].recordId] = part[k];
-      var rs = await to.setRecords({ tableId: OP.tableId, data: data }, {});
-      if (!rs || rs.result !== 2) { out.ok = false; out.errors.push({ step: 'setRecords(new)', at: s, result: rs && rs.result, reason: rs && rs.reason }); }
+      var data = {}, empty = true;
+      for (var k = 0; k < part.length; k++) { data[ra.data[k].recordId] = part[k]; if (!allNull(part[k])) empty = false; }
+      var rs = await setWithRetry(data, empty);
+      if (!rs || (rs.result !== 2 && !(rs.result === 0 && empty))) { out.ok = false; out.errors.push({ step: 'setRecords(new)', at: s, result: rs && rs.result, reason: rs && rs.reason }); }
       for (var k2 = 0; k2 < part.length; k2++) out.created.push(ra.data[k2].recordId);
     }
     for (var u = 0; u < OP.updates.length; u += BATCH) {
       var upart = OP.updates.slice(u, u + BATCH);
       var udata = {};
       for (var q = 0; q < upart.length; q++) udata[upart[q].recordId] = upart[q].cells;
-      var ru = await to.setRecords({ tableId: OP.tableId, data: udata }, {});
-      if (!ru || ru.result !== 2) { out.ok = false; out.errors.push({ step: 'setRecords(update)', at: u, result: ru && ru.result, reason: ru && ru.reason }); continue; }
+      // Sửa: 0 = "không đổi gì" (giá trị đã đúng như vậy) là hợp lệ — đọc lại ở main sẽ xác nhận.
+      var ru = await setWithRetry(udata, true);
+      if (!ru || (ru.result !== 2 && ru.result !== 0)) { out.ok = false; out.errors.push({ step: 'setRecords(update)', at: u, result: ru && ru.result, reason: ru && ru.reason }); continue; }
       for (var q2 = 0; q2 < upart.length; q2++) out.updated.push(upart[q2].recordId);
     }
     return out;
@@ -192,7 +211,7 @@ export function attachScript(op: { token: string; tableId: string; recordId: str
     (Array.isArray(cur) ? cur : []).forEach(function (x) { if (x && !before.some(function (b) { return b && b.attachmentToken === x.attachmentToken; })) before.push(x); });
     var next = OP.replace ? OP.items.slice() : before.concat(OP.items.filter(function (x) { return !before.some(function (b) { return b && b.attachmentToken === x.attachmentToken; }); }));
     var data = {}; data[OP.recordId] = {}; data[OP.recordId][OP.fieldId] = { type: 17, value: next };
-    var r = await to.setRecords({ tableId: OP.tableId, data: data }, {});
+    var r = await setWithRetry(data, false);
     return { ok: !!r && r.result === 2, result: r && r.result, reason: r && r.reason, before: before.map(function (b) { return b && b.attachmentToken; }), after: next.map(function (b) { return b.attachmentToken; }) };
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 })()`;

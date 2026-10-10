@@ -72,7 +72,9 @@ export function parseCsv(text: string): string[][] {
     row.push(cell);
     rows.push(row);
   }
-  return rows.filter((r) => r.some((c) => c !== ''));
+  // Bỏ dòng TRỐNG HẲN (không có cả dấu phân cách); dòng ",,," là một bản ghi rỗng thật — vẫn đếm, để
+  // số dòng của thẻ tệp khớp "N dòng nguồn → N dòng trong tệp" của bộ xuất.
+  return rows.filter((r) => r.length > 1 || r[0] !== '');
 }
 
 function sheetFromRows(name: string, rows: string[][]): FilePreviewSheet {
@@ -85,16 +87,42 @@ function sheetFromRows(name: string, rows: string[][]): FilePreviewSheet {
   };
 }
 
-/** Tên các sheet theo thứ tự trong workbook (kể cả sheet trống — bộ trích chữ bỏ qua chúng). */
-function workbookSheetNames(buf: Buffer): string[] {
+const unesc = (v: string) => v.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+
+/**
+ * Các sheet theo thứ tự trong workbook (kể cả sheet trống — bộ trích chữ bỏ qua chúng) + số dòng THẬT
+ * của từng sheet = chỉ số `<row r>` lớn nhất (dòng trống vẫn là một dòng — bản ghi rỗng xuất ra tệp).
+ */
+function workbookSheets(buf: Buffer): { name: string; maxRow: number }[] {
   try {
-    const wb = unzip(buf).find((x) => x.path === 'xl/workbook.xml');
+    const parts = unzip(buf);
+    const wb = parts.find((x) => x.path === 'xl/workbook.xml');
     if (!wb) return [];
-    const xml = wb.data.toString('utf8');
-    const out: string[] = [];
-    const re = /<sheet\b[^>]*\bname="([^"]*)"/g;
+    const rels = parts.find((x) => x.path === 'xl/_rels/workbook.xml.rels');
+    const target = new Map<string, string>();
+    if (rels) {
+      const re = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+      let m: RegExpExecArray | null;
+      const xml = rels.data.toString('utf8');
+      while ((m = re.exec(xml))) target.set(m[1], 'xl/' + m[2].replace(/^\/?(xl\/)?/, ''));
+    }
+    const out: { name: string; maxRow: number }[] = [];
+    const re = /<sheet\b([^>]*)\/?>/g;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(xml))) out.push(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"));
+    const xml = wb.data.toString('utf8');
+    while ((m = re.exec(xml))) {
+      const name = unesc(/name="([^"]*)"/.exec(m[1])?.[1] ?? '');
+      const rid = /r:id="([^"]+)"/.exec(m[1])?.[1] ?? '';
+      const part = parts.find((x) => x.path === target.get(rid));
+      let maxRow = 0;
+      if (part) {
+        const sx = part.data.toString('utf8');
+        const rr = /<row\b[^>]*\br="(\d+)"/g;
+        let k: RegExpExecArray | null;
+        while ((k = rr.exec(sx))) maxRow = Math.max(maxRow, Number(k[1]));
+      }
+      out.push({ name, maxRow });
+    }
     return out;
   } catch {
     return [];
@@ -109,9 +137,13 @@ export function previewXlsx(buf: Buffer): FilePreview {
     if (!m) continue;
     byName.set(m[1], m[2] ? m[2].split('\n').map((l) => l.split('\t')) : []);
   }
-  const names = workbookSheetNames(buf);
-  const order = names.length ? names : [...byName.keys()];
-  const sheets = order.map((n) => sheetFromRows(n, byName.get(n) || []));
+  const wbs = workbookSheets(buf);
+  const order = wbs.length ? wbs : [...byName.keys()].map((name) => ({ name, maxRow: 0 }));
+  const sheets = order.map((w) => {
+    const sh = sheetFromRows(w.name, byName.get(w.name) || []);
+    // Có dữ liệu thì số dòng = phạm vi thật của sheet (gồm cả dòng trống ở giữa/cuối).
+    return sh.rows ? { ...sh, rows: Math.max(sh.rows, w.maxRow) } : sh;
+  });
   const summary = `${sheets.length} sheet · ${sheets.map((s) => `«${s.name}» ${Math.max(0, s.rows - 1)} dòng × ${s.cols} cột`).join(', ')}`;
   return { kind: 'xlsx', summary, sheets };
 }

@@ -220,6 +220,10 @@ const SID2 = 'ad99aa4b-1b37-41b6-a3b8-765d8b499620';
     assert.ok(existsSync(join(twSlugA, `${A}.jsonl`)), 'bản Toolswave còn nguyên');
     assert.strictEqual(treeHash(S), srcBefore, 'thư mục Toolswave không đổi');
   });
+  await t('nhập: KHÔNG tạo thư mục làm việc rỗng cho hội thoại không có phiên để chép', async () => {
+    assert.ok(!existsSync(join(D, 'lark/work/c-c')), 'c-c không còn bản ghi phiên → không tạo thư mục');
+    assert.ok(existsSync(join(D, 'lark/work/c-a')));
+  });
   await t('nhập: phiên ở cwd cũ khác vẫn được tìm theo đúng id; không còn bản ghi ⇒ bỏ id + ghi lý do', async () => {
     assert.strictEqual(J(join(D, 'lark/sessions', UID, 'c-b.json')).agentSessionId, Bq);
     assert.ok(existsSync(join(P2, C.claudeProjectSlug(realpathSync(join(D, 'lark/work/c-b'))), `${Bq}.jsonl`)));

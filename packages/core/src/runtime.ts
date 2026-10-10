@@ -323,7 +323,7 @@ export interface LarkFilePreview {
 export interface LarkFileActionInput {
   action: 'reveal' | 'saveAs' | 'drive' | 'sheet' | 'doc';
   path: string;
-  /** drive/sheet/doc: thư mục Drive đích (token hoặc link …/drive/folder/<token>); bỏ trống = "Không gian của tôi". */
+  /** drive/sheet/doc: thư mục Drive đích (token hoặc link …/drive/folder/<token>); bỏ trống = thư mục «Larkwave» trong "Không gian của tôi". */
   folder?: string;
 }
 export interface LarkFileActionResult {

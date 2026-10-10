@@ -2365,19 +2365,21 @@ export class LarkWebSession {
     return { token: p.token, ...(p.url ? { url: p.url } : {}) };
   }
 
-  /** Token thư mục gốc "Không gian của tôi" (khi người dùng không chỉ thư mục đích). */
-  async webRootFolder(): Promise<string> {
-    for (const path of ['/space/api/explorer/v3/my_space/folder/', '/space/api/explorer/root/get/', '/space/api/explorer/v2/root_folder/meta/']) {
-      try {
-        const j = await this.webJson(path);
-        const d = j?.data || {};
-        const t = d.token || d.root_token || d.obj_token || d.node_token || d.folder_token;
-        if (j?.code === 0 && t) return String(t);
-      } catch {
-        /* thử đường kế */
-      }
+  /**
+   * Thư mục mặc định khi người dùng không chỉ thư mục đích: «Larkwave» trong "Không gian của tôi" (dùng lại
+   * nếu đã có, chưa có thì tạo — tạo thư mục ở gốc là đường đã đo). Không đổ tệp thẳng ra gốc Drive:
+   * Drive mới (v3) không có token thư mục gốc để đọc lại/kiểm tệp.
+   */
+  async webDefaultFolder(name = 'Larkwave'): Promise<string> {
+    try {
+      const j = await this.webJson('/space/api/explorer/v3/my_space/folder/');
+      const nodes = (j?.data?.entities?.nodes || {}) as Record<string, J>;
+      const hit = Object.values(nodes).find((n) => n && n.type === 0 && String(n.name || '') === name && !n.delete_flag);
+      if (hit?.token) return String(hit.token);
+    } catch {
+      /* tạo mới bên dưới */
     }
-    throw new Error('Không xác định được thư mục gốc "Không gian của tôi" — hãy chỉ rõ thư mục Drive đích (link …/drive/folder/<token>).');
+    return (await this.webCreateFolder(name, '')).token;
   }
 
   /** Con của một thư mục Drive (để xác minh tệp vừa tải/nhập nằm đúng chỗ). */
@@ -2407,7 +2409,7 @@ export class LarkWebSession {
   }
 
   /** Mở một tài liệu trong khung Lark rồi chạy đoạn đọc/ghi của nó (Sheets: window.spread; Docs: DOM). */
-  private async runOnDoc(url: string, script: string, timeoutMs = 90_000): Promise<J> {
+  private async runOnDoc(url: string, script: string, timeoutMs = 90_000, force = false): Promise<J> {
     if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web.');
     const wc = this.win.webContents;
     const cur = (() => {
@@ -2417,7 +2419,7 @@ export class LarkWebSession {
         return '';
       }
     })();
-    if (!cur.split('?')[0].endsWith(new URL(url).pathname)) {
+    if (force || !cur.split('?')[0].endsWith(new URL(url).pathname)) {
       try {
         await this.win.loadURL(url, { userAgent: CHROME_UA });
       } catch {
@@ -2427,8 +2429,29 @@ export class LarkWebSession {
     return Promise.race([wc.executeJavaScript(script, true).catch((e) => ({ ok: false, error: String((e as Error)?.message || e) })), new Promise((r) => setTimeout(() => r({ ok: false, error: 'timeout' }), timeoutMs))]);
   }
 
+  /** Tiêu đề thật của tài liệu (meta) — tiêu đề tab lúc trang đang tải có thể chỉ là "Docs". */
+  async webDocTitle(token: string, type: 3 | 22): Promise<string> {
+    try {
+      const j = await this.webJson(`/space/api/meta/?token=${enc(token)}&type=${type}`);
+      return j?.code === 0 && j.data?.title ? String(j.data.title) : '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** Đọc lại MỌI sheet: sheet đang mở đọc ngay, các sheet khác mở bằng `?sheet=<id>` (Lark tải lười). */
   async webReadSheet(token: string): Promise<J> {
-    return this.runOnDoc(`${this.host}/sheets/${enc(token)}`, sheetReadScript());
+    const base = `${this.host}/sheets/${enc(token)}`;
+    const r = await this.runOnDoc(base, sheetReadScript());
+    if (!r?.ok || !Array.isArray(r.sheets)) return r;
+    const sheets: J[] = r.sheets;
+    for (const sh of sheets.slice(0, 12)) {
+      if (sh.loaded || !sh.id) continue;
+      const one = await this.runOnDoc(`${base}?sheet=${enc(String(sh.id))}`, sheetReadScript(), 90_000, true);
+      const got = Array.isArray(one?.sheets) ? one.sheets.find((x: J) => x.id === sh.id && x.loaded) : null;
+      if (got) Object.assign(sh, { rows: got.rows, cols: got.cols, head: got.head, loaded: true });
+    }
+    return { ...r, sheets, title: await this.webDocTitle(token, 3) };
   }
 
   async webWriteSheet(token: string, op: { sheetName?: string; row: number; col: number; values: unknown[][] }): Promise<J> {
@@ -2436,7 +2459,9 @@ export class LarkWebSession {
   }
 
   async webReadDoc(token: string): Promise<J> {
-    return this.runOnDoc(`${this.host}/docx/${enc(token)}`, docReadScript());
+    const r = await this.runOnDoc(`${this.host}/docx/${enc(token)}`, docReadScript());
+    const title = await this.webDocTitle(token, 22);
+    return r && typeof r === 'object' ? { ...r, ...(title ? { title } : {}) } : r;
   }
 }
 

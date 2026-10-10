@@ -335,8 +335,9 @@ async function linkClaudeSession(ctx: Ctx, src: string, convId: string, sid: str
   const env = ctx.o.claudeEnv ?? process.env;
   const projects = claudeProjectsDir(env);
   const workDir = join(ctx.o.dest, 'lark', 'work', scopeOf(convId));
-  if (!ctx.dryRun) await ctx.mkdirDest(workDir);
-  const toDir = claudeProjectDirFor(workDir, env);
+  // Slug tính trên đường dẫn đã chuẩn hoá; thư mục làm việc CHỈ được tạo khi thật sự có phiên để chép
+  // (không đẻ thư mục rỗng cho mọi hội thoại), và tính lại slug sau khi tạo (realpath — đúng thứ CLI thấy).
+  let toDir = claudeProjectDirFor(workDir, env);
   const fromPreferred = claudeProjectDirFor(join(src, 'lark', 'work', scopeOf(convId)), env);
   const found = await findClaudeTranscript(sid, { projectsDir: projects, preferDirs: [fromPreferred], excludeDirs: [toDir] });
   if (!found) {
@@ -348,6 +349,10 @@ async function linkClaudeSession(ctx: Ctx, src: string, convId: string, sid: str
     }
     ctx.skip(src, join(src, 'lark', 'sessions', `${convId}.json`), 'không còn bản ghi phiên Claude CLI trên máy — lượt sau nối lại bằng lịch sử hội thoại');
     return false;
+  }
+  if (!ctx.dryRun) {
+    await ctx.mkdirDest(workDir);
+    toDir = claudeProjectDirFor(workDir, env);
   }
   ctx.guardDest(toDir);
   const r = await copyClaudeSession({ sessionId: sid, fromDir: found.dir, toDir, dryRun: ctx.dryRun });

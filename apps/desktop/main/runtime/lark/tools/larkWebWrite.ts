@@ -308,7 +308,7 @@ async function writeLocalFile(name: string, format: 'xlsx' | 'csv', rows: unknow
 
 // ── tệp → Drive / Sheets / Docs (dùng chung cho công cụ và nút trên thẻ tệp) ─────────────────────
 
-/** Thư mục đích: token/link người dùng đưa, hoặc thư mục gốc "Không gian của tôi". */
+/** Thư mục đích: token/link người dùng đưa, hoặc thư mục «Larkwave» trong "Không gian của tôi". */
 export async function resolveFolder(folder?: string): Promise<string> {
   const f = String(folder || '').trim();
   if (f) {
@@ -316,7 +316,7 @@ export async function resolveFolder(folder?: string): Promise<string> {
     if (!t) throw new Error(`«${f}» không phải link/token thư mục Drive (…/drive/folder/<token>).`);
     return t;
   }
-  return web().webRootFolder();
+  return web().webDefaultFolder();
 }
 
 export async function uploadToDrive(local: { bytes: Buffer; name: string; mime: string }, folder?: string): Promise<J> {
@@ -347,6 +347,7 @@ export async function importAsSheet(local: { bytes: Buffer; name: string; mime: 
     for (const ws of want.sheets) {
       const g = want.kind === 'csv' ? gotSheets[0] : gotSheets.find((s) => s.name === ws.name);
       if (!g) problems.push(`thiếu sheet «${ws.name}»`);
+      else if (g.loaded === false) problems.push(`sheet «${ws.name}»: chưa đọc lại được nội dung`);
       else if (g.rows < ws.rows) problems.push(`sheet «${ws.name}»: Lark có ${g.rows} dòng, tệp có ${ws.rows}`);
     }
   }
@@ -356,6 +357,7 @@ export async function importAsSheet(local: { bytes: Buffer; name: string; mime: 
     kind: 'sheet',
     token: r.token,
     url: r.url,
+    ...(back?.title ? { title: back.title } : {}),
     sheets: gotSheets.map((s) => ({ name: s.name, rows: s.rows, cols: s.cols, first_rows: (s.head || []).slice(0, 3) })),
     verified: problems.length ? `lệch: ${problems.join('; ')}` : `đọc lại khớp: ${gotSheets.map((s) => `«${s.name}» ${s.rows} dòng`).join(', ')}`,
     note: problems.length ? 'CHƯA khớp hoàn toàn — báo người dùng.' : `ĐÃ NHẬP thành Lark Sheets và đọc lại khớp. Gửi người dùng link: ${r.url}`,
@@ -390,7 +392,7 @@ export async function importAsDoc(local: { bytes: Buffer; name: string; mime: st
   };
 }
 
-const FOLDER_PROP = str('Thư mục Drive đích: link …/drive/folder/<token> hoặc token. Bỏ trống = "Không gian của tôi".');
+const FOLDER_PROP = str('Thư mục Drive đích: link …/drive/folder/<token> hoặc token. Bỏ trống = thư mục «Larkwave» trong "Không gian của tôi" (tự tạo nếu chưa có).');
 const TABLE_PROPS = {
   app_token: str('Token Base (hoặc link …/base/<token>)'),
   table: str('TÊN bảng hoặc table_id (tbl…)'),

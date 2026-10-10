@@ -190,14 +190,19 @@ export function colLetter(i: number): string {
   return s;
 }
 
-/** Đọc lại bảng tính: tên các sheet + số dòng/cột có dữ liệu + vài dòng đầu. */
+/**
+ * Đọc lại bảng tính: tên + id các sheet, và dữ liệu (số dòng/cột có dữ liệu + vài dòng đầu) của sheet
+ * ĐANG MỞ. Lark Sheets chỉ tải dữ liệu của sheet đang mở (đo 10/10/2026: sheet thứ hai đọc ra trống,
+ * mở bằng `?sheet=<id>` thì có đủ, còn sheet đầu lại trống) — main đọc từng sheet bằng cách mở `?sheet=`.
+ */
 export function sheetReadScript(o: { maxRows?: number; maxCols?: number; scanRows?: number } = {}): string {
   return `(async () => {
-  for (var k = 0; k < 60; k++) { if (window.spread && window.spread.sheets && window.spread.sheets.length) break; await new Promise(function (r) { setTimeout(r, 500); }); }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  for (var k = 0; k < 60; k++) { if (window.spread && window.spread.sheets && window.spread.sheets.length) break; await sleep(500); }
   if (!(window.spread && window.spread.sheets)) return { ok: false, error: 'sheet-not-ready' };
+  await sleep(1200);
   var MR = ${o.maxRows ?? 10}, MC = ${o.maxCols ?? 12}, SCAN = ${o.scanRows ?? 2000};
-  var out = [];
-  window.spread.sheets.forEach(function (sh) {
+  var readSheet = function (sh) {
     var rows = 0, cols = 0, head = [];
     var rc = Math.min(sh.getRowCount ? sh.getRowCount() : 0, SCAN), cc = Math.min(sh.getColumnCount ? sh.getColumnCount() : 0, 200);
     for (var r = 0; r < rc; r++) {
@@ -206,7 +211,12 @@ export function sheetReadScript(o: { maxRows?: number; maxCols?: number; scanRow
       if (has) { rows = r + 1; cols = Math.max(cols, last + 1); }
       if (r < MR) head.push(line.slice(0, MC));
     }
-    out.push({ name: sh.name ? sh.name() : '', id: sh.id ? sh.id() : '', rows: rows, cols: cols, head: head.slice(0, Math.min(MR, rows)).map(function (l) { return l.slice(0, Math.min(MC, cols)); }) });
+    return { rows: rows, cols: cols, head: head.slice(0, Math.min(MR, rows)).map(function (l) { return l.slice(0, Math.min(MC, cols)); }) };
+  };
+  var active = window.spread._activeSheetIndex || 0;
+  var out = window.spread.sheets.map(function (sh, i) {
+    var base = { name: sh.name ? sh.name() : '', id: sh.id ? sh.id() : '', active: i === active };
+    return i === active ? Object.assign(base, readSheet(sh), { loaded: true }) : Object.assign(base, { rows: 0, cols: 0, head: [], loaded: false });
   });
   return { ok: true, sheets: out };
 })()`;
