@@ -11,7 +11,7 @@
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
-import { resolveToolFile, setGlobalOutDir, turnOutDir } from '../fileContext';
+import { currentTurnFiles, resolveToolFile, setGlobalOutDir, turnOutDir } from '../fileContext';
 import { buildFilePreview } from '../filePreview';
 import { extractOfficeText, officeKindFor } from '../ooxml';
 import { enc, type LarkToolDef, str } from './types';
@@ -203,7 +203,7 @@ export const fileTools: LarkToolDef[] = [
       // Sao lưu lên máy chủ tài khoản, để tệp mở lại được ở máy khác — giống hệt cách hội thoại
       // đi theo tài khoản. Nuốt lỗi có chủ ý: tệp cục bộ đã ghi xong rồi, một lần mạng chập
       // không được phép biến lượt chạy thành thất bại.
-      const uploadId = UPLOAD ? await UPLOAD({ name: fileName, bytes, mime: meta.mime }).catch(() => null) : null;
+      const uploadId = UPLOAD && !currentTurnFiles()?.noUpload ? await UPLOAD({ name: fileName, bytes, mime: meta.mime }).catch(() => null) : null;
 
       return {
         ok: true,
@@ -300,7 +300,7 @@ export const fileTools: LarkToolDef[] = [
       const fileName = `${base}${meta.ext}`;
       const path = join(OUT_DIR, fileName);
       await writeFile(path, outBytes);
-      const uploadId = UPLOAD ? await UPLOAD({ name: fileName, bytes: outBytes, mime: meta.mime }).catch(() => null) : null;
+      const uploadId = UPLOAD && !currentTurnFiles()?.noUpload ? await UPLOAD({ name: fileName, bytes: outBytes, mime: meta.mime }).catch(() => null) : null;
 
       return {
         ok: true,

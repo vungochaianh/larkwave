@@ -259,7 +259,7 @@ const t = async (name, fn) => {
     assert.deepStrictEqual(report.written[0], { tool: 'lark_web_write_records', target: 'Đơn', created: 2, updated: 1, unchanged: 3, url: 'https://x/base/T?table=t', verified: true });
     assert.deepStrictEqual(report.verify, { ok: 1, failed: 1 });
     report.skipped = [{ tool: 'messaging_send_message', category: 'send', reason: 'x' }];
-    assert.match(REC.reportLine(report), /ghi: 2 mới · 1 sửa.*đọc lại 1 khớp · 1 LỆCH.*1 thao tác bị bỏ qua/);
+    assert.match(REC.reportLine(report), /ghi: 2 mới · 1 sửa · 3 không đổi.*đọc lại 1 khớp · 1 LỆCH.*1 thao tác bị bỏ qua/);
     assert.strictEqual(tools[1].additive, true, 'bọc giữ nguyên cờ của tool');
   });
 
@@ -335,8 +335,14 @@ const t = async (name, fn) => {
     const ctx = { outDir: runDir, attachDir: f.root, extraRoots: [f.root] };
     const read = await FC.withTurnFiles(ctx, () => tool('prepare_local_file').exec({ path: src.path }));
     assert.ok(read.ok && /DH-1/.test(read.text), JSON.stringify(read).slice(0, 200));
-    const made = await FC.withTurnFiles(ctx, () => tool('create_file').exec({ format: 'xlsx', name: 'Báo cáo', rows: [['A'], [1]] }));
+    const uploads = [];
+    require(join(B, 'tools', 'files.js')).setFileUploader(async (f) => (uploads.push(f.name), 'up1'));
+    const made = await FC.withTurnFiles({ ...ctx, noUpload: true }, () => tool('create_file').exec({ format: 'xlsx', name: 'Báo cáo', rows: [['A'], [1]] }));
     assert.ok(made.path.startsWith(runDir), made.path);
+    assert.deepStrictEqual(uploads, [], 'lượt tự động không sao lưu tệp lên máy chủ tài khoản');
+    const chatMade = await FC.withTurnFiles({ outDir: runDir }, () => tool('create_file').exec({ format: 'csv', name: 'Chat', rows: [['A'], [1]] }));
+    assert.ok(chatMade.upload_id === 'up1' && uploads.length === 1, 'lượt chat thường vẫn sao lưu như cũ');
+    require(join(B, 'tools', 'files.js')).setFileUploader(null);
     const other = await AF.ensureAutomationFolder(BASE, 'rule-khac');
     const leak = await AF.addInputFile(other, 'bi-mat.csv', Buffer.from('x'));
     const denied = await FC.withTurnFiles(ctx, () => tool('prepare_local_file').exec({ path: leak.path }));
@@ -346,7 +352,8 @@ const t = async (name, fn) => {
   await t('mã nguồn: lượt tự động dùng thư mục riêng + luật không người trông + biên bản + kỹ năng; máy chạy hộ cũng vậy', () => {
     const svc = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
     const body = svc.slice(svc.indexOf('private async runAutomationAgent('), svc.indexOf('private async fetchAutoSource('));
-    assert.ok(/files: \{ outDir: runDir, attachDir: folder\.root, extraRoots: \[folder\.root\] \}/.test(body));
+    assert.ok(/files: \{ outDir: runDir, attachDir: folder\.root, extraRoots: \[folder\.root\], noUpload: true \}/.test(body), 'thư mục riêng + không sao lưu tệp mỗi lần chạy');
+    assert.ok(/rm\(automationRoot\(this\.baseDir, id\)/.test(svc), 'xoá quy tắc thì xoá thư mục của nó');
     assert.ok(/unattendedDecision\(tool, input, perms\)/.test(body));
     assert.ok(/wrapToolsForReport\(tools, report\)/.test(body));
     assert.ok(/withSkills: true/.test(body));

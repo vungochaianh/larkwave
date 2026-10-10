@@ -17,6 +17,7 @@ userData/lark/automations/<id quy tắc>/
   sources/<nguồn>/   tệp tải TƯƠI từ Lark mỗi lần chạy (xoá sạch rồi tải lại)
   outputs/<YYYYMMDD-HHmmss>/   tệp lần chạy đó dựng ra; giữ N lần gần nhất (mặc định 10), lần không ra tệp thì không giữ thư mục
   .extract/          chữ trích từ Excel/Word để agent Read (Read không mở được tệp ZIP nhị phân)
+  (xoá quy tắc = xoá cả thư mục; tệp của lần chạy KHÔNG sao lưu lên máy chủ tài khoản — `noUpload`)
   state.json         sha256 của tệp ĐÃ xử lý (tối đa 5 000)
 ```
 
@@ -173,3 +174,19 @@ sửa: "Lịch sử phiên bản" (Khác biệt — `lineDiff`, Khôi phục, Ho
 không tính vào "N dòng nguồn → N dòng").
 
 Kiểm: `test/skillLearning.cjs` (12 ca).
+
+## 9. Kiểm thật (10/10/2026, chế độ ẩn, phiên Lark web thật, bảng thử riêng trong «Base Test»)
+
+- Tệp «File test.xlsx» của hội thoại Toolswave `c3f9cd1c…`: `prepare_local_file` với đường dẫn Toolswave → bản chép ở
+  Larkwave (cùng nội dung, nguồn không đổi), đính vào một dòng của bảng thử → `verified:true`. `/etc/hosts` và
+  `…/@toolswave/desktop/skills/registry.json` bị từ chối kèm lý do. (Không đụng bản ghi thật của người dùng.)
+- Quy tắc thử "đọc tệp → ghi Base" (tệp nguồn xlsx 3 dòng + nguồn "ô đính kèm" tải tươi bằng `webDownload`):
+  lần 1 (32 s) 3 mới + đính báo cáo, đọc lại khớp; lần 2 (23 s) 0 mới · 3 không đổi, không đính lại báo cáo; bảng
+  đọc lại đủ 4 dòng (không trùng); lần 3 "chỉ tệp mới" → không chạy agent (1 s); lần 4 thêm tệp sửa DH-002 + thêm
+  DH-004 khi CHƯA cấp "ghi đè ô" → DH-004 được thêm, DH-002 bị bỏ qua và biên bản ghi rõ lý do. Màn Tự động hoá hiện
+  biên bản + thẻ tệp kết quả; màn sửa quy tắc hiện thư mục/tệp nguồn/nguồn Lark/quyền/"Chạy ở".
+- Tự học: "Từ giờ khi xuất Excel thì luôn thêm dòng tổng ở cuối." → agent gọi `skill_list` rồi `skill_save` (bổ sung
+  cho «Xuất bảng ra Excel/CSV đầy đủ», không sửa kỹ năng dựng sẵn) → "Đã học…"; lượt sau "Xuất bảng … ra Excel" →
+  `lark_export_table_file` với `total_row:true`, tệp có dòng "Tổng" `=SUM(C2:C6)`. "Hoàn tác" → kỹ năng biến mất khỏi
+  thư viện và `~/.claude/skills`.
+- Đã dọn: bảng thử (xoá khối bảng, quét lại Base không còn), quy tắc + thư mục, hội thoại thử, nhật ký học/lịch sử gợi ý.

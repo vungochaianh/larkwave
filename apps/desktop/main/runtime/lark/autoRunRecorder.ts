@@ -44,7 +44,8 @@ export function noteToolResult(report: LarkAutoRunReport, name: string, input: R
       push(report, 'read', { what: `tệp đính kèm ${d.name ?? input.name ?? input.file_token ?? ''}` });
       return;
     case 'prepare_local_file': {
-      const rows = Array.isArray(d.preview?.sheets) ? d.preview.sheets.reduce((n: number, sh: J) => n + (num(sh?.rows) ?? 0), 0) : undefined;
+      // Dòng DỮ LIỆU (bỏ hàng tiêu đề của mỗi sheet).
+      const rows = Array.isArray(d.preview?.sheets) ? d.preview.sheets.reduce((n: number, sh: J) => n + Math.max(0, (num(sh?.rows) ?? 0) - 1), 0) : undefined;
       push(report, 'read', { what: `tệp ${d.file_name ?? input.path ?? ''}`, rows });
       return;
     }
@@ -131,8 +132,10 @@ export function reportLine(r: LarkAutoRunReport): string {
   const w = r.written ?? [];
   const created = w.reduce((n, x) => n + (x.created ?? 0), 0);
   const updated = w.reduce((n, x) => n + (x.updated ?? 0), 0);
+  const unchanged = w.reduce((n, x) => n + (x.unchanged ?? 0), 0);
   const other = w.reduce((n, x) => n + (x.count ?? 0), 0);
-  if (created || updated || other) parts.push(`ghi: ${created} mới · ${updated} sửa${other ? ` · ${other} thao tác khác` : ''}`);
+  if (created || updated || unchanged || other)
+    parts.push(`ghi: ${created} mới · ${updated} sửa${unchanged ? ` · ${unchanged} không đổi` : ''}${other ? ` · ${other} thao tác khác` : ''}`);
   if (r.verify) parts.push(`đọc lại ${r.verify.ok} khớp${r.verify.failed ? ` · ${r.verify.failed} LỆCH` : ''}`);
   if (r.skipped?.length) parts.push(`${r.skipped.length} thao tác bị bỏ qua (thiếu quyền)`);
   if (r.outputs?.length) parts.push(`${r.outputs.length} tệp kết quả`);

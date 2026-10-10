@@ -1559,7 +1559,8 @@ export class LarkService {
       let rows: number | undefined;
       try {
         const pv = /\.(xlsx|csv)$/i.test(f.name) ? buildFilePreview(f.name, readFileSyncSafe(f.path)) : null;
-        rows = pv?.sheets?.reduce((n, sh) => n + (sh.rows || 0), 0);
+        // Số DÒNG DỮ LIỆU (bỏ hàng tiêu đề của mỗi sheet có dữ liệu).
+        rows = pv?.sheets?.reduce((n, sh) => n + Math.max(0, (sh.rows || 0) - 1), 0);
       } catch {
         rows = undefined;
       }
@@ -1605,7 +1606,7 @@ export class LarkService {
         attachNames.length ? { dir: folder.root, names: attachNames } : undefined,
         900_000,
         {
-          files: { outDir: runDir, attachDir: folder.root, extraRoots: [folder.root] },
+          files: { outDir: runDir, attachDir: folder.root, extraRoots: [folder.root], noUpload: true },
           cwd: folder.root,
           decide: (tool, input) => {
             const d = unattendedDecision(tool, input, perms);
@@ -1809,7 +1810,7 @@ export class LarkService {
       'Mỗi kỹ năng một lần gọi skill_save: name ngắn có tên Base, triggers (tên bảng, nghiệp vụ, VI/EN), instructions là các bước/quy ước cụ thể (dùng ĐÚNG tên bảng/cột trong «…»). Gọi skill_list trước để không trùng. ' +
       'Không ghi bí mật, không ghi dữ liệu cá nhân của bản ghi mẫu (chỉ quy ước). Việc CHỈ ĐỌC. Cuối cùng liệt kê ngắn các đề xuất.';
     await this.runScheduledAgentTurn(prompt, 'ask', undefined, 12_000, undefined, 600_000, {
-      files: { outDir: work ?? null, attachDir: work ?? null },
+      files: { outDir: work ?? null, attachDir: work ?? null, noUpload: true },
       decide: () => false,
       wrap: (tools) => [...tools.filter((t) => t.name !== 'skill_save'), collect],
       extraSystem: '=== HỌC TỪ BASE (chỉ đọc, đề xuất kỹ năng) === Chỉ dùng công cụ ĐỌC + skill_list/skill_get + skill_save (đề xuất). Không ghi gì vào Lark.',
@@ -3225,7 +3226,10 @@ export class LarkService {
     const tool = resolveTool(name) ?? this.plugins.collectTools().find((t) => t.name === name);
     if (!tool) return { ok: false, error: `Không tìm thấy tool ${name}.` };
     try {
-      const data = await tool.exec(input, client as LarkClient);
+      // Công cụ chạy trực tiếp (bảng công cụ / thẻ) cũng có thư mục ghi riêng — nếu không, công cụ dựng/tải
+      // tệp báo "chưa có thư mục ghi tệp".
+      const dir = await this.chatWorkDir('tool-runs').catch(() => null);
+      const data = await withTurnFiles({ outDir: dir, attachDir: dir }, () => tool.exec(input, client as LarkClient));
       return { ok: true, data };
     } catch (e) {
       return { ok: false, error: e instanceof LarkApiError ? e.message : String((e as Error)?.message ?? e) };
@@ -4159,7 +4163,10 @@ export class LarkService {
     return this.automation.upsert(input).map((r) => this.publicRule(r));
   }
   deleteAutomation(id: string): LarkAutomation[] {
-    return this.automation.remove(id).map((r) => this.publicRule(r));
+    const list = this.automation.remove(id).map((r) => this.publicRule(r));
+    // Xoá quy tắc thì xoá luôn thư mục của nó (tệp nguồn, kết quả các lần chạy, dấu tệp đã xử lý).
+    void rm(automationRoot(this.baseDir, id), { recursive: true, force: true }).catch(() => undefined);
+    return list;
   }
   setAutomationEnabled(id: string, on: boolean): LarkAutomation[] {
     return this.automation.setEnabled(id, on).map((r) => this.publicRule(r));

@@ -20,6 +20,11 @@ export interface TurnFileContext {
   attachDir?: string | null;
   /** Thư mục được phép thêm (thư mục của một quy tắc tự động hoá). */
   extraRoots?: string[];
+  /**
+   * KHÔNG sao lưu tệp dựng ra lên máy chủ tài khoản (lượt tự động hoá / Học từ Base): tệp của lần chạy đã
+   * nằm trong thư mục quy tắc (giữ N lần) — tải lên mỗi lần chạy chỉ làm đầy hạn mức lưu trữ.
+   */
+  noUpload?: boolean;
 }
 
 const als = new AsyncLocalStorage<TurnFileContext>();
