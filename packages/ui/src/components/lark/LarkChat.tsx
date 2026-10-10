@@ -824,7 +824,7 @@ export function LarkChat({
         }
       }
     } else if (ev.type === 'tool_result') {
-      updateTool(ev.callId, (c) => ({ ...c, status: ev.ok ? 'ok' : 'error', summary: ev.summary, error: ev.error, suspectAppBug: ev.suspectAppBug, tier: ev.tier }));
+      updateTool(ev.callId, (c) => ({ ...c, status: ev.ok ? 'ok' : 'error', summary: ev.summary, ...(ev.memo ? { memo: ev.memo } : {}), error: ev.error, suspectAppBug: ev.suspectAppBug, tier: ev.tier }));
       // The tool already ran (e.g. auto-approved server-side) — drop any lingering confirm.
       setPendings((p) => p.filter((x) => x.callId !== ev.callId));
     } else if (ev.type === 'file') {

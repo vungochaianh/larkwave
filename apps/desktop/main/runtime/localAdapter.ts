@@ -562,6 +562,10 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   resyncSkills(): void {
     this.skills.resync();
   }
+  /** Sau khi nhập/nối phiên Claude: bỏ id phiên đã nạp trong bộ nhớ (xem LarkService.forgetTurnStates). */
+  larkForgetTurnStates(): void {
+    this.lark.forgetTurnStates();
+  }
   larkGrantPolicies(): Promise<Record<string, LarkGrantPolicy>> {
     return this.lark.getGrantPolicies();
   }

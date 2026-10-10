@@ -27,41 +27,53 @@ export async function runRunnerOnce(opts: {
   const cwd = opts.cwd || join(tmpdir(), `tw-lark-run-${randomUUID()}`);
   await mkdir(cwd, { recursive: true });
   const env = runnerEnv(opts.runnerId);
-  const args = buildArgs(opts.runnerId, opts.prompt, opts.model, cwd);
-  const text = await spawnCollect(cat.bin, args, cwd, env);
+  const { args, stdin } = buildArgs(opts.runnerId, opts.prompt, opts.model, cwd);
+  const text = await spawnCollect(cat.bin, args, cwd, env, stdin);
   if (opts.cwd !== cwd) await rm(cwd, { recursive: true, force: true }).catch(() => {});
   return text;
 }
 
-function buildArgs(runnerId: RunnerId, prompt: string, model: string | undefined, cwd: string): string[] {
+/**
+ * Prompt dài hơn mức này đi qua STDIN (lịch sử hội thoại + bộ công cụ có thể tới hàng trăm nghìn ký
+ * tự; argv có trần của hệ điều hành — xem larkAgent.STDIN_PROMPT_MIN_CHARS). Cả hai CLI đều đọc stdin:
+ * `codex exec -` lấy toàn bộ chỉ dẫn từ stdin; `gemini -p <x>` nối `<x>` vào SAU nội dung stdin.
+ */
+export const RUNNER_STDIN_MIN_CHARS = 60_000;
+
+export function buildArgs(runnerId: RunnerId, prompt: string, model: string | undefined, cwd: string): { args: string[]; stdin?: string } {
+  const big = prompt.length > RUNNER_STDIN_MIN_CHARS;
   switch (runnerId) {
     case 'grok': {
       const path = writeRunnerPromptFile(cwd, 'lark', prompt);
       const args = ['--prompt-file', path, '--cwd', cwd, '--always-approve'];
       if (model) args.push('-m', model);
-      return args;
+      return { args };
     }
     case 'gemini': {
-      const args = ['-p', prompt, '--yolo'];
+      const args = big ? ['-p', '(Thực hiện đúng yêu cầu [USER] ở cuối nội dung phía trên.)', '--yolo'] : ['-p', prompt, '--yolo'];
       if (model) args.push('-m', model);
-      return args;
+      return big ? { args, stdin: prompt } : { args };
     }
     case 'codex': {
-      const args = ['exec', prompt, '--cd', cwd, '--dangerously-bypass-approvals-and-sandbox'];
+      const args = ['exec', big ? '-' : prompt, '--cd', cwd, '--dangerously-bypass-approvals-and-sandbox'];
       if (model) args.push('-m', model);
-      return args;
+      return big ? { args, stdin: prompt } : { args };
     }
     default:
       throw new Error(`Runner ${runnerId} không hỗ trợ orchestrator Lark.`);
   }
 }
 
-function spawnCollect(bin: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
+function spawnCollect(bin: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, stdin?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, { cwd, env, stdio: [stdin !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+    if (stdin !== undefined && child.stdin) {
+      child.stdin.on('error', () => undefined);
+      child.stdin.end(stdin, 'utf8');
+    }
     let out = '';
-    child.stdout.on('data', (c: Buffer) => (out += c.toString('utf8')));
-    child.stderr.on('data', (c: Buffer) => (out += c.toString('utf8')));
+    child.stdout!.on('data', (c: Buffer) => (out += c.toString('utf8')));
+    child.stderr!.on('data', (c: Buffer) => (out += c.toString('utf8')));
     child.on('error', (err: NodeJS.ErrnoException) => {
       reject(
         new Error(

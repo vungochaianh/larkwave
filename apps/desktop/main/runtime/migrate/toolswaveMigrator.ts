@@ -26,6 +26,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, stat, writeFile, copyFile } from 'node:fs/promises';
 import { join, resolve, sep, dirname } from 'node:path';
 import { mergeSession, mergeSpec, type StoredSession } from '../lark/larkMerge';
+import { claudeProjectDirFor, claudeProjectsDir, copyClaudeSession, findClaudeTranscript, isSessionId } from '../claudeSessions';
 import type { LarkSpecDoc, ToolswaveMigrationCategory, ToolswaveMigrationReport } from '@larkwave/core';
 
 export type MigrateCategory = ToolswaveMigrationCategory;
@@ -50,6 +51,13 @@ export interface MigrateOpts {
   /** Giới hạn tệp làm việc (lark/work) — chỉ chép tệp nhỏ. */
   maxWorkFileBytes?: number;
   maxWorkTotalBytes?: number;
+  /**
+   * Môi trường của Claude CLI (để tính đúng `~/.claude/projects` và slug) — mặc định process.env.
+   * Bài kiểm trỏ `CLAUDE_CONFIG_DIR` vào fixture.
+   */
+  claudeEnv?: Record<string, string | undefined>;
+  /** Chỉ chạy hạng mục hội thoại (+ nối lại phiên Claude) — lượt bổ sung cho tài khoản đã nhập trước bản này. */
+  sessionsOnly?: boolean;
 }
 
 export const FOLLOW_UPS = [
@@ -155,7 +163,7 @@ async function isDir(p: string): Promise<boolean> {
 }
 
 function emptyCounts(): Record<MigrateCategory, CategoryCount> {
-  const cats: MigrateCategory[] = ['sessions', 'deleted', 'specs', 'larkConfig', 'automations', 'bases', 'relogin', 'workFiles', 'skills', 'plugins'];
+  const cats: MigrateCategory[] = ['sessions', 'claudeSessions', 'deleted', 'specs', 'larkConfig', 'automations', 'bases', 'relogin', 'workFiles', 'skills', 'plugins'];
   return Object.fromEntries(cats.map((c) => [c, { added: 0, merged: 0, unchanged: 0 }])) as Record<MigrateCategory, CategoryCount>;
 }
 
@@ -190,6 +198,15 @@ class Ctx {
     const tmp = `${p}.${process.pid}.migrate.tmp`;
     await writeFile(tmp, data);
     await rename(tmp, p);
+  }
+  /** Chốt luật 1 cho đích nằm NGOÀI userData (thư mục phiên của Claude CLI). */
+  guardDest(p: string): void {
+    this.guard(p);
+  }
+  async mkdirDest(p: string): Promise<void> {
+    this.guard(p);
+    if (this.dryRun) return;
+    await mkdir(p, { recursive: true });
   }
   async copyDest(from: string, to: string): Promise<void> {
     this.guard(to);
@@ -267,29 +284,81 @@ async function migrateSessions(ctx: Ctx, src: string, migratedIds: Set<string>):
     }
     const target = join(dest, job.to, `${scopeOf(s.id)}.json`);
     const ex = await readDestJson<StoredSession>(target);
+    // Phiên Claude CLI của hội thoại bên Toolswave. Nó nằm ở thư mục slug của cwd TOOLSWAVE nên
+    // `--resume` từ thư mục Larkwave sẽ báo "không tìm thấy" — chép bản ghi gốc sang slug của
+    // Larkwave thì CLI nối lại đúng phiên đó, nhớ trọn (kể cả kết quả công cụ) thay vì chỉ một
+    // bản chữ rút gọn.
+    const twSid = activeSessionId(s);
+    const exSid = ex ? activeSessionId(ex) : null;
+    // Larkwave đã chạy tiếp hội thoại này bằng phiên CỦA NÓ (khác id) → phiên đó mới là phần nối
+    // tiếp, giữ nguyên. Còn lại (chưa có / trùng id) thì nối phiên gốc.
+    const linked = twSid && (!exSid || exSid === twSid) ? await linkClaudeSession(ctx, src, s.id, twSid) : false;
     if (!ex) {
-      // Phiên CLI cũ (`--resume`) gắn với thư mục làm việc của app Toolswave — ở đây không tồn
-      // tại, CLI sẽ báo "không tìm thấy hội thoại". Bỏ id phiên để lượt sau mở phiên mới; bản ghi
-      // hội thoại (items) vẫn đủ để đọc và để nối tiếp ngữ cảnh.
-      const fresh: StoredSession = { ...s, claudeSessionId: '' };
-      delete fresh.agentSessionId;
-      await ctx.writeDest(target, JSON.stringify(fresh, null, 2));
+      const next: StoredSession = linked ? { ...s, claudeSessionId: twSid!, agentSessionId: twSid! } : { ...s, claudeSessionId: '' };
+      // Không thấy bản ghi phiên ở đâu cả: bỏ id để lượt sau mở phiên mới, nối tiếp bằng lịch sử.
+      if (!linked) delete next.agentSessionId;
+      await ctx.writeDest(target, JSON.stringify(next, null, 2));
       ctx.count('sessions', 'added');
       migratedIds.add(s.id);
       continue;
     }
     const merged = mergeSession(ex, s);
-    if (merged === ex) {
+    const adopt = linked && !exSid; // hội thoại có sẵn ở Larkwave (vd kéo từ bản sao lưu) nhưng chưa có phiên CLI
+    if (merged === ex && !adopt) {
       ctx.count('sessions', 'unchanged');
       continue;
     }
-    // Giữ id phiên CLI của Larkwave (nó mới chạy được ở thư mục này).
-    const keep: StoredSession = { ...merged, claudeSessionId: ex.claudeSessionId, ...(ex.agentSessionId ? { agentSessionId: ex.agentSessionId } : {}) };
-    if (!ex.agentSessionId) delete keep.agentSessionId;
+    // Giữ id phiên CLI của Larkwave (nó mới chạy được ở thư mục này) — hoặc nhận phiên gốc vừa nối.
+    const keep: StoredSession = adopt
+      ? { ...merged, claudeSessionId: twSid!, agentSessionId: twSid! }
+      : { ...merged, claudeSessionId: ex.claudeSessionId, ...(ex.agentSessionId ? { agentSessionId: ex.agentSessionId } : {}) };
+    if (!adopt && !ex.agentSessionId) delete keep.agentSessionId;
     await ctx.writeDest(target, JSON.stringify(keep, null, 2));
-    ctx.count('sessions', 'merged');
+    ctx.count('sessions', merged === ex ? 'unchanged' : 'merged');
     migratedIds.add(s.id);
   }
+}
+
+/** Id phiên CLI mà lượt kế tiếp sẽ `--resume` (cùng luật với larkService.loadTurnState). */
+function activeSessionId(s: StoredSession): string | null {
+  const id = s.agentSessionId || s.claudeSessionId || '';
+  return isSessionId(id) ? id : null;
+}
+
+/**
+ * Chép `<sid>.jsonl` (+ thư mục phụ `<sid>/`) từ slug của thư mục làm việc Toolswave sang slug của
+ * thư mục làm việc Larkwave (tạo sẵn thư mục làm việc để realpath khớp đúng thứ CLI sẽ thấy).
+ * Không thấy ở slug Toolswave thì tìm đúng id ở mọi thư mục dự án (phiên cũ từng chạy ở cwd khác).
+ * Trả về true khi đích có bản ghi dùng được (vừa chép, vừa cập nhật, hoặc đã có sẵn).
+ */
+async function linkClaudeSession(ctx: Ctx, src: string, convId: string, sid: string): Promise<boolean> {
+  const env = ctx.o.claudeEnv ?? process.env;
+  const projects = claudeProjectsDir(env);
+  const workDir = join(ctx.o.dest, 'lark', 'work', scopeOf(convId));
+  if (!ctx.dryRun) await ctx.mkdirDest(workDir);
+  const toDir = claudeProjectDirFor(workDir, env);
+  const fromPreferred = claudeProjectDirFor(join(src, 'lark', 'work', scopeOf(convId)), env);
+  const found = await findClaudeTranscript(sid, { projectsDir: projects, preferDirs: [fromPreferred], excludeDirs: [toDir] });
+  if (!found) {
+    // Có thể đã nằm sẵn ở đích (lần nhập trước, hoặc CLI đã chạy ở thư mục Larkwave).
+    const already = await findClaudeTranscript(sid, { projectsDir: projects, preferDirs: [toDir] });
+    if (already && already.dir === toDir) {
+      ctx.count('claudeSessions', 'unchanged');
+      return true;
+    }
+    ctx.skip(src, join(src, 'lark', 'sessions', `${convId}.json`), 'không còn bản ghi phiên Claude CLI trên máy — lượt sau nối lại bằng lịch sử hội thoại');
+    return false;
+  }
+  ctx.guardDest(toDir);
+  const r = await copyClaudeSession({ sessionId: sid, fromDir: found.dir, toDir, dryRun: ctx.dryRun });
+  if (r.status === 'copied') ctx.count('claudeSessions', 'added');
+  else if (r.status === 'updated') ctx.count('claudeSessions', 'merged');
+  else if (r.status === 'unchanged') ctx.count('claudeSessions', 'unchanged');
+  else if (r.status === 'diverged') {
+    ctx.count('claudeSessions', 'unchanged');
+    ctx.skip(src, join(src, 'lark', 'sessions', `${convId}.json`), 'phiên Claude đã chạy tiếp ở cả hai app — giữ bản Larkwave, không ghi đè');
+  }
+  return r.status !== 'missing';
 }
 
 async function migrateDeleted(ctx: Ctx, src: string): Promise<void> {
@@ -572,6 +641,7 @@ export async function migrateFromToolswave(o: MigrateOpts): Promise<MigrateRepor
   for (const src of o.sources) {
     const ids = new Set<string>();
     await migrateSessions(ctx, src, ids);
+    if (o.sessionsOnly) continue;
     await migrateDeleted(ctx, src);
     await migrateSpecs(ctx, src);
     await migrateLarkConfig(ctx, src);

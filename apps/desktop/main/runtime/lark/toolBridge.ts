@@ -8,23 +8,7 @@ import {
   isSelfDeclaredFailure,
   suspectAppBugError,
   tierForError,
-  tierForPayload, fileEventFor, runPreflight, needsConfirmation, previewFor } from './larkToolExec';
-
-/** Tóm tắt ngắn gọn kết quả một công cụ, cho thẻ hiển thị ở giao diện. */
-function summarize(data: unknown): string {
-  try {
-    if (data && typeof data === 'object') {
-      const o = data as Record<string, unknown>;
-      if (Array.isArray(o.items)) return `${o.items.length} mục`;
-      if (Array.isArray((o as { records?: unknown[] }).records)) return `${(o as { records: unknown[] }).records.length} bản ghi`;
-      const keys = Object.keys(o);
-      return keys.length ? `${keys.length} trường` : 'OK';
-    }
-    return String(data ?? 'OK').slice(0, 80);
-  } catch {
-    return 'OK';
-  }
-}
+  tierForPayload, fileEventFor, runPreflight, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
 
 /**
  * Bộ công cụ + hàm THỰC THI dùng chung cho mọi đường chạy Lark agent (API trực tiếp và MAIC).
@@ -104,7 +88,7 @@ export function createToolBridge(
               suspectAppBug: isFailurePayload(data),
               tier: tierForPayload(data, name),
             }
-          : { type: 'tool_result', callId, ok: true, summary: summarize(data) },
+          : { type: 'tool_result', callId, ok: true, summary: summarizeTool(name, data), memo: memoForTool(name, data) || undefined },
       );
       // Thẻ tệp — luật nằm ở `fileEventFor`, dùng chung với mcpServer để hai đường không lệch.
       if (!failed) {

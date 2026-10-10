@@ -139,14 +139,6 @@ function simplifyRecord(fields: Record<string, unknown>): Record<string, unknown
   return out;
 }
 
-/** Minimal shape of a persisted chat item (a renderer bubble or tool card) as needed to rebuild
- *  a transcript. Items are otherwise stored opaquely; only these fields are read here. */
-interface ChatItemLite {
-  kind?: string;
-  role?: string;
-  text?: string;
-  call?: { name?: string; input?: unknown; summary?: string; status?: string; error?: string };
-}
 
 /** A `skills/registry.json` record, as SkillHost writes it (see runtime/skills/skillHost.ts).
  *  Read-only here — the chat engine only needs to find + load a skill, never to edit one. */
@@ -173,6 +165,8 @@ const MAIC_PROMPT_MAX = 20000;
 
 import { agentTools, allTools, isAdditiveTool, isWriteTool, readOnlyTools } from './tools';
 import { extractOfficeText, officeKindFor } from './ooxml';
+import { buildApiHistory as buildApiHistoryMsgs, buildTranscript as buildTranscriptText } from './transcript';
+import { transcriptBudgetTokens } from '../contextBudget';
 import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
 import { newFilesSince, snapshotDir } from './fileBuild';
@@ -953,6 +947,18 @@ export class LarkService {
     return st;
   }
 
+  /**
+   * Quên trạng thái lượt đã nạp (id phiên CLI) của các hội thoại KHÔNG đang chạy — gọi sau khi bộ
+   * nhập dữ liệu ghi lại id phiên vào tệp hội thoại (nối phiên Claude từ Toolswave), để lượt kế
+   * tiếp đọc id mới từ đĩa thay vì dùng bản cũ trong bộ nhớ.
+   */
+  forgetTurnStates(): void {
+    for (const id of [...this.turnState.keys()]) {
+      if (this.runs.has(id) || this.draftBases.has(id)) continue;
+      this.turnState.delete(id);
+    }
+  }
+
   /** Persist the current conversation's items (+ applied Bases when provided). */
   async larkSaveSession(id: string, items: unknown[], bases?: LarkBaseRef[]): Promise<void> {
     const existing = await this.readSession(id);
@@ -998,8 +1004,12 @@ export class LarkService {
       // those on the next completed turn.
       ...existing,
       id,
-      claudeSessionId: existing?.claudeSessionId || this.chatSessionId || randomUUID(),
-      agentSessionId: existing?.agentSessionId || this.chatSessionId || randomUUID(),
+      // Id phiên CLI của CHÍNH hội thoại này (turnState) đứng trước `this.chatSessionId` — field đó
+      // là của tab đang xem. Lấy nhầm nó thì hội thoại nhập từ Toolswave (chưa có id) bị ghi id của
+      // hội thoại KHÁC (hoặc một id ngẫu nhiên không ai từng chạy) → mở lại app là `--resume` hụt và
+      // AI quên sạch. turnState cũng là nơi giữ id mới sau khi đổi runner / nén phiên.
+      claudeSessionId: existing?.claudeSessionId || this.turnState.get(id)?.agentSessionId || this.chatSessionId || randomUUID(),
+      agentSessionId: this.turnState.get(id)?.agentSessionId || existing?.agentSessionId || this.chatSessionId || randomUUID(),
       runner: this.activeRunner || existing?.runner || 'claude',
       model: this.activeModel ?? existing?.model,
       title: existing?.title || this.deriveTitle(items),
@@ -3680,126 +3690,16 @@ export class LarkService {
   }
 
   /**
-   * Render ONE persisted chat item to a transcript line, or null to skip it. Includes `tool`
-   * items (name + args + result summary), not just `msg` text — so a rebuilt transcript carries
-   * the memory of what the agent already fetched/wrote in Lark on earlier turns (otherwise a
-   * non-claude/API runner re-fetches or hallucinates that data every turn).
-   */
-  private renderItemLine(it: ChatItemLite): string | null {
-    if (it?.kind === 'msg' && typeof it.text === 'string' && it.text.trim()) {
-      // Per-message cap so no single line (incl. the always-pinned first user message) can bust the
-      // window budget or the CLI `-p` argv (ARG_MAX) — e.g. a pasted document as the first message.
-      return `${it.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${it.text.trim().slice(0, 4000)}`;
-    }
-    if (it?.kind === 'tool' && it.call?.name) {
-      const c = it.call;
-      let argStr = '';
-      try {
-        // Cắt thẳng JSON ở 300 ký tự sẽ NUỐT MẤT đúng thứ đáng giữ nhất khi tham số dài (filter/sort/
-        // field_names của bitable_search_records chẳng hạn): các ĐỊNH DANH. Mất app_token/table_id ở
-        // các lượt sau nghĩa là model không còn đường đọc lại bảng đó — hay đọc tệp đính kèm trong nó.
-        // Nên tách định danh ra trước, chỉ cắt phần còn lại.
-        const inp = (c.input || {}) as Record<string, unknown>;
-        const KEYS = ['app_token', 'table_id', 'record_id', 'field_id', 'file_token', 'chat_id'];
-        const ids: Record<string, unknown> = {};
-        const rest: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(inp)) (KEYS.includes(k) ? ids : rest)[k] = v;
-        const idStr = Object.keys(ids).length ? JSON.stringify(ids) : '';
-        const restStr = Object.keys(rest).length ? JSON.stringify(rest).slice(0, 300) : '';
-        argStr = idStr || restStr ? ` ${[idStr, restStr].filter(Boolean).join(' ')}` : '';
-      } catch {
-        argStr = '';
-      }
-      // "(lỗi)" trơ trọi là vô dụng ở lượt sau: model không biết đã hỏng VÌ SAO nên hoặc lặp lại y
-      // nguyên lời gọi sai, hoặc bỏ cuộc. Giữ lại một đoạn thông báo lỗi thật.
-      const res = c.summary
-        ? ` → ${String(c.summary).slice(0, 400)}`
-        : c.status === 'error'
-          ? ` → (lỗi: ${String(c.error || 'không rõ').slice(0, 200)})`
-          : '';
-      return `[Tool ${c.name}${argStr}]${res}`;
-    }
-    return null;
-  }
-
-  /**
-   * Rebuild a compact TEXT transcript of a conversation. Used (a) as the ONLY cross-turn memory
-   * for non-claude CLI runners (no `--resume`), and (b) to RE-SEED claude when its local CLI
-   * session is gone (cross-device restore / reinstall / CLI prune) or after switching runner —
-   * without which the default runner silently forgets the whole conversation the UI still shows.
-   * Windowed by an approximate TOKEN budget (newest-first), not a fixed message count, and the
-   * first user message (task/scope) is preserved when older turns are evicted.
+   * Lịch sử chữ của hội thoại (xem transcript.ts) — trí nhớ của runner không có `--resume`, và
+   * đường lui của Claude khi phiên gốc không còn ở đâu cả. Ngân sách theo cửa sổ của runner/model.
    */
   private buildTranscript(items: unknown[], budgetTokens = 9000): string {
-    const rendered = (items as ChatItemLite[])
-      .map((it) => ({ it, line: this.renderItemLine(it) }))
-      .filter((x): x is { it: ChatItemLite; line: string } => !!x.line);
-    if (!rendered.length) return '';
-    const picked: string[] = [];
-    let used = 0;
-    let evicted = false;
-    for (let i = rendered.length - 1; i >= 0; i--) {
-      const t = Math.ceil(rendered[i].line.length / 4);
-      if (used + t > budgetTokens) {
-        evicted = true;
-        break;
-      }
-      picked.push(rendered[i].line);
-      used += t;
-    }
-    picked.reverse();
-    if (evicted) {
-      const firstUser = rendered.find((r) => r.it.kind === 'msg' && r.it.role === 'user');
-      picked.unshift('… (đã lược bớt phần cũ hơn của hội thoại) …');
-      if (firstUser && !picked.includes(firstUser.line)) picked.unshift(firstUser.line);
-    }
-    return picked.join('\n');
+    return buildTranscriptText(items, budgetTokens);
   }
 
-  /**
-   * Same windowing as buildTranscript but shaped for the DIRECT-API path (structured messages).
-   * Tool items are folded in as assistant lines so the model keeps the memory of prior Lark reads/
-   * writes. Replaces the old fixed `.slice(-14)` msg-only cap (which dropped tool context + early
-   * turns) with a token budget.
-   */
-  private buildApiHistory(
-    items: unknown[],
-    budgetTokens = 9000,
-  ): { role: 'user' | 'assistant'; text: string }[] {
-    const msgs = (items as ChatItemLite[])
-      .map((it) => {
-        if (it?.kind === 'msg' && (it.role === 'user' || it.role === 'assistant') && typeof it.text === 'string' && it.text.trim()) {
-          return { role: it.role as 'user' | 'assistant', text: it.text.trim() };
-        }
-        const line = it?.kind === 'tool' ? this.renderItemLine(it) : null;
-        return line ? { role: 'assistant' as const, text: line } : null;
-      })
-      .filter((x): x is { role: 'user' | 'assistant'; text: string } => !!x);
-    const picked: { role: 'user' | 'assistant'; text: string }[] = [];
-    let used = 0;
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      const t = Math.ceil(msgs[i].text.length / 4);
-      if (used + t > budgetTokens) break;
-      picked.push(msgs[i]);
-      used += t;
-    }
-    picked.reverse();
-    // Normalize for provider constraints: Anthropic requires the first message to be a user turn;
-    // Gemini requires STRICT user/assistant alternation. Folding tool items in as assistant lines
-    // (and token-windowing) can otherwise start on assistant or repeat a role → 400. So: drop any
-    // leading non-user entries, then merge consecutive same-role entries into one.
-    const out: { role: 'user' | 'assistant'; text: string }[] = [];
-    for (const m of picked) {
-      if (!out.length && m.role !== 'user') continue; // must begin on a user turn
-      const prev = out[out.length - 1];
-      if (prev && prev.role === m.role) prev.text = `${prev.text}\n${m.text}`;
-      else out.push({ role: m.role, text: m.text });
-    }
-    // Callers append the CURRENT turn as a user message, so history must end on an assistant turn
-    // (or be empty) to preserve strict alternation — drop a dangling trailing user (a prior turn
-    // that produced no assistant reply).
-    while (out.length && out[out.length - 1].role === 'user') out.pop();
-    return out;
+  /** Như buildTranscript nhưng dạng tin có vai cho đường API trực tiếp. */
+  private buildApiHistory(items: unknown[], budgetTokens = 9000): { role: 'user' | 'assistant'; text: string }[] {
+    return buildApiHistoryMsgs(items, budgetTokens);
   }
 
   /** The user's skill registry (`skills/registry.json`, written by SkillHost) — [] when there is
@@ -4022,10 +3922,12 @@ export class LarkService {
     // it as their only cross-turn memory; claude uses it to RE-SEED context when `--resume` can't
     // find the CLI session locally (cross-device restore / reinstall / prune). claude's normal
     // --resume path ignores it, so the happy path is unchanged.
-    let transcript = !general ? this.buildTranscript(stored?.items ?? []) : undefined;
+    // Ngân sách theo cửa sổ của runner/model (60k token với model 1M — trước đây cố định 9k).
+    const seedBudget = transcriptBudgetTokens(runner, model);
+    let transcript = !general ? this.buildTranscript(stored?.items ?? [], seedBudget) : undefined;
     let runnerSwitchNote: string | undefined;
     if (!general && input.runnerSwitched && stored?.items?.length) {
-      runnerSwitchNote = this.buildTranscript(stored.items);
+      runnerSwitchNote = this.buildTranscript(stored.items, seedBudget);
       // Switching runner starts a FRESH agent session (the previous runner's native/--resume
       // context does not transfer). Rotate for claude too — otherwise claude would --resume the
       // OLD id and the switch note would be built but never used → the switch loses all context.
@@ -4184,7 +4086,7 @@ export class LarkService {
           signal: abort.signal,
         });
       } else if (onApi) {
-        const history = this.buildApiHistory(stored?.items ?? []);
+        const history = this.buildApiHistory(stored?.items ?? [], seedBudget);
         inner = runLarkApiAgent(turnPrompt, input.mode, {
           client: client!,
           systemPrompt,
@@ -4338,7 +4240,7 @@ export class LarkService {
           const fbKey = general || !client ? null : this.resolveApiKey(runner);
           if (fbKey) {
             yield { type: 'text', delta: '\n\n_(Hết credit ở CLI — tự chuyển sang API trực tiếp, giữ nguyên hội thoại…)_\n\n' };
-            const history = this.buildApiHistory(stored?.items ?? []);
+            const history = this.buildApiHistory(stored?.items ?? [], seedBudget);
             const fb = runLarkApiAgent(turnPrompt, input.mode, {
               client: client!,
               systemPrompt,

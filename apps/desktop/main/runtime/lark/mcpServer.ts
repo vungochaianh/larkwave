@@ -11,7 +11,7 @@ import {
   tierForError,
   tierForPayload,
   versionNote,
-  withVersionNote, fileEventFor, runPreflight, needsConfirmation, previewFor } from './larkToolExec';
+  withVersionNote, fileEventFor, runPreflight, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
 
 /**
  * A minimal in-process MCP server (Streamable HTTP, JSON responses) that exposes
@@ -252,7 +252,7 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
               suspectAppBug: isFailurePayload(data),
               tier: tierForPayload(data, name),
             }
-          : { type: 'tool_result', callId, ok: true, summary: summarize(name, data) },
+          : { type: 'tool_result', callId, ok: true, summary: summarizeTool(name, data), memo: memoForTool(name, data) || undefined },
       );
       // THẺ TỆP. Đây là đường lượt Lark thật sự đi qua (Claude CLI ⇄ cầu MCP), nên thiếu ở đây là
       // thiếu ở mọi lượt chat Lark — dù `toolBridge` có phát đúng thì cũng không ai thấy.
@@ -293,15 +293,6 @@ function toolError(text: string) {
   return { content: [{ type: 'text', text }], isError: true };
 }
 
-/** A short human label for the tool-result chip in the UI (no raw dumps). */
-function summarize(name: string, data: any): string {
-  if (data && typeof data === 'object') {
-    if (Array.isArray((data as any).items)) return `${(data as any).items.length} mục`;
-    if ((data as any).record?.record_id) return `record ${(data as any).record.record_id}`;
-    if ((data as any).message_id) return `đã gửi (${(data as any).message_id})`;
-  }
-  return name;
-}
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {

@@ -57,7 +57,11 @@ const toolswaveMigration = new ToolswaveMigrationService(
   (ev) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.toolswaveMigrationEvent, ev);
   },
-  () => runtime.resyncSkills(),
+  () => {
+    runtime.resyncSkills();
+    // Bộ nhập vừa ghi id phiên Claude vào tệp hội thoại → lượt sau phải đọc lại từ đĩa.
+    runtime.larkForgetTurnStates();
+  },
 );
 const agentClient = new AgentClient(runtime, app.getPath('userData'), (s) => {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(IPC.agentEvent, s);

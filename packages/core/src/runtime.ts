@@ -1130,6 +1130,12 @@ export type LarkChatEvent =
       callId: string;
       ok: boolean;
       summary?: string;
+      /**
+       * Bản tóm KẾT QUẢ để làm trí nhớ (id, số lượng, liên kết, tên) — không hiển thị. Lưu cùng thẻ
+       * công cụ trong lịch sử, để khi phải nối lại hội thoại bằng chữ (runner không có --resume,
+       * phiên CLI đã mất) model vẫn biết công cụ đã trả về gì, không chỉ đã được gọi với gì.
+       */
+      memo?: string;
       error?: string;
       suspectAppBug?: boolean;
       /**
@@ -1970,6 +1976,8 @@ export interface RuntimeAdapter {
 // ── Nhập dữ liệu từ app desktop Toolswave ──────────────────────────────────────────────────────
 export type ToolswaveMigrationCategory =
   | 'sessions'
+  /** Phiên Claude CLI gốc (`~/.claude/projects/<slug>/<id>.jsonl`) chép sang thư mục làm việc Larkwave — "phiên Claude đã nối lại". */
+  | 'claudeSessions'
   | 'deleted'
   | 'specs'
   | 'larkConfig'
@@ -1990,6 +1998,11 @@ export interface ToolswaveMigrationReport {
   skipped: { path: string; reason: string }[];
   droppedSecretFields: number;
   followUps: string[];
+  /**
+   * Lần nối lại phiên Claude CLI (bổ sung cho tài khoản đã nhập trước khi có bước này). Có trường
+   * này thì máy đã chạy bước nối phiên — không tự chạy lại.
+   */
+  claudeRelink?: { at: string; added: number; merged: number; unchanged: number };
 }
 
 export interface ToolswaveMigrationStatus {

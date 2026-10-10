@@ -107,7 +107,7 @@ export async function executeLarkTool(
             suspectAppBug: isFailurePayload(data),
             tier: tierForPayload(data, name),
           }
-        : { type: 'tool_result', callId, ok: true, summary: summarizeTool(name, data) },
+        : { type: 'tool_result', callId, ok: true, summary: summarizeTool(name, data), memo: memoForTool(name, data) || undefined },
     );
     // Tool có thể BÁO HỎNG bằng dữ liệu (`{ok:false, reason}`) chứ không ném — với người dùng thì
     // hai kiểu đó hỏng như nhau, nên ghi chú phiên bản phải gắn cho cả hai.
@@ -359,9 +359,16 @@ export async function versionNote(allowed?: boolean): Promise<string> {
   }
 }
 
-function summarizeTool(name: string, data: unknown): string {
+/**
+ * Nhãn ngắn cho chip kết quả công cụ trong giao diện (không đổ dữ liệu thô). MỘT chỗ duy nhất —
+ * cầu MCP, toolBridge và orchestrator đều gọi vào đây (trước kia mỗi nơi một bản, lệch nhau).
+ */
+export function summarizeTool(name: string, data: unknown): string {
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>;
+    if (typeof d.file_name === 'string' && typeof d.path === 'string') return `tệp ${d.file_name}`;
+    if (typeof d.written === 'number') return `đã ghi ${d.written} dòng${d.verified ? ' · đã đọc lại khớp' : ''}`;
+    if (typeof d.url === 'string' && /^https?:/.test(d.url) && (d.kind === 'sheet' || d.kind === 'docx' || d.kind === 'drive_file')) return `${d.kind === 'sheet' ? 'Lark Sheets' : d.kind === 'docx' ? 'Lark Docs' : 'Drive'} · ${d.url}`;
     if (Array.isArray(d.items)) return `${d.items.length} mục`;
     const rec = d.record as { record_id?: string } | undefined;
     if (rec?.record_id) return `record ${rec.record_id}`;
@@ -370,6 +377,59 @@ function summarizeTool(name: string, data: unknown): string {
     if (typeof d.valid === 'boolean') return d.valid ? 'thiết kế hợp lệ' : `thiết kế còn ${Array.isArray(d.errors) ? d.errors.length : ''} lỗi`;
   }
   return name;
+}
+
+const MEMO_ID_KEY = /(^|_)(id|ids|token|tokens)$|^(app_token|table_id|record_id|record_ids|field_id|file_token|workflow_id|block_id|folder_token|chat_id|message_id|obj_token|sheet_id|doc_token)$/i;
+const MEMO_COUNT_KEY = /^(count|total|created|failed|written|added_count|rows|records|record_count|source_rows|file_rows|sheets|has_more|verified|filled_cells|kept_existing|page_count|pages)$/i;
+const MEMO_NAME_KEY = /^(name|title|file_name|table_name|sheet_name|base_name)$/i;
+const MEMO_SKIP_KEY = /secret|password|access_token|refresh_token|tmp_url|download_url|cookie|csrf|preview|samples|rows_data|data_b64|bytes_b64/i;
+
+/**
+ * Bản tóm KẾT QUẢ công cụ để làm trí nhớ xuyên lượt (`tool_result.memo`, lưu cùng thẻ công cụ): id,
+ * số lượng, liên kết, tên — đúng thứ lượt sau cần để làm tiếp mà không phải gọi lại hay đoán. Duyệt
+ * nông (3 tầng), bỏ trường bí mật/nhị phân, trần ~700 ký tự.
+ */
+export function memoForTool(name: string, data: unknown): string {
+  if (!data || typeof data !== 'object') return '';
+  const ids: string[] = [];
+  const counts: string[] = [];
+  const names: string[] = [];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const add = (bucket: string[], s: string, max: number) => {
+    if (bucket.length >= max || seen.has(s)) return;
+    seen.add(s);
+    bucket.push(s);
+  };
+  const walk = (v: unknown, key: string, depth: number) => {
+    if (depth > 3 || v === null || v === undefined) return;
+    if (key && MEMO_SKIP_KEY.test(key)) return;
+    if (typeof v === 'string') {
+      if (/^https?:\/\//.test(v)) add(urls, v.length > 200 ? `${v.slice(0, 200)}…` : v, 4);
+      else if (key && MEMO_ID_KEY.test(key) && v.length <= 80) add(ids, `${key}=${v}`, 12);
+      else if (key && MEMO_NAME_KEY.test(key) && v.length <= 120) add(names, `«${v}»`, 5);
+      return;
+    }
+    if (typeof v === 'number' || typeof v === 'boolean') {
+      if (key && MEMO_COUNT_KEY.test(key)) add(counts, `${key}=${v}`, 8);
+      return;
+    }
+    if (Array.isArray(v)) {
+      if (key && MEMO_COUNT_KEY.test(key) === false && v.length && v.every((x) => typeof x === 'string') && MEMO_ID_KEY.test(key)) {
+        add(ids, `${key}=[${(v as string[]).slice(0, 5).join(',')}${v.length > 5 ? `,…(${v.length})` : ''}]`, 12);
+        return;
+      }
+      if (key) add(counts, `${key}:${v.length}`, 8);
+      for (const x of v.slice(0, 5)) walk(x, '', depth + 1);
+      return;
+    }
+    if (typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) walk(x, k, depth + 1);
+  };
+  walk(data, '', 0);
+  const parts = [...counts, ...names, ...ids, ...urls];
+  if (!parts.length) return '';
+  const out = parts.join(' · ');
+  return out.length > 700 ? `${out.slice(0, 700)}…` : out;
 }
 
 /** JSON schema list for orchestrator system prompt. */

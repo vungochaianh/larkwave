@@ -122,6 +122,8 @@ function makeDest() {
 }
 
 const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
+// Kín: không bao giờ quét/ghi ~/.claude thật của máy chạy kiểm.
+const claudeEnv = { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'lw-claude-')) };
 
 (async () => {
   const S = makeSource();
@@ -141,7 +143,7 @@ const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
   let dry;
   await t('chạy thử: đếm đủ, KHÔNG ghi gì (cả đích lẫn nguồn)', async () => {
-    dry = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, dryRun: true, maxWorkFileBytes: 1500 });
+    dry = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, claudeEnv, dryRun: true, maxWorkFileBytes: 1500 });
     assert.strictEqual(dry.dryRun, true);
     assert.strictEqual(treeHash(D), destBefore);
     assert.strictEqual(treeHash(S), before);
@@ -154,7 +156,7 @@ const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
   let real;
   await t('chạy thật xong — thư mục Toolswave không đổi một byte', async () => {
-    real = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, maxWorkFileBytes: 1500 });
+    real = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, claudeEnv, maxWorkFileBytes: 1500 });
     assert.strictEqual(treeHash(S), before);
     assert.deepStrictEqual(real.counts, dry.counts, 'chạy thử phải đếm đúng như chạy thật');
   });
@@ -241,7 +243,7 @@ const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
   });
   await t('chạy lại: không thêm gì nữa, đích không đổi (idempotent)', async () => {
     const h = treeHash(D);
-    const again = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, maxWorkFileBytes: 1500 });
+    const again = await M.migrateFromToolswave({ sources: [S], dest: D, userId: UID, claudeEnv, maxWorkFileBytes: 1500 });
     const added = Object.values(again.counts).reduce((n, c) => n + c.added + c.merged, 0);
     assert.strictEqual(added, 0, JSON.stringify(again.counts));
     assert.strictEqual(treeHash(D), h);
@@ -257,7 +259,7 @@ const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
     assert.strictEqual(treeHash(S), before);
   });
   await t('chưa đăng nhập ⇒ không chạy', async () => {
-    await assert.rejects(M.migrateFromToolswave({ sources: [S], dest: D, userId: '' }), /đăng nhập/);
+    await assert.rejects(M.migrateFromToolswave({ sources: [S], dest: D, userId: '', claudeEnv }), /đăng nhập/);
   });
   await t('nhận diện blob mã hoá + trường bí mật', async () => {
     assert.ok(M.isEncryptedBlob(Buffer.from('v10\x01\x02')));

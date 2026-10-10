@@ -10,6 +10,7 @@ const { Text, Paragraph } = Typography;
 /** Nhãn từng hạng mục — thứ tự hiển thị. */
 const CAT_LABEL: [ToolswaveMigrationCategory, string][] = [
   ['sessions', 'Hội thoại Lark'],
+  ['claudeSessions', 'Phiên Claude đã nối lại (AI nhớ trọn hội thoại cũ)'],
   ['deleted', 'Danh sách đã xoá'],
   ['specs', 'Đặc tả'],
   ['larkConfig', 'Cài đặt Lark'],

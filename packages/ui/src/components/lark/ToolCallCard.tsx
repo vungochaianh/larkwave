@@ -22,6 +22,8 @@ export interface ToolCallState {
   gated: boolean;
   status: ToolStatus;
   summary?: string;
+  /** Tóm kết quả để làm trí nhớ khi nối lại hội thoại (không hiển thị) — xem LarkChatEvent.tool_result.memo. */
+  memo?: string;
   error?: string;
   /** Main phân loại: thất bại này đáng ngờ do ỨNG DỤNG hỏng (xem LarkChatEvent.tool_result). */
   suspectAppBug?: boolean;

@@ -53,3 +53,30 @@ export function contextUsageFromResult(obj: any, model?: string): ContextUsage |
   const percentUsed = Math.max(0, Math.min(1, contextTokens / windowTokens));
   return { contextTokens, windowTokens, percentUsed };
 }
+
+/**
+ * Cửa sổ ngữ cảnh ước lượng theo RUNNER (Claude theo model; Codex/Gemini/Grok theo đời model mặc
+ * định của CLI tương ứng). Chỉ dùng để chia ngân sách lịch sử nối lại — không cần chính xác tới token.
+ */
+export function runnerContextWindow(runner?: string, model?: string): number {
+  const r = (runner || 'claude').toLowerCase();
+  if (r === 'claude') return modelContextWindow(model);
+  if (r === 'gemini') return 1_000_000;
+  if (r === 'codex') return 272_000;
+  if (r === 'grok') return 256_000;
+  return 200_000;
+}
+
+/** Trần ngân sách lịch sử nối lại (token) — đủ cho hội thoại dài mà không chiếm chỗ của lượt mới. */
+export const TRANSCRIPT_BUDGET_MAX = 60_000;
+export const TRANSCRIPT_BUDGET_MIN = 9_000;
+
+/**
+ * Bao nhiêu token lịch sử hội thoại được nhồi lại khi KHÔNG có phiên gốc để `--resume` (runner khác
+ * Claude, phiên CLI đã mất, đổi runner). ~8% cửa sổ, trong khoảng [9k, 60k]: model 1M → 60k,
+ * 200k → 16k. Trước đây cố định 9k cho mọi model — hội thoại dài chỉ còn vài lượt cuối.
+ */
+export function transcriptBudgetTokens(runner?: string, model?: string): number {
+  const w = runnerContextWindow(runner, model);
+  return Math.max(TRANSCRIPT_BUDGET_MIN, Math.min(TRANSCRIPT_BUDGET_MAX, Math.round(w * 0.08)));
+}

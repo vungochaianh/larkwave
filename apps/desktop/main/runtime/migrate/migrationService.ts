@@ -55,10 +55,30 @@ export class ToolswaveMigrationService {
     if (process.env.LARKWAVE_NO_AUTO_MIGRATE === '1') return;
     const uid = this.userId;
     void (async () => {
-      if (await readMarker(this.dest, uid)) return; // đã nhập rồi — lần sau chỉ chạy khi bấm nút
+      const marker = await readMarker(this.dest, uid);
       if (!this.sources().length) return;
-      await this.run({ dryRun: false, auto: true }).catch(() => undefined);
+      if (!marker) {
+        await this.run({ dryRun: false, auto: true }).catch(() => undefined);
+        return;
+      }
+      // Đã nhập bằng bản CŨ (trước khi có bước nối phiên Claude): bản cũ bỏ id phiên CLI nên mọi
+      // hội thoại nhập về đều "quên" ngữ cảnh gốc. Chạy MỘT lần riêng hạng mục hội thoại để nối
+      // lại — không chạy lại các hạng mục khác (kỹ năng/lịch người dùng đã xoá sẽ không quay về).
+      if (!marker.claudeRelink) await this.relink(uid, marker).catch(() => undefined);
     })();
+  }
+
+  /** Lượt bổ sung: chỉ hội thoại + phiên Claude, ghi kết quả vào dấu đã nhập. Im lặng (không hộp thoại). */
+  private async relink(uid: string, marker: MigrateReport): Promise<void> {
+    if (this.running) return;
+    const report = await migrateFromToolswave({ sources: this.sources(), dest: this.dest, userId: uid, sessionsOnly: true });
+    const c = report.counts.claudeSessions;
+    await writeMarker(this.dest, { ...marker, claudeRelink: { at: report.at, added: c.added, merged: c.merged, unchanged: c.unchanged } });
+    try {
+      this.afterImport(report);
+    } catch {
+      /* phụ */
+    }
   }
 
   async run(o: { dryRun: boolean; auto?: boolean }): Promise<MigrateReport> {
@@ -71,6 +91,9 @@ export class ToolswaveMigrationService {
       try {
         const report = await migrateFromToolswave({ sources: this.sources(), dest: this.dest, userId: uid, dryRun: o.dryRun });
         if (!o.dryRun) {
+          // Lượt nhập đầy đủ đã gồm bước nối phiên Claude → đánh dấu luôn để không chạy bù.
+          const c = report.counts.claudeSessions;
+          report.claudeRelink = { at: report.at, added: c.added, merged: c.merged, unchanged: c.unchanged };
           await writeMarker(this.dest, report);
           try {
             this.afterImport(report);

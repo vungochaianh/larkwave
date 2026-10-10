@@ -80,7 +80,8 @@ thì chụp lại. Hiện không thiếu route nào. Những chỗ khác hình d
 
 | Hạng mục | Nguồn | Cách nhập |
 |---|---|---|
-| Hội thoại Lark | `lark/sessions/<scope>/*.json` | Mới: chép, bỏ `claudeSessionId/agentSessionId` (phiên CLI gắn với thư mục làm việc của Toolswave, ở đây sẽ báo "không tìm thấy"). Đã có: `mergeSession` hợp item theo id, bản mới hơn quyết định thứ tự, giữ phiên CLI của Larkwave. Đã xoá ở Larkwave (bia mộ): không nhập lại |
+| Hội thoại Lark | `lark/sessions/<scope>/*.json` | Mới: chép, GIỮ id phiên CLI khi nối được phiên gốc (dòng dưới), không nối được thì bỏ id. Đã có: `mergeSession` hợp item theo id, bản mới hơn quyết định thứ tự, giữ phiên CLI của Larkwave (chưa có phiên thì nhận phiên gốc). Đã xoá ở Larkwave (bia mộ): không nhập lại |
+| Phiên Claude CLI ("phiên Claude đã nối lại") | `~/.claude/projects/<slug(cwd Toolswave)>/<id>.jsonl` + thư mục `<id>/` | CHÉP (không chuyển) sang `~/.claude/projects/<slug(cwd Larkwave)>/`. Xem mục "Trí nhớ của hội thoại cũ" |
 | Bia mộ | `lark/deleted/<scope>/deleted.json` | Hợp lại, giữ mốc sớm nhất |
 | Đặc tả | `lark/specs/<scope>/spec.json` | `mergeSpec` |
 | Cài đặt Lark | `lark/accounts/<scope>/settings.json` (và `lark/settings.json` kiểu cũ) | Larkwave thắng khi trùng khoá; bỏ `runnerId` và mọi trường trông như bí mật |
@@ -107,10 +108,46 @@ thì chụp lại. Hiện không thiếu route nào. Những chỗ khác hình d
 
 Bản sao lưu trên máy chủ (`GET /me/lark-backup`, cùng ô mà app Toolswave khôi phục) được kéo về và hợp nhất mỗi lần mở Lark × Agents, theo đúng luật hợp nhất và chống rò rỉ (gắn theo token, bia mộ, settings thì máy này thắng, automations thì máy này thắng).
 
+## Trí nhớ của hội thoại cũ (phiên Claude CLI)
+
+**Vì sao AI "quên" hội thoại chép từ Toolswave:** Claude CLI cất phiên theo THƯ MỤC LÀM VIỆC:
+`<CLAUDE_CONFIG_DIR | ~/.claude>/projects/<slug(cwd)>/<sessionId>.jsonl` (+ thư mục phụ `<sessionId>/` chứa
+`tool-results/`…). Larkwave chạy mỗi hội thoại ở `userData/lark/work/<convId>`, Toolswave ở
+`…/@toolswave/desktop/lark/work/<convId>` → khác slug → `--resume` báo `No conversation found`. Bản nhập cũ còn
+bỏ luôn id phiên, nên lượt sau mở phiên mới và chỉ được nhồi lại ~9 000 token chữ (mất kết quả công cụ).
+
+**Luật slug** (đọc thẳng từ CLI 2.1.295, kiểm ở `test/claudeSessions.cjs` với tên thư mục thật của cả hai app):
+`realpath(cwd).normalize('NFC').replace(/[^a-zA-Z0-9]/g, '-')`; dài hơn 200 ký tự thì cắt 200 + `-` + băm kiểu Java
+(base36). `CLAUDE_CONFIG_DIR` đổi gốc; có thêm `CLAUDE_CODE_PROJECT_DIR_NAME` thì mọi cwd dùng chung một thư mục.
+Ví dụ: `…/Application Support/@larkwave/desktop (development)/lark/work/<id>` →
+`-Users-<u>-Library-Application-Support--larkwave-desktop--development--lark-work-<id>`.
+
+**Ba lớp, theo thứ tự:**
+1. **Lúc nhập** (`toolswaveMigrator.linkClaudeSession`): với phiên đang dùng (`agentSessionId || claudeSessionId`),
+   tìm `<id>.jsonl` ở slug cwd Toolswave, không có thì ĐÚNG id đó ở mọi thư mục dự án (bản mới nhất), chép sang
+   slug cwd Larkwave (tạo sẵn thư mục làm việc để realpath khớp). Đích mới hơn ⇒ bỏ qua; đích cũ hơn ⇒ chỉ cập nhật
+   khi đích là đoạn đầu của nguồn (không xoá lượt đã chạy ở Larkwave); hai bên cùng chạy tiếp ⇒ giữ đích. Đếm ở
+   hạng mục `claudeSessions` của báo cáo. Máy đã nhập bằng bản cũ: `migrationService` tự chạy MỘT lượt bổ sung chỉ
+   hạng mục hội thoại (`sessionsOnly`), đánh dấu `claudeRelink` trong `migrations/toolswave-<userId>.json`; các hạng
+   mục khác không chạy lại (kỹ năng/lịch đã xoá không quay về).
+2. **Lúc `--resume` hụt** (`larkAgent` → `claudeSessions.rescueClaudeSession`): hội thoại chuyển thư mục / khôi phục
+   từ máy khác / phiên lỡ ghi ở thư mục khác — tìm đúng id ở mọi thư mục dự án, chép sang slug cwd hiện tại, `--resume`
+   lại MỘT lần. Không bao giờ đọc/chép id khác. Đo thật (CLI 2.1.295): phiên tạo ở thư mục A, `--resume` từ thư mục C
+   → `No conversation found`; chép tệp sang slug của C → `--resume` nhớ đúng mã bí mật của lượt đầu.
+3. **Không còn bản gốc ở đâu cả**: nhồi lại lịch sử chữ (`lark/transcript.ts`) với ngân sách theo cửa sổ của
+   runner/model (`contextBudget.transcriptBudgetTokens`: ~8% cửa sổ trong [9k, 60k] — model 1M → 60k, Haiku → 16k),
+   giữ tin đầu tiên của người dùng, kèm tóm KẾT QUẢ công cụ (`tool_result.memo`: id, số lượng, link, tên — lưu cùng
+   thẻ công cụ) và thẻ tệp đã dựng. Áp cho cả Codex/Gemini/Grok (trí nhớ duy nhất của chúng) và đường API trực tiếp.
+   Prompt dài hơn 60 000 ký tự đi qua STDIN (`claude -p` không tham số prompt, `codex exec -`, `gemini -p` nối sau
+   stdin) — argv có trần của hệ điều hành.
+
+Kèm theo: `larkSaveSession` lấy id phiên của CHÍNH hội thoại (turnState) trước `chatSessionId` của tab đang xem —
+trước đây hội thoại chưa có id bị ghi id của hội thoại khác hoặc một id chưa từng chạy, mở lại app là quên.
+
 ## Kiểm
 
 ```bash
-bash apps/desktop/test/run.sh        # gồm endpointCompat.cjs + toolswaveMigrate.cjs + larkDeleteSync.cjs (không PUT)
+bash apps/desktop/test/run.sh        # gồm endpointCompat.cjs + toolswaveMigrate.cjs + claudeSessions.cjs + larkDeleteSync.cjs (không PUT)
 node scripts/toolswave-routes.mjs    # chụp lại route của API Toolswave sau mỗi lần đồng bộ
 ```
 

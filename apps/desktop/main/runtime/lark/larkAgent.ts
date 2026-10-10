@@ -9,6 +9,15 @@ import type { LarkClient } from './larkClient';
 import { claudeEnv } from '../claudeRunner';
 import { allTools, readOnlyTools, type LarkToolDef } from './tools';
 import { startMcpBridge } from './mcpServer';
+import { rescueClaudeSession } from '../claudeSessions';
+
+/**
+ * Prompt dài hơn mức này đi qua STDIN thay vì argv. Lịch sử nối lại (re-seed) có thể tới hàng trăm
+ * nghìn ký tự: argv bị trần của hệ điều hành (macOS ~1 MB cho cả argv + env, Linux 128 KB MỖI tham
+ * số, Windows 32 K ký tự cả dòng lệnh) — vượt là lượt chết với E2BIG trước khi CLI kịp chạy.
+ * `claude -p` không có tham số prompt thì đọc prompt từ stdin.
+ */
+export const STDIN_PROMPT_MIN_CHARS = 60_000;
 
 /**
  * Turn a raw CLI/provider error into a clear, actionable Vietnamese message. Crucially it
@@ -356,12 +365,19 @@ export async function* runLarkChat(
   const runOnce = (sessionArgs: string[], promptOverride?: string) =>
     new Promise<'ok' | 'resume-missing'>((resolve) => {
       // baseArgs[0..1] are ['-p', finalPrompt]; swap in a seeded prompt when re-seeding context.
-      const args = promptOverride ? ['-p', promptOverride, ...baseArgs.slice(2)] : baseArgs;
+      const promptText = promptOverride ?? finalPrompt;
+      // Prompt rất dài (lịch sử nối lại) → stdin, không nhồi vào argv (xem STDIN_PROMPT_MIN_CHARS).
+      const viaStdin = promptText.length > STDIN_PROMPT_MIN_CHARS;
+      const args = viaStdin ? ['-p', ...baseArgs.slice(2)] : promptOverride ? ['-p', promptOverride, ...baseArgs.slice(2)] : baseArgs;
       const child = spawn('claude', [...args, ...sessionArgs], {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [viaStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         env: bridge ? { ...claudeEnv({ noKey: deps.preferSubscription }), ...mcpWaitEnv() } : claudeEnv({ noKey: deps.preferSubscription }),
         cwd: workCwd,
       });
+      if (viaStdin && child.stdin) {
+        child.stdin.on('error', () => undefined); // CLI thoát sớm → EPIPE, đừng làm sập tiến trình chính
+        child.stdin.end(promptText, 'utf8');
+      }
       childRef.current = child;
       // Kill the child the instant an abort is requested — SYNCHRONOUSLY, not via this
       // generator's finally (which is queued behind the parked next() while the CLI is
@@ -389,7 +405,7 @@ export async function* runLarkChat(
       }
       let buf = '';
       let resumeMissing = false;
-      child.stdout.on('data', (chunk: Buffer) => {
+      child.stdout!.on('data', (chunk: Buffer) => {
         buf += chunk.toString('utf8');
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
@@ -475,7 +491,7 @@ export async function* runLarkChat(
           }
         }
       });
-      child.stderr.on('data', () => {
+      child.stderr!.on('data', () => {
         /* CLI diagnostics — ignored; errors surface via the result event / close code */
       });
       child.on('error', (err: NodeJS.ErrnoException) => {
@@ -512,7 +528,15 @@ export async function* runLarkChat(
   // of starting blank (the visible history lives in the renderer; Claude's own context had reset).
   void (async () => {
     if (deps.session.resume) {
-      const status = await runOnce(['--resume', deps.session.id]);
+      let status = await runOnce(['--resume', deps.session.id]);
+      if (status === 'resume-missing') {
+        // CỨU PHIÊN GỐC trước khi đành nhồi lại lịch sử: Claude CLI cất phiên theo thư mục làm việc,
+        // nên hội thoại nhập từ Toolswave / chuyển thư mục / khôi phục từ máy khác vẫn còn nguyên bản
+        // ghi `<id>.jsonl` — chỉ là ở thư mục dự án KHÁC. Đúng id đó (không bao giờ id khác), bản mới
+        // nhất, chép sang thư mục của cwd này rồi `--resume` lại một lần. Nhớ trọn, kể cả kết quả công cụ.
+        const rescued = await rescueClaudeSession(deps.session.id, workCwd || process.cwd(), claudeEnv({ noKey: deps.preferSubscription })).catch(() => null);
+        if (rescued) status = await runOnce(['--resume', deps.session.id]);
+      }
       if (status === 'resume-missing') {
         if (historyForSeed) push({ type: 'text', delta: '_(Khôi phục ngữ cảnh hội thoại trên máy này…)_\n\n' });
         await runOnce(['--session-id', deps.session.id], historyForSeed ? seededPrompt : undefined);
