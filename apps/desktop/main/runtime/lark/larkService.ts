@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { hostname } from 'node:os';
+import { existsSync } from 'node:fs';
+import { homedir, hostname } from 'node:os';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -173,6 +174,8 @@ import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
 import { newFilesSince, snapshotDir } from './fileBuild';
 import { canMakePdf, htmlToPdf } from './filePdf';
+import { setLocalFileEnv, withTurnFiles } from './fileContext';
+import { toolswaveDataDirCandidates } from './filePaths';
 import type { LarkToolDef } from './tools/types';
 import { claudeAvailable, hasInjectedCredential } from '../claudeRunner';
 import { tryAcquire, release, currentOwner, isBusy, maxConcurrent, type Lease } from '../agentLock';
@@ -363,6 +366,18 @@ export class LarkService {
     // nói rõ còn hơn để agent thử lại PDF tới lúc hết giờ.
     setPdfMaker(canMakePdf() ? htmlToPdf : null);
     /**
+     * Bộ phân giải đường dẫn tệp của công cụ (fileContext.resolveToolFile): nhận ra đường dẫn CŨ trong
+     * thư mục làm việc của app Toolswave (hội thoại nhập từ Toolswave nhắc tới chúng) và chép đúng tệp
+     * đó sang thư mục hội thoại Larkwave — chỉ khi hội thoại ấy CÓ ở Larkwave (của tài khoản đang
+     * đăng nhập hoặc `_local`). Thư mục Toolswave chỉ đọc.
+     */
+    const twOverride = (process.env.LARKWAVE_TOOLSWAVE_DATA_DIR ?? '').trim();
+    setLocalFileEnv({
+      larkwaveWorkRoot: join(baseDir, 'lark', 'work'),
+      toolswaveRoots: twOverride ? [twOverride] : toolswaveDataDirCandidates(process.platform, homedir(), process.env.APPDATA),
+      conversationExists: (convId) => this.conversationExists(convId),
+    });
+    /**
      * Tệp agent dựng ra được sao lưu lên máy chủ tài khoản, để nó đi theo TÀI KHOẢN chứ không
      * nằm chết trên một máy — đúng cách hội thoại vẫn làm. Chưa đăng nhập thì bỏ qua, tệp vẫn
      * ghi cục bộ như thường.
@@ -513,6 +528,15 @@ export class LarkService {
   private workDirPath(conversationId: string): string {
     const safe = conversationId.replace(/[^A-Za-z0-9_-]/g, '') || 'default';
     return join(this.baseDir, 'lark', 'work', safe);
+  }
+  /**
+   * Hội thoại có ở Larkwave không — của tài khoản ĐANG đăng nhập hoặc kho `_local` (không bao giờ của
+   * tài khoản khác trên cùng máy). Dùng để quyết định có được chép tệp từ thư mục Toolswave không.
+   */
+  conversationExists(convId: string): boolean {
+    const safe = String(convId || '').replace(/[^A-Za-z0-9_-]/g, '');
+    if (!safe) return false;
+    return [this.sessionsDirFor(this.currentUserId), this.sessionsDirFor(null)].some((d) => existsSync(join(d, `${safe}.json`)));
   }
   /** workDirPath() + ensure it exists. */
   private async chatWorkDir(conversationId: string): Promise<string> {
@@ -2784,7 +2808,10 @@ export class LarkService {
   async fileAction(input: LarkFileActionInput): Promise<LarkFileActionResult> {
     try {
       const root = join(this.baseDir, 'lark', 'work');
-      const local = await readLocalFile(input.path, root);
+      // Thẻ tệp trong hội thoại (lark/work) hoặc trong lịch sử chạy của tự động hoá (lark/automations).
+      const local = await withTurnFiles({ outDir: null, attachDir: null, extraRoots: [join(this.baseDir, 'lark', 'automations')] }, () =>
+        readLocalFile(input.path, root),
+      );
       if (!getLarkWebSession().webHost()) return { ok: false, error: 'Chưa đăng nhập Lark web — mở khung Lark, đăng nhập rồi bấm lại.' };
       const folder = input.folder?.trim() || undefined;
       const r: Record<string, any> = input.action === 'drive' ? await uploadToDrive(local, folder) : input.action === 'sheet' ? await importAsSheet(local, folder) : input.action === 'doc' ? await importAsDoc(local, folder) : { ok: false, note: 'Thao tác không hợp lệ.' };
@@ -4024,6 +4051,9 @@ export class LarkService {
     // Tệp agent DỰNG RA nằm cùng chỗ với tệp nó tải về: cùng một thư mục hội thoại, nên
     // `--resume` của lượt sau vẫn thấy, và cùng bị dọn theo phiên như mọi thứ khác.
     setFileOutDir(workDir ?? null);
+    // Cùng thư mục, nhưng đi theo TỪNG lần thực thi công cụ của lượt này (fileContext): một lịch tự động
+    // chạy song song không còn ghi đè được thư mục của hội thoại đang mở.
+    const turnFiles = { outDir: workDir ?? null, attachDir: workDir ?? null };
 
     // Materialise any attached files/images into the dir the agent runs in. It MUST be the
     // conversation dir, not a temp one: a temp dir would put this turn in a different Claude
@@ -4102,6 +4132,7 @@ export class LarkService {
       let inner: AsyncGenerator<LarkChatEvent>;
       if (onMaic) {
         inner = runLarkMaicAgent(turnPrompt, input.mode, {
+          files: turnFiles,
           client: client!,
           systemPrompt,
           accountToken: this.accountTokenGetter!()!,
@@ -4117,6 +4148,7 @@ export class LarkService {
       } else if (onApi) {
         const history = this.buildApiHistory(stored?.items ?? [], seedBudget);
         inner = runLarkApiAgent(turnPrompt, input.mode, {
+          files: turnFiles,
           client: client!,
           systemPrompt,
           runner,
@@ -4132,6 +4164,7 @@ export class LarkService {
         });
       } else {
         inner = runLarkAgent(turnPrompt, input.mode, {
+          fileContext: turnFiles,
           client: client ?? undefined,
           systemPrompt,
           runner,
@@ -4211,6 +4244,7 @@ export class LarkService {
           // user's OWN claude login (key stripped) — works for both general + Lark chats.
           yield { type: 'text', delta: '\n\n_(API key trong app hết credit/không hợp lệ — chuyển sang đăng nhập Claude CLI của bạn, giữ nguyên hội thoại…)_\n\n' };
           const fb = runLarkAgent(turnPrompt, input.mode, {
+            fileContext: turnFiles,
             client: client ?? undefined,
             systemPrompt,
             runner,
@@ -4243,6 +4277,7 @@ export class LarkService {
           this.apiCreditOut.add(runner); // don't hammer the dead key on the next turns
           yield { type: 'text', delta: '\n\n_(API hết credit — tự chuyển sang Claude CLI/subscription, giữ nguyên hội thoại…)_\n\n' };
           const fb = runLarkAgent(turnPrompt, input.mode, {
+            fileContext: turnFiles,
             client: client ?? undefined,
             systemPrompt,
             runner,
@@ -4273,6 +4308,7 @@ export class LarkService {
             yield { type: 'text', delta: '\n\n_(Hết credit ở CLI — tự chuyển sang API trực tiếp, giữ nguyên hội thoại…)_\n\n' };
             const history = this.buildApiHistory(stored?.items ?? [], seedBudget);
             const fb = runLarkApiAgent(turnPrompt, input.mode, {
+              files: turnFiles,
               client: client!,
               systemPrompt,
               runner,

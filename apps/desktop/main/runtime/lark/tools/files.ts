@@ -10,9 +10,10 @@
  * này", "lưu lên Drive") thì mới gọi thêm — đó là các thao tác GHI ra ngoài, không được tự ý làm.
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
-import { isInsideDir } from '../filePaths';
-import { getAttachmentDir } from './attachments';
+import { basename, dirname, extname, join } from 'node:path';
+import { resolveToolFile, setGlobalOutDir, turnOutDir } from '../fileContext';
+import { buildFilePreview } from '../filePreview';
+import { extractOfficeText, officeKindFor } from '../ooxml';
 import { enc, type LarkToolDef, str } from './types';
 import {
   FORMAT_META,
@@ -26,14 +27,17 @@ import {
   type SheetData,
 } from '../fileBuild';
 
-/** Thư mục ghi tệp của lượt hiện tại — cùng cơ chế với `setAttachmentDir`. */
-let OUT_DIR: string | null = null;
+/**
+ * Thư mục ghi tệp của lượt hiện tại — cùng cơ chế với `setAttachmentDir`. Giá trị đặt ở đây chỉ là
+ * DỰ PHÒNG: lượt nào truyền ngữ cảnh tệp (`withTurnFiles`, xem fileContext.ts) thì ngữ cảnh đó thắng,
+ * nên hai lượt chạy song song không ghi đè thư mục của nhau.
+ */
 export function setFileOutDir(dir: string | null): void {
-  OUT_DIR = dir;
+  setGlobalOutDir(dir);
 }
 /** Thư mục ghi tệp của lượt hiện tại (công cụ đưa tệp lên Lark dùng để chốt đường dẫn). */
 export function getFileOutDir(): string | null {
-  return OUT_DIR;
+  return turnOutDir();
 }
 
 /**
@@ -145,6 +149,7 @@ export const fileTools: LarkToolDef[] = [
       if (!FORMATS.includes(format)) {
         throw new Error(`Định dạng "${input.format}" không hỗ trợ. Dùng một trong: ${FORMATS.join(', ')}.`);
       }
+      const OUT_DIR = getFileOutDir();
       if (!OUT_DIR) throw new Error('Chưa có thư mục ghi tệp cho lượt này.');
 
       const rows = normRows(input.rows);
@@ -256,16 +261,17 @@ export const fileTools: LarkToolDef[] = [
     // dùng, không gửi đi đâu) — cùng mức rủi ro với create_file.
     gated: false,
     async exec(input) {
+      const OUT_DIR = getFileOutDir();
       if (!OUT_DIR) throw new Error('Chưa có thư mục ghi tệp cho lượt này.');
-      const src = String(input.source_path || '').trim();
-      if (!src) throw new Error('Thiếu `source_path` (đường dẫn file mẫu).');
-      // Chỉ cho đọc file NẰM TRONG thư mục đính kèm của lượt này, hoặc thư mục kết quả (file
-      // create_file vừa tạo). `source_path` tới từ model = dữ liệu không tin được; không chốt thì
-      // nó đọc được bất kỳ .xlsx nào trên máy.
-      const attachDir = getAttachmentDir();
-      if (!isInsideDir(OUT_DIR, src) && !isInsideDir(attachDir, src)) {
-        throw new Error('Chỉ điền được vào file người dùng đính kèm trong lượt này.');
-      }
+      const asked = String(input.source_path || '').trim();
+      if (!asked) throw new Error('Thiếu `source_path` (đường dẫn file mẫu).');
+      // Chỉ cho đọc file trong thư mục đính kèm / thư mục kết quả của lượt này, thư mục tự động hoá,
+      // hoặc tệp của hội thoại cũ nhập từ Toolswave (tự chép sang Larkwave). `source_path` tới từ
+      // model = dữ liệu không tin được; không chốt thì nó đọc được bất kỳ .xlsx nào trên máy. Luật
+      // nằm ở filePaths (qua resolveToolFile) — không tự so chuỗi ở đây.
+      const r = await resolveToolFile(asked);
+      if (r.ok === false) throw new Error(`Chỉ điền được vào file người dùng đính kèm / file trong thư mục hội thoại: ${r.reason}`);
+      const src = r.path;
       if (!/\.xlsx$/i.test(src)) throw new Error('fill_xlsx chỉ nhận file .xlsx. File khác thì dùng create_file.');
       const st = await stat(src).catch(() => null);
       if (!st?.isFile()) throw new Error(`Không tìm thấy file mẫu: ${basename(src)}`);
@@ -314,6 +320,67 @@ export const fileTools: LarkToolDef[] = [
   },
 
   {
+    name: 'prepare_local_file',
+    description:
+      'CHUẨN BỊ + ĐỌC một tệp trên máy theo ĐƯỜNG DẪN trước khi làm gì với nó (đính vào Bitable, đưa lên Drive/Sheets/Docs, ' +
+      'nhập vào bảng, điền mẫu…). Dùng khi người dùng/hội thoại nhắc tới một đường dẫn tệp — kể cả đường dẫn CŨ của app ' +
+      'Toolswave (…/@toolswave/desktop/lark/work/<hội thoại>/…): tool tự CHÉP tệp đó sang thư mục hội thoại Larkwave (bản gốc ' +
+      'giữ nguyên) và trả `path` MỚI — dùng `path` này cho các tool sau. Trả kèm xem trước (sheet/dòng/cột) và phần CHỮ đã trích ' +
+      '(Excel/Word/CSV/text) để đọc ngay. Đường dẫn ngoài thư mục hội thoại / tệp đính kèm / thư mục tự động hoá bị từ chối.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['path'],
+      properties: {
+        path: str('Đường dẫn tệp đúng như người dùng/hội thoại đưa (tuyệt đối, hoặc tên tệp trong thư mục hội thoại).'),
+        max_chars: { type: 'integer', description: 'Số ký tự chữ trả về để đọc (mặc định 12000, tối đa 60000).' },
+      },
+    },
+    // Không gated: chỉ ĐỌC, và (khi là tệp Toolswave) chép một bản vào thư mục hội thoại của chính
+    // người dùng — không đụng Lark, không gửi đi đâu.
+    gated: false,
+    async exec(input) {
+      const r = await resolveToolFile(String(input.path || ''));
+      if (r.ok === false) return { ok: false, error: r.reason };
+      const st = await stat(r.path).catch(() => null);
+      if (!st?.isFile()) return { ok: false, error: `Không tìm thấy tệp: ${basename(r.path)}` };
+      const name = basename(r.path);
+      const ext = extname(name).replace(/^\./, '').toLowerCase();
+      const bytes = await readFile(r.path);
+      const preview = buildFilePreview(name, bytes);
+      const max = Math.max(500, Math.min(60_000, Number(input.max_chars) || 12_000));
+      let text = '';
+      let textPath: string | undefined;
+      const kind = officeKindFor(name, '');
+      if (kind) text = extractOfficeText(bytes, kind);
+      else if (/^(csv|txt|md|json|tsv|xml|html?|log)$/.test(ext)) text = bytes.toString('utf8').replace(/^﻿/, '');
+      if (text && text.length > max) {
+        // Chữ dài: ghi đủ ra một tệp .txt (thư mục ẩn cạnh tệp) để đọc tiếp bằng Read/Grep.
+        try {
+          const dir = join(dirname(r.path), '.extract');
+          await mkdir(dir, { recursive: true });
+          textPath = join(dir, `${name}.txt`);
+          await writeFile(textPath, text.slice(0, 2_000_000), 'utf8');
+        } catch {
+          textPath = undefined;
+        }
+      }
+      return {
+        ok: true,
+        path: r.path,
+        file_name: name,
+        bytes: st.size,
+        ...(r.copiedFrom ? { copied_from: r.copiedFrom } : {}),
+        ...(r.note ? { note: r.note } : {}),
+        ...(preview ? { preview } : {}),
+        ...(text ? { text: text.slice(0, max), text_truncated: text.length > max } : {}),
+        ...(textPath ? { text_path: textPath } : {}),
+        next: 'Dùng `path` ở trên (KHÔNG dùng lại đường dẫn cũ) cho lark_web_attach_file / lark_web_drive_upload / lark_web_import_as_sheet / fill_xlsx …',
+      };
+    },
+  },
+
+  {
     name: 'send_file',
     description:
       'GỬI một tệp đã tạo bằng create_file đi nơi khác: vào một nhóm/chat Lark, đính vào ô đính kèm ' +
@@ -344,13 +411,15 @@ export const fileTools: LarkToolDef[] = [
     gated: true,
     async exec(input, client) {
       const to = String(input.to || '');
-      const p = String(input.path || '');
-      // Chỉ cho gửi tệp NẰM TRONG thư mục của lượt này. Không có chốt này thì một `path` do model
-      // sinh ra (hoặc do dữ liệu Base gợi ý) gửi được bất kỳ tệp nào trên máy vào một nhóm Lark.
-      // Luật nằm ở `filePaths.isInsideDir` — một chỗ duy nhất, dùng chung với handler IPC mở tệp.
-      if (!isInsideDir(OUT_DIR, p)) {
-        throw new Error('Chỉ gửi được tệp do create_file vừa tạo trong lượt này.');
+      // Chỉ cho gửi tệp NẰM TRONG thư mục được phép của lượt này (thư mục hội thoại/kết quả, tệp đính
+      // kèm, thư mục tự động hoá, hoặc bản chép từ hội thoại Toolswave đã nhập). Không có chốt này
+      // thì một `path` do model sinh ra (hoặc do dữ liệu Base gợi ý) gửi được bất kỳ tệp nào trên máy
+      // vào một nhóm Lark. Luật nằm ở filePaths (qua resolveToolFile) — một chỗ duy nhất.
+      const resolved = await resolveToolFile(String(input.path || ''));
+      if (resolved.ok === false) {
+        throw new Error(`Chỉ gửi được tệp trong thư mục hội thoại / tự động hoá: ${resolved.reason}`);
       }
+      const p = resolved.path;
       const st = await stat(p).catch(() => null);
       if (!st?.isFile()) throw new Error(`Không tìm thấy tệp: ${basename(p)}`);
       const bytes = await readFile(p);

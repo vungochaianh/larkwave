@@ -64,8 +64,25 @@ export class ToolswaveMigrationService {
       // Đã nhập bằng bản CŨ (trước khi có bước nối phiên Claude): bản cũ bỏ id phiên CLI nên mọi
       // hội thoại nhập về đều "quên" ngữ cảnh gốc. Chạy MỘT lần riêng hạng mục hội thoại để nối
       // lại — không chạy lại các hạng mục khác (kỹ năng/lịch người dùng đã xoá sẽ không quay về).
-      if (!marker.claudeRelink) await this.relink(uid, marker).catch(() => undefined);
+      let m: MigrateReport = marker;
+      if (!m.claudeRelink) {
+        await this.relink(uid, m).catch(() => undefined);
+        m = (await readMarker(this.dest, uid)) ?? m;
+      }
+      // Đã nhập bằng bản chỉ chép tệp ≤ 5 MB của hội thoại VỪA nhập: thẻ tệp cũ còn trỏ vào thư mục
+      // Toolswave và chốt mở tệp từ chối. Chép bù MỘT lần mọi tệp làm việc + trỏ lại thẻ tệp.
+      if (!m.filesRelink) await this.relinkFiles(uid, m).catch(() => undefined);
     })();
+  }
+
+  /** Lượt bổ sung: hội thoại + tệp làm việc + thẻ tệp. Im lặng, ghi kết quả vào dấu đã nhập. */
+  private async relinkFiles(uid: string, marker: MigrateReport): Promise<void> {
+    if (this.running) return;
+    const report = await migrateFromToolswave({ sources: this.sources(), dest: this.dest, userId: uid, filesOnly: true });
+    await writeMarker(this.dest, {
+      ...marker,
+      filesRelink: { at: report.at, files: report.counts.workFiles.added, links: report.counts.fileLinks.merged, skipped: report.skipped.length },
+    });
   }
 
   /** Lượt bổ sung: chỉ hội thoại + phiên Claude, ghi kết quả vào dấu đã nhập. Im lặng (không hộp thoại). */
@@ -94,6 +111,7 @@ export class ToolswaveMigrationService {
           // Lượt nhập đầy đủ đã gồm bước nối phiên Claude → đánh dấu luôn để không chạy bù.
           const c = report.counts.claudeSessions;
           report.claudeRelink = { at: report.at, added: c.added, merged: c.merged, unchanged: c.unchanged };
+          report.filesRelink = { at: report.at, files: report.counts.workFiles.added, links: report.counts.fileLinks.merged, skipped: report.skipped.length };
           await writeMarker(this.dest, report);
           try {
             this.afterImport(report);

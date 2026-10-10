@@ -5,6 +5,7 @@ import { buildFilePreview } from './filePreview';
 import type { LarkClient } from './larkClient';
 import { LarkApiError } from './larkClient';
 import type { LarkToolDef } from './tools';
+import { withTurnFiles, type TurnFileContext } from './fileContext';
 
 export const ASK_USER_TOOL_NAME = 'ask_user';
 
@@ -25,6 +26,8 @@ export interface ToolExecContext {
    * cài được gì trên máy này, và bảo họ đi cài lại là vô nghĩa lẫn khó hiểu.
    */
   allowVersionHint?: boolean;
+  /** Thư mục tệp của lượt này — mọi lần thực thi công cụ chạy trong ngữ cảnh này (xem fileContext). */
+  files?: TurnFileContext;
 }
 
 /** Execute one Lark tool (shared by MCP bridge + multi-runner orchestrator). */
@@ -73,8 +76,9 @@ export async function executeLarkTool(
 
   const callId = `lt_${randomUUID()}`;
   // Kiểm trước: thiết kế chắc chắn bị từ chối thì đừng bắt người dùng duyệt (xem LarkToolDef.preflight).
-  const pre = await runPreflight(tool, input, ctx.client);
-  const needsConfirm = needsConfirmation(tool, ctx, !!pre, input);
+  const pre = await withTurnFiles(ctx.files, () => runPreflight(tool, input, ctx.client));
+  const dyn = pre ? undefined : await withTurnFiles(ctx.files, () => runAdditiveCheck(tool, input, ctx.client));
+  const needsConfirm = needsConfirmation(tool, ctx, !!pre, input, dyn);
   ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
   if (needsConfirm) {
@@ -94,7 +98,7 @@ export async function executeLarkTool(
   }
 
   try {
-    const data = pre ?? (await tool.exec(input as Record<string, any>, ctx.client));
+    const data = pre ?? (await withTurnFiles(ctx.files, () => tool.exec(input as Record<string, any>, ctx.client)));
     // Tool báo hỏng bằng DỮ LIỆU (`{ok:false, reason}`) vẫn là hỏng: phát ok:false để chip trong
     // chat có màu đúng và hộp "Lỗi công cụ" liệt kê được. Trước đây mọi lượt exec không ném đều
     // báo thành công, nên loại thất bại này vô hình với người dùng.
@@ -143,13 +147,37 @@ export function needsConfirmation(
   ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean },
   preflightBlocked = false,
   input?: unknown,
+  /** Kết quả `additiveCheck` của lần gọi (undefined = tool không có / không kết luận được). */
+  dynamicAdditive?: boolean,
 ): boolean {
   if (!tool.gated || preflightBlocked) return false;
   if (ctx.autoApprove) return false;
   // Cộng thêm theo TỪNG lần gọi: vd đính tệp ghi thêm thì tự duyệt, `replace:true` (ghi đè) thì hỏi.
-  const additiveNow = !!tool.additive && (!tool.additiveWhen || safeAdditiveWhen(tool.additiveWhen, input));
+  const staticAdditive = !!tool.additive && (!tool.additiveWhen || safeAdditiveWhen(tool.additiveWhen, input));
+  // Kiểm ĐỘNG (vd ghi theo khoá `match_by`: chỉ thêm mới / không đổi gì = cộng thêm; có dòng cần SỬA =
+  // ghi đè) thắng luật tĩnh — nhưng chỉ với tool vốn có cờ `additive`.
+  const additiveNow = dynamicAdditive === undefined ? staticAdditive : !!tool.additive && dynamicAdditive;
   if (additiveNow && ctx.autoApproveTool?.(tool.name)) return false;
   return true;
+}
+
+/**
+ * Chạy `additiveCheck` của tool (nếu có): true = lần gọi này chỉ cộng thêm, false = có ghi đè, undefined
+ * = không có/không kết luận. NÉM lỗi ⇒ false (nghi ngờ thì hỏi) — khác preflight, vì ở đây sai theo
+ * hướng "tự duyệt" là nguy hiểm.
+ */
+export async function runAdditiveCheck(
+  tool: Pick<LarkToolDef, 'additiveCheck'>,
+  input: unknown,
+  client: unknown,
+): Promise<boolean | undefined> {
+  if (!tool.additiveCheck) return undefined;
+  try {
+    const r = await tool.additiveCheck((input ?? {}) as Record<string, any>, client as never);
+    return r === true ? true : r === false ? false : undefined;
+  } catch {
+    return false;
+  }
 }
 
 function safeAdditiveWhen(fn: (input: Record<string, any>) => boolean, input: unknown): boolean {

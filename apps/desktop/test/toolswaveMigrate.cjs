@@ -70,7 +70,12 @@ function treeHash(dir) {
 function makeSource() {
   const S = mkdtempSync(join(tmpdir(), 'tw-src-'));
   // hội thoại: của user, _local, phẳng kiểu cũ, của tài khoản KHÁC
-  put(join(S, 'lark/sessions', UID, 's-new.json'), sess('s-new', '2026-09-10T00:00:00Z', [it('a', 'mới')], { agentSessionId: 'ag-1' }));
+  put(join(S, 'lark/sessions', UID, 's-new.json'), sess('s-new', '2026-09-10T00:00:00Z', [
+    it('a', 'mới'),
+    { id: 'f1', kind: 'file', name: 'report.xlsx', path: join(S, 'lark/work/s-new/report.xlsx'), mime: 'x', bytes: 1024, ts: 2 },
+    { id: 'f2', kind: 'file', name: 'huge.bin.out', path: join(S, 'lark/work/s-new/huge.bin.out'), mime: 'x', bytes: 2048, ts: 3 },
+    { id: 'f3', kind: 'file', name: 'sub.csv', path: join(S, 'lark/work/s-new/thu muc/sub.csv'), mime: 'x', bytes: 3, ts: 4 },
+  ], { agentSessionId: 'ag-1' }));
   put(join(S, 'lark/sessions', UID, 's-both.json'), sess('s-both', '2026-09-05T00:00:00Z', [it('x', 'cũ'), it('tw-only', 'chỉ ở Toolswave')]));
   put(join(S, 'lark/sessions', UID, 's-dead.json'), sess('s-dead', '2026-09-05T00:00:00Z', [it('d', 'đã xoá ở Larkwave')]));
   put(join(S, 'lark/sessions', '_local', 's-local.json'), sess('s-local', '2026-09-02T00:00:00Z', [it('l', 'chưa đăng nhập')]));
@@ -93,6 +98,8 @@ function makeSource() {
   put(join(S, 'lark/work/s-new/report.xlsx'), Buffer.alloc(1024, 1));
   put(join(S, 'lark/work/s-new/huge.bin.out'), Buffer.alloc(2048, 1));
   put(join(S, 'lark/work/s-new/.claude/state.json'), '{}');
+  put(join(S, 'lark/work/s-new/thu muc/sub.csv'), 'a,b');
+  put(join(S, 'lark/work/s-new/~$report.xlsx'), 'lock');
   put(join(S, 'lark/work/s-other/x.txt'), 'không thuộc hội thoại được nhập');
   // kỹ năng + plugin
   put(join(S, 'skills/registry.json'), [{ id: 'kc-a', name: 'KC A', description: 'd', enabled: true, scope: ['claude'] }, { id: 'kc-b', name: 'KC B', description: 'd', enabled: true, scope: ['claude'] }]);
@@ -225,11 +232,24 @@ const claudeEnv = { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'lw-claude-'))
     assert.strictEqual(J(join(D, 'lark/specs', UID, 'spec.json')).bases[0].appToken, 'bA');
     assert.strictEqual(J(join(D, `lark-relogin-${UID}.json`)).length, 1);
   });
-  await t('tệp làm việc: chỉ của hội thoại được nhập, chỉ tệp nhỏ, bỏ thư mục ẩn', async () => {
+  await t('tệp làm việc: chỉ của hội thoại được nhập, cả thư mục con; bỏ tệp quá trần / tệp khoá / thư mục ẩn — kèm lý do', async () => {
     assert.ok(existsSync(join(D, 'lark/work/s-new/report.xlsx')));
+    assert.ok(existsSync(join(D, 'lark/work/s-new/thu muc/sub.csv')));
     assert.ok(!existsSync(join(D, 'lark/work/s-new/huge.bin.out')));
+    assert.ok(!existsSync(join(D, 'lark/work/s-new/~$report.xlsx')));
     assert.ok(!existsSync(join(D, 'lark/work/s-new/.claude')));
     assert.ok(!existsSync(join(D, 'lark/work/s-other')));
+    assert.ok(real.skipped.some((x) => /huge\.bin\.out/.test(x.path) && /quá lớn/.test(x.reason)));
+    assert.ok(real.skipped.some((x) => /report\.xlsx/.test(x.path) && /tạm\/khoá/.test(x.reason)));
+  });
+  await t('thẻ tệp trỏ sang bản chép ở Larkwave; tệp không chép (quá lớn) thì giữ đường cũ', async () => {
+    const s = J(join(D, 'lark/sessions', UID, 's-new.json'));
+    const by = Object.fromEntries(s.items.map((x) => [x.id, x]));
+    assert.strictEqual(by.f1.path, join(D, 'lark/work/s-new/report.xlsx'));
+    assert.strictEqual(by.f3.path, join(D, 'lark/work/s-new/thu muc/sub.csv'));
+    assert.strictEqual(by.f2.path, join(S, 'lark/work/s-new/huge.bin.out'));
+    assert.strictEqual(real.counts.fileLinks.merged, 2);
+    assert.strictEqual(dry.counts.fileLinks.merged, 2, 'chạy thử đếm đúng như chạy thật');
   });
   await t('kỹ năng: thêm kc-a (giữ hợp đồng), KHÔNG ghi đè kc-b của Larkwave; snapshots/set-runs; plugin', async () => {
     const reg = J(join(D, 'skills/registry.json'));
@@ -247,6 +267,19 @@ const claudeEnv = { CLAUDE_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'lw-claude-'))
     const added = Object.values(again.counts).reduce((n, c) => n + c.added + c.merged, 0);
     assert.strictEqual(added, 0, JSON.stringify(again.counts));
     assert.strictEqual(treeHash(D), h);
+  });
+  await t('lượt BỔ SUNG chỉ-tệp (máy đã nhập bằng bản cũ): chép tệp còn thiếu + trỏ lại thẻ tệp, không đụng hạng mục khác', async () => {
+    const D2 = makeDest();
+    // Giả lập bản nhập CŨ: hội thoại đã có, thẻ tệp còn trỏ vào Toolswave, chưa có tệp làm việc nào.
+    put(join(D2, 'lark/sessions', UID, 's-new.json'), J(join(S, 'lark/sessions', UID, 's-new.json')));
+    const r = await M.migrateFromToolswave({ sources: [S], dest: D2, userId: UID, claudeEnv, filesOnly: true, maxWorkFileBytes: 1500 });
+    assert.ok(existsSync(join(D2, 'lark/work/s-new/report.xlsx')));
+    assert.strictEqual(J(join(D2, 'lark/sessions', UID, 's-new.json')).items.find((x) => x.id === 'f1').path, join(D2, 'lark/work/s-new/report.xlsx'));
+    assert.strictEqual(r.counts.skills.added, 0, 'không chạy hạng mục kỹ năng');
+    assert.strictEqual(r.counts.automations.added, 0, 'không chạy hạng mục lịch');
+    assert.ok(!existsSync(join(D2, 'skills/lib/kc-a')));
+    const again = await M.migrateFromToolswave({ sources: [S], dest: D2, userId: UID, claudeEnv, filesOnly: true, maxWorkFileBytes: 1500 });
+    assert.strictEqual(again.counts.workFiles.added + again.counts.fileLinks.merged, 0, 'chạy lại không đổi gì');
   });
   await t('dấu đã nhập theo tài khoản', async () => {
     assert.strictEqual(await M.readMarker(D, UID), null);

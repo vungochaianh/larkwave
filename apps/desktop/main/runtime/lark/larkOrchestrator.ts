@@ -61,6 +61,7 @@ export async function* runLarkOrchestrator(
     autoApprove: deps.autoApprove,
     autoApproveTool: deps.autoApproveTool,
     allowVersionHint: deps.allowVersionHint,
+    files: deps.fileContext,
   };
 
   const queue: LarkChatEvent[] = [];

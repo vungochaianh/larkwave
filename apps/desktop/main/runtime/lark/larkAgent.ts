@@ -9,6 +9,7 @@ import type { LarkClient } from './larkClient';
 import { claudeEnv } from '../claudeRunner';
 import { allTools, readOnlyTools, type LarkToolDef } from './tools';
 import { startMcpBridge } from './mcpServer';
+import type { TurnFileContext } from './fileContext';
 import { rescueClaudeSession } from '../claudeSessions';
 
 /**
@@ -128,6 +129,11 @@ export interface LarkAgentDeps {
   /** Abort the turn. Kills the CLI child SYNCHRONOUSLY (independent of the generator's
    *  finally, which can't run while the generator is parked awaiting silent CLI output). */
   signal?: AbortSignal;
+  /**
+   * Thư mục tệp của lượt (thư mục ghi, thư mục đính kèm, thư mục tự động hoá). Mỗi lần thực thi công
+   * cụ chạy trong ngữ cảnh này — hai lượt song song không ghi đè thư mục của nhau (xem fileContext).
+   */
+  fileContext?: TurnFileContext;
 }
 
 /** Route to Claude MCP or multi-runner orchestrator. */
@@ -206,6 +212,7 @@ export async function* runLarkChat(
         autoApprove: deps.autoApprove,
         autoApproveTool: deps.autoApproveTool,
         allowVersionHint: deps.allowVersionHint,
+        files: deps.fileContext,
       });
 
   // Write the MCP config to a temp file (a path is accepted by every Claude Code

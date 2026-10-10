@@ -26,6 +26,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, stat, writeFile, copyFile } from 'node:fs/promises';
 import { join, resolve, sep, dirname } from 'node:path';
 import { mergeSession, mergeSpec, type StoredSession } from '../lark/larkMerge';
+import { isInsideDir } from '../lark/filePaths';
 import { claudeProjectDirFor, claudeProjectsDir, copyClaudeSession, findClaudeTranscript, isSessionId } from '../claudeSessions';
 import type { LarkSpecDoc, ToolswaveMigrationCategory, ToolswaveMigrationReport } from '@larkwave/core';
 
@@ -48,8 +49,9 @@ export interface MigrateOpts {
   /** User id của tài khoản đang đăng nhập (JWT `sub`). */
   userId: string;
   dryRun?: boolean;
-  /** Giới hạn tệp làm việc (lark/work) — chỉ chép tệp nhỏ. */
+  /** Trần MỘT tệp làm việc (lark/work) — mặc định 200 MB; lớn hơn thì bỏ qua và ghi vào báo cáo. */
   maxWorkFileBytes?: number;
+  /** Trần TỔNG (mặc định không giới hạn — mọi tệp của người dùng đều chép, xem migrateWorkFiles). */
   maxWorkTotalBytes?: number;
   /**
    * Môi trường của Claude CLI (để tính đúng `~/.claude/projects` và slug) — mặc định process.env.
@@ -58,6 +60,11 @@ export interface MigrateOpts {
   claudeEnv?: Record<string, string | undefined>;
   /** Chỉ chạy hạng mục hội thoại (+ nối lại phiên Claude) — lượt bổ sung cho tài khoản đã nhập trước bản này. */
   sessionsOnly?: boolean;
+  /**
+   * Chỉ chạy hội thoại + TỆP LÀM VIỆC + trỏ lại đường dẫn thẻ tệp — lượt bổ sung cho tài khoản đã nhập
+   * bằng bản cũ (bản cũ chỉ chép tệp ≤ 5 MB của hội thoại vừa nhập, nên thẻ tệp cũ trỏ vào Toolswave).
+   */
+  filesOnly?: boolean;
 }
 
 export const FOLLOW_UPS = [
@@ -65,20 +72,8 @@ export const FOLLOW_UPS = [
   'Nếu bạn dùng "Lark Bot (App ID)": nhập lại App Secret ở mục Lark Bot (App ID) — App Secret được mã hoá bằng khoá của app Toolswave nên không chép sang.',
 ];
 
-/** Thư mục userData của app desktop Toolswave, theo thứ tự ưu tiên (bản cài trước, bản dev sau). */
-export function toolswaveDataDirCandidates(platform: string, home: string, appData?: string): string[] {
-  const roots: string[] = [];
-  if (platform === 'darwin') roots.push(join(home, 'Library', 'Application Support'));
-  else if (platform === 'win32') roots.push(appData || join(home, 'AppData', 'Roaming'));
-  else roots.push(process.env.XDG_CONFIG_HOME || join(home, '.config'));
-  const out: string[] = [];
-  for (const r of roots) {
-    out.push(join(r, '@toolswave', 'desktop'));
-    out.push(join(r, '@toolswave', 'desktop (development)'));
-    out.push(join(r, 'toolswave-desktop'));
-  }
-  return out;
-}
+/** Thư mục userData của app desktop Toolswave — MỘT nguồn sự thật ở filePaths (bộ phân giải đường dẫn dùng chung). */
+export { toolswaveDataDirCandidates } from '../lark/filePaths';
 
 /** Ứng viên nào thực sự có dữ liệu Lark/kỹ năng (bỏ thư mục chỉ có cache Chromium). */
 export function findToolswaveDataDirs(candidates: string[], dest: string): string[] {
@@ -163,7 +158,7 @@ async function isDir(p: string): Promise<boolean> {
 }
 
 function emptyCounts(): Record<MigrateCategory, CategoryCount> {
-  const cats: MigrateCategory[] = ['sessions', 'claudeSessions', 'deleted', 'specs', 'larkConfig', 'automations', 'bases', 'relogin', 'workFiles', 'skills', 'plugins'];
+  const cats: MigrateCategory[] = ['sessions', 'claudeSessions', 'deleted', 'specs', 'larkConfig', 'automations', 'bases', 'relogin', 'workFiles', 'fileLinks', 'skills', 'plugins'];
   return Object.fromEntries(cats.map((c) => [c, { added: 0, merged: 0, unchanged: 0 }])) as Record<MigrateCategory, CategoryCount>;
 }
 
@@ -264,7 +259,10 @@ function scopesFor(userId: string): { from: string; to: string }[] {
   ];
 }
 
-async function migrateSessions(ctx: Ctx, src: string, migratedIds: Set<string>): Promise<void> {
+/** id hội thoại đã nhập → tệp phiên ở Larkwave (đích) + tệp phiên ở Toolswave (nguồn). */
+type ConvMap = Map<string, { target: string; srcFile: string }>;
+
+async function migrateSessions(ctx: Ctx, src: string, migratedIds: ConvMap): Promise<void> {
   const root = join(src, 'lark', 'sessions');
   const dest = join(ctx.o.dest, 'lark', 'sessions');
   // Tệp phẳng kiểu cũ (trước khi chia theo tài khoản) → `_local`.
@@ -299,13 +297,15 @@ async function migrateSessions(ctx: Ctx, src: string, migratedIds: Set<string>):
       if (!linked) delete next.agentSessionId;
       await ctx.writeDest(target, JSON.stringify(next, null, 2));
       ctx.count('sessions', 'added');
-      migratedIds.add(s.id);
+      migratedIds.set(s.id, { target, srcFile: job.file });
       continue;
     }
     const merged = mergeSession(ex, s);
     const adopt = linked && !exSid; // hội thoại có sẵn ở Larkwave (vd kéo từ bản sao lưu) nhưng chưa có phiên CLI
     if (merged === ex && !adopt) {
       ctx.count('sessions', 'unchanged');
+      // Vẫn là hội thoại đã nhập (lần trước) → tệp làm việc của nó vẫn phải có ở Larkwave.
+      migratedIds.set(s.id, { target, srcFile: job.file });
       continue;
     }
     // Giữ id phiên CLI của Larkwave (nó mới chạy được ở thư mục này) — hoặc nhận phiên gốc vừa nối.
@@ -315,7 +315,7 @@ async function migrateSessions(ctx: Ctx, src: string, migratedIds: Set<string>):
     if (!adopt && !ex.agentSessionId) delete keep.agentSessionId;
     await ctx.writeDest(target, JSON.stringify(keep, null, 2));
     ctx.count('sessions', merged === ex ? 'unchanged' : 'merged');
-    migratedIds.add(s.id);
+    migratedIds.set(s.id, { target, srcFile: job.file });
   }
 }
 
@@ -492,9 +492,18 @@ async function noteGrants(ctx: Ctx, src: string): Promise<void> {
   if (existsSync(p)) ctx.skip(src, p, 'quyền uỷ quyền cho bạn bè — app Toolswave tiếp tục phục vụ (tránh một lượt chạy hai lần)');
 }
 
-async function migrateWorkFiles(ctx: Ctx, src: string, ids: Set<string>): Promise<void> {
-  const maxFile = ctx.o.maxWorkFileBytes ?? 5 * 1024 * 1024;
-  let budget = ctx.o.maxWorkTotalBytes ?? 200 * 1024 * 1024;
+/** Tệp tạm/khoá của CLI, trình duyệt, Office — không phải tệp của người dùng. */
+const TEMP_FILE = /(^~\$)|(\.(tmp|temp|part|crdownload|download|swp|lock)$)|(\.migrate\.tmp$)|(^Thumbs\.db$)/i;
+
+/**
+ * Chép TẤT CẢ tệp của người dùng trong thư mục làm việc của các hội thoại đã nhập (và `sched-files`),
+ * để thẻ tệp/đường dẫn cũ vẫn mở được. Bỏ: thư mục/tệp ẩn (`.claude/…` trạng thái CLI, `.lark-files`
+ * bản trích tạm), tệp tạm/khoá, tệp > 200 MB (mỗi mục bỏ qua đều có trong báo cáo kèm lý do). Tệp đã có
+ * ở Larkwave thì giữ nguyên (không ghi đè).
+ */
+async function migrateWorkFiles(ctx: Ctx, src: string, ids: ConvMap): Promise<void> {
+  const maxFile = ctx.o.maxWorkFileBytes ?? 200 * 1024 * 1024;
+  let budget = ctx.o.maxWorkTotalBytes ?? Number.POSITIVE_INFINITY;
   const root = join(src, 'lark', 'work');
   for (const conv of await ls(root)) {
     if (!ids.has(conv) && conv !== 'sched-files') continue;
@@ -509,14 +518,22 @@ async function migrateWorkFiles(ctx: Ctx, src: string, ids: Set<string>): Promis
           await walk(r);
           continue;
         }
+        if (TEMP_FILE.test(f)) {
+          ctx.skip(src, a, 'tệp tạm/khoá (không phải tệp của người dùng)');
+          continue;
+        }
         let size = 0;
         try {
           size = (await stat(a)).size;
         } catch {
           continue;
         }
-        if (size > maxFile || size > budget) {
-          ctx.skip(src, a, 'tệp làm việc quá lớn');
+        if (size > maxFile) {
+          ctx.skip(src, a, `tệp làm việc quá lớn (> ${Math.round(maxFile / 1048576) || 1} MB) — mở thẳng từ thư mục Toolswave nếu cần`);
+          continue;
+        }
+        if (size > budget) {
+          ctx.skip(src, a, 'vượt trần tổng dung lượng chép');
           continue;
         }
         const to = join(ctx.o.dest, 'lark', 'work', conv, r);
@@ -530,6 +547,49 @@ async function migrateWorkFiles(ctx: Ctx, src: string, ids: Set<string>): Promis
       }
     };
     await walk('');
+  }
+}
+
+/**
+ * Trỏ lại `path` của thẻ tệp (item `kind:'file'`) trong các hội thoại đã nhập: đường dẫn nằm trong
+ * thư mục làm việc Toolswave (`<src>/lark/work/<hội thoại>/…`) → bản chép ở Larkwave, khi bản chép đó
+ * có thật (hoặc SẼ có, ở chạy thử). Bấm "Mở"/"Đưa lên Lark" trên thẻ cũ nhờ vậy chạy được (chốt mở tệp
+ * chỉ nhận `userData/lark/work`). Không đổi `updatedAt` (không xáo thứ tự danh sách hội thoại).
+ */
+async function rewriteFileLinks(ctx: Ctx, src: string, ids: ConvMap): Promise<void> {
+  const twWork = join(src, 'lark', 'work');
+  const maxFile = ctx.o.maxWorkFileBytes ?? 200 * 1024 * 1024;
+  for (const { target, srcFile } of ids.values()) {
+    // Chạy thử: đích chưa được ghi → đếm trên bản SẼ ghi (hợp đích + nguồn, đúng luật mergeSession).
+    const ex = await readDestJson<StoredSession>(target);
+    let doc = ex;
+    if (ctx.dryRun) {
+      const sd = await readDestJson<StoredSession>(srcFile);
+      doc = ex && sd ? mergeSession(ex, sd) : ex ?? sd;
+    }
+    if (!doc || !Array.isArray(doc.items)) continue;
+    let changed = 0;
+    const items = await Promise.all(
+      doc.items.map(async (it) => {
+        const o = it as { kind?: unknown; path?: unknown };
+        if (!o || o.kind !== 'file' || typeof o.path !== 'string') return it;
+        if (!isInsideDir(twWork, o.path) || resolve(o.path) === resolve(twWork)) return it;
+        const rel = resolve(o.path).slice(resolve(twWork).length).replace(/^[\\/]+/, '');
+        if (!rel || rel.split(/[\\/]+/).some((x) => x.startsWith('.') || x === '..')) return it;
+        const next = join(ctx.o.dest, 'lark', 'work', rel);
+        let ok = existsSync(next);
+        if (!ok && ctx.dryRun) {
+          const st = await stat(o.path).catch(() => null);
+          ok = !!st?.isFile() && st.size <= maxFile;
+        }
+        if (!ok) return it;
+        changed++;
+        return { ...(it as Record<string, unknown>), path: next };
+      }),
+    );
+    if (!changed) continue;
+    ctx.count('fileLinks', 'merged', changed);
+    if (existsSync(target)) await ctx.writeDest(target, JSON.stringify({ ...doc, items }, null, 2));
   }
 }
 
@@ -644,15 +704,21 @@ export async function migrateFromToolswave(o: MigrateOpts): Promise<MigrateRepor
   if (!o.userId) throw new Error('Cần đăng nhập để nhập dữ liệu theo đúng tài khoản.');
   const ctx = new Ctx(o, !!o.dryRun);
   for (const src of o.sources) {
-    const ids = new Set<string>();
+    const ids: ConvMap = new Map();
     await migrateSessions(ctx, src, ids);
     if (o.sessionsOnly) continue;
+    if (o.filesOnly) {
+      await migrateWorkFiles(ctx, src, ids);
+      await rewriteFileLinks(ctx, src, ids);
+      continue;
+    }
     await migrateDeleted(ctx, src);
     await migrateSpecs(ctx, src);
     await migrateLarkConfig(ctx, src);
     await migrateRelogin(ctx, src);
     await noteGrants(ctx, src);
     await migrateWorkFiles(ctx, src, ids);
+    await rewriteFileLinks(ctx, src, ids);
     await migrateSkills(ctx, src);
     await migratePlugins(ctx, src);
     await noteIntentionalSkips(ctx, src);

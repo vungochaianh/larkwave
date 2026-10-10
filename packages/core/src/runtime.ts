@@ -2021,6 +2021,8 @@ export type ToolswaveMigrationCategory =
   | 'bases'
   | 'relogin'
   | 'workFiles'
+  /** Thẻ tệp trong hội thoại đã nhập được trỏ sang bản chép ở Larkwave (thay vì thư mục Toolswave). */
+  | 'fileLinks'
   | 'skills'
   | 'plugins';
 
@@ -2039,6 +2041,11 @@ export interface ToolswaveMigrationReport {
    * này thì máy đã chạy bước nối phiên — không tự chạy lại.
    */
   claudeRelink?: { at: string; added: number; merged: number; unchanged: number };
+  /**
+   * Lần chép bổ sung TẤT CẢ tệp làm việc + trỏ lại thẻ tệp (cho tài khoản đã nhập bằng bản chỉ chép tệp
+   * ≤ 5 MB). Có trường này thì không tự chạy lại.
+   */
+  filesRelink?: { at: string; files: number; links: number; skipped: number };
 }
 
 export interface ToolswaveMigrationStatus {

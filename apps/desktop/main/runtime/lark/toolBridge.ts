@@ -8,7 +8,8 @@ import {
   isSelfDeclaredFailure,
   suspectAppBugError,
   tierForError,
-  tierForPayload, fileEventFor, runPreflight, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+  tierForPayload, fileEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+import { withTurnFiles, type TurnFileContext } from './fileContext';
 
 /**
  * Bộ công cụ + hàm THỰC THI dùng chung cho mọi đường chạy Lark agent (API trực tiếp và MAIC).
@@ -37,6 +38,8 @@ export function createToolBridge(
     baseTools: (m: LarkChatMode) => LarkToolDef[];
     /** Ghi chú "bản cài đã cũ". Máy nền không có khái niệm bản cài nên bỏ trống. */
     versionNote?: (allow?: boolean) => Promise<string>;
+    /** Thư mục tệp của lượt — mọi lần thực thi công cụ chạy trong ngữ cảnh này (xem fileContext). */
+    files?: TurnFileContext;
   },
   push: (e: LarkChatEvent) => void,
 ): {
@@ -64,8 +67,9 @@ export function createToolBridge(
     }
     const callId = randomUUID();
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
-    const pre = await runPreflight(tool, input, deps.client);
-    const gated = needsConfirmation(tool, deps, !!pre, input);
+    const pre = await withTurnFiles(deps.files, () => runPreflight(tool, input, deps.client));
+    const dyn = pre ? undefined : await withTurnFiles(deps.files, () => runAdditiveCheck(tool, input, deps.client));
+    const gated = needsConfirmation(tool, deps, !!pre, input, dyn);
     push({ type: 'tool_call', callId, name, input, gated, ...(gated ? await previewFor(tool, input) : {}) });
     if (gated) {
       const ok = await deps.awaitConfirm(callId, name, input);
@@ -75,7 +79,7 @@ export function createToolBridge(
       }
     }
     try {
-      const data = pre ?? (await tool.exec(input, deps.client));
+      const data = pre ?? (await withTurnFiles(deps.files, () => tool.exec(input, deps.client)));
       const failed = isSelfDeclaredFailure(data);
       // Xem larkToolExec: thất bại tự khai báo cũng phải hiện ra là lỗi.
       push(

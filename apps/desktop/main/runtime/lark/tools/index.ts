@@ -87,7 +87,7 @@ export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_ui_template_apply',
 ] as const;
 /** Tool không cần client Open API: phiên web + dựng tệp cục bộ. */
-const CLIENTLESS = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, ...LARK_WEB_WRITE_TOOL_NAMES, 'create_file', 'fill_xlsx']);
+const CLIENTLESS = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, ...LARK_WEB_WRITE_TOOL_NAMES, 'create_file', 'fill_xlsx', 'prepare_local_file']);
 
 /**
  * BỘ CÔNG CỤ HỢP NHẤT của Lark × Agents (một agent cho cả "Lark × Agents" và "Tạo workflow" — hai

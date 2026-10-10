@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type LarkToolDef, str } from './types';
 import { extractOfficeText, officeKindFor } from '../ooxml';
+import { setGlobalAttachDir, turnAttachDir } from '../fileContext';
 
 /**
  * Thư mục để ghi tệp đính kèm tải về.
@@ -10,16 +11,20 @@ import { extractOfficeText, officeKindFor } from '../ooxml';
  * LarkService gọi setAttachmentDir() khi bắt đầu một lượt chat, nên tệp nằm cạnh workspace của
  * đúng cuộc hội thoại đó.
  */
-let ATTACH_DIR: string | null = null;
+let LAST_SET_DIR: string | null = null;
 export function setAttachmentDir(dir: string | null): void {
   // Thư mục đổi = sang cuộc hội thoại khác → quên ngữ cảnh Bitable của cuộc trước, để table_id của
   // một Base khác không bị mang nhầm sang đây.
-  if (dir !== ATTACH_DIR) resetBitableContext();
-  ATTACH_DIR = dir;
+  if (dir !== LAST_SET_DIR) resetBitableContext();
+  LAST_SET_DIR = dir;
+  setGlobalAttachDir(dir);
 }
-/** Thư mục chứa tệp người dùng ĐÍNH KÈM lượt này — `fill_xlsx` đọc tệp mẫu từ đây (có kiểm phạm vi). */
+/**
+ * Thư mục chứa tệp người dùng ĐÍNH KÈM lượt này — `fill_xlsx` đọc tệp mẫu từ đây (có kiểm phạm vi).
+ * Ngữ cảnh tệp của lượt (fileContext.withTurnFiles) thắng giá trị đặt bằng `setAttachmentDir`.
+ */
 export function getAttachmentDir(): string | null {
-  return ATTACH_DIR;
+  return turnAttachDir();
 }
 
 /** Bao nhiêu chữ trả thẳng vào hội thoại. Nhiều hơn thì agent tự Read tệp đã ghi ra đĩa. */
@@ -78,9 +83,10 @@ function buildExtra(a: { tableId?: string; fieldId?: string; recordId?: string; 
  * (không có gì để mất — phần đầu vẫn được trả về bình thường).
  */
 async function spillText(name: string, text: string): Promise<Record<string, string>> {
-  if (!ATTACH_DIR) return {};
+  const base = getAttachmentDir();
+  if (!base) return {};
   try {
-    const dir = join(ATTACH_DIR, '.lark-files');
+    const dir = join(base, '.lark-files');
     await mkdir(dir, { recursive: true });
     const path = join(dir, `${name}.txt`);
     await writeFile(path, text, 'utf8');
@@ -256,13 +262,14 @@ export const attachmentTools: LarkToolDef[] = [
       }
 
       // Ảnh/PDF/khác: ghi ra đĩa, Claude tự Read.
-      if (!ATTACH_DIR) {
+      const attachRoot = getAttachmentDir();
+      if (!attachRoot) {
         return {
           ok: false,
           reason: 'Chưa có thư mục làm việc cho lượt chat này nên không ghi tệp ra đĩa được.',
         };
       }
-      const dir = join(ATTACH_DIR, '.lark-files');
+      const dir = join(attachRoot, '.lark-files');
       await mkdir(dir, { recursive: true });
       const path = join(dir, name);
       await writeFile(path, dl.bytes);

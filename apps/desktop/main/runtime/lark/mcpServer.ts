@@ -11,7 +11,8 @@ import {
   tierForError,
   tierForPayload,
   versionNote,
-  withVersionNote, fileEventFor, runPreflight, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+  withVersionNote, fileEventFor, runPreflight, runAdditiveCheck, needsConfirmation, previewFor, summarizeTool, memoForTool } from './larkToolExec';
+import { withTurnFiles, type TurnFileContext } from './fileContext';
 
 /**
  * A minimal in-process MCP server (Streamable HTTP, JSON responses) that exposes
@@ -47,6 +48,8 @@ export interface McpToolContext {
   heartbeatMs?: number;
   /** Xem ToolExecContext.allowVersionHint — mặc định KHÔNG nhắc. */
   allowVersionHint?: boolean;
+  /** Thư mục tệp của lượt — mọi lần thực thi công cụ chạy trong ngữ cảnh này (xem fileContext). */
+  files?: TurnFileContext;
 }
 
 /**
@@ -218,8 +221,9 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
     // UI shows no modal, and run it straight through (the gated flag is the single
     // source of truth the renderer keys off).
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
-    const pre = await runPreflight(tool, input, ctx.client);
-    const needsConfirm = needsConfirmation(tool, ctx, !!pre, input);
+    const pre = await withTurnFiles(ctx.files, () => runPreflight(tool, input, ctx.client));
+    const dyn = pre ? undefined : await withTurnFiles(ctx.files, () => runAdditiveCheck(tool, input, ctx.client));
+    const needsConfirm = needsConfirmation(tool, ctx, !!pre, input, dyn);
     ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
     if (needsConfirm) {
@@ -240,7 +244,7 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
       }
     }
     try {
-      const data = pre ?? (await tool.exec(input, ctx.client));
+      const data = pre ?? (await withTurnFiles(ctx.files, () => tool.exec(input, ctx.client)));
       // Xem larkToolExec: thất bại tự khai báo cũng phải hiện ra là lỗi.
       ctx.emit(
         isSelfDeclaredFailure(data)

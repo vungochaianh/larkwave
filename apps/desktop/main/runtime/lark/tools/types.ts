@@ -28,6 +28,13 @@ export interface LarkToolDef {
    */
   additiveWhen?(input: Record<string, any>): boolean;
   /**
+   * Kiểm ĐỘNG cờ cộng-thêm khi luật tĩnh không đủ (cần đọc dữ liệu): vd ghi theo khoá `match_by` —
+   * dòng nào cũng mới hoặc giống hệt bản đang có ⇒ true (tự duyệt được); có dòng phải SỬA ⇒ false
+   * (hỏi người dùng / lượt tự động phải có quyền "ghi đè ô"). Trả undefined = theo luật tĩnh.
+   * Lỗi khi kiểm ⇒ coi như false (xem runAdditiveCheck).
+   */
+  additiveCheck?(input: Record<string, any>, client: LarkClient): Promise<boolean | undefined>;
+  /**
    * Bản dễ đọc của input cho hộp xác nhận (vd thay `fld…` bằng tên cột). Chỉ để HIỂN THỊ — lỗi ở
    * đây không được chặn thao tác (nơi gọi nuốt lỗi).
    */

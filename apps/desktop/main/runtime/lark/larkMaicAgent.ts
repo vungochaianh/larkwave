@@ -4,6 +4,7 @@ import type { LarkClient } from './larkClient';
 import type { LarkToolDef } from './tools/types';
 import { createToolBridge } from './larkApiAgent';
 import { allTools, readOnlyTools } from './tools';
+import type { TurnFileContext } from './fileContext';
 
 /**
  * Chạy một lượt Lark agent bằng GÓI LARKWAVE (MAIC), không cần CLI cài trên máy và không cần
@@ -31,6 +32,8 @@ export interface LarkMaicAgentDeps {
   awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
   allowVersionHint?: boolean;
   signal?: AbortSignal;
+  /** Thư mục tệp của lượt (xem fileContext) — truyền thẳng vào createToolBridge. */
+  files?: TurnFileContext;
 }
 
 export async function* runLarkMaicAgent(

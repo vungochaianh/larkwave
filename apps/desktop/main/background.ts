@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { hostname } from 'node:os';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import serve from 'electron-serve';
@@ -13,7 +13,7 @@ import { getRunner, invalidateRunnerStatus, listRunnerStatus } from './runtime/r
 import { AgentClient } from './runtime/agentClient';
 import { startAuthLoopback } from './authLoopback';
 import { openAuthWindow } from './authWindow';
-import { isInsideDir } from './runtime/lark/filePaths';
+import { isExecutableName, isInsideDir } from './runtime/lark/filePaths';
 import { openLarkAuthWindow } from './runtime/lark/larkOAuth';
 import { resolveRenderer, downloadAndOpenInstaller, type UpdateInfo } from './codePush';
 import { AccountCache } from './accountCache';
@@ -315,11 +315,18 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.openLocalFile, async (_e, p: string) => {
     try {
       const root = path.join(app.getPath('userData'), 'lark', 'work');
+      // Thư mục của các quy tắc tự động hoá (tệp nguồn + kết quả mỗi lần chạy) — cùng mức tin cậy.
+      const autoRoot = path.join(app.getPath('userData'), 'lark', 'automations');
       const target = path.resolve(String(p || ''));
-      if (!isInsideDir(root, target)) {
+      if (!isInsideDir(root, target) && !isInsideDir(autoRoot, target)) {
         return { ok: false, error: 'Tệp nằm ngoài thư mục hội thoại.' };
       }
       if (!existsSync(target)) return { ok: false, error: 'Tệp không còn trên máy.' };
+      // `shell.openPath` lên ứng dụng/script là CHẠY nó — kể cả khi nằm đúng thư mục (một tệp tải từ
+      // Lark về có thể là .command/.exe). Thư mục (kể cả gói .app) cũng không mở.
+      if (isExecutableName(target) || statSync(target).isDirectory()) {
+        return { ok: false, error: 'Không mở tệp chạy được (ứng dụng/script/thư mục) — chỉ mở tài liệu.' };
+      }
       const err = await shell.openPath(target);
       return err ? { ok: false, error: err } : { ok: true };
     } catch (e) {
@@ -334,8 +341,9 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkFileAction, async (_e, input: LarkFileActionInput): Promise<LarkFileActionResult> => {
     try {
       const root = path.join(app.getPath('userData'), 'lark', 'work');
+      const autoRoot = path.join(app.getPath('userData'), 'lark', 'automations');
       const target = path.resolve(String(input?.path || ''));
-      if (!isInsideDir(root, target)) return { ok: false, error: 'Tệp nằm ngoài thư mục hội thoại.' };
+      if (!isInsideDir(root, target) && !isInsideDir(autoRoot, target)) return { ok: false, error: 'Tệp nằm ngoài thư mục hội thoại.' };
       if (!existsSync(target)) return { ok: false, error: 'Tệp không còn trên máy.' };
       if (input.action === 'reveal') {
         shell.showItemInFolder(target);

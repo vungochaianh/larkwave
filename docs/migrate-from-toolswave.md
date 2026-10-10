@@ -88,7 +88,8 @@ thì chụp lại. Hiện không thiếu route nào. Những chỗ khác hình d
 | Base | `bases.json` | Hợp theo `appToken` |
 | Lịch tự động hoá | `automations.json` | Hợp theo `id`, Larkwave thắng. Lease chung đảm bảo lịch chỉ chạy ở một app |
 | Lịch sử đăng nhập Lark web | `lark-relogin-<scope>.json` | Hợp theo `at`, giữ 30 |
-| Tệp làm việc | `lark/work/<convId>/` | Chỉ của hội thoại vừa nhập (và `sched-files`). Mỗi tệp ≤ 5 MB, tổng ≤ 200 MB. Bỏ thư mục ẩn |
+| Tệp làm việc | `lark/work/<convId>/` | MỌI tệp của người dùng (cả thư mục con) của mọi hội thoại đã nhập — kể cả hội thoại đã có từ lần nhập trước — và `sched-files`. Bỏ: thư mục/tệp ẩn (`.claude/…`, `.lark-files`), tệp tạm/khoá (`~$…`, `.tmp`, `.part`…), tệp > 200 MB — mỗi mục bỏ qua có trong báo cáo kèm lý do. Tệp đã có ở Larkwave thì giữ nguyên |
+| Thẻ tệp ("fileLinks") | item `kind:'file'` trong hội thoại đã nhập | `path` trỏ vào `<Toolswave>/lark/work/…` → trỏ sang bản chép ở Larkwave (khi bản chép có thật). Không đổi `updatedAt` |
 | Kỹ năng | `skills/registry.json`, `skills/lib/<id>/**`, `snapshots.json`, `set-runs.json` | Thêm kỹ năng chưa có (giữ nguyên SKILL.md cùng hợp đồng kỹ năng chéo), không ghi đè kỹ năng cùng id. Sau đó dựng lại `~/.claude/skills/larkwave-<id>` |
 | Plugin | `plugins/registry.json`, `plugins/<id>/**`, `trusted-keys.json` | Thêm cái chưa có |
 
@@ -107,6 +108,33 @@ thì chụp lại. Hiện không thiếu route nào. Những chỗ khác hình d
 2. Nếu dùng "Lark Bot (App ID)": nhập lại App Secret ở mục **Lark Bot (App ID)**.
 
 Bản sao lưu trên máy chủ (`GET /me/lark-backup`, cùng ô mà app Toolswave khôi phục) được kéo về và hợp nhất mỗi lần mở Lark × Agents, theo đúng luật hợp nhất và chống rò rỉ (gắn theo token, bia mộ, settings thì máy này thắng, automations thì máy này thắng).
+
+### Lượt bổ sung "chỉ tệp" (`filesRelink`)
+
+Máy đã nhập bằng bản cũ (chỉ chép tệp ≤ 5 MB của hội thoại vừa nhập) tự chạy MỘT lượt `filesOnly`: hội thoại
+(idempotent) + chép bù mọi tệp làm việc + trỏ lại thẻ tệp. Kết quả ghi vào `filesRelink` trong
+`migrations/toolswave-<userId>.json`; kỹ năng/lịch/cài đặt không chạy lại.
+
+## Đường dẫn tệp CŨ trong hội thoại (bộ phân giải `filePaths` / `fileContext.resolveToolFile`)
+
+Hội thoại nhập từ Toolswave còn nhắc tới đường dẫn kiểu
+`/Users/<u>/Library/Application Support/@toolswave/desktop/lark/work/<convId>/File test.xlsx` (trong chữ của
+agent, trong phiên Claude CLI đã nối lại). Mọi công cụ nhận đường dẫn tệp (`prepare_local_file`,
+`lark_web_attach_file`, `lark_web_drive_upload`, `lark_web_import_as_sheet/_doc`, `fill_xlsx`, `send_file`) đi
+qua MỘT bộ phân giải:
+
+| Đường dẫn | Kết quả |
+|---|---|
+| trong thư mục làm việc/xuất của lượt, thư mục đính kèm, thư mục của quy tắc tự động hoá đang chạy | dùng thẳng (realpath phải còn ở trong — symlink thoát ra ngoài bị chặn) |
+| tên tệp tương đối | hiểu theo thư mục làm việc của lượt |
+| `<Toolswave>/{desktop, desktop (development), toolswave-desktop}/lark/work/<convId>/<tệp>` (mac/Windows/Linux), hội thoại `<convId>` CÓ ở Larkwave (tài khoản đang đăng nhập hoặc `_local`) | CHÉP đúng tệp đó (nguồn chỉ đọc) sang `userData/lark/work/<convId>/<tệp>` rồi dùng bản chép. Đích cùng nội dung → dùng luôn; đích KHÁC và MỚI HƠN → không ghi đè, chép sang `<tên> (Toolswave).<đuôi>`; nguồn mới hơn → cập nhật. ≤ 200 MB, chỉ tệp thường |
+| `..` ở bất kỳ đâu, đường tuyệt đối tuỳ ý, chỗ khác trong dữ liệu Toolswave (`skills/`, `lark/accounts/*.bin`…), tệp ẩn CLI, hội thoại chưa nhập | từ chối kèm lý do |
+
+So tiền tố luôn nối `sep` (kiểm cả ma trận `path.win32`). `prepare_local_file` là công cụ "chuẩn bị + đọc": trả
+`path` mới + xem trước + phần chữ đã trích, để agent dùng `path` mới cho bước ghi. Mở tệp (IPC `openLocalFile`)
+chỉ nhận `lark/work` và `lark/automations`, và từ chối tệp chạy được (`.app/.exe/.command/.sh/…`) cùng thư mục.
+Mỗi lần thực thi công cụ chạy trong ngữ cảnh tệp của ĐÚNG lượt đó (`withTurnFiles`, AsyncLocalStorage) — lịch tự
+động hoá chạy song song với hội thoại không ghi đè thư mục của nhau. Kiểm: `test/localFiles.cjs`.
 
 ## Trí nhớ của hội thoại cũ (phiên Claude CLI)
 
@@ -147,7 +175,7 @@ trước đây hội thoại chưa có id bị ghi id của hội thoại khác 
 ## Kiểm
 
 ```bash
-bash apps/desktop/test/run.sh        # gồm endpointCompat.cjs + toolswaveMigrate.cjs + claudeSessions.cjs + larkDeleteSync.cjs (không PUT)
+bash apps/desktop/test/run.sh        # gồm endpointCompat.cjs + toolswaveMigrate.cjs + claudeSessions.cjs + localFiles.cjs + larkDeleteSync.cjs (không PUT)
 node scripts/toolswave-routes.mjs    # chụp lại route của API Toolswave sau mỗi lần đồng bộ
 ```
 

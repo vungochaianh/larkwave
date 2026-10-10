@@ -41,12 +41,16 @@ const files = readFileSync(join(R, 'runtime', 'lark', 'tools', 'files.ts'), 'utf
 const bg = readFileSync(join(R, 'background.ts'), 'utf8');
 
 const than = files.slice(files.indexOf("name: 'send_file'"));
-assert.ok(/isInsideDir\(OUT_DIR, p\)/.test(than), 'send_file phải chốt qua isInsideDir');
+// send_file chốt qua BỘ PHÂN GIẢI dùng chung (filePaths qua fileContext.resolveToolFile) — thư mục lượt,
+// đính kèm, tự động hoá, hoặc bản chép từ hội thoại Toolswave đã nhập; không tự so chuỗi.
+assert.ok(/resolveToolFile\(/.test(than), 'send_file phải chốt qua resolveToolFile');
 assert.ok(!/startsWith\(/.test(than), 'send_file không được tự so chuỗi nữa');
 
-const hbody = bg.slice(bg.indexOf('IPC.openLocalFile'), bg.indexOf('IPC.openLocalFile') + 1200);
+const hbody = bg.slice(bg.indexOf('IPC.openLocalFile'), bg.indexOf('IPC.openLocalFile') + 1600);
 assert.ok(/isInsideDir\(root, target\)/.test(hbody), 'handler mở tệp phải chốt qua isInsideDir');
 assert.ok(/'lark', 'work'/.test(hbody), 'handler phải chốt theo userData/lark/work');
+assert.ok(/'lark', 'automations'/.test(hbody), 'handler chỉ nhận thêm thư mục tự động hoá, không gì khác');
+assert.ok(/isExecutableName\(target\)/.test(hbody), 'handler phải từ chối tệp chạy được (shell.openPath = CHẠY)');
 assert.ok(!/startsWith\(/.test(hbody), 'handler không được tự so chuỗi nữa');
 console.log('✓ cả send_file lẫn handler IPC đều gọi vào hàm chung, không còn bản chép nào');
 
@@ -60,10 +64,12 @@ const blockOf = (name, next) => {
 };
 assert.ok(/gated: true/.test(blockOf('send_file', null)), 'send_file phải gated — tệp đi ra ngoài');
 assert.ok(/gated: false/.test(blockOf('create_file', 'fill_xlsx')), 'create_file không nên gated — chỉ ghi thư mục tạm');
-assert.ok(/gated: false/.test(blockOf('fill_xlsx', 'send_file')), 'fill_xlsx không nên gated — chỉ ghi thư mục tạm');
+assert.ok(/gated: false/.test(blockOf('fill_xlsx', 'prepare_local_file')), 'fill_xlsx không nên gated — chỉ ghi thư mục tạm');
+assert.ok(/gated: false/.test(blockOf('prepare_local_file', 'send_file')), 'prepare_local_file chỉ đọc/chép vào thư mục hội thoại — không gated');
+assert.ok(/resolveToolFile\(/.test(blockOf('prepare_local_file', 'send_file')), 'prepare_local_file phải đi qua bộ phân giải');
 // fill_xlsx đọc file mẫu theo `source_path` do MODEL đưa → phải chốt phạm vi qua isInsideDir (chỉ
 // đọc trong thư mục đính kèm / thư mục kết quả của lượt này), không tự so chuỗi.
-const fx = blockOf('fill_xlsx', 'send_file');
-assert.ok(/isInsideDir\(/.test(fx), 'fill_xlsx phải chốt source_path qua isInsideDir');
+const fx = blockOf('fill_xlsx', 'prepare_local_file');
+assert.ok(/resolveToolFile\(/.test(fx), 'fill_xlsx phải chốt source_path qua resolveToolFile');
 assert.ok(!/startsWith\(/.test(fx), 'fill_xlsx không được tự so chuỗi');
 console.log('✓ send_file có hỏi xác nhận; create_file/fill_xlsx thì không, và fill_xlsx chốt phạm vi đọc');

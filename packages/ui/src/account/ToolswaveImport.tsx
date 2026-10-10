@@ -18,6 +18,7 @@ const CAT_LABEL: [ToolswaveMigrationCategory, string][] = [
   ['automations', 'Lịch tự động hoá'],
   ['relogin', 'Lịch sử đăng nhập Lark web'],
   ['workFiles', 'Tệp làm việc'],
+  ['fileLinks', 'Thẻ tệp trỏ sang bản chép ở Larkwave'],
   ['skills', 'Kỹ năng'],
   ['plugins', 'Plugin'],
 ];

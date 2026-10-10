@@ -25,9 +25,8 @@ import { compareSheetBack, driveFileUrl, folderTokenFrom, importTargetFor, parse
 import { buildCsv, buildDocx, buildXlsx, FORMAT_META, safeFileName } from '../fileBuild';
 import { buildFilePreview } from '../filePreview';
 import { extractOfficeText } from '../ooxml';
-import { isInsideDir } from '../filePaths';
+import { resolveToolFile } from '../fileContext';
 import { getFileOutDir } from './files';
-import { getAttachmentDir } from './attachments';
 import { enc, str, type LarkToolDef } from './types';
 import type { LarkClient } from '../larkClient';
 
@@ -66,20 +65,21 @@ function tokenOf(i: J): string {
 }
 
 /**
- * Tệp cục bộ được phép đưa lên Lark: CHỈ tệp trong thư mục của hội thoại này (tệp agent dựng, tệp người
- * dùng đính kèm). `path` tới từ model = dữ liệu không tin được — không chốt là tải được khoá SSH lên Drive.
+ * Tệp cục bộ được phép đưa lên Lark: tệp trong thư mục của hội thoại/lượt này (tệp agent dựng, tệp người
+ * dùng đính kèm), thư mục của quy tắc tự động hoá đang chạy, hoặc tệp của hội thoại CŨ nhập từ Toolswave
+ * (tự chép sang thư mục hội thoại Larkwave — bản gốc chỉ đọc). `path` tới từ model = dữ liệu không tin
+ * được — không chốt là tải được khoá SSH lên Drive. Luật ở filePaths (qua resolveToolFile).
  * `extraRoot` cho đường người dùng bấm trên thẻ tệp (main truyền `userData/lark/work`).
  */
-export async function readLocalFile(p: string, extraRoot?: string | null): Promise<{ bytes: Buffer; name: string; mime: string }> {
-  const path = String(p || '').trim();
-  if (!path) throw new Error('Thiếu `path` (đường dẫn tệp — lấy nguyên từ kết quả create_file / tệp đính kèm).');
-  if (!isInsideDir(getFileOutDir(), path) && !isInsideDir(getAttachmentDir(), path) && !isInsideDir(extraRoot, path)) {
-    throw new Error('Chỉ đưa được lên Lark tệp nằm trong thư mục hội thoại này (tệp agent dựng hoặc tệp người dùng đính kèm).');
-  }
-  const st = await stat(path).catch(() => null);
-  if (!st?.isFile()) throw new Error(`Không tìm thấy tệp: ${basename(path)}`);
-  const name = basename(path);
-  return { bytes: await readFile(path), name, mime: mimeFor(name) };
+export async function readLocalFile(p: string, extraRoot?: string | null): Promise<{ bytes: Buffer; name: string; mime: string; path: string; copiedFrom?: string }> {
+  const asked = String(p || '').trim();
+  if (!asked) throw new Error('Thiếu `path` (đường dẫn tệp — lấy nguyên từ kết quả create_file / tệp đính kèm).');
+  const r = await resolveToolFile(asked, extraRoot);
+  if (r.ok === false) throw new Error(`Chỉ đưa được lên Lark tệp trong thư mục hội thoại / tệp đính kèm / thư mục tự động hoá — ${r.reason}`);
+  const st = await stat(r.path).catch(() => null);
+  if (!st?.isFile()) throw new Error(`Không tìm thấy tệp: ${basename(r.path)}`);
+  const name = basename(r.path);
+  return { bytes: await readFile(r.path), name, mime: mimeFor(name), path: r.path, ...(r.copiedFrom ? { copiedFrom: r.copiedFrom } : {}) };
 }
 
 const toEnc = (f: WebField): EncField => ({ id: f.id, name: f.name, type: f.type, uiType: f.uiType, isPrimary: f.isPrimary, options: f.options, linkTable: f.linkTable, formatter: f.formatter, multiple: f.multiple });
@@ -628,6 +628,7 @@ export const larkWebWriteTools: LarkToolDef[] = [
         via: 'web',
         file_token: up.fileToken,
         file_name: local.name,
+        ...(local.copiedFrom ? { local_path: local.path, copied_from: local.copiedFrom } : {}),
         field: f.name,
         record_id: recordId,
         kept_existing: i.replace === true ? 0 : current.length,

@@ -38,6 +38,8 @@ export interface LarkApiAgentDeps {
   autoApprove?: boolean;
   awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
   signal?: AbortSignal;
+  /** Thư mục tệp của lượt (xem fileContext) — truyền thẳng vào createToolBridge. */
+  files?: TurnFileContext;
 }
 
 /** Short human summary of a tool result for the UI card. */
@@ -58,6 +60,7 @@ function summarize(data: unknown): string {
 
 
 import { createToolBridge } from './toolBridge';
+import type { TurnFileContext } from './fileContext';
 export { createToolBridge };
 
 export async function* runLarkApiAgent(
