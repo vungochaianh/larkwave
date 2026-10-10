@@ -31,6 +31,10 @@ let OUT_DIR: string | null = null;
 export function setFileOutDir(dir: string | null): void {
   OUT_DIR = dir;
 }
+/** Thư mục ghi tệp của lượt hiện tại (công cụ đưa tệp lên Lark dùng để chốt đường dẫn). */
+export function getFileOutDir(): string | null {
+  return OUT_DIR;
+}
 
 /**
  * Tải tệp lên máy chủ Larkwave — để nó SỐNG như một hội thoại, không chỉ nằm trên một máy.

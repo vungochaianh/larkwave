@@ -309,6 +309,38 @@ export interface AgentControls {
 
 /** State of the connected Lark custom app (no secrets ever cross this boundary). */
 /** One Lark chat turn's input. */
+/** Xem trước nội dung một tệp agent dựng (thẻ tệp trong hội thoại). Dựng ở main (lark/filePreview.ts). */
+export interface LarkFilePreview {
+  kind: 'xlsx' | 'csv' | 'docx' | 'pdf' | 'text';
+  summary: string;
+  sheets?: { name: string; rows: number; cols: number; head: string[][] }[];
+  paragraphs?: number;
+  pages?: number;
+  head?: string[];
+}
+
+/** Thao tác người dùng bấm trên thẻ tệp (không qua agent). Main chốt đường dẫn trong thư mục hội thoại. */
+export interface LarkFileActionInput {
+  action: 'reveal' | 'saveAs' | 'drive' | 'sheet' | 'doc';
+  path: string;
+  /** drive/sheet/doc: thư mục Drive đích (token hoặc link …/drive/folder/<token>); bỏ trống = "Không gian của tôi". */
+  folder?: string;
+}
+export interface LarkFileActionResult {
+  ok: boolean;
+  error?: string;
+  /** saveAs: nơi đã lưu (người dùng chọn). */
+  savedTo?: string;
+  /** drive/sheet/doc: liên kết mở trên Lark + token. */
+  url?: string;
+  token?: string;
+  kind?: 'drive_file' | 'sheet' | 'docx';
+  /** Đường đã dùng: phiên Lark web hay Open API (custom app). */
+  via?: 'web' | 'openapi';
+  /** Đọc lại sau khi tạo: tóm tắt thứ Lark đang có (sheet/dòng, tiêu đề tài liệu). */
+  verified?: string;
+}
+
 export interface LarkChatInput {
   prompt: string;
   mode: LarkChatMode;
@@ -1110,6 +1142,8 @@ export type LarkChatEvent =
       /** Bản sao trên máy chủ tài khoản. Có thì tệp mở lại được ở MÁY KHÁC — tệp đi theo
        *  tài khoản đúng như hội thoại, thay vì nằm chết trên máy vừa tạo ra nó. */
       uploadId?: string;
+      /** Xem trước thật của nội dung (sheet/dòng/cột/vài dòng đầu, đoạn đầu, số trang) — main dựng. */
+      preview?: LarkFilePreview;
     }
   | {
       type: 'tool_call';
@@ -1637,6 +1671,8 @@ export interface RuntimeAdapter {
   /** Mở tệp agent vừa dựng (create_file) bằng ứng dụng mặc định của hệ điều hành.
    *  Chỉ desktop; phía main chặn mọi đường dẫn nằm ngoài thư mục hội thoại. */
   openLocalFile?(path: string): Promise<{ ok: boolean; error?: string }>;
+  /** Thẻ tệp: hiện trong thư mục / lưu về… (hộp thoại CHỈ khi người dùng bấm) / đưa lên Lark Drive, Sheets, Docs. */
+  larkFileAction?(input: LarkFileActionInput): Promise<LarkFileActionResult>;
   /**
    * Theo dõi tiến trình tải bộ cài. Trả về hàm huỷ đăng ký.
    *

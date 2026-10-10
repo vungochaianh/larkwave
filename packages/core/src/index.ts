@@ -102,6 +102,7 @@ export const IPC = {
   agentEvent: 'tw:agentEvent', // main → renderer push (live AgentClientStatus)
   openExternal: 'tw:openExternal',
   openLocalFile: 'tw:openLocalFile', // mở tệp agent vừa dựng, CHỈ trong thư mục hội thoại
+  larkFileAction: 'tw:larkFileAction', // thẻ tệp: hiện thư mục / lưu về… / đưa lên Lark (Drive, Sheets, Docs)
   installerProgress: 'tw:installerProgress', // main → renderer: đã tải bao nhiêu / tổng bao nhiêu
   larkCompactSession: 'tw:larkCompactSession', // nén ngữ cảnh TẠI CHỖ, giữ nguyên hội thoại
   checkUpdate: 'tw:checkUpdate', // code-push: query the release manifest

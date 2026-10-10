@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { app, dialog, BrowserWindow } from 'electron';
 import { buildContractSuggestPrompt, parseContractSuggestion } from '@larkwave/core';
 import { setAgentSkillAuthor, setAgentSkillEditor, setAgentSkillLister } from './lark/skillBridge';
-import type { SkillContractFields, LarkPendingPrompts } from '@larkwave/core';
+import type { SkillContractFields, LarkPendingPrompts, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
 import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomationInput, LarkAutomationRunResult, LarkBaseRef, LarkGrantPolicy, LarkNoteDoc, LarkShareInfo, LarkTableRef, LarkBaseSnapshot, LarkBotConfig, LarkBotStatus, LarkChatEvent, LarkChatInput, LarkConnection, LarkWebInfo, LarkWebRecording, LarkSessionMeta, LarkSpecDoc, LarkToolRunResult, LarkSkillSet, LarkSkillRunResult, LarkExtractResult, PluginInfo, PluginPanelInfo, RuntimeAdapter, SkillAttachment, SkillInfo, SpecBuildResult, SpecPromoteInput, CmsSyncJob, CmsSyncJobPatch, CmsSyncErrorReport, CmsSyncLarkChat, CmsSyncRefreshResult, CmsKeeperStatus, LarkReloginEntry, LarkBrowserRect, LarkBrowserState, LarkUiTemplate, LarkUiTemplateApplyResult, LarkWebBase } from '@larkwave/core';
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
@@ -561,6 +561,10 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
   /** Sau khi nhập kỹ năng từ Toolswave: đọc lại thư viện + đặt bản sao vào thư mục các CLI. */
   resyncSkills(): void {
     this.skills.resync();
+  }
+  /** Thẻ tệp → Lark Drive / Sheets / Docs (main đã chốt đường dẫn trong lark/work). */
+  larkFileAction(input: LarkFileActionInput): Promise<LarkFileActionResult> {
+    return this.lark.fileAction(input);
   }
   /** Sau khi nhập/nối phiên Claude: bỏ id phiên đã nạp trong bộ nhớ (xem LarkService.forgetTurnStates). */
   larkForgetTurnStates(): void {

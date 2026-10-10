@@ -65,7 +65,7 @@ export function createToolBridge(
     const callId = randomUUID();
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
     const pre = await runPreflight(tool, input, deps.client);
-    const gated = needsConfirmation(tool, deps, !!pre);
+    const gated = needsConfirmation(tool, deps, !!pre, input);
     push({ type: 'tool_call', callId, name, input, gated, ...(gated ? await previewFor(tool, input) : {}) });
     if (gated) {
       const ok = await deps.awaitConfirm(callId, name, input);

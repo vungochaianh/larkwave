@@ -60,6 +60,7 @@ const CH = {
   agentEvent: 'tw:agentEvent',
   openExternal: 'tw:openExternal',
   openLocalFile: 'tw:openLocalFile',
+  larkFileAction: 'tw:larkFileAction',
   installerProgress: 'tw:installerProgress',
   larkCompactSession: 'tw:larkCompactSession',
   checkUpdate: 'tw:checkUpdate',
@@ -283,6 +284,7 @@ const bridge = {
   },
   openExternal: (url: string) => ipcRenderer.invoke(CH.openExternal, url),
   openLocalFile: (p: string) => ipcRenderer.invoke(CH.openLocalFile, p),
+  larkFileAction: (input: unknown) => ipcRenderer.invoke(CH.larkFileAction, input),
   larkCompactSession: (convId?: string) => ipcRenderer.invoke(CH.larkCompactSession, convId),
   onInstallerProgress: (cb: (p: { received: number; total: number }) => void) => {
     const handler = (_e: unknown, p: { received: number; total: number }) => cb(p);

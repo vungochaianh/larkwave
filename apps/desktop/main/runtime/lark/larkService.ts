@@ -163,9 +163,11 @@ const SKILL_COMMAND_BUDGET = 40000;
  *  user's own question, which sits at the tail. */
 const MAIC_PROMPT_MAX = 20000;
 
-import { agentTools, allTools, isAdditiveTool, isWriteTool, readOnlyTools } from './tools';
+import { agentTools, allTools, isAdditiveCall, isAdditiveTool, isClientlessTool, isWriteTool, readOnlyTools } from './tools';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { buildApiHistory as buildApiHistoryMsgs, buildTranscript as buildTranscriptText } from './transcript';
+import { importAsDoc, importAsSheet, readLocalFile, uploadToDrive } from './tools/larkWebWrite';
+import { buildFilePreview } from './filePreview';
 import { transcriptBudgetTokens } from '../contextBudget';
 import { setAttachmentDir } from './tools/attachments';
 import { setFileOutDir, setFileUploader, setPdfMaker } from './tools/files';
@@ -192,7 +194,7 @@ import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo, LarkWebBase } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebBase, LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
 
 /**
  * Owns the connected Lark custom app in the main process: credential storage,
@@ -2763,14 +2765,40 @@ export class LarkService {
   /** Run a Lark tool directly (UI-initiated, e.g. a plugin form panel). */
   async runTool(name: string, input: Record<string, unknown>): Promise<LarkToolRunResult> {
     const client = this.ensureClient();
-    if (!client) return { ok: false, error: 'Chưa kết nối Lark.' };
+    // Tool chạy bằng phiên Lark web (không cần custom app) vẫn chạy được khi chưa kết nối App ID.
+    if (!client && !isClientlessTool(name)) return { ok: false, error: 'Chưa kết nối Lark.' };
     const tool = resolveTool(name) ?? this.plugins.collectTools().find((t) => t.name === name);
     if (!tool) return { ok: false, error: `Không tìm thấy tool ${name}.` };
     try {
-      const data = await tool.exec(input, client);
+      const data = await tool.exec(input, client as LarkClient);
       return { ok: true, data };
     } catch (e) {
       return { ok: false, error: e instanceof LarkApiError ? e.message : String((e as Error)?.message ?? e) };
+    }
+  }
+
+  /**
+   * Nút trên thẻ tệp → Lark (người dùng bấm, không qua agent): Drive / thành Lark Sheets / thành Lark Docs.
+   * Chạy bằng phiên Lark web (Larkwave mặc định không có App ID); đọc lại để báo đã đúng chưa.
+   */
+  async fileAction(input: LarkFileActionInput): Promise<LarkFileActionResult> {
+    try {
+      const root = join(this.baseDir, 'lark', 'work');
+      const local = await readLocalFile(input.path, root);
+      if (!getLarkWebSession().webHost()) return { ok: false, error: 'Chưa đăng nhập Lark web — mở khung Lark, đăng nhập rồi bấm lại.' };
+      const folder = input.folder?.trim() || undefined;
+      const r: Record<string, any> = input.action === 'drive' ? await uploadToDrive(local, folder) : input.action === 'sheet' ? await importAsSheet(local, folder) : input.action === 'doc' ? await importAsDoc(local, folder) : { ok: false, note: 'Thao tác không hợp lệ.' };
+      return {
+        ok: !!r.ok,
+        url: r.url,
+        token: r.token || r.file_token,
+        kind: r.kind,
+        via: 'web',
+        verified: r.verified,
+        ...(r.ok ? {} : { error: String(r.note || r.verified || 'Chưa xác minh được.') }),
+      };
+    } catch (e) {
+      return { ok: false, error: (e as Error)?.message || String(e) };
     }
   }
 
@@ -4062,7 +4090,8 @@ export class LarkService {
      */
     const confirm = (callId: string, name: string, input: unknown) => {
       if (!workflowTurn && this.store.getSettings().autoApprove) return Promise.resolve(true);
-      if (autoApproveTool?.(name)) return Promise.resolve(true);
+      // Theo TỪNG lần gọi (isAdditiveCall): đính tệp `replace:true` vẫn phải hỏi dù công tắc Tự động bật.
+      if (autoApproveTool?.(name) && isAdditiveCall(name, input)) return Promise.resolve(true);
       return new Promise<boolean>((resolve) => this.pending.set(callId, { convId, resolve, name, input }));
     };
 
@@ -4170,7 +4199,9 @@ export class LarkService {
        */
       if (general && workDir) {
         for (const f of await newFilesSince(workDir, filesBefore)) {
-          yield { type: 'file', name: f.name, path: f.path, mime: f.mime, bytes: f.bytes };
+          // Xem trước thật (đọc lại tệp) — cùng luật với thẻ tệp của lượt Lark (larkToolExec.fileEventFor).
+          const preview = await readFile(f.path).then((b) => buildFilePreview(f.name, b)).catch(() => null);
+          yield { type: 'file', name: f.name, path: f.path, mime: f.mime, bytes: f.bytes, ...(preview ? { preview } : {}) };
         }
       }
       if (creditErr) {

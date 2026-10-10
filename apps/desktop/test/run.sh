@@ -16,6 +16,7 @@ npx tsc main/runtime/versionHint.ts main/runtime/apiRunner.ts main/runtime/lark/
   main/runtime/lark/workflowV3.ts main/runtime/lark/tools/workflowsV3.ts \
   main/runtime/migrate/toolswaveMigrator.ts main/runtime/skills/skillHost.ts main/deviceIdentity.ts \
   main/runtime/claudeSessions.ts main/runtime/lark/transcript.ts main/runtime/contextBudget.ts \
+  main/runtime/lark/bitableEncode.ts main/runtime/lark/webRecords.ts main/runtime/lark/webFiles.ts main/runtime/lark/filePreview.ts \
   main/runtime/lark/larkWebApi.ts main/runtime/lark/workflowInternal.ts main/runtime/lark/webAutomation.ts main/runtime/lark/workflowBlock.ts main/runtime/lark/baseStructure.ts main/runtime/lark/mcpServer.ts \
   --outDir .test-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck
 # Bộ gánh nhiều tenant của tw-lark-runner. Nằm ngoài apps/desktop nên outDir sinh ra đường dẫn
@@ -46,7 +47,7 @@ test -f .test-build/runtime/lark/larkService.js || { echo "✗ không biên dị
 test -f .test-build/runtime/lark/tools/index.js || { echo "✗ không biên dịch được tools/index"; exit 1; }
 test -f .test-build/runtime/lark/systemPrompt.js || { echo "✗ không biên dịch được systemPrompt"; exit 1; }
 fail=0
-for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs; do
+for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs test/larkWebWrite.cjs; do
   echo "── $t"
   node "$t" || fail=1
 done

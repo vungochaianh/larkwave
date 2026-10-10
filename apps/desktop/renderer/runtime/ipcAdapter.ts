@@ -1,4 +1,6 @@
 import type {
+  LarkFileActionInput,
+  LarkFileActionResult,
   ToolswaveMigrationEvent,
   ToolswaveMigrationReport,
   ToolswaveMigrationStatus,
@@ -113,6 +115,7 @@ interface Bridge {
   onClaudeLoginEvent(cb: (streamId: string, ev: ClaudeLoginEvent | { type: '__end__' }) => void): () => void;
   openExternal(url: string): void;
   openLocalFile(path: string): Promise<{ ok: boolean; error?: string }>;
+  larkFileAction(input: LarkFileActionInput): Promise<LarkFileActionResult>;
   onInstallerProgress(cb: (p: { received: number; total: number }) => void): () => void;
   checkUpdate(): Promise<DesktopUpdateInfo>;
   applyUpdate(): Promise<DesktopUpdateInfo>;
@@ -375,6 +378,10 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
 
   openLocalFile(p: string): Promise<{ ok: boolean; error?: string }> {
     return this.bridge.openLocalFile(p);
+  }
+
+  larkFileAction(input: LarkFileActionInput): Promise<LarkFileActionResult> {
+    return this.bridge.larkFileAction(input);
   }
 
   onInstallerProgress(cb: (p: { received: number; total: number }) => void): () => void {

@@ -240,6 +240,10 @@ export interface WebField {
   isPrimary?: boolean;
   options?: { id: string; name: string }[];
   linkTable?: string;
+  /** Định dạng số (vd "0.00%" — cột phần trăm). */
+  formatter?: string;
+  /** Cột Người / Liên kết cho nhiều giá trị. */
+  multiple?: boolean;
 }
 export interface WebTable {
   id: string;
@@ -330,6 +334,8 @@ export function parseTableSchema(t: J, name?: string, maxSamples = 3): WebTable 
       ...(f.isPrimary || t.primaryKey === id ? { isPrimary: true } : {}),
       ...(opts?.length ? { options: opts } : {}),
       ...(f.property?.tableId ? { linkTable: String(f.property.tableId) } : {}),
+      ...(typeof f.property?.formatter === 'string' && f.property.formatter ? { formatter: String(f.property.formatter) } : {}),
+      ...(typeof f.property?.multiple === 'boolean' ? { multiple: f.property.multiple } : {}),
     };
   });
   const views = viewOrder

@@ -331,6 +331,7 @@ export const bitableTools: LarkToolDef[] = [
         table_id: str('table_id của bảng'),
         page_size: { type: 'integer', description: 'Số bản ghi tối đa (mặc định 50, tối đa 500)' },
         page_token: str('Token trang tiếp theo (lấy từ kết quả trước)'),
+        fetch_all: { type: 'boolean', description: 'Đọc HẾT mọi trang (tối đa 20 000 bản ghi) — dùng khi cần số liệu/báo cáo trên toàn bộ dữ liệu' },
         field_names: { type: 'array', items: { type: 'string' }, description: 'Chỉ lấy các cột này (theo tên)' },
         filter: {
           type: 'object',
@@ -348,17 +349,50 @@ export const bitableTools: LarkToolDef[] = [
     gated: false,
     exec: async (i, c) => {
       noteBitableContext(String(i.app_token || ''), String(i.table_id || ''));
-      const d = await c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records/search`, {
+      const body = {
+        field_names: i.field_names,
+        ...(i.filter ? { filter: i.filter } : {}),
+        ...(Array.isArray(i.sort) && i.sort.length ? { sort: i.sort } : {}),
+      };
+      if (i.fetch_all === true) {
+        // ĐỌC HẾT: lặp trang 500 tới khi has_more=false, đối chiếu `total` — không cắt im lặng ở 100/500.
+        const items: unknown[] = [];
+        let pageToken: string | undefined;
+        let total: number | null = null;
+        for (let page = 0; page < 40; page++) {
+          const d = (await c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records/search`, { params: { page_size: 500, ...(pageToken ? { page_token: pageToken } : {}) }, data: body })) as { items?: unknown[]; has_more?: boolean; page_token?: string; total?: number };
+          if (typeof d?.total === 'number') total = d.total;
+          items.push(...(d?.items || []));
+          if (!d?.has_more || !d?.page_token) {
+            pageToken = undefined;
+            break;
+          }
+          pageToken = d.page_token;
+        }
+        const complete = !pageToken && (total === null || items.length === total);
+        return {
+          app_token: i.app_token,
+          table_id: i.table_id,
+          total: total ?? items.length,
+          returned: items.length,
+          complete,
+          items,
+          ...(complete ? {} : { note: `CHƯA ĐỦ: mới đọc ${items.length}/${total ?? '?'} bản ghi. Không tổng hợp/xuất tệp trên phần này — dùng lark_export_table_file hoặc lọc bớt.` }),
+        };
+      }
+      const d = (await c.request('POST', `${apps(i.app_token)}/tables/${enc(i.table_id)}/records/search`, {
         params: { page_size: i.page_size ?? 50, page_token: i.page_token },
-        data: {
-          field_names: i.field_names,
-          ...(i.filter ? { filter: i.filter } : {}),
-          ...(Array.isArray(i.sort) && i.sort.length ? { sort: i.sort } : {}),
-        },
-      });
+        data: body,
+      })) as Record<string, unknown>;
       // Nhắc lại app_token/table_id trong KẾT QUẢ: sang lượt sau model chỉ còn nhớ tên tool và một
       // mẩu input, nên nếu không nhắc lại thì nó không còn cách nào biết bảng nào để đọc đính kèm.
-      return { app_token: i.app_token, table_id: i.table_id, ...(d as Record<string, unknown>) };
+      return {
+        app_token: i.app_token,
+        table_id: i.table_id,
+        ...d,
+        // Còn trang sau → nói thẳng, để model không lấy một trang làm toàn bộ dữ liệu.
+        ...(d?.has_more ? { note: `CÒN DỮ LIỆU (tổng ${typeof d.total === 'number' ? d.total : '?'}): đây mới là một trang. Đọc tiếp bằng page_token, hoặc gọi lại với fetch_all:true; ĐỪNG báo cáo/xuất tệp khi chưa đủ.` } : {}),
+      };
     },
   },
   {

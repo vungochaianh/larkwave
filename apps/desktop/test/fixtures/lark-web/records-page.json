@@ -1,0 +1,28 @@
+{
+  "_note": "records?tableID&offset&limit sau khi giải gzip (đo Base Test 10/10/2026, id đã thay). Ô server trả có modifiedTime/modifiedUser; khoá JSON không theo thứ tự lúc ghi.",
+  "tableID": "tblTEST0000000001",
+  "tableRev": 21,
+  "tableRecordNum": 3,
+  "viewRecordNum": 0,
+  "groupList": [{ "by": null, "recordIDList": ["recA000001", "recA000002", "recA000003"] }],
+  "recordMap": {
+    "recA000001": {
+      "fldText0001": { "value": [{ "type": "text", "text": "Dòng đủ kiểu" }], "modifiedTime": 1791595065, "modifiedUser": "7600000000000000001" },
+      "fldNum00001": { "value": 1234.5 },
+      "fldMoney001": { "value": 1500000 },
+      "fldPct00001": { "value": 0.25 },
+      "fldSel00001": { "value": "optNew0001" },
+      "fldMul00001": { "value": ["optA000001", "optC000001"] },
+      "fldDate0001": { "value": 1791617400000 },
+      "fldChk00001": { "value": true },
+      "fldUrl00001": { "value": [{ "text": "Lark", "link": "https://www.larksuite.com", "type": "url" }] },
+      "fldPhone001": { "value": { "fullPhoneNum": "0901234567" } },
+      "fldMail0001": { "value": [{ "type": "url", "text": "test@example.com", "link": "mailto:test@example.com" }] },
+      "fldUser0001": { "value": { "users": [{ "name": "Phương", "enName": "Phương", "notify": false, "userId": "7600000000000000009", "avatarUrl": null }] } },
+      "fldLink0001": { "value": ["recB000001"] },
+      "fldFile0001": { "value": [{ "timeStamp": 1791595057025, "text": "a.csv", "name": "a.csv", "mimeType": "text/csv", "size": 14, "id": "TokFile0000001", "attachmentToken": "TokFile0000001" }] }
+    },
+    "recA000002": { "fldText0001": { "value": [{ "type": "text", "text": "007" }] }, "fldNum00001": { "value": 0 } },
+    "recA000003": { "fldText0001": { "value": null } }
+  }
+}

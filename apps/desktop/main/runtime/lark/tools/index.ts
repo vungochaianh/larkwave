@@ -17,6 +17,7 @@ import { automationTools } from './automation';
 import { attachmentTools } from './attachments';
 import { skillTools } from './skills';
 import { fileTools } from './files';
+import { larkWebWriteTools, LARK_WEB_WRITE_TOOL_NAMES } from './larkWebWrite';
 
 /**
  * Ghi CỘNG THÊM của đường Open API (tạo bản ghi/bảng/cột/view mới, tạo workflow v3 — luôn TẮT):
@@ -40,6 +41,7 @@ const ALL: LarkToolDef[] = [
   ...bitableTools,
   ...bitablePermissionTools,
   ...larkWebTools,
+  ...larkWebWriteTools,
   ...workflowV3Tools,
   ...workflowTools,
   ...larkUiTools,
@@ -85,7 +87,7 @@ export const WORKFLOW_MODE_TOOL_NAMES = [
   'lark_ui_template_apply',
 ] as const;
 /** Tool không cần client Open API: phiên web + dựng tệp cục bộ. */
-const CLIENTLESS = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, 'create_file', 'fill_xlsx']);
+const CLIENTLESS = new Set<string>([...WORKFLOW_MODE_TOOL_NAMES, ...LARK_WEB_WRITE_TOOL_NAMES, 'create_file', 'fill_xlsx']);
 
 /**
  * BỘ CÔNG CỤ HỢP NHẤT của Lark × Agents (một agent cho cả "Lark × Agents" và "Tạo workflow" — hai
@@ -126,4 +128,24 @@ export function isWriteTool(name: string): boolean {
 export function isAdditiveTool(name: string): boolean {
   const t = ALL.find((x) => x.name === name);
   return !!(t?.gated && t.additive);
+}
+
+/**
+ * Lần gọi CỤ THỂ này có phải ghi cộng thêm không (cờ `additive` + `additiveWhen(input)` nếu có) — vd
+ * đính tệp ghi thêm là cộng thêm, `replace:true` thì không. Công tắc "Tự động" chỉ tự duyệt khi true.
+ */
+export function isAdditiveCall(name: string, input: unknown): boolean {
+  const t = ALL.find((x) => x.name === name);
+  if (!t?.gated || !t.additive) return false;
+  if (!t.additiveWhen) return true;
+  try {
+    return t.additiveWhen((input ?? {}) as Record<string, any>) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tool chạy được KHÔNG cần custom app (phiên Lark web + tệp cục bộ). */
+export function isClientlessTool(name: string): boolean {
+  return CLIENTLESS.has(name);
 }

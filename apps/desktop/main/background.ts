@@ -1,9 +1,11 @@
 import path from 'node:path';
 import { hostname } from 'node:os';
 import { existsSync } from 'node:fs';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { copyFile } from 'node:fs/promises';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import serve from 'electron-serve';
 import { APIA_BASE, IPC } from '@larkwave/core';
+import type { LarkFileActionInput, LarkFileActionResult } from '@larkwave/core';
 import type { CmsSyncErrorReport, CmsSyncJobPatch, LarkBaseRef, LarkBrowserRect, LarkChatInput, LarkGrantPolicy, LarkNoteDoc, LarkSpecDoc, SkillContractFields, SpecPromoteInput, UpdateTokenNotifyInput } from '@larkwave/core';
 import { LocalRuntimeAdapter } from './runtime/localAdapter';
 import { onLockChange, currentOwner, owners, forceRelease, forceReleaseAll } from './runtime/agentLock';
@@ -322,6 +324,32 @@ function registerIpc(win: BrowserWindow) {
       return err ? { ok: false, error: err } : { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : 'Không mở được tệp.' };
+    }
+  });
+  /**
+   * Nút trên thẻ tệp. Cùng chốt thư mục với openLocalFile: chỉ tệp trong `lark/work/`. "Lưu về…" mở hộp
+   * thoại lưu của hệ điều hành — CHỈ vì người dùng vừa bấm nút đó. Đưa lên Lark đi qua larkService
+   * (phiên Lark web) — không qua agent, không cần duyệt (người dùng bấm chính là lệnh).
+   */
+  ipcMain.handle(IPC.larkFileAction, async (_e, input: LarkFileActionInput): Promise<LarkFileActionResult> => {
+    try {
+      const root = path.join(app.getPath('userData'), 'lark', 'work');
+      const target = path.resolve(String(input?.path || ''));
+      if (!isInsideDir(root, target)) return { ok: false, error: 'Tệp nằm ngoài thư mục hội thoại.' };
+      if (!existsSync(target)) return { ok: false, error: 'Tệp không còn trên máy.' };
+      if (input.action === 'reveal') {
+        shell.showItemInFolder(target);
+        return { ok: true };
+      }
+      if (input.action === 'saveAs') {
+        const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), path.basename(target)) });
+        if (r.canceled || !r.filePath) return { ok: false, error: 'cancelled' };
+        await copyFile(target, r.filePath);
+        return { ok: true, savedTo: r.filePath };
+      }
+      return await runtime.larkFileAction({ ...input, path: target });
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Không làm được thao tác với tệp.' };
     }
   });
   ipcMain.handle(IPC.authLoopback, () => startAuthLoopback(win));

@@ -219,7 +219,7 @@ export function startMcpBridge(ctx: McpToolContext): Promise<McpBridge> {
     // source of truth the renderer keys off).
     // Kiểm trước hộp xác nhận — xem LarkToolDef.preflight / runPreflight.
     const pre = await runPreflight(tool, input, ctx.client);
-    const needsConfirm = needsConfirmation(tool, ctx, !!pre);
+    const needsConfirm = needsConfirmation(tool, ctx, !!pre, input);
     ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
     if (needsConfirm) {

@@ -1,0 +1,16 @@
+{
+  "_note": "Phản hồi thật (id đã thay) — box/stream/upload/all, import/create, import/result, explorer/v2/create/folder, explorer/v2/children/list. 10/10/2026.",
+  "upload_bitable": { "status": 200, "json": { "code": 0, "message": "Success", "data": { "data_version": "7694842135425584897", "extra": {}, "file_token": "FileTok000000000000000001", "version": "7694842135425584897" } } },
+  "upload_explorer": { "status": 200, "json": { "code": 0, "message": "Success", "data": { "data_version": "7694842429299494621", "extra": { "node_token": "nodTest000000000000000001" }, "file_token": "FileTok000000000000000002", "version": "7694842429299494621" } } },
+  "upload_import": { "status": 200, "json": { "code": 0, "message": "Success", "data": { "extra": { "extra": "{\"obj_type\":\"sheet\",\"file_extension\":\"xlsx\"}" }, "file_token": "FileTok000000000000000003" } } },
+  "import_create_missing_event_source": { "code": 2, "msg": "Parameter Error", "data": {} },
+  "import_create_ok": { "msg": "success", "data": { "ticket": "7694842645537640169", "job_timeout": 600 }, "code": 0 },
+  "import_result_sheet": { "code": 0, "msg": "success", "data": { "result": { "job_error_msg": "success", "token": "ShtTok000000000000000001", "url": "https://tenant.sg.larksuite.com/sheets/ShtTok000000000000000001", "extra": {}, "type": "sheet", "job_status": 0 } } },
+  "import_result_minimal_docx": { "code": 0, "msg": "success", "data": { "result": { "job_status": 129, "job_error_msg": "save_as_import", "extra": { "_pod_name": "dp-x" } } } },
+  "import_result_docx": { "code": 0, "msg": "success", "data": { "result": { "job_status": 0, "job_error_msg": "success", "token": "DocTok000000000000000001", "url": "https://tenant.sg.larksuite.com/docx/DocTok000000000000000001", "extra": {}, "type": "docx" } } },
+  "create_folder": { "msg": "Success", "data": { "entities": { "nodes": { "FoldTok00000000000000001": { "name": "Larkwave Test (tự xoá)", "token": "FoldTok00000000000000001", "url": "https://tenant.sg.larksuite.com/drive/folder/FoldTok00000000000000001", "type": 0 } } }, "node_list": ["FoldTok00000000000000001"] }, "code": 0 },
+  "children": { "code": 0, "msg": "Success", "data": { "node_list": ["nodSheet0000000000000001", "nodDoc00000000000000001"], "entities": { "nodes": {
+    "FoldTok00000000000000001": { "name": "Larkwave Test (tự xoá)", "type": 0, "obj_token": "FoldTok00000000000000001" },
+    "nodSheet0000000000000001": { "name": "LW Test nhập Sheet (tự xoá)", "type": 3, "obj_token": "ShtTok000000000000000001", "url": "https://tenant.sg.larksuite.com/sheets/ShtTok000000000000000001" },
+    "nodDoc00000000000000001": { "name": "LW Test nhập Docs (tự xoá)", "type": 22, "obj_token": "DocTok000000000000000001", "url": "https://tenant.sg.larksuite.com/docx/DocTok000000000000000001" } } } } }
+}

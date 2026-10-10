@@ -27,6 +27,30 @@ import {
   type WebTable,
   type WebAutomation,
 } from './larkWebApi';
+import { parseRecordsPage, readAllRecords, recordsByIdBody, recordsPagePath, RECORDS_BY_ID_PATH, type AllRecords, type RecordsPage } from './webRecords';
+import {
+  adler32,
+  childrenPath,
+  CREATE_FOLDER_PATH,
+  docReadScript,
+  IMPORT_CREATE_PATH,
+  importCreateBody,
+  importResultPath,
+  importTargetFor,
+  importUploadExtra,
+  parseChildren,
+  parseCreateFolder,
+  parseImportResult,
+  parseUploadResponse,
+  sheetReadScript,
+  sheetWriteScript,
+  uploadQuery,
+  uploadScript,
+  WEB_UPLOAD_MAX_BYTES,
+  type MountPoint,
+} from './webFiles';
+import type { DirectoryUser } from './bitableEncode';
+import { randomUUID } from 'node:crypto';
 import {
   addWorkflowBlockScript,
   deleteWorkflowBlockScript,
@@ -2258,6 +2282,161 @@ export class LarkWebSession {
   /** Delete/disable a workflow. */
   async disableWorkflow(baseId: string, workflowID: string, bizType = '2'): Promise<unknown> {
     return this.fetchApi(`${bit(baseId)}/workflow/disable`, 'POST', { workflowID, bizType });
+  }
+
+  // ── GHI qua phiên web: bản ghi, tệp, Drive, nhập Sheets/Docs (docs/lark-web-api.md mục 13–15) ───────
+
+  /** Origin của tenant đang đăng nhập (vd https://x.sg.larksuite.com) — null nếu chưa đăng nhập. */
+  webHost(): string | null {
+    return this.win && !this.win.isDestroyed() ? this.host : null;
+  }
+
+  /** Một trang bản ghi (offset/limit) — đã giải nén. */
+  async webRecordsPage(token: string, tableId: string, offset: number, limit: number, viewId = ''): Promise<RecordsPage> {
+    const j = await this.webJson(recordsPagePath(token, tableId, offset, limit, viewId), 'GET', undefined, 60_000);
+    if (j?.code !== 0) throw new Error(`Lark không trả bản ghi (mã ${j?.code}: ${j?.msg || 'không rõ'}).`);
+    const d = j.data || {};
+    const rec = typeof d.records === 'string' ? (d.encoding === 17 ? JSON.parse(d.records) : decodeLarkGz(d.records)) : d.records;
+    return parseRecordsPage(rec, viewId);
+  }
+
+  /** ĐỌC HẾT bản ghi của bảng (phân trang tới đủ số máy chủ báo; thiếu là ném lỗi). */
+  async webReadAllRecords(token: string, tableId: string, viewId = ''): Promise<AllRecords> {
+    return readAllRecords((off, lim) => this.webRecordsPage(token, tableId, off, lim, viewId));
+  }
+
+  /** Đọc lại ĐÚNG các bản ghi theo id từ máy chủ (sau khi ghi). */
+  async webRecordsById(token: string, tableId: string, ids: string[]): Promise<Record<string, Record<string, J>>> {
+    const out: Record<string, Record<string, J>> = {};
+    for (let i = 0; i < ids.length; i += 200) {
+      const j = await this.webJson(RECORDS_BY_ID_PATH, 'POST', recordsByIdBody(token, tableId, ids.slice(i, i + 200)), 60_000);
+      if (j?.code !== 0) throw new Error(`Lark không đọc lại được bản ghi (mã ${j?.code}: ${j?.msg || 'không rõ'}).`);
+      const d = j.data || {};
+      const rm = d.records && typeof d.records === 'object' ? d.records : decodeLarkGz(d.gzipRecords);
+      Object.assign(out, rm || {});
+    }
+    return out;
+  }
+
+  /** Cấu trúc một bảng, đọc TƯƠI (cột/kiểu/lựa chọn/định dạng) + múi giờ của Base. */
+  async webTableSchema(token: string, tableId: string): Promise<{ table: WebTable; timezone?: string; baseName: string; tables: { id: string; name: string }[] }> {
+    const j = await this.webJson(clientVarsPath(token, tableId, 0));
+    if (j?.code !== 0) throw new Error(`Không đọc được bảng (Lark báo ${j?.code}: ${j?.msg || ''}).`);
+    const meta = j.data?.base ? parseBaseMeta(decodeLarkGz(j.data.base)) : null;
+    const table = parseTableSchema(decodeLarkGz(j.data?.table), meta?.tables.find((t) => t.id === tableId)?.name, 0);
+    return { table, timezone: meta?.timezone, baseName: meta?.name || '', tables: meta?.tables || [] };
+  }
+
+  /** Thành viên có quyền trên tài liệu (để tra TÊN người → id cho cột Người). */
+  async webMembers(token: string, objType = 8): Promise<DirectoryUser[]> {
+    const j = await this.webJson(`/space/api/suite/permission/members/?token=${enc(token)}&type=${objType}`);
+    if (j?.code !== 0) return [];
+    const users = j.data?.entities?.users || {};
+    return Object.values(users as Record<string, J>).map((u) => ({ id: String(u.id || u.suid), name: String(u.cn_name || u.name || ''), enName: u.en_name ? String(u.en_name) : undefined, email: u.email ? String(u.email) : undefined }));
+  }
+
+  /** Chạy một đoạn lệnh trong trang Base (mở đúng Base nếu cần) — dùng chung với dựng cấu trúc. */
+  async webRunInBase(token: string, script: string): Promise<J> {
+    return this.runBaseStructure(token, script);
+  }
+
+  /** Tải một tệp lên Lark (cùng origin tenant, multipart như bộ tải lên của Lark). */
+  async webUpload(f: { bytes: Buffer; name: string; mime: string; mountPoint: MountPoint; mountNode: string; extra?: string }): Promise<{ fileToken: string; nodeToken?: string }> {
+    if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web — đăng nhập trong khung Lark trước.');
+    if (f.bytes.length > WEB_UPLOAD_MAX_BYTES) throw new Error(`Tệp ${Math.round(f.bytes.length / 1048576)} MB vượt trần ${WEB_UPLOAD_MAX_BYTES / 1048576} MB của đường tải qua phiên web.`);
+    await this.webJson('/space/api/user/'); // đưa trang về đúng origin tenant (webJson tự sửa) trước khi tải
+    const path = uploadQuery({ name: f.name, size: f.bytes.length, checksum: adler32(f.bytes), mountPoint: f.mountPoint, mountNode: f.mountNode, extra: f.extra });
+    const run = this.win.webContents.executeJavaScript(uploadScript({ path, b64: f.bytes.toString('base64'), name: f.name, mime: f.mime }), true) as Promise<J>;
+    const res = await Promise.race([run.catch((e) => ({ error: String((e as Error)?.message || e) })), new Promise<J>((r) => setTimeout(() => r({ error: 'quá 120 giây không trả lời' }), 120_000))]);
+    const p = parseUploadResponse(res);
+    if (!p.ok) throw new Error((p as { error: string }).error);
+    return { fileToken: p.fileToken, ...(p.nodeToken ? { nodeToken: p.nodeToken } : {}) };
+  }
+
+  /** Tạo thư mục Drive (bỏ trống parent = "Không gian của tôi"). */
+  async webCreateFolder(name: string, parent = ''): Promise<{ token: string; url?: string }> {
+    if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web.');
+    const js = `(async () => { try { var m = document.cookie.match(/(?:^|; )_csrf_token=([^;]+)/);
+      var r = await fetch(${JSON.stringify(CREATE_FOLDER_PATH)}, { method: 'POST', credentials: 'include', headers: { 'x-csrftoken': m ? decodeURIComponent(m[1]) : '', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ parent_token: ${JSON.stringify(parent)}, name: ${JSON.stringify(name)}, source: '0' }) });
+      return await r.json(); } catch (e) { return { code: -1, msg: String(e) }; } })()`;
+    await this.webJson('/space/api/user/');
+    const p = parseCreateFolder(await this.win.webContents.executeJavaScript(js, true));
+    if (!p.ok) throw new Error((p as { error: string }).error);
+    return { token: p.token, ...(p.url ? { url: p.url } : {}) };
+  }
+
+  /** Token thư mục gốc "Không gian của tôi" (khi người dùng không chỉ thư mục đích). */
+  async webRootFolder(): Promise<string> {
+    for (const path of ['/space/api/explorer/v3/my_space/folder/', '/space/api/explorer/root/get/', '/space/api/explorer/v2/root_folder/meta/']) {
+      try {
+        const j = await this.webJson(path);
+        const d = j?.data || {};
+        const t = d.token || d.root_token || d.obj_token || d.node_token || d.folder_token;
+        if (j?.code === 0 && t) return String(t);
+      } catch {
+        /* thử đường kế */
+      }
+    }
+    throw new Error('Không xác định được thư mục gốc "Không gian của tôi" — hãy chỉ rõ thư mục Drive đích (link …/drive/folder/<token>).');
+  }
+
+  /** Con của một thư mục Drive (để xác minh tệp vừa tải/nhập nằm đúng chỗ). */
+  async webFolderChildren(folderToken: string): Promise<ReturnType<typeof parseChildren>> {
+    return parseChildren(await this.webJson(childrenPath(folderToken)), folderToken);
+  }
+
+  /**
+   * NHẬP một tệp thành tài liệu trực tuyến MỚI (xlsx/csv → Lark Sheets, docx → Lark Docs): tải lên mount
+   * `ccm_import`, tạo việc nhập, chờ tới khi xong. Đúng luồng "Tải lên → Nhập thành tài liệu trực tuyến".
+   */
+  async webImport(f: { bytes: Buffer; name: string; mime: string; folderToken: string; timeoutMs?: number }): Promise<{ token: string; url: string; type: string }> {
+    const target = importTargetFor(f.name);
+    if (!target) throw new Error(`Không nhập được «${f.name}» — chỉ nhận .xlsx/.xls/.csv (→ Sheets) hoặc .docx/.md/.txt (→ Docs).`);
+    const up = await this.webUpload({ bytes: f.bytes, name: f.name, mime: f.mime, mountPoint: 'ccm_import', mountNode: f.folderToken, extra: importUploadExtra(target) });
+    const c = await this.webJson(IMPORT_CREATE_PATH, 'POST', importCreateBody({ fileToken: up.fileToken, type: target.type, ext: target.ext, folderToken: f.folderToken, clientToken: randomUUID() }));
+    const ticket = c?.data?.ticket;
+    if (c?.code !== 0 || !ticket) throw new Error(`Lark từ chối tạo việc nhập (mã ${c?.code}: ${c?.msg || 'không rõ'}).`);
+    const end = Date.now() + (f.timeoutMs ?? 180_000);
+    while (Date.now() < end) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const r = parseImportResult(await this.webJson(importResultPath(String(ticket), f.folderToken)));
+      if (r.state === 'done') return { token: r.token, url: r.url || `${this.host}/${target.type === 'sheet' ? 'sheets' : 'docx'}/${r.token}`, type: r.type || target.type };
+      if (r.state === 'failed') throw new Error(r.error);
+    }
+    throw new Error('Lark chưa nhập xong sau 3 phút — xem lại trong thư mục Drive.');
+  }
+
+  /** Mở một tài liệu trong khung Lark rồi chạy đoạn đọc/ghi của nó (Sheets: window.spread; Docs: DOM). */
+  private async runOnDoc(url: string, script: string, timeoutMs = 90_000): Promise<J> {
+    if (!this.win || this.win.isDestroyed() || !this.host) throw new Error('Chưa đăng nhập Lark web.');
+    const wc = this.win.webContents;
+    const cur = (() => {
+      try {
+        return wc.getURL();
+      } catch {
+        return '';
+      }
+    })();
+    if (!cur.split('?')[0].endsWith(new URL(url).pathname)) {
+      try {
+        await this.win.loadURL(url, { userAgent: CHROME_UA });
+      } catch {
+        /* SPA có thể chuyển hướng nội bộ — đoạn chạy bên dưới tự chờ */
+      }
+    }
+    return Promise.race([wc.executeJavaScript(script, true).catch((e) => ({ ok: false, error: String((e as Error)?.message || e) })), new Promise((r) => setTimeout(() => r({ ok: false, error: 'timeout' }), timeoutMs))]);
+  }
+
+  async webReadSheet(token: string): Promise<J> {
+    return this.runOnDoc(`${this.host}/sheets/${enc(token)}`, sheetReadScript());
+  }
+
+  async webWriteSheet(token: string, op: { sheetName?: string; row: number; col: number; values: unknown[][] }): Promise<J> {
+    return this.runOnDoc(`${this.host}/sheets/${enc(token)}`, sheetWriteScript(op), 180_000);
+  }
+
+  async webReadDoc(token: string): Promise<J> {
+    return this.runOnDoc(`${this.host}/docx/${enc(token)}`, docReadScript());
   }
 }
 

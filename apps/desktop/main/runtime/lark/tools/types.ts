@@ -23,6 +23,11 @@ export interface LarkToolDef {
    */
   additive?: boolean;
   /**
+   * Cờ `additive` chỉ đúng với MỘT SỐ input (vd đính tệp: ghi thêm = cộng thêm, `replace:true` = ghi
+   * đè). Có hàm này thì tool chỉ được tự duyệt khi nó trả true cho input của lần gọi đó.
+   */
+  additiveWhen?(input: Record<string, any>): boolean;
+  /**
    * Bản dễ đọc của input cho hộp xác nhận (vd thay `fld…` bằng tên cột). Chỉ để HIỂN THỊ — lỗi ở
    * đây không được chặn thao tác (nơi gọi nuốt lỗi).
    */

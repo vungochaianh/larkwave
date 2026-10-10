@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { LarkChatEvent } from '@larkwave/core';
+import { buildFilePreview } from './filePreview';
 import type { LarkClient } from './larkClient';
 import { LarkApiError } from './larkClient';
 import type { LarkToolDef } from './tools';
@@ -72,7 +74,7 @@ export async function executeLarkTool(
   const callId = `lt_${randomUUID()}`;
   // Kiểm trước: thiết kế chắc chắn bị từ chối thì đừng bắt người dùng duyệt (xem LarkToolDef.preflight).
   const pre = await runPreflight(tool, input, ctx.client);
-  const needsConfirm = needsConfirmation(tool, ctx, !!pre);
+  const needsConfirm = needsConfirmation(tool, ctx, !!pre, input);
   ctx.emit({ type: 'tool_call', callId, name, input, gated: needsConfirm, ...(needsConfirm ? await previewFor(tool, input) : {}) });
 
   if (needsConfirm) {
@@ -137,14 +139,25 @@ export async function executeLarkTool(
  *    vẫn hỏi dù hàm tự duyệt có trả true — chốt nằm ở đây, không phụ thuộc nơi gọi lọc đúng.
  */
 export function needsConfirmation(
-  tool: { gated?: boolean; additive?: boolean; name: string },
+  tool: { gated?: boolean; additive?: boolean; name: string; additiveWhen?: (input: Record<string, any>) => boolean },
   ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean },
   preflightBlocked = false,
+  input?: unknown,
 ): boolean {
   if (!tool.gated || preflightBlocked) return false;
   if (ctx.autoApprove) return false;
-  if (tool.additive && ctx.autoApproveTool?.(tool.name)) return false;
+  // Cộng thêm theo TỪNG lần gọi: vd đính tệp ghi thêm thì tự duyệt, `replace:true` (ghi đè) thì hỏi.
+  const additiveNow = !!tool.additive && (!tool.additiveWhen || safeAdditiveWhen(tool.additiveWhen, input));
+  if (additiveNow && ctx.autoApproveTool?.(tool.name)) return false;
   return true;
+}
+
+function safeAdditiveWhen(fn: (input: Record<string, any>) => boolean, input: unknown): boolean {
+  try {
+    return fn((input ?? {}) as Record<string, any>) === true;
+  } catch {
+    return false; // nghi ngờ thì hỏi
+  }
 }
 
 /** `{preview}` cho sự kiện tool_call của một thao tác đang chờ duyệt — lỗi thì bỏ qua (chỉ để hiển thị). */
@@ -455,8 +468,15 @@ export function toolsSchemaBlock(tools: LarkToolDef[]): string {
  *
  * Gom về một hàm để hai đường không thể lệch nhau lần nữa.
  */
+/**
+ * Công cụ nào trả về một TỆP CỤC BỘ agent vừa dựng cho người dùng (→ thẻ tệp). `fill_xlsx` và bộ
+ * xuất bảng trước đây không có ở đây: tệp vẫn được tạo nhưng không hiện thẻ nào, và agent đành dán
+ * bảng vào chat hoặc tự đẩy lên Drive.
+ */
+export const FILE_PRODUCING_TOOLS = new Set(['create_file', 'fill_xlsx', 'lark_export_table_file']);
+
 export function fileEventFor(name: string, data: unknown): LarkChatEvent | null {
-  if (name !== 'create_file') return null;
+  if (!FILE_PRODUCING_TOOLS.has(name)) return null;
   const d = data as {
     file_name?: unknown;
     path?: unknown;
@@ -465,6 +485,13 @@ export function fileEventFor(name: string, data: unknown): LarkChatEvent | null 
     upload_id?: unknown;
   };
   if (typeof d?.path !== 'string' || typeof d?.file_name !== 'string') return null;
+  // Xem trước THẬT: đọc lại chính tệp trên đĩa (không tin mô tả của model). Hỏng thì vẫn hiện thẻ.
+  let preview: ReturnType<typeof buildFilePreview> = null;
+  try {
+    preview = buildFilePreview(d.file_name, readFileSync(d.path));
+  } catch {
+    preview = null;
+  }
   return {
     type: 'file',
     name: d.file_name,
@@ -472,5 +499,6 @@ export function fileEventFor(name: string, data: unknown): LarkChatEvent | null 
     mime: typeof d.mime === 'string' ? d.mime : 'application/octet-stream',
     bytes: typeof d.bytes === 'number' ? d.bytes : 0,
     ...(typeof d.upload_id === 'string' ? { uploadId: d.upload_id } : {}),
+    ...(preview ? { preview } : {}),
   };
 }

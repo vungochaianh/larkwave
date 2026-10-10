@@ -25,6 +25,7 @@ import { loadFold, saveFold, onFoldChange, isLongAnswer, type FoldStore } from '
 import { clockTime, humanDuration } from '../../time';
 import { useSlashCommands, skillsToCommandItems, type SlashCommandItem } from '../SlashCommandMenu';
 import { ToolCallGroup, type ToolCallState } from './ToolCallCard';
+import { FileCard, type FileCardItem } from './FileCard';
 import { ConfirmToolModal, type PendingConfirm } from './ConfirmToolModal';
 import { AskUserModal, type PendingAsk } from './AskUserModal';
 import { findAnswer, isToolAllowed, rememberAnswer, rememberTool, type RememberScope } from './agentPrefs';
@@ -52,87 +53,7 @@ type ChatItem =
    * Tệp agent vừa dựng (create_file). Lưu vào lịch sử hội thoại như mọi mục khác, nên mở lại
    * hội thoại cũ vẫn thấy — tệp nằm trong thư mục hội thoại, không bị dọn theo lượt chạy.
    */
-  | {
-      kind: 'file';
-      id: string;
-      name: string;
-      path: string;
-      mime: string;
-      bytes: number;
-      /** Bản trên máy chủ — để mở lại được ở MÁY KHÁC, nơi `path` không tồn tại. */
-      uploadId?: string;
-      ts?: number;
-    };
-
-/**
- * Thẻ tệp agent vừa dựng — bấm là mở bằng ứng dụng mặc định.
- *
- * Mở qua IPC riêng chứ không phải `openExternal`: đường này nhận ĐƯỜNG DẪN trên máy, và phía main
- * chặn mọi thứ nằm ngoài thư mục hội thoại. `openExternal` chỉ nhận http(s) — đúng như vậy, vì nới
- * nó ra để mở được tệp nội bộ là mở luôn cho mọi đường dẫn khác.
- */
-function FileCard({ item, runtime }: { item: Extract<ChatItem, { kind: 'file' }>; runtime: RuntimeAdapter }) {
-  const { message } = App.useApp();
-  const [busy, setBusy] = useState(false);
-  const kb = item.bytes > 1048576 ? `${(item.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(item.bytes / 1024))} KB`;
-  /**
-   * Mở tệp. Ưu tiên bản TRÊN MÁY; không có thì lấy bản đã sao lưu trên máy chủ.
-   *
-   * Hai đường vì tệp đi theo TÀI KHOẢN chứ không theo máy: mở cùng hội thoại ở máy khác thì
-   * `path` trỏ vào một đường dẫn không tồn tại ở đó. Trước đây gặp ca ấy là một thông báo lỗi
-   * cụt, trong khi tệp vẫn còn nguyên trên máy chủ.
-   */
-  const open = async () => {
-    setBusy(true);
-    try {
-      if (runtime.openLocalFile) {
-        const r = await runtime.openLocalFile(item.path);
-        if (r.ok) return;
-        if (!item.uploadId) return message.error(r.error || 'Không mở được tệp.');
-      }
-      if (!item.uploadId) return message.info('Bản này chưa mở được tệp từ hội thoại.');
-      const raw = await accountApi.uploadRaw(item.uploadId);
-      const bin = atob(raw.dataBase64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([bytes], { type: raw.mime || item.mime }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = raw.name || item.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e) {
-      message.error((e as Error).message || 'Không mở được tệp.');
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div
-      onClick={busy ? undefined : open}
-      style={{
-        alignSelf: 'flex-start',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        maxWidth: '94%',
-        padding: '10px 14px',
-        border: `1px solid ${V.border}`,
-        borderRadius: 12,
-        background: V.surface,
-        cursor: busy ? 'progress' : 'pointer',
-      }}
-    >
-      <FileTextOutlined style={{ fontSize: 20, color: BRAND }} />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: V.text, wordBreak: 'break-word' }}>{item.name}</div>
-        <div style={{ fontSize: 11.5, color: V.textSub }}>{kb} · bấm để mở</div>
-      </div>
-    </div>
-  );
-}
+  | FileCardItem;
 
 const rid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -838,6 +759,7 @@ export function LarkChat({
           mime: ev.mime,
           bytes: ev.bytes,
           ...(ev.uploadId ? { uploadId: ev.uploadId } : {}),
+          ...(ev.preview ? { preview: ev.preview } : {}),
           ts: Date.now(),
         },
       ]);
@@ -1734,7 +1656,20 @@ export function LarkChat({
                   />
                 )
               ) : it.kind === 'file' ? (
-                <FileCard key={it.id} item={it} runtime={runtime} />
+                <FileCard
+                  key={it.id}
+                  item={it}
+                  runtime={runtime}
+                  onUpdate={(patch) =>
+                    setItems((cur) => {
+                      const next = cur.map((x) => (x.id === it.id && x.kind === 'file' ? { ...x, ...patch } : x));
+                      // Link Lark vừa có phải đi theo hội thoại (mở lại vẫn thấy) — lưu ngay.
+                      if (loadedRef.current && sessionId && runtime.larkSaveSession) void runtime.larkSaveSession(sessionId, next as unknown[]);
+                      return next;
+                    })
+                  }
+                  onAskAgent={(text) => setInput(text)}
+                />
               ) : (
                 <div key={it.id} id={`tw-msg-${it.id}`} style={{ display: 'flex', justifyContent: it.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: it.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: it.role === 'user' ? '82%' : '94%' }}>

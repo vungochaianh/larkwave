@@ -477,38 +477,69 @@ export function buildDocx(text: string): Buffer {
     })
     .join('');
 
+  // ĐỦ BỘ PHẦN của một .docx chuẩn (styles, settings, docProps, rels của document, khổ trang). Word mở
+  // được cả bản tối giản 3 phần, nhưng bộ NHẬP của Lark thì không: đo 10/10/2026, bản tối giản bị từ
+  // chối với job_status 129 "save_as_import"; bổ sung các phần này thì nhập thành Lark Docs được.
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const xml = (body: string) => Buffer.from('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + body, 'utf8');
+  const title = xmlEscape(String(text ?? '').replace(/\r\n/g, '\n').split('\n').map((l) => l.replace(/^#+\s+/, '').trim()).find(Boolean) || 'Tài liệu');
   return zip([
     {
       path: '[Content_Types].xml',
-      data: Buffer.from(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      data: xml(
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
           '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
           '<Default Extension="xml" ContentType="application/xml"/>' +
           '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+          '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+          '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>' +
+          '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+          '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
           '</Types>',
-        'utf8',
       ),
     },
     {
       path: '_rels/.rels',
-      data: Buffer.from(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      data: xml(
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
           '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+          '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>' +
+          '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>' +
           '</Relationships>',
-        'utf8',
+      ),
+    },
+    {
+      path: 'word/_rels/document.xml.rels',
+      data: xml(
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+          '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>' +
+          '</Relationships>',
       ),
     },
     {
       path: 'word/document.xml',
-      data: Buffer.from(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-          '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-          `<w:body>${paras}</w:body></w:document>`,
-        'utf8',
+      data: xml(
+        `<w:document xmlns:w="${W}">` +
+          `<w:body>${paras}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`,
       ),
     },
+    {
+      path: 'word/styles.xml',
+      data: xml(
+        `<w:styles xmlns:w="${W}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault><w:pPrDefault/></w:docDefaults>` +
+          '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>',
+      ),
+    },
+    { path: 'word/settings.xml', data: xml(`<w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/></w:settings>`) },
+    {
+      path: 'docProps/core.xml',
+      data: xml(
+        '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
+          `<dc:title>${title}</dc:title><dc:creator>Larkwave</dc:creator></cp:coreProperties>`,
+      ),
+    },
+    { path: 'docProps/app.xml', data: xml('<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Larkwave</Application></Properties>') },
   ]);
 }
 
