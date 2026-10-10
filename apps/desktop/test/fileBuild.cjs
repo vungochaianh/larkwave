@@ -91,3 +91,11 @@ assert.strictEqual(safeFileName('Báo cáo thu tiền tháng 9'), 'Báo cáo thu
 assert.ok(!safeFileName('../../etc/passwd').includes('/'), 'tên tệp không được chứa dấu phân cách');
 assert.ok(!safeFileName('..').startsWith('.'), 'tên tệp không được bắt đầu bằng dấu chấm');
 console.log('✓ tên cột/sheet/tệp: giữ dấu tiếng Việt, chặn đường dẫn thoát ra ngoài');
+
+// ── Ô công thức chưa có giá trị tính sẵn: bộ đọc hiện chính công thức, không để trống ─────────────
+{
+  const fx = buildXlsx({ name: 'Bảng giá', rows: [['Mã', 'Đơn giá', 'Số lượng', 'Thành tiền'], ['001', 5000, 10, '=B2*C2']] });
+  const txt = extractOfficeText(fx, 'xlsx');
+  assert.ok(/=B2\*C2/.test(txt), 'ô công thức chưa tính phải hiện "=B2*C2", không được rỗng');
+  console.log('✓ ô công thức chưa có giá trị tính sẵn hiện chính công thức (xem trước không còn cột trống)');
+}
