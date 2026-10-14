@@ -1,91 +1,97 @@
-# Desktop code push (renderer OTA)
+# Phát hành desktop: bản cài + code-push giao diện
 
-> **Larkwave:** tài liệu này kế thừa từ Toolswave (trước khi tách). Những phần nói về dựng app
-> (codegen, build, deploy app, cửa hàng, blog…) KHÔNG còn áp dụng — xem [TACH-APP.md](TACH-APP.md).
+Larkwave có **hai kênh phát hành**, ở hai nơi khác nhau. Cả hai đều do app đọc qua **một** route trên
+toolswave.net.
 
-The installed desktop app loads its renderer from **Cloudflare Pages**
-(`https://twd-desktop-renderer.pages.dev`) with the bundled renderer as an offline
-fallback. So a renderer/UI change reaches installed apps **without a reinstall** — just
-redeploy the renderer. The MAIN process (native/IPC) can't be hot-swapped — a main
-change needs a new `.dmg` and is gated by `minMain` in the manifest.
+| Kênh | Nằm ở đâu | Khi nào dùng |
+|---|---|---|
+| Bản cài (`.dmg`, sau này `.exe`) | GitLab generic registry, project 83700259, gói `larkwave-desktop/<ver>/Larkwave-<ver>-universal.dmg` | đổi main process / IPC / native |
+| Giao diện (code-push) | Cloudflare Pages `larkwave-desktop-renderer` → `https://larkwave-desktop-renderer.pages.dev` | chỉ đổi `packages/ui` / `renderer/` |
 
-## How it works (apps/desktop/main/codePush.ts)
+> Trước 10/2026 tài liệu này tả kênh của Toolswave (`twd-desktop-renderer`, `pnpm push:renderer`).
+> Kênh đó **không** phải của Larkwave: trỏ vào nó thì app tải giao diện Toolswave về đè lên.
+> `package.json` gốc cũng không có script nào, nên mọi lệnh dưới đây gọi thẳng `node scripts/…`.
 
-On launch (prod), the app fetches the manifest, then:
-- remote renderer is used iff it's HTTPS + `minMain` ≤ installed version + reachable;
-- otherwise the bundled renderer (fallback on ANY problem — offline / 404 / abort).
+## App đọc gì
 
-Manifest (`https://twd-desktop-renderer.pages.dev/release.json`, override with
-`LARKWAVE_RELEASE_URL`):
+`apps/desktop/main/codePush.ts` (`manifestUrl()`) và `packages/ui/src/useUpdateStatus.ts`
+(`RELEASE_URL`) cùng đọc:
 
-```json
-{
-  "renderer": "https://twd-desktop-renderer.pages.dev",
-  "minMain": "1.0.2",           // min MAIN version the renderer needs
-  "rendererVersion": "1.0.4",    // version of the renderer hosted here (anti-downgrade)
-  "latestVersion": "1.0.4",      // newest full version → UpdateBanner suggests reinstall
-  "notice": null,
-  "downloads": { "mac": "…dmg", "win": "…zip" }
-}
+```
+https://toolswave.net/api/apps-release/larkwave      (đổi được bằng LARKWAVE_RELEASE_URL)
 ```
 
-`rendererVersion` is REQUIRED for the anti-stale guard: `codePush.ts` refuses a remote
-renderer OLDER than the installed app, so a stale Pages deploy can never downgrade a fresh
-install to an old UI (which is what hid the version footer before). `scripts/push-renderer.mjs`
-always stamps it = the app version.
+Route nằm ở **repo Toolswave**, `apps/web/src/lib/appsRelease.ts`. Nó làm hai việc:
 
-CF project: `twd-desktop-renderer`. Auth = `wrangler login` once, OR
-`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in the env (a Pages-scoped token).
+- Hỏi registry để lấy bản cài mới nhất của mỗi nền tảng: `latestVersion` và `downloads`. Trang
+  `/larkwave` cũng lấy link từ đây.
+- Nếu `APPS.larkwave.renderer` được cấu hình, đọc `<renderer>/release.json` và chuyển tiếp các trường
+  `renderer`, `rendererVersion`, `minMain`, `mainChangedAt`, `notice`.
+- `latestVersion` **chỉ** lấy từ registry. Phiên bản trong `release.json` không làm app báo "có bản
+  mới".
 
-## Push a RENDERER update (no reinstall for users) — ONE command
+Kết quả được đệm 300 giây kiểu stale-while-revalidate. Sau khi phát hành có thể mất vài phút, và một
+lượt gọi trả bản cũ trước khi làm mới.
+
+Lúc mở app (bản cài), `codePush.ts` chỉ nạp giao diện từ xa khi đủ cả bốn điều kiện:
+- địa chỉ là HTTPS;
+- `minMain` ≤ phiên bản lõi đã cài;
+- `rendererVersion` không cũ hơn bản đã cài (chống tụt về giao diện cũ);
+- trang tới được.
+
+Thiếu bất kỳ điều kiện nào thì dùng giao diện đóng gói sẵn trong bản cài.
+
+## Đẩy giao diện (không cần cài lại)
 
 ```bash
-# from the repo root, with Cloudflare auth available (see above):
-pnpm push:renderer
-#   --dry-run      build + stage + write release.json, do NOT deploy (no creds needed)
-#   --notice "…"   surface a message in the in-app version modal
-#   --mac <url> --win <url>   set installer links shown on the /download page
+set -a; . /Users/deveris/app/.env; set +a        # CF_API_TOKEN, CF_ACCOUNT_ID — đừng in ra
+export CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID"
+ALLOW_DEPLOY=1 node scripts/push-renderer.mjs --min-main 0.1.0 --dry-run   # xem trước, không deploy
+ALLOW_DEPLOY=1 node scripts/push-renderer.mjs --min-main 0.1.0
 ```
 
-It (1) reads the desktop version, (2) builds the renderer export, (3) stages it + writes a
-correct `release.json` (incl. `rendererVersion` + `latestVersion`, preserving `minMain`/
-`downloads`), (4) `wrangler pages deploy`s it, (5) verifies the live manifest + `/home`.
-Installed apps pick it up on next launch (or the in-app "Tải lại bản mới" button).
+Script làm các bước sau:
+1. Dựng `@larkwave/shared` + `core` và renderer.
+2. Ghi `release.json`, đóng dấu `rendererVersion` = phiên bản app, giữ `minMain`/`downloads` cũ nếu
+   không truyền.
+3. `wrangler pages deploy`.
+4. Kiểm lại trang đang chạy.
 
-> Smoke-test first with `pnpm push:renderer -- --dry-run` (the old manual rsync/ssh flow to
-> `root@100.100.164.92:/tmp/redeploy-renderer.sh` is now replaced by this script).
+Máy đã cài nhận giao diện mới ở lần mở app sau.
 
-⚠️ A bad renderer push reaches everyone (only an *unreachable* remote falls back, not a
-broken-but-reachable one) — smoke-test before deploying.
+- `minMain` mặc định `0.1.0`, tức bản cài đầu tiên. **Đừng** để `1.0.0` như bên Toolswave: lõi 0.1.0
+  sẽ vừa từ chối giao diện, vừa bắt người dùng cài lại.
+- Giao diện mới phải **chạy được trên lõi cũ nhất ≥ minMain**. Gọi IPC mới thì dò xem lõi có kênh đó
+  không (`runtime.xxx ? … : …`); không có thì lùi về hành vi cũ.
+- ⚠️ Một bản giao diện hỏng tới **mọi** máy. Chỉ trang không tới được mới lùi về bản đóng gói; trang
+  tới được mà hỏng thì không. Kiểm trước khi đẩy.
 
-## Ship a MAIN change (needs a new installer) — ONE command
+## Ra bản cài mới (đổi main process)
 
-A main-process change (native/IPC) can't be code-pushed — cut a new installer:
+```bash
+# 1. tăng version ở apps/desktop/package.json + thêm mục đầu ở packages/ui/src/changelog.ts
+pnpm --filter @larkwave/shared build && pnpm --filter @larkwave/core build   # BẮT BUỘC (xem dưới)
+cd apps/desktop && env -u ELECTRON_RUN_AS_NODE CSC_IDENTITY_AUTO_DISCOVERY=false pnpm dist:mac && cd ../..
+node scripts/check-dist-mac.mjs                          # chữ ký, đúng Larkwave.app
+env -u ELECTRON_RUN_AS_NODE node scripts/boot-smoke.mjs  # khởi động sạch, đủ kênh IPC
+ALLOW_DEPLOY=1 GITLAB_TOKEN="$(grep '^GITLAB_TOKEN=' /Users/deveris/app/.env | cut -d= -f2-)" \
+  node scripts/push-installers.mjs --dry-run             # rồi chạy lại không có --dry-run
+ALLOW_DEPLOY=1 node scripts/push-renderer.mjs --min-main <lõi thấp nhất giao diện mới cần> --main-change
+```
 
-1. Bump `version` in `apps/desktop/package.json` (e.g. 1.0.5) **and** add a matching top
-   entry in `packages/ui/src/changelog.ts` (the publish scripts assert they match).
-2. Build the installers (unsigned is fine for testing):
-   ```bash
-   CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @larkwave/desktop dist:mac   # → dist/*.dmg
-   CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @larkwave/desktop dist:win   # → dist/*-win.zip
-   ```
-   (A true Windows NSIS `.exe` needs Wine → build it on a Linux runner with the
-   `electronuserland/builder:wine` image; the macOS host produces the portable `.zip`.)
-3. Upload + publish in one go:
-   ```bash
-   GITLAB_TOKEN=… pnpm push:installers          # uploads dist installers → GitLab generic
-                                                 # packages, then runs push-renderer --main-change
-   ```
-   This sets `minMain` + `latestVersion` = the new version and `downloads.{mac,win}`.
-   - Old installs see `minMain` > their version → fall back to bundled + the UpdateBanner
-     shows "phiên bản mới … tải bản cài".
-   - New installs (≥ minMain) load the pushed renderer; the website `/download` page links
-     the new installers automatically (it reads the same manifest via `/api/desktop-release`).
+- **Phải dựng core trước.** `dist:mac` gói `@larkwave/core` từ `dist/`, không từ `src/`, và không tự
+  dựng lại. Core cũ làm một kênh IPC thành `undefined`, app trắng màn hình khi mở, mà lúc dựng không
+  có lỗi nào báo. `boot-smoke.mjs` bắt đúng lỗi này.
+- `push-installers.mjs` chỉ tải tệp lên registry, không có bước manifest. Route tự thấy bản mới.
+  Sau đó kiểm `curl -s https://toolswave.net/api/apps-release/larkwave` và trang `/larkwave`.
+- Shell của VS Code có `ELECTRON_RUN_AS_NODE=1`, nên luôn `env -u ELECTRON_RUN_AS_NODE`. Nếu không,
+  Electron thoát lặng với mã 0.
+- Bản Windows dựng trên máy Windows: `scripts/win-release.ps1`, xem
+  [may-phat-hanh-windows.md](may-phat-hanh-windows.md). Một bản Windows chỉ **bắt kịp** phiên bản đã
+  phát hành thì **không** dùng `--main-change`.
 
-   Preview safely first: `pnpm push:installers -- --dry-run`.
+## Về tự cập nhật trọn app (electron-updater)
 
-## Note on full binary auto-update (electron-updater)
-
-`electron-updater` (auto-replace the whole app) needs the macOS app to be **signed
-(Developer ID + notarized)** to auto-install — the unsigned `.dmg` can't. This renderer
-OTA is the unsigned-friendly path; add electron-updater later once signing is in place.
+Muốn tự thay cả app thì bản macOS phải được ký Developer ID và notarize; bản `.dmg` ký ad-hoc hiện
+nay không làm được. Code-push giao diện là đường đi được khi chưa ký. Xem
+[ky-va-notarize-macos.md](ky-va-notarize-macos.md).

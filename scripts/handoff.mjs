@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn trỏ vào hạ tầng Toolswave. Phase deploy chưa làm — đặt ALLOW_DEPLOY=1 khi đã đổi đích.'); process.exit(1); }
+// CHỈ ĐỌC (git fetch + hỏi manifest công khai) nên không chặn bằng ALLOW_DEPLOY như các script phát hành.
 /**
  * BÀN GIAO giữa hai máy (Mac ↔ Windows).
  *
@@ -11,7 +11,8 @@ if (process.env.ALLOW_DEPLOY !== '1') { console.error('Chặn: script này vẫn
  * Nên script này KHÔNG dặn dò gì cả — nó đo:
  *   • máy này là máy nào, và làm được việc gì mà máy kia không làm được
  *   • git đang lệch bao nhiêu so với origin
- *   • phiên bản desktop ở ba nơi: máy này / origin / manifest đang phát hành
+ *   • phiên bản desktop ở ba nơi: máy này / origin / bản đang phát hành
+ *     (toolswave.net/api/apps-release/<app> — đọc thẳng registry, KHÔNG phải manifest của Toolswave)
  *   • bản cài của nền tảng nào đang tụt lại
  *
  * Dùng:
@@ -25,6 +26,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// '@appwave/desktop' → 'appwave': tên app trên route phát hành và tên gói registry (`<app>-desktop`).
+const APP = JSON.parse(readFileSync(path.join(ROOT, 'apps/desktop/package.json'), 'utf8')).name.replace(/^@([^/]+)\/.*$/, '$1');
 const NO_NET = process.argv.includes('--no-net');
 
 const C = { d: '\x1b[2m', r: '\x1b[0m', y: '\x1b[33m', g: '\x1b[32m', e: '\x1b[31m', c: '\x1b[36m' };
@@ -68,12 +71,18 @@ if (isMac) {
 
 // ── Git lệch bao nhiêu ────────────────────────────────────────────────────────────────────
 head('GIT');
-git('fetch', 'origin', 'main', '--quiet');
-const ahead = Number(git('rev-list', '--count', 'origin/main..HEAD') || '0');
-const behind = Number(git('rev-list', '--count', 'HEAD..origin/main') || '0');
+const hasOrigin = git('remote').split('\n').includes('origin');
+if (hasOrigin) git('fetch', 'origin', 'main', '--quiet');
+const ahead = hasOrigin ? Number(git('rev-list', '--count', 'origin/main..HEAD') || '0') : 0;
+const behind = hasOrigin ? Number(git('rev-list', '--count', 'HEAD..origin/main') || '0') : 0;
 const dirty = git('status', '--porcelain').split('\n').filter(Boolean).length;
 
 const problems = [];
+if (!hasOrigin) {
+  // Không có origin thì mọi phép so ở dưới đều vô nghĩa — và tệ hơn: mã chỉ nằm trên MỘT máy.
+  say(`  ${C.e}✗ chưa có remote 'origin'${C.r} — mã chỉ nằm trên máy này: không có bản sao lưu, máy ${other} không lấy được`);
+  problems.push(`thêm remote origin rồi push (nơi đặt repo do người dùng quyết định — đừng tự tạo)`);
+}
 if (behind > 0) {
   say(`  ${C.y}⬇ chậm hơn origin ${behind} commit${C.r} — máy ${other} đã đẩy lên mà máy này chưa lấy về`);
   problems.push(`git pull   ${C.d}(lấy ${behind} commit của máy ${other})${C.r}`);
@@ -82,7 +91,7 @@ if (ahead > 0) {
   say(`  ${C.y}⬆ đi trước origin ${ahead} commit${C.r} — máy ${other} KHÔNG thấy được công việc này`);
   problems.push(`git push origin main   ${C.d}(đẩy ${ahead} commit lên cho máy ${other})${C.r}`);
 }
-if (!ahead && !behind) say(`  ${C.g}✓ khớp với origin${C.r}`);
+if (hasOrigin && !ahead && !behind) say(`  ${C.g}✓ khớp với origin${C.r}`);
 if (dirty) {
   say(`  ${C.y}✎ ${dirty} thay đổi chưa commit${C.r} — chúng sẽ KHÔNG sang được máy kia`);
   problems.push('commit trước khi bàn giao');
@@ -93,27 +102,35 @@ head('PHIÊN BẢN DESKTOP');
 const localVer = JSON.parse(readFileSync(path.join(ROOT, 'apps/desktop/package.json'), 'utf8')).version;
 let originVer = '';
 try {
-  originVer = JSON.parse(git('show', 'origin/main:apps/desktop/package.json') || '{}').version || '(không đọc được)';
+  if (hasOrigin) originVer = JSON.parse(git('show', 'origin/main:apps/desktop/package.json') || '{}').version || '(không đọc được)';
 } catch {
   originVer = '(không đọc được)';
 }
 say(`  máy này : ${localVer}`);
-say(`  origin  : ${originVer}${originVer !== localVer ? `  ${C.y}← lệch${C.r}` : ''}`);
+if (hasOrigin) say(`  origin  : ${originVer}${originVer !== localVer ? `  ${C.y}← lệch${C.r}` : ''}`);
 
 if (!NO_NET) {
   try {
-    const res = await fetch('https://twd-desktop-renderer.pages.dev/release.json', { cache: 'no-store' });
+    const res = await fetch(`https://toolswave.net/api/apps-release/${APP}`, { cache: 'no-store' });
     const m = await res.json();
     const nameOf = (u) => (u ? String(u).split('/').pop() : '(chưa có)');
-    const verOf = (u) => (String(u || '').match(/toolswave-desktop\/([\d.]+)\//) || [])[1] || '?';
-    say(`  đang phát hành: ${m.latestVersion}  ${C.d}(minMain ${m.minMain})${C.r}`);
+    const verOf = (u) => (String(u || '').match(new RegExp(`${APP}-desktop/([\\d.]+)/`)) || [])[1] || '';
+    // So theo SỐ: so chuỗi thì '0.1.10' < '0.1.9'.
+    const cmp = (a, b) => {
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+      for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+      return 0;
+    };
+    say(`  đang phát hành: ${m.latestVersion || m.version || '(chưa có)'}  ${C.d}(code-push: ${m.rendererVersion ? `giao diện ${m.rendererVersion}, minMain ${m.minMain}` : 'chưa có'})${C.r}`);
     const macV = verOf(m.downloads?.mac);
     const winV = verOf(m.downloads?.win);
-    say(`    mac: ${macV}  ${C.d}${nameOf(m.downloads?.mac)}${C.r}`);
-    say(`    win: ${winV}  ${C.d}${nameOf(m.downloads?.win)}${C.r}`);
-    // Nền tảng nào tụt lại → việc đó thuộc về máy dựng được nền tảng ấy.
-    if (macV !== winV) {
-      const lagging = macV > winV ? 'win' : 'mac';
+    say(`    mac: ${macV || '(chưa có)'}  ${C.d}${nameOf(m.downloads?.mac)}${C.r}`);
+    say(`    win: ${winV || '(chưa có)'}  ${C.d}${nameOf(m.downloads?.win)}${C.r}`);
+    if (macV && localVer !== macV && cmp(localVer, macV) < 0) say(`  ${C.y}⚠ máy này (${localVer}) CŨ hơn bản đang phát hành (${macV})${C.r}`);
+    // Nền tảng nào tụt lại → việc đó thuộc về máy dựng được nền tảng ấy. Chưa từng có bản Windows
+    // thì không tính là "tụt" (chưa phát hành, không phải bị bỏ quên).
+    if (macV && winV && macV !== winV) {
+      const lagging = cmp(macV, winV) > 0 ? 'win' : 'mac';
       const owner = lagging === 'mac' ? 'Mac' : 'Windows';
       say(`  ${C.y}⚠ bản ${lagging} tụt lại (${lagging === 'mac' ? macV : winV} so với ${lagging === 'mac' ? winV : macV})${C.r}`);
       problems.push(

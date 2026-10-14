@@ -1,8 +1,19 @@
 # Larkwave
 
-Larkwave là bản **Lark-only** tách từ Toolswave: làm việc với Lark/Feishu bằng AI, cộng Trợ lý AI,
-nhưng **không có** phần dựng app (codegen/build/deploy/cửa hàng/blog/Developer API).
-Chi tiết về việc tách, những gì giữ/bỏ và việc còn phải làm ở phase deploy: [docs/TACH-APP.md](docs/TACH-APP.md).
+**AI agent làm việc thật trong Lark.** Màn Lark × Agents cho bạn chat với một agent đang cầm phiên
+Lark web của chính bạn. Agent đọc và ghi Base, Sheet, Doc, Drive; tạo automation/workflow (để TẮT cho
+bạn tự bật); xuất tệp xlsx/docx/pdf; và chạy lịch tự động. Mỗi tab là một hội thoại kèm một trang Lark
+riêng, và app hỗ trợ nhiều tài khoản Lark. Đi kèm có Trợ lý AI, Kỹ năng, điều khiển từ xa.
+
+- **Tải bản macOS:** https://toolswave.net/larkwave (bản 0.1.3). Windows chưa có.
+- **Tài khoản:** dùng chung tài khoản Toolswave. App gọi `https://api.toolswave.net/v1`. Dữ liệu Lark của
+  app Toolswave cũ được nhập tự động.
+- Larkwave tách từ Toolswave ngày 06/10/2026 và **không có** phần dựng app. Chi tiết:
+  [docs/TACH-APP.md](docs/TACH-APP.md).
+
+> **Làm việc với Claude Code:** mở session ngay trong thư mục này. Claude tự đọc
+> [CLAUDE.md](CLAUDE.md), nơi ghi kiến trúc thật, lệnh, quy trình phát hành, **luật kiểm thử với Lark
+> thật**, luật an toàn và các bẫy đã gặp.
 
 ## Thành phần
 
@@ -38,4 +49,13 @@ pnpm --filter @larkwave/desktop typecheck:desktop && bash apps/desktop/test/run.
 node scripts/check-duplicates.mjs
 ```
 
-Các kịch bản deploy/phát hành vẫn trỏ hạ tầng Toolswave và bị chặn bằng `ALLOW_DEPLOY=1`.
+Thêm `node scripts/check-toolswave-api.mjs` để kiểm mọi đường app gọi có trên API Toolswave.
+
+## Phát hành
+
+Bản cài lên GitLab registry (gói `larkwave-desktop`). Giao diện được code-push qua Cloudflare Pages
+(`larkwave-desktop-renderer`). App và trang `/larkwave` cùng đọc `toolswave.net/api/apps-release/larkwave`.
+Script phát hành chặn bằng `ALLOW_DEPLOY=1`. Từng bước: [docs/code-push.md](docs/code-push.md).
+
+`apps/api` và `apps/web` ở đây là bản tách của máy chủ Toolswave, **không được deploy**. Desktop gọi API
+Toolswave. Đừng `prisma db push` schema này vào DB Toolswave.
