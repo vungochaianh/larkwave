@@ -97,6 +97,9 @@ CLOUDFLARE_API_TOKEN=$CF_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CF_ACCOUNT_ID ALLOW_DE
 8. `push-renderer.mjs --min-main 0.1.0 --main-change`.
 
 Sau khi tải lên:
+- Máy chủ chạy **hai** tiến trình web (cổng 4100 và 4102), mỗi tiến trình một bộ đệm. Sau khi phát hành,
+  một lượt gọi có thể ra bản mới trong khi lượt khác vẫn ra bản cũ. Gọi trang 8 lần liền; chỉ khi cả 8
+  đều ra bản mới thì mới coi là xong.
 - `/api/apps-release/larkwave` đệm 300 giây, nên có thể mất vài phút mới thấy bản mới.
 - Kiểm lại bằng `curl`, và kiểm trang `/larkwave` bằng Playwright headless.
 
