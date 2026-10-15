@@ -7,6 +7,14 @@ import { useRuntime } from '../RuntimeProvider';
 import { V } from '../theme';
 import { useI18n } from '../i18n';
 import { API_KEYS_CHANGED_EVENT } from './lark/engineChip';
+import { isAnthropicApiKey } from '../claudeKeyKind';
+
+/**
+ * Câu từ chối của LÕI ≤0.1.3: nó chỉ nhận đúng tiền tố `sk-ant-api…`, nên từ chối cả API key hợp lệ dạng
+ * mới `sk-ant-usr-…` (Console cấp từ 10/2026). Giao diện đi theo code-push nên đã mới, còn lõi chỉ đổi khi
+ * cài lại .dmg — người dùng thoát/mở lại app vẫn gặp đúng câu này (gặp thật 15/10/2026).
+ */
+const OLD_CORE_KEY_REJECT = /Chỉ (chấp nhận|kiểm tra được) API key[\s\S]*sk-ant-api/;
 
 const { Title, Text, Link } = Typography;
 
@@ -29,7 +37,7 @@ export function ClaudeKeyManager({
   const runtime = useRuntime();
   const { t } = useI18n();
   const claude = runtime.claude;
-  const { message } = AntApp.useApp();
+  const { message, modal } = AntApp.useApp();
 
   const [list, setList] = useState<ApiKeyList | null>(null);
   const [label, setLabel] = useState('');
@@ -58,10 +66,51 @@ export function ClaudeKeyManager({
     setChecking(true);
     setCheck(null);
     try {
-      setCheck(await claude.validateKey!(k));
+      const res = await claude.validateKey!(k);
+      // Lõi cũ không kiểm được key dạng mới — đừng để người dùng tưởng key hỏng.
+      if (!res.ok && OLD_CORE_KEY_REJECT.test(res.error || '') && isAnthropicApiKey(k)) {
+        setCheck({
+          ok: false,
+          error: t(
+            'ui.keys.oldCoreCheck',
+            'Bản cài Larkwave trên máy này còn cũ nên chưa kiểm được API key dạng mới (sk-ant-usr-…). Key có thể vẫn đúng: bấm "Thêm key" để dùng ngay, hoặc cài bản mới nhất ở toolswave.net/larkwave.',
+          ),
+        });
+      } else setCheck(res);
     } finally {
       setChecking(false);
     }
+  };
+
+  /**
+   * Lõi cũ từ chối key dạng mới vào danh sách nhóm, nhưng ô "Kết nối Claude bằng token" của nó nhận mọi
+   * khoá và đưa khoá không phải `sk-ant-oat…` vào ANTHROPIC_API_KEY — dùng được ngay, không cần cài lại.
+   * Phải HỎI: nó thay token Claude đã dán trước đó (nếu có) và Claude CLI sẽ chạy bằng API key (tính tiền
+   * theo key) thay cho gói đang đăng nhập.
+   */
+  const offerTokenFallback = (k: string) => {
+    modal.confirm({
+      title: t('ui.keys.oldCoreTitle', 'Bản cài trên máy này còn cũ'),
+      content: t(
+        'ui.keys.oldCoreBody',
+        'Phần lõi của bản cài này chưa nhận API key dạng mới (sk-ant-usr-…) vào danh sách nhóm. Có thể dùng key này NGAY làm khoá Claude của máy này: Claude CLI sẽ chạy bằng API key này (tính tiền theo key) thay cho tài khoản đang đăng nhập, và thay khoá/token Claude đã dán trước đó (nếu có). Cài bản mới nhất ở toolswave.net/larkwave để quản lý key trong danh sách.',
+      ),
+      okText: t('ui.keys.oldCoreOk', 'Dùng key này ngay'),
+      cancelText: t('ui.keys.oldCoreCancel', 'Để sau'),
+      onOk: async () => {
+        try {
+          await claude.setToken(k);
+          setLabel('');
+          setKey('');
+          setCheck(null);
+          window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT));
+          onActiveChange?.();
+          message.success(t('ui.keys.oldCoreDone', 'Đã lưu — Claude trên máy này giờ chạy bằng API key này.'));
+        } catch (e) {
+          message.error((e as Error)?.message || t('ui.keys.addFailed', 'Không thêm được key.'));
+        }
+      },
+    });
   };
 
   const doAdd = async () => {
@@ -78,7 +127,12 @@ export function ClaudeKeyManager({
       message.success(t('ui.keys.added', 'Đã thêm API key.'));
       onActiveChange?.();
     } catch (e) {
-      message.error((e as Error)?.message || t('ui.keys.addFailed', 'Không thêm được key.'));
+      const msg = (e as Error)?.message || '';
+      if (OLD_CORE_KEY_REJECT.test(msg) && isAnthropicApiKey(k)) {
+        offerTokenFallback(k);
+        return;
+      }
+      message.error(msg || t('ui.keys.addFailed', 'Không thêm được key.'));
     } finally {
       setAdding(false);
     }

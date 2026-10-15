@@ -21,6 +21,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "An toàn hơn khi dùng Gemini: Gemini không còn được tự chạy lệnh trên máy hay ghi tệp; chỉ dùng công cụ Lark của app (và đọc tệp bạn đính kèm).",
       "Gemini chưa đăng nhập hoặc hết hạn mức thì báo rõ cách xử lý (chạy `gemini` → Login with Google) thay vì một lỗi khó hiểu.",
       "Sửa lỗi không thêm được API key Claude dạng mới (sk-ant-usr-…) mà Anthropic Console đang cấp: app nhận mọi API key Anthropic và kiểm trực tiếp với API, chỉ từ chối token đăng nhập / admin key kèm câu giải thích.",
+      "Máy còn bản cài cũ mà thêm API key dạng mới (sk-ant-usr-…): app không báo lỗi khó hiểu nữa mà đề nghị dùng key ngay làm khoá Claude của máy (không cần cài lại), kèm lời nhắc cài bản mới để quản lý key trong danh sách.",
       "Thanh trên màn chat không còn báo nhầm \"Chưa có API key\" khi key đã thêm (tự làm mới ngay khi thêm/xoá key). Chọn \"API trực tiếp\" mà chưa kết nối Lark Bot (App ID) thì app nói rõ: lượt chat chạy bằng CLI trên máy, vẫn dùng API key của bạn.",
     ],
   },

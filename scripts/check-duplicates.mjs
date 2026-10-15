@@ -24,6 +24,11 @@ const PAIRS = [
     'apps/api/src/skills/skill-command.util.ts',
   ],
   [
+    'claudeKeyKind (phân loại khoá Anthropic)',
+    'apps/desktop/main/runtime/claudeKeyKind.ts',
+    'packages/ui/src/claudeKeyKind.ts',
+  ],
+  [
     'ooxml (bộ đọc xlsx/docx)',
     'apps/api/src/uploads/ooxml.ts',
     'apps/desktop/main/runtime/lark/ooxml.ts',
