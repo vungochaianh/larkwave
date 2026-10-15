@@ -153,6 +153,7 @@ export function LarkChatToolbar({
   onRunSource,
   apiKeyReady,
   maicAvailable,
+  appConnected,
   autoMode,
   onAuto,
   frame,
@@ -174,6 +175,8 @@ export function LarkChatToolbar({
   onRunSource: (s: RunSource) => void;
   apiKeyReady: boolean;
   maicAvailable: boolean;
+  /** Đã kết nối Lark Bot (App ID) chưa — "API trực tiếp" cần nó (xem engineWarn). */
+  appConnected?: boolean;
   autoMode: boolean | null;
   onAuto: (on: boolean) => void;
   /** Bố cục chat: nút mở/đóng khung Lark bên phải. */
@@ -212,7 +215,7 @@ export function LarkChatToolbar({
       alive = false;
     };
   }, [runtime]);
-  const eng = engineModel({ runners, runnerId, model, runSource, apiKeyReady, maicAvailable });
+  const eng = engineModel({ runners, runnerId, model, runSource, apiKeyReady, maicAvailable, appConnected });
   const active = runners.find((r) => r.id === runnerId);
 
   const toggle = (b: BaseOption) => {

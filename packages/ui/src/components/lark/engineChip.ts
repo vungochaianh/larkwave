@@ -29,9 +29,12 @@ export interface EngineInput {
   runSource: RunSource;
   apiKeyReady: boolean;
   maicAvailable: boolean;
+  /** Đã kết nối Lark Bot (App ID) chưa. Đường "API trực tiếp" cần nó để gọi công cụ Lark; thiếu thì lượt
+   *  chạy bằng CLI trên máy (vẫn tiêm API key đã lưu). Không truyền = không biết ⇒ không báo. */
+  appConnected?: boolean;
 }
 
-export type EngineWarnKind = 'notInstalled' | 'needsLogin' | 'outdated' | 'apiNoKey' | 'maicOff';
+export type EngineWarnKind = 'notInstalled' | 'needsLogin' | 'outdated' | 'apiNoKey' | 'apiNeedsApp' | 'maicOff';
 
 export interface EngineWarn {
   kind: EngineWarnKind;
@@ -91,7 +94,16 @@ export function engineModel(i: EngineInput): EngineModel {
  * và ngược lại). Thứ tự: lượt sẽ HỎNG (error) trước, rồi mới tới "vẫn chạy nhưng nên cập nhật".
  */
 export function engineWarn(i: EngineInput, r: RunnerLite | undefined, runnerLabel: string): EngineWarn | null {
-  if (i.runSource === 'api') return i.apiKeyReady ? null : { kind: 'apiNoKey', level: 'error', text: `Chưa có API key cho ${runnerLabel} — dán key ở cài đặt agent (sidebar trái).` };
+  if (i.runSource === 'api') {
+    if (!i.apiKeyReady) return { kind: 'apiNoKey', level: 'error', text: `Chưa có API key cho ${runnerLabel} — dán key ở cài đặt agent (sidebar trái).` };
+    if (i.appConnected === false)
+      return {
+        kind: 'apiNeedsApp',
+        level: 'warn',
+        text: `"API trực tiếp" cần kết nối Lark Bot (App ID) để gọi công cụ Lark. Chưa kết nối nên lượt chat chạy bằng ${shortRunnerLabel(runnerLabel)} CLI trên máy — vẫn dùng API key bạn đã lưu.`,
+      };
+    return null;
+  }
   if (i.runSource === 'maic') return i.maicAvailable ? null : { kind: 'maicOff', level: 'error', text: 'Gói Larkwave cần đăng nhập tài khoản Larkwave.' };
   if (!r) return null;
   if (!r.installed) return { kind: 'notInstalled', level: 'error', text: `Chưa cài ${r.label}.`, command: r.installHint || (r.id === 'claude' ? DEFAULT_UPDATE : undefined) };
@@ -111,4 +123,19 @@ export function autoTip(on: boolean): string {
   return on
     ? 'Tự động: tạo workflow/automation (luôn TẮT), thêm bảng/cột/bản ghi mới chạy ngay không hỏi. Xoá, sửa, ghi đè, gửi tin vẫn hỏi. Không bao giờ tự bật workflow.'
     : 'Hỏi trước khi ghi: mọi thao tác ghi đều hiện hộp xác nhận vẽ sẵn thiết kế.';
+}
+
+/** Sự kiện cửa sổ khi API key vừa được thêm / xoá / đổi key đang dùng — màn chat nghe để làm mới chip. */
+export const API_KEYS_CHANGED_EVENT = 'larkwave:api-keys-changed';
+
+/**
+ * Nguồn "API trực tiếp" đã có key chưa. Lõi ≤0.1.4 KHÔNG trả `apiKeyReady` khi chưa kết nối Lark Bot
+ * (App ID) — thiếu trường ⇒ chip cũ báo "chưa có API key" dù key đã lưu (gặp thật 15/10/2026). Claude: hỏi
+ * thẳng kho key nhóm (đúng kho lõi tiêm vào lượt chạy). Runner khác: tin lõi; lõi không nói ⇒ không biết ⇒
+ * KHÔNG báo lỗi giả (lượt chạy tự báo nếu thật sự thiếu).
+ */
+export function apiKeyReadyFrom(statusReady: boolean | undefined, runnerId: string, claudeKeys: { keys: { active: boolean }[] } | null | undefined): boolean {
+  if (runnerId === 'claude' && claudeKeys) return claudeKeys.keys.some((k) => k.active);
+  if (typeof statusReady === 'boolean') return statusReady;
+  return true;
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { App, Alert, Button, Input, Modal, Space, Tag, Typography } from 'antd';
 import { CheckCircleFilled, KeyOutlined, ExportOutlined, CopyOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo, RuntimeAdapter } from '@larkwave/core';
+import { API_KEYS_CHANGED_EVENT } from './lark/engineChip';
 
 const { Text, Paragraph } = Typography;
 
@@ -83,6 +84,7 @@ export function AgentGuideModal({
     try {
       const list = await runtime.runners.setToken(runner.id, k);
       onChanged(list);
+      window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT)); // chip "thiếu key" của màn chat làm mới ngay
       setKey('');
       const now = list.find((r) => r.id === runner.id);
       message.success(now?.ready ? `${runner.label} đã sẵn sàng.` : 'Đã lưu API key.');

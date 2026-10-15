@@ -31,6 +31,7 @@ import { ConfirmToolModal, type PendingConfirm } from './ConfirmToolModal';
 import { AskUserModal, type PendingAsk } from './AskUserModal';
 import { findAnswer, isToolAllowed, rememberAnswer, rememberTool, type RememberScope } from './agentPrefs';
 import { takeLarkPrompt } from './larkHandoff';
+import { API_KEYS_CHANGED_EVENT, apiKeyReadyFrom } from './engineChip';
 import { useI18n } from '../../i18n';
 
 const { Text } = Typography;
@@ -540,7 +541,10 @@ export function LarkChat({
   }, [items, pendings]);
 
   // Direct-API mode (run via provider API, no local CLI) + whether the chosen provider has a key.
-  const [apiKeyReady, setApiKeyReady] = useState(false);
+  // `statusKeyReady` = lõi báo (lõi ≤0.1.4 bỏ trống khi chưa kết nối App ID); Claude thì hỏi thẳng kho
+  // key nhóm — xem apiKeyReadyFrom.
+  const [statusKeyReady, setStatusKeyReady] = useState<boolean | undefined>(undefined);
+  const [claudeKeys, setClaudeKeys] = useState<{ keys: { active: boolean }[] } | null>(null);
   /** Đã kết nối custom app (App ID) chưa — quyết định nút "Hỏi nhanh" dùng tool Open API hay phiên Lark web. */
   const [appConnected, setAppConnected] = useState(true);
   /** Nguồn chạy agent: CLI trên máy · khoá API riêng · gói Larkwave (MAIC). */
@@ -552,7 +556,7 @@ export function LarkChat({
     runtime.larkStatus?.().then((s) => {
       setAutoApprove(!!s.autoApprove);
       setAppConnected(!!s.connected);
-      setApiKeyReady(!!s.apiKeyReady);
+      setStatusKeyReady(s.apiKeyReady);
       setRunSource(s.larkRunSource ?? (s.apiMode ? 'api' : 'cli'));
       setMaicAvailable(!!s.maicAvailable);
       if (s.defaultRunner) setRunnerId(s.defaultRunner);
@@ -560,11 +564,37 @@ export function LarkChat({
     }).catch(() => undefined);
   }, [runtime]);
 
+  // Làm mới "đã có key chưa" khi quay lại cửa sổ và ngay khi key vừa được thêm / xoá / đổi. Màn chat được
+  // giữ nguyên lúc chuyển tab, nên chỉ đọc một lần khi mở là chip báo "chưa có API key" mãi dù key đã lưu.
+  useEffect(() => {
+    let last = 0;
+    const refresh = (force = false) => {
+      if (!force && Date.now() - last < 3000) return;
+      last = Date.now();
+      runtime.claude?.listKeys?.().then(setClaudeKeys).catch(() => undefined);
+      runtime.larkStatus?.()
+        .then((s) => {
+          setStatusKeyReady(s.apiKeyReady);
+          setAppConnected(!!s.connected);
+        })
+        .catch(() => undefined);
+    };
+    const onFocus = () => refresh();
+    const onKeys = () => refresh(true);
+    runtime.claude?.listKeys?.().then(setClaudeKeys).catch(() => undefined);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener(API_KEYS_CHANGED_EVENT, onKeys);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener(API_KEYS_CHANGED_EVENT, onKeys);
+    };
+  }, [runtime]);
+
   const pickRunSource = (src: 'cli' | 'api' | 'maic') => {
     setRunSource(src);
     runtime.larkSetAgentPrefs
       ?.({ larkRunSource: src })
-      .then((s) => setApiKeyReady(!!s.apiKeyReady))
+      .then((s) => setStatusKeyReady(s.apiKeyReady))
       .catch(() => undefined);
   };
 
@@ -1608,8 +1638,9 @@ export function LarkChat({
           }}
           runSource={runSource}
           onRunSource={pickRunSource}
-          apiKeyReady={apiKeyReady}
+          apiKeyReady={apiKeyReadyFrom(statusKeyReady, runnerId, claudeKeys)}
           maicAvailable={maicAvailable}
+          appConnected={appConnected}
           autoMode={autoMode}
           onAuto={(on) => void changeAuto(on)}
           frame={frame}

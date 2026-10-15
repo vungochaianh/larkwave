@@ -6,6 +6,7 @@ import type { ApiKeyEntry, ApiKeyList, KeyValidation } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { V } from '../theme';
 import { useI18n } from '../i18n';
+import { API_KEYS_CHANGED_EVENT } from './lark/engineChip';
 
 const { Title, Text, Link } = Typography;
 
@@ -70,6 +71,7 @@ export function ClaudeKeyManager({
     try {
       const next = await claude.addKey!({ label: label.trim(), key: k });
       setList(next);
+      window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT)); // chip của màn chat làm mới ngay
       setLabel('');
       setKey('');
       setCheck(null);
@@ -86,6 +88,7 @@ export function ClaudeKeyManager({
     setBusyId(id);
     try {
       setList(await claude.setActiveKey!(id));
+      window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT)); // chip của màn chat làm mới ngay
       onActiveChange?.();
     } finally {
       setBusyId(null);
@@ -96,6 +99,7 @@ export function ClaudeKeyManager({
     setBusyId(id);
     try {
       setList(await claude.removeKey!(id));
+      window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT)); // chip của màn chat làm mới ngay
       onActiveChange?.();
     } finally {
       setBusyId(null);

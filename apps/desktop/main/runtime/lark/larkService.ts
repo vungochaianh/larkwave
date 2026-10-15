@@ -3740,6 +3740,8 @@ export class LarkService {
         // Cũng trả ở nhánh CHƯA kết nối: thiếu thì mở app lần đầu, lựa chọn nguồn chạy nhảy về
         // 'cli' rồi lần lưu kế tiếp ghi đè mất lựa chọn thật của người dùng.
         larkRunSource: settings.larkRunSource ?? (apiMode ? 'api' : 'cli'),
+        // Trước 0.1.5 nhánh này thiếu trường này ⇒ giao diện báo "Chưa có API key" dù key đã lưu.
+        apiKeyReady: this.apiReady(defaultRunner),
         maicAvailable: !!this.accountTokenGetter?.() && this.maicAvailCache?.ok !== false,
       };
     return {

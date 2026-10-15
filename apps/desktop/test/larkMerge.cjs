@@ -75,6 +75,27 @@ t('cảnh báo theo NGUỒN chạy: API thiếu key = chấm đỏ (CLI cũ khô
   assert.strictEqual(eng.engineModel({ ...base, runSource: 'maic' }).warn.kind, 'maicOff');
   assert.strictEqual(eng.engineModel({ ...base, runSource: 'maic', maicAvailable: true }).dot, null);
 });
+t('API key đã lưu mà chip báo "chưa có key" (lỗi thật 15/10/2026): Claude hỏi thẳng kho key nhóm; lõi không nói ⇒ không báo giả', () => {
+  const keys = { keys: [{ active: true }] };
+  // Lõi ≤0.1.4, CHƯA kết nối App ID: trạng thái không có trường apiKeyReady.
+  assert.strictEqual(eng.apiKeyReadyFrom(undefined, 'claude', keys), true);
+  assert.strictEqual(eng.apiKeyReadyFrom(false, 'claude', keys), true, 'kho key là nguồn thật của Claude');
+  assert.strictEqual(eng.apiKeyReadyFrom(undefined, 'claude', { keys: [] }), false);
+  assert.strictEqual(eng.apiKeyReadyFrom(undefined, 'claude', { keys: [{ active: false }] }), false, 'có key nhưng chưa chọn key nào đang dùng');
+  assert.strictEqual(eng.apiKeyReadyFrom(true, 'gemini', null), true);
+  assert.strictEqual(eng.apiKeyReadyFrom(false, 'gemini', null), false);
+  assert.strictEqual(eng.apiKeyReadyFrom(undefined, 'gemini', null), true, 'không biết ⇒ không báo lỗi giả');
+  assert.ok(eng.API_KEYS_CHANGED_EVENT);
+});
+t('API trực tiếp mà CHƯA kết nối App ID: nói thật là đang chạy bằng CLI (vẫn dùng key), mức cảnh báo vàng', () => {
+  const w = eng.engineModel({ ...base, runSource: 'api', apiKeyReady: true, appConnected: false });
+  assert.strictEqual(w.warn.kind, 'apiNeedsApp');
+  assert.strictEqual(w.dot, 'warn');
+  assert.match(w.warn.text, /Lark Bot \(App ID\)[\s\S]*Claude CLI[\s\S]*vẫn dùng API key/);
+  assert.strictEqual(eng.engineModel({ ...base, runSource: 'api', apiKeyReady: true, appConnected: true }).dot, null);
+  assert.strictEqual(eng.engineModel({ ...base, runSource: 'api', apiKeyReady: false, appConnected: false }).warn.kind, 'apiNoKey', 'thiếu key vẫn là lỗi đỏ, xếp trước');
+  assert.strictEqual(eng.engineModel({ ...base, runSource: 'api', apiKeyReady: true }).dot, null, 'không truyền appConnected ⇒ không báo');
+});
 t('lượt sẽ HỎNG xếp trước CLI cũ: chưa cài / cần đăng nhập = chấm đỏ', () => {
   assert.strictEqual(eng.engineModel({ ...base, runners: [{ ...CLAUDE, installed: false }] }).warn.kind, 'notInstalled');
   assert.strictEqual(eng.engineModel({ ...base, runners: [{ ...CLAUDE, ready: false }] }).warn.kind, 'needsLogin');
