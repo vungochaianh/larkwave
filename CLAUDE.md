@@ -134,6 +134,10 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 
 ## Bẫy đã gặp
 
+- **API key Anthropic không chỉ có dạng `sk-ant-api…`.** Từ 10/2026 Console cấp cả `sk-ant-usr-…`.
+  Nhận diện khoá bằng `apps/desktop/main/runtime/claudeKeyKind.ts`, đừng viết regex tiền tố mới. Hàm đó
+  chỉ loại những dạng biết chắc không phải API key (token đăng nhập `oat`, admin key…), còn lại để lần
+  gọi thử API (`validateKey`) quyết định.
 - **Claude CLI đóng băng lời nhắc hệ thống và danh sách công cụ ở lượt đầu.** `--resume` và
   `--fork-session` dùng lại đúng ảnh chụp ấy (`prompt_snapshot` trong jsonl của phiên).
   - Thứ đổi theo lượt (Base, công tắc Tự động, kỹ năng) phải đi qua `buildTurnContextBlock`
