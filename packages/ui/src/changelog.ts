@@ -20,6 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Thêm model Gemini 3.1 Pro, 3 Pro, 3 Flash và \"Tự chọn\" (Gemini tự chọn model theo độ khó của câu hỏi).",
       "An toàn hơn khi dùng Gemini: Gemini không còn được tự chạy lệnh trên máy hay ghi tệp; chỉ dùng công cụ Lark của app (và đọc tệp bạn đính kèm).",
       "Gemini chưa đăng nhập hoặc hết hạn mức thì báo rõ cách xử lý (chạy `gemini` → Login with Google) thay vì một lỗi khó hiểu.",
+      "Sửa lỗi không thêm được API key Claude dạng mới (sk-ant-usr-…) mà Anthropic Console đang cấp: app nhận mọi API key Anthropic và kiểm trực tiếp với API, chỉ từ chối token đăng nhập / admin key kèm câu giải thích.",
     ],
   },
   {

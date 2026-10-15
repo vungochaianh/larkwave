@@ -164,7 +164,7 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               onPressEnter={() => void saveToken()}
-              placeholder={t('ui.claude.tokenPlaceholder', 'sk-ant-api… (API key) hoặc sk-ant-oat… (token đăng nhập)')}
+              placeholder={t('ui.claude.tokenPlaceholder', 'sk-ant-api… / sk-ant-usr… (API key) hoặc sk-ant-oat… (token đăng nhập)')}
               autoComplete="off"
             />
             <Button block loading={savingToken} disabled={!token.trim()} onClick={saveToken}>

@@ -9,7 +9,7 @@ rm -rf .test-build
 # @larkwave/core phải được dựng TRƯỚC: các file dưới đây import kiểu từ dist của nó, và một
 # dist cũ sẽ báo lỗi kiểu ma (đúng lớp lỗi "stale core" từng làm trắng màn hình bản cài).
 (cd ../.. && pnpm --filter @larkwave/core build >/dev/null)
-npx tsc main/runtime/versionHint.ts main/runtime/apiRunner.ts main/runtime/lark/larkToolExec.ts \
+npx tsc main/runtime/versionHint.ts main/runtime/apiRunner.ts main/runtime/claudeKeyKind.ts main/runtime/lark/larkToolExec.ts \
   main/runtime/lark/ooxml.ts main/runtime/lark/automationEngine.ts main/runtime/lark/skillRun.ts \
   main/runtime/lark/fileBuild.ts main/runtime/lark/filePaths.ts main/runtime/lark/fileContext.ts \
   main/runtime/lark/automationFiles.ts main/runtime/lark/unattendedPolicy.ts main/runtime/lark/upsertPlan.ts main/runtime/lark/autoRunRecorder.ts \
@@ -48,7 +48,7 @@ test -f .test-build/runtime/lark/larkService.js || { echo "✗ không biên dị
 test -f .test-build/runtime/lark/tools/index.js || { echo "✗ không biên dịch được tools/index"; exit 1; }
 test -f .test-build/runtime/lark/systemPrompt.js || { echo "✗ không biên dịch được systemPrompt"; exit 1; }
 fail=0
-for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/larkLoginUrl.cjs test/webDelete.cjs test/turnContext.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs test/larkWebWrite.cjs test/localFiles.cjs test/autoFiles.cjs test/skillsBuiltin.cjs test/skillLearning.cjs test/geminiCli.cjs; do
+for t in test/versionHint.basic.cjs test/versionHint.offline.cjs test/apiRunner.image.cjs test/apiRunner.fallback.cjs test/toolClassifier.cjs test/larkDeleteSync.cjs test/parallelTurns.cjs test/grantScope.cjs test/draftSession.cjs test/attachOffice.cjs test/scheduleDue.cjs test/scheduledSession.cjs test/answerActions.cjs test/hostedTenants.cjs test/hostedEmptyBackup.cjs test/skillContract.cjs test/skillRun.cjs test/agentTurnGuards.cjs test/schedNoSelfSchedule.cjs test/fileBuild.cjs test/fileGuards.cjs test/fileDeliver.cjs test/fileEvent.cjs test/chatTurn.cjs test/larkAppTools.cjs test/cliVersion.cjs test/i18nBanner.cjs test/larkUiDriver.cjs test/larkTemplates.cjs test/larkLoginState.cjs test/larkLoginUrl.cjs test/webDelete.cjs test/turnContext.cjs test/workflowV3.cjs test/larkWeb.cjs test/workflowInternal.cjs test/quickAsks.cjs test/larkMerge.cjs test/endpointCompat.cjs test/toolswaveMigrate.cjs test/claudeSessions.cjs test/larkWebWrite.cjs test/localFiles.cjs test/autoFiles.cjs test/skillsBuiltin.cjs test/skillLearning.cjs test/geminiCli.cjs test/claudeKeyKind.cjs; do
   echo "── $t"
   node "$t" || fail=1
 done

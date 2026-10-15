@@ -12,7 +12,7 @@ const { Title, Text, Link } = Typography;
 /**
  * Manage the Anthropic API keys the team uses to run Claude — the COMPLIANT alternative
  * to handing one person's login token to others. An admin pastes org-provisioned
- * `sk-ant-api…` keys, labels them, validates them, and picks the active one (fed to the
+ * Anthropic API keys (`sk-ant-api03-…`, `sk-ant-usr-…` — see claudeKeyKind.ts), labels them, validates them, and picks the active one (fed to the
  * local Claude CLI). The raw key never leaves the main process — the UI only ever sees
  * the masked form. Renders nothing on a runtime without managed-key support (web / older
  * desktop bundle), so it degrades gracefully.
@@ -153,7 +153,7 @@ export function ClaudeKeyManager({
         </Title>
       </div>
       <Text type="secondary">
-        {t('ui.keys.teamDescPre', 'Phân phối API key Anthropic (')}<Text code>sk-ant-api…</Text>{t('ui.keys.teamDescPost', ') cho cả nhóm dùng chung — cách hợp lệ để nhiều người chạy Claude. Mỗi máy chọn 1 key đang dùng; key được mã hoá & lưu trên máy, không gửi đi đâu.')}
+        {t('ui.keys.teamDescPre', 'Phân phối API key Anthropic (')}<Text code>sk-ant-…</Text>{t('ui.keys.teamDescPost', ') cho cả nhóm dùng chung — cách hợp lệ để nhiều người chạy Claude. Mỗi máy chọn 1 key đang dùng; key được mã hoá & lưu trên máy, không gửi đi đâu.')}
       </Text>
 
       {list && !list.encrypted && (
@@ -175,7 +175,7 @@ export function ClaudeKeyManager({
             maxLength={40}
           />
           <Input.Password
-            placeholder="sk-ant-api…"
+            placeholder="sk-ant-api03-… / sk-ant-usr-…"
             value={key}
             onChange={(e) => {
               setKey(e.target.value);

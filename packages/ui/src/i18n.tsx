@@ -1366,7 +1366,7 @@ export const MESSAGES: Record<string, { vi: string; en: string }> = {
   "ui.claude.orTerminalMid": { vi: "rồi", en: "then" },
   "ui.claude.orTerminalPost": { vi: ", sau đó bấm", en: ", then click" },
   "ui.claude.orPasteToken": { vi: "hoặc dán token", en: "or paste a token" },
-  "ui.claude.tokenPlaceholder": { vi: "sk-ant-api… (API key) hoặc sk-ant-oat… (token đăng nhập)", en: "sk-ant-api… (API key) or sk-ant-oat… (login token)" },
+  "ui.claude.tokenPlaceholder": { vi: "sk-ant-api… / sk-ant-usr… (API key) hoặc sk-ant-oat… (token đăng nhập)", en: "sk-ant-api… / sk-ant-usr… (API key) or sk-ant-oat… (login token)" },
   "ui.claude.saveToken": { vi: "Lưu token", en: "Save token" },
   "ui.claude.keyHelpPre": { vi: "API key lấy ở", en: "Get an API key at" },
   "ui.claude.keyHelpMid": { vi: "(tính phí theo token). Token đăng nhập (dùng gói Pro/Max) tạo bằng", en: "(billed per token). Create a login token (uses your Pro/Max plan) with" },

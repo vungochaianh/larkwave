@@ -14,7 +14,7 @@ const GUIDE: Record<
   claude: {
     login: 'claude    →  rồi gõ /login (đăng nhập gói Claude của bạn)',
     keyLabel: 'Anthropic API key (hoặc token đăng nhập)',
-    keyPlaceholder: 'sk-ant-api… hoặc sk-ant-oat…',
+    keyPlaceholder: 'sk-ant-api… / sk-ant-usr… hoặc sk-ant-oat…',
     keyDocs: 'https://console.anthropic.com/settings/keys',
     keyDocsLabel: 'Lấy Anthropic API key',
   },

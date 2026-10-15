@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { app, safeStorage } from 'electron';
 import type { ApiKeyEntry, ApiKeyList } from '@larkwave/core';
+import { isAnthropicApiKey, notApiKeyMessage } from './claudeKeyKind';
 
 /**
  * Multi-key store for Anthropic API keys (`sk-ant-api…`), under `${userData}/claude/keys.bin`.
@@ -104,20 +105,21 @@ export function listKeys(): ApiKeyList {
   return { keys: f.keys.map((k) => toEntry(k, f.activeId)), encrypted: encAvailable() };
 }
 
-/** True if the input looks like an Anthropic API key (not an OAuth login token). */
+/** True if the input is an Anthropic API key — any form (`sk-ant-api03-…`, `sk-ant-usr-…`, …), never an
+ *  OAuth login token. See claudeKeyKind.ts: the API call in validateKey() is the real judge. */
 export function isApiKey(key: string): boolean {
-  return /^sk-ant-api/i.test(key.trim());
+  return isAnthropicApiKey(key);
 }
 
 /**
- * Add a key. Rejects anything that isn't an `sk-ant-api…` key (API keys only — no
+ * Add a key. Rejects anything that isn't an Anthropic API key (API keys only — no
  * personal OAuth tokens). Becomes active if it's the first key. `valid`/`lastValidated`
  * are optional (set by the caller after a validateKey() round-trip).
  */
 export function addKey(input: { label: string; key: string; valid?: boolean }): ApiKeyList {
   const key = input.key.trim();
   if (!isApiKey(key)) {
-    throw new Error('Chỉ chấp nhận API key Anthropic (sk-ant-api…). Token đăng nhập cá nhân (sk-ant-oat…) không dùng để chia sẻ cho người khác.');
+    throw new Error(notApiKeyMessage(key));
   }
   const f = load();
   if (f.keys.some((k) => k.key === key)) throw new Error('Key này đã được thêm rồi.');

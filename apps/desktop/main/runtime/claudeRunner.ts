@@ -5,6 +5,7 @@ import type { AppMode, BuildEvent, ClaudeLoginEvent, ClaudeStatus, KeyValidation
 import { getStoredToken, removeStoredToken, storeToken, tokenEnvVar } from './claudeTokenStore';
 import { getActiveKey, clearActiveKey } from './claudeKeyStore';
 import { contextUsageFromResult, CONTEXT_WARN_THRESHOLD } from './contextBudget';
+import { isAnthropicApiKey, notApiKeyMessage } from './claudeKeyKind';
 
 /**
  * macOS/Linux GUI apps don't inherit the shell PATH, so `spawn('claude')` fails
@@ -310,7 +311,7 @@ export async function clearClaudeToken(): Promise<ClaudeStatus> {
  */
 export async function validateKey(key: string): Promise<KeyValidation> {
   const k = key.trim();
-  if (!/^sk-ant-api/i.test(k)) return { ok: false, error: 'Chỉ kiểm tra được API key (sk-ant-api…).' };
+  if (!isAnthropicApiKey(k)) return { ok: false, error: notApiKeyMessage(k) };
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
