@@ -141,6 +141,23 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   - Đổi luật hoặc công cụ thì `promptFingerprint` (`systemPrompt.ts`) đổi, và `larkService.chat` xoay
     sang phiên mới rồi mồi lại lịch sử.
   - Triệu chứng: "AI cứ làm theo luật cũ / nhắc chế độ Hỏi đáp không tồn tại".
+- **Ba đường chạy một lượt Lark** (`runLarkAgent` trong `larkAgent.ts`):
+  - Claude: `runLarkChat`, đi cầu MCP.
+  - Gemini: `runLarkGemini` (`larkGeminiAgent.ts`), đi CÙNG cầu MCP, từ 0.1.4.
+  - Grok/Codex: `larkOrchestrator.ts`, vòng `<tool_call>` dạng chữ. CLI ở đường này chạy chế độ tự duyệt
+    mọi công cụ dựng sẵn (`--always-approve` / `--dangerously-bypass…`). Đừng cho lượt của người lạ
+    (bot Lark trong nhóm) đi đường này.
+- **Gemini CLI** — mọi sự thật đo được nằm ở đầu `geminiCli.ts`; nâng bản CLI thì đo lại.
+  - Khi chạy headless, quyết định "ask_user" bị coi là từ chối, nên KHÔNG dùng `--yolo`.
+  - `tools.core: []` nghĩa là không có công cụ dựng sẵn nào.
+  - `GEMINI_SYSTEM_MD` thay hẳn lời nhắc hệ thống, dựng lại mỗi lần chạy, nên không đóng băng như Claude.
+  - Không tự đặt được id phiên: lấy id từ sự kiện `init`.
+  - `--resume` vào một dự án chưa có phiên nào thì CLI **lặng lẽ mở phiên mới**, nên phải tự kiểm phiên
+    còn trước (`geminiSessionExists`).
+  - Thử không cần đăng nhập: đặt `GEMINI_API_KEY=<khoá giả>`. Cách này kiểm được MCP, policy và
+    stream-json; model trả 400.
+  - Đừng dùng `spawnSync` khi cầu MCP chạy cùng tiến trình: nó chặn vòng sự kiện, khiến Gemini báo
+    "Disconnected".
 - **Mỗi hội thoại (tab) có một trang Lark riêng, gọi là "làn".**
   - `LarkWebSession.win` / `.cdp` là getter theo `currentLane()`.
   - Getter `win` **TẠO** trang cho làn. Chỗ nào chỉ hỏi trạng thái phải dùng `pageFor(lane, false)`,
