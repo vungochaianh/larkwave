@@ -259,7 +259,14 @@ export const RUNNER_CATALOG: readonly RunnerCatalogEntry[] = [
     label: 'Gemini CLI',
     bin: 'gemini',
     installHint: 'npm i -g @google/gemini-cli',
+    // Tên model của Gemini CLI 0.34 (core/config/models.js). `auto` = CLI tự chọn giữa 3.1 Pro và Flash
+    // theo độ khó (đo: `-m auto` → `auto-gemini-3`). Đường "API trực tiếp" đổi id không phải `gemini-…`
+    // về model mặc định của API (resolveApiModel). Model mới hơn bản CLI đã cài ⇒ `brew upgrade gemini-cli`.
     models: [
+      { id: 'auto', label: 'Gemini · Tự chọn (3.x)' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview)' },
+      { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro (preview)' },
+      { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (preview)' },
       { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
     ],

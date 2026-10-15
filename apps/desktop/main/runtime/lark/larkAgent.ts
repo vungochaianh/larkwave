@@ -136,7 +136,7 @@ export interface LarkAgentDeps {
   fileContext?: TurnFileContext;
 }
 
-/** Route to Claude MCP or multi-runner orchestrator. */
+/** Route to Claude MCP, Gemini MCP, or the multi-runner orchestrator (grok/codex). */
 export async function* runLarkAgent(
   prompt: string,
   mode: LarkChatMode,
@@ -149,6 +149,13 @@ export async function* runLarkAgent(
   // would run the friend's prompt fully unsandboxed. The --tools/--disallowedTools read-only
   // whitelist lives ONLY in runLarkChat (the claude path), so force any readOnly turn there
   // regardless of the owner's active runner. (runAgentGrantTurn also pins runner='claude'.)
+  // Gemini CLI đi CÙNG cầu MCP Lark với Claude (công cụ gọi thật, stream chữ, --resume, không --yolo)
+  // thay vì vòng orchestrator văn bản — xem larkGeminiAgent.ts / geminiCli.ts.
+  if (runner === 'gemini' && !deps.generalMode) {
+    const { runLarkGemini } = await import('./larkGeminiAgent');
+    yield* runLarkGemini(prompt, mode, deps);
+    return;
+  }
   if (runner !== 'claude' && !(deps.generalMode && deps.readOnly)) {
     const { runLarkOrchestrator } = await import('./larkOrchestrator');
     yield* runLarkOrchestrator(prompt, mode, deps);

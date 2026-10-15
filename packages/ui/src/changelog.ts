@@ -13,6 +13,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.4',
+    date: '2026-10-15',
+    items: [
+      "Lark × Agents chạy đầy đủ bằng Gemini (Gemini CLI): gọi thẳng công cụ Lark như Claude, chữ hiện dần khi đang trả lời, nhớ hội thoại giữa các lượt. Thao tác ghi vẫn hỏi bạn qua hộp xác nhận.",
+      "Thêm model Gemini 3.1 Pro, 3 Pro, 3 Flash và \"Tự chọn\" (Gemini tự chọn model theo độ khó của câu hỏi).",
+      "An toàn hơn khi dùng Gemini: Gemini không còn được tự chạy lệnh trên máy hay ghi tệp; chỉ dùng công cụ Lark của app (và đọc tệp bạn đính kèm).",
+      "Gemini chưa đăng nhập hoặc hết hạn mức thì báo rõ cách xử lý (chạy `gemini` → Login with Google) thay vì một lỗi khó hiểu.",
+    ],
+  },
+  {
     version: '0.1.3',
     date: '2026-10-11',
     items: [

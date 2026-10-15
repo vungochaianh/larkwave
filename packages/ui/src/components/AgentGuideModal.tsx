@@ -26,7 +26,7 @@ const GUIDE: Record<
     keyDocsLabel: 'Lấy xAI API key',
   },
   gemini: {
-    login: 'gemini    →  đăng nhập bằng tài khoản Google',
+    login: 'gemini    →  chọn "Login with Google" rồi đăng nhập (xong gõ /quit)',
     keyLabel: 'Google Gemini API key',
     keyPlaceholder: 'AIza…',
     keyDocs: 'https://aistudio.google.com/apikey',
