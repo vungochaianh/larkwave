@@ -18,6 +18,7 @@ import { attachmentTools } from './attachments';
 import { skillTools } from './skills';
 import { fileTools } from './files';
 import { larkWebWriteTools, LARK_WEB_WRITE_TOOL_NAMES } from './larkWebWrite';
+import { connectorTools, CONNECTOR_TOOL_NAMES } from './connectors';
 
 /**
  * Ghi CỘNG THÊM của đường Open API (tạo bản ghi/bảng/cột/view mới, tạo workflow v3 — luôn TẮT):
@@ -53,6 +54,7 @@ const ALL: LarkToolDef[] = [
   ...wikiTools,
   ...sheetsTools,
   ...driveTools,
+  ...connectorTools,
 ].map((t) => (t.gated && ADDITIVE_OPEN_API.has(t.name) ? { ...t, additive: true } : t));
 const BY_NAME = new Map(ALL.map((t) => [t.name, t]));
 
@@ -101,6 +103,8 @@ const CLIENTLESS = new Set<string>([
   'create_skill',
   'update_skill',
   'schedule_agent_job',
+  // Zalo / Gmail chạy bằng kết nối riêng của app, không cần custom app Lark (chốt ở tools/connectors.ts).
+  ...CONNECTOR_TOOL_NAMES,
 ]);
 
 /**
@@ -119,6 +123,10 @@ export function agentTools(opts: { withOpenApi: boolean; mode?: 'ask' | 'build' 
 /** Tên cũ (chế độ "Tạo workflow" trước khi hợp nhất) — giữ cho nơi gọi/test cũ. */
 export function workflowModeTools(withOpenApi = false): LarkToolDef[] {
   return withOpenApi ? ALL.filter((t) => CLIENTLESS.has(t.name) || ['bitable_scan_base', 'bitable_workflow_validate', 'bitable_workflow_create'].includes(t.name)) : agentTools({ withOpenApi: false });
+}
+/** Tool phải người dùng tự duyệt TỪNG lần, thắng mọi chế độ tự duyệt (gửi Zalo / Gmail). */
+export function isAlwaysConfirmTool(name: string): boolean {
+  return !!BY_NAME.get(name)?.alwaysConfirm;
 }
 /** Resolve a tool by name (for the MCP bridge dispatcher). */
 export const resolveTool = (name: string): LarkToolDef | undefined => BY_NAME.get(name);

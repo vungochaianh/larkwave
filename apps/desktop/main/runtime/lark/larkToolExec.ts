@@ -149,7 +149,7 @@ export async function executeLarkTool(
  *    vẫn hỏi dù hàm tự duyệt có trả true — chốt nằm ở đây, không phụ thuộc nơi gọi lọc đúng.
  */
 export function needsConfirmation(
-  tool: { gated?: boolean; additive?: boolean; name: string; additiveWhen?: (input: Record<string, any>) => boolean },
+  tool: { gated?: boolean; additive?: boolean; alwaysConfirm?: boolean; name: string; additiveWhen?: (input: Record<string, any>) => boolean },
   ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean },
   preflightBlocked = false,
   input?: unknown,
@@ -157,6 +157,8 @@ export function needsConfirmation(
   dynamicAdditive?: boolean,
 ): boolean {
   if (!tool.gated || preflightBlocked) return false;
+  // Gửi tin/thư thật bằng tài khoản cá nhân: luôn hỏi, kể cả khi "Tự động duyệt" đang bật.
+  if (tool.alwaysConfirm) return true;
   if (ctx.autoApprove) return false;
   // Cộng thêm theo TỪNG lần gọi: vd đính tệp ghi thêm thì tự duyệt, `replace:true` (ghi đè) thì hỏi.
   const staticAdditive = !!tool.additive && (!tool.additiveWhen || safeAdditiveWhen(tool.additiveWhen, input));

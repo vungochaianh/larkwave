@@ -75,15 +75,15 @@ const hashTree = (d) => {
   const before = userLib();
   const h = new SkillHost(D);
 
-  await t('cài lần đầu: 7 kỹ năng lw-*, bật, dùng chung mọi model, nhãn "Larkwave · Tệp & dữ liệu", thư mục CLI larkwave-lw-*', () => {
+  await t('cài lần đầu: 11 kỹ năng lw-* (7 Tệp & dữ liệu + 4 Zalo & Gmail), bật, dùng chung mọi model, đúng nhãn, thư mục CLI larkwave-lw-*', () => {
     const r = h.ensureBuiltins(BUILTIN_SKILLS);
-    assert.strictEqual(r.installed.length, 6, JSON.stringify(r));
+    assert.strictEqual(r.installed.length, 10, JSON.stringify(r));
     assert.deepStrictEqual(r.kept, ['lw-tep-len-lark'], 'trùng id với kỹ năng KHÔNG dựng sẵn → không đụng');
     const list = h.list().filter((s) => s.builtin);
-    assert.strictEqual(list.length, 6);
+    assert.strictEqual(list.length, 10);
     for (const s of list) {
       assert.ok(s.id.startsWith('lw-') && s.enabled && s.scope.length === 4, s.id);
-      assert.deepStrictEqual(s.tags, ['Larkwave', 'Tệp & dữ liệu']);
+      assert.deepStrictEqual(s.tags, /^lw-(zalo|gmail)-/.test(s.id) ? ['Larkwave', 'Zalo & Gmail'] : ['Larkwave', 'Tệp & dữ liệu']);
       assert.ok(s.triggers.length >= 5, s.id);
       assert.ok(existsSync(join(HOME, '.claude', 'skills', `larkwave-${s.id}`, 'SKILL.md')), s.id);
     }
@@ -151,7 +151,7 @@ const hashTree = (d) => {
       assert.ok(d.triggers.some((x) => /[ăâđêôơưàáạảãèéẹẻẽ]/i.test(x)) && d.triggers.some((x) => /^[a-z ]+$/i.test(x)), `${d.id}: cần từ khoá VI và EN`);
       for (const sec of ['## Khi nào dùng', '## Các bước', '## Khi lỗi']) assert.ok(d.body.includes(sec) || (sec === '## Khi lỗi' && d.body.includes('## Luật')), `${d.id} thiếu ${sec}`);
       assert.ok(/Xác minh|xác minh|BÁO|Báo/.test(d.body), d.id);
-      const tools = [...d.body.matchAll(/`([a-z][a-z0-9]*_[a-z0-9_]+)`/g)].map((m) => m[1]).filter((n) => /^(lark_|bitable_|create_|fill_|prepare_|send_|schedule_|skill_|messaging_|drive_|sheets_)/.test(n));
+      const tools = [...d.body.matchAll(/`([a-z][a-z0-9]*_[a-z0-9_]+)`/g)].map((m) => m[1]).filter((n) => /^(lark_|bitable_|create_|fill_|prepare_|send_|schedule_|skill_|messaging_|drive_|sheets_|zalo_|gmail_)/.test(n));
       assert.ok(tools.length >= 1, d.id);
       for (const n of tools) assert.ok(known.has(n), `${d.id}: công cụ không tồn tại «${n}»`);
     }

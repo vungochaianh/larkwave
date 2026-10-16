@@ -1983,6 +1983,11 @@ export interface RuntimeAdapter {
   larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
   /** Hội thoại đóng tab → giải phóng TRANG Lark riêng của nó (`lane` = id hội thoại). Đăng nhập không đổi. */
   larkBrowserRelease?(lane: string): Promise<void>;
+  /**
+   * Kết nối CÁ NHÂN cho kỹ năng Zalo / Gmail (từ 0.1.5). Không có ⇒ lõi cũ. Agent không gọi những thao
+   * tác này — chỉ người dùng (Kỹ năng → Kết nối); agent dùng kết nối qua công cụ zalo_ / gmail_ trong kỹ năng.
+   */
+  connectorsCall?(op: ConnectorOp, payload?: unknown): Promise<unknown>;
   /** Tài khoản Lark web trên máy này: liệt kê / chuyển / thêm (mở trang đăng nhập) / đăng xuất cái đang dùng. */
   larkWebAccounts?(): Promise<LarkWebAccounts>;
   larkWebSwitchAccount?(id: string): Promise<LarkWebAccounts>;
@@ -2254,3 +2259,39 @@ export type ToolswaveMigrationEvent =
   | { phase: 'start'; dryRun: boolean; auto: boolean }
   | { phase: 'done'; report: ToolswaveMigrationReport; auto: boolean }
   | { phase: 'error'; message: string; auto: boolean };
+
+// ── Kết nối cá nhân cho kỹ năng (Zalo / Gmail) ──────────────────────────────────────────────────
+export type ConnectorOp = 'zaloStatus' | 'zaloQrStart' | 'zaloQrRetry' | 'zaloQrAbort' | 'zaloLogout' | 'gmailList' | 'gmailAdd' | 'gmailRemove';
+
+export type ZaloQrState = 'idle' | 'starting' | 'awaiting-scan' | 'scanned' | 'authenticating' | 'success' | 'expired' | 'declined' | 'error' | 'aborted';
+
+export interface ZaloQrSnapshot {
+  state: ZaloQrState;
+  /** PNG base64, không kèm tiền tố `data:`. */
+  image?: string;
+  scannedName?: string;
+  accountId?: string;
+  message: string;
+}
+
+export interface ZaloConnectorAccount {
+  accountId: string;
+  label: string;
+  phone: string;
+  avatar: string;
+  status: 'connecting' | 'ready' | 'reconnecting' | 'logged-out' | 'error';
+  message: string;
+}
+
+export interface ZaloConnectorStatus {
+  accounts: ZaloConnectorAccount[];
+  qr: ZaloQrSnapshot;
+}
+
+export interface GmailConnectorAccount {
+  email: string;
+  name?: string;
+  addedAt: string;
+  /** false ⇒ máy không có kho khoá, mật khẩu ứng dụng lưu dạng thường. */
+  encrypted: boolean;
+}

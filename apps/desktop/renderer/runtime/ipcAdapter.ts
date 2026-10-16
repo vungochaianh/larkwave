@@ -61,6 +61,7 @@ import type {
   LarkBrowserRect,
   LarkBrowserState,
   LarkWebAccounts,
+  ConnectorOp,
   LarkWebBase,
   LarkUiTemplate,
   LarkUiTemplateApplyResult,
@@ -172,6 +173,7 @@ interface Bridge {
   larkBrowserResumeAi?(lane?: string): Promise<LarkBrowserState>;
   larkBrowserRelease?(lane: string): Promise<void>;
   larkWebAccounts?(): Promise<LarkWebAccounts>;
+  connectorsCall?(op: string, payload?: unknown): Promise<unknown>;
   larkWebSwitchAccount?(id: string): Promise<LarkWebAccounts>;
   larkWebAddAccount?(): Promise<LarkWebAccounts>;
   larkWebLogout?(): Promise<LarkWebAccounts>;
@@ -304,6 +306,8 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
       if (!b.larkBrowserAttach) (this as Record<string, unknown>).larkBrowserAttach = undefined;
       // Menu tài khoản Lark (đăng xuất / thêm / chuyển) chỉ hiện khi lõi có các kênh này.
       if (!b.larkWebAccounts) for (const k of ['larkWebAccounts', 'larkWebSwitchAccount', 'larkWebAddAccount', 'larkWebLogout']) (this as Record<string, unknown>)[k] = undefined;
+      // Lõi < 0.1.5 chưa có kết nối Zalo/Gmail cho kỹ năng → giao diện hiện "cần bản cài mới".
+      if (!b.connectorsCall) (this as Record<string, unknown>).connectorsCall = undefined;
       if (!b.larkUiTemplateList) (this as Record<string, unknown>).larkUiTemplateList = undefined;
     }
   }
@@ -590,6 +594,10 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   /** Lõi cũ (một trang Lark chung) không có kênh này → không có gì để giải phóng. */
   larkBrowserRelease(lane: string): Promise<void> {
     return this.bridge.larkBrowserRelease ? this.bridge.larkBrowserRelease(lane) : Promise.resolve();
+  }
+  connectorsCall(op: ConnectorOp, payload?: unknown): Promise<unknown> {
+    if (!this.bridge.connectorsCall) return Promise.reject(new Error('Kết nối Zalo/Gmail cần bản cài mới (.dmg 0.1.5).'));
+    return this.bridge.connectorsCall(op, payload);
   }
   larkWebAccounts(): Promise<LarkWebAccounts> {
     if (!this.bridge.larkWebAccounts) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));

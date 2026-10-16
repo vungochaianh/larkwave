@@ -1,5 +1,6 @@
 import type { LarkToolDef } from './types';
 import { str } from './types';
+import { noteSkillLoaded } from './connectors';
 import { getAgentSkillAuthor, getAgentSkillEditor, getAgentSkillFullLister, getAgentSkillLearner, getAgentSkillLister, getAgentSkillReader } from '../skillBridge';
 
 /**
@@ -111,6 +112,8 @@ export const skillTools: LarkToolDef[] = [
       const id = String(input.id || '').trim();
       if (!id) throw new Error('Thiếu id kỹ năng.');
       const r = await read(id);
+      // Kỹ năng vừa nạp dùng công cụ Zalo/Gmail ⇒ mở khoá cho lượt này (chỉ khi lượt có quyền — connectors.ts).
+      noteSkillLoaded(id, String(r.instructions || ''));
       return { ...r, kind: r.builtin ? 'dựng sẵn' : r.learned ? 'AI tự học' : 'người dùng' };
     },
   },

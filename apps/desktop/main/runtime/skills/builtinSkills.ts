@@ -20,12 +20,15 @@ export interface BuiltinSkill {
   description: string;
   triggers: string[];
   contract?: SkillContractFields;
+  /** Nhãn riêng (mặc định BUILTIN_TAGS). */
+  tags?: string[];
   body: string;
 }
 
 /** Tiền tố id của kỹ năng dựng sẵn — thư mục CLI là `larkwave-lw-…`, không đụng id của người dùng/Toolswave. */
 export const BUILTIN_PREFIX = 'lw-';
 export const BUILTIN_TAGS = ['Larkwave', 'Tệp & dữ liệu'];
+export const CONNECTOR_TAGS = ['Larkwave', 'Zalo & Gmail'];
 
 const FACTS_NOTE =
   'Khi chạy trong một BỘ kỹ năng (lượt kỹ năng có hợp đồng), kết thúc bằng khối ```facts ghi các khoá ở `produces`; trò chuyện thường thì không cần khối này.';
@@ -238,5 +241,125 @@ ${FACTS_NOTE}`,
 - KHÔNG bật workflow Lark; KHÔNG gửi tin khi chưa có quyền + custom app.
 
 ${FACTS_NOTE}`,
+  },
+  // ── Zalo & Gmail (17/10/2026) — kết nối cá nhân do APP giữ; agent chỉ dùng qua các kỹ năng này ──────
+  {
+    id: 'lw-zalo-doc-tin',
+    name: 'Đọc & tóm tắt tin Zalo',
+    version: 1,
+    command: 'zalo-doc-tin',
+    tags: CONNECTOR_TAGS,
+    contract: { needs: [], produces: ['zalo_doc_so_tin'], checks: ['zalo_doc_so_tin >= 1'] },
+    description: 'Dùng khi cần XEM / TÓM TẮT / TRÍCH thông tin từ tin nhắn Zalo của một người, một nhóm hoặc tin mới gần đây (kể cả ghi nội dung đã trích vào Base).',
+    triggers: ['tin zalo', 'tin nhắn zalo', 'đọc zalo', 'xem zalo', 'tóm tắt zalo', 'nhóm zalo', 'chat zalo', 'zalo của', 'trên zalo', 'zalo messages', 'read zalo'],
+    body: `## Khi nào dùng
+Người dùng muốn xem hoặc tóm tắt tin nhắn Zalo (của một người, một nhóm, hay "tin mới gần đây"), trích thông tin từ tin Zalo (đơn hàng, yêu cầu của khách…), hoặc ghi phần đã trích vào Base.
+
+## Các bước (đúng thứ tự)
+1. \`zalo_status\` — chưa có tài khoản nào kết nối thì DỪNG và hướng dẫn: mở **Kỹ năng → Kết nối → Zalo**, quét mã QR bằng app Zalo trên điện thoại.
+2. **Tìm hội thoại**: \`zalo_list_chats\` {query: tên người/nhóm hoặc chữ trong tin}; nhóm thì \`zalo_list_groups\` {query}; có số điện thoại thì \`zalo_find_user\` {phone}. Nhiều kết quả cùng tên → hỏi người dùng chọn (nêu tên + tin gần nhất), KHÔNG đoán.
+3. **Đọc**: \`zalo_read_chat\` {threadId, limit} (mặc định 50 tin cuối).
+4. **Trả lời** đúng điều được hỏi: tóm tắt / liệt kê việc cần làm / trích số liệu. Trích dẫn ngắn kèm người gửi + giờ (giờ Việt Nam). Nêu phạm vi đã đọc: "N tin, từ … đến …".
+5. Được nhờ ghi vào Base → dùng công cụ Lark như thường (vd \`lark_web_write_records\`): ghi phần đã trích/tóm tắt, KHÔNG dán nguyên văn cả hội thoại riêng tư nếu người dùng không yêu cầu.
+
+## Giới hạn — nói thật với người dùng
+- Chat 1-1: chỉ có tin Zalo đồng bộ lúc kết nối và tin đến/đi trong lúc app đang mở. Không có lịch sử xa hơn thì nói rõ, KHÔNG bịa.
+- Nhóm: lấy thêm được lịch sử gần đây từ Zalo.
+
+## Riêng tư
+- Đây là tin nhắn riêng của người dùng: chỉ đọc đúng hội thoại được nhờ, không liệt kê/đọc các hội thoại khác "cho chắc".
+- Kỹ năng này KHÔNG gửi tin. Muốn trả lời → dùng kỹ năng «Gửi tin Zalo» (/zalo-gui-tin).
+
+## Khi lỗi
+- "Chưa kết nối Zalo" / "mất kết nối" → báo người dùng mở Kỹ năng → Kết nối → Zalo để quét lại QR; không thử lại liên tục.
+- "chỉ chạy trong một KỸ NĂNG" → kỹ năng này chưa được nạp đủ: gọi \`skill_get\` {id:"lw-zalo-doc-tin"} rồi làm lại.
+- Báo đúng số tin đã đọc được; không có tin thì nói "không có tin trong sổ", không suy đoán.`,
+  },
+  {
+    id: 'lw-zalo-gui-tin',
+    name: 'Gửi tin Zalo',
+    version: 1,
+    command: 'zalo-gui-tin',
+    tags: CONNECTOR_TAGS,
+    contract: { needs: [], produces: ['zalo_gui_nguoi_nhan', 'zalo_gui_da_gui'], checks: ['zalo_gui_da_gui <= zalo_gui_nguoi_nhan'] },
+    description: 'Dùng khi người dùng nhờ NHẮN / GỬI / TRẢ LỜI tin Zalo cho một người hoặc một nhóm bằng Zalo của họ — luôn có hộp xác nhận.',
+    triggers: ['nhắn zalo', 'gửi zalo', 'gửi tin zalo', 'nhắn tin zalo', 'trả lời zalo', 'zalo cho', 'qua zalo', 'send zalo', 'zalo message to'],
+    body: `## Khi nào dùng
+Người dùng nhờ nhắn/gửi một tin Zalo cho một người hoặc một nhóm (kể cả "trả lời tin này").
+
+## Các bước (đúng thứ tự)
+1. \`zalo_status\` — chưa kết nối thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Zalo**, quét QR.
+2. **Xác định người nhận** chắc chắn đúng MỘT người/nhóm: \`zalo_find_user\` {phone} / \`zalo_list_friends\` {query} / \`zalo_list_groups\` {query} / \`zalo_list_chats\` {query}. Không chắc → hỏi lại người dùng, KHÔNG đoán.
+3. **Soạn** đúng ý người dùng (giữ nguyên câu chữ nếu họ đã viết sẵn). Nhiều người nhận → tối đa 10 người mỗi lượt, mỗi người một tin riêng (cá nhân hoá tên nếu được nhờ).
+4. **Gửi**: \`zalo_send_text\` {threadId, text, isGroup, recipientName} — app LUÔN hiện hộp xác nhận người nhận + nội dung. Người dùng từ chối → DỪNG, không thử cách khác.
+5. **Báo cáo**: đã gửi cho ai (tên), lúc mấy giờ; lỗi thì nêu đúng lỗi.
+
+## Luật
+- KHÔNG gửi hàng loạt / quảng cáo: quá 10 người hoặc cả danh sách khách → khuyên dùng chiến dịch của Social Wave (có nhịp gửi, danh sách từ chối, báo cáo). App chặn ở 30 tin/giờ, mỗi tin cách ≥8 giây.
+- Không tự thêm link, số tài khoản hay nội dung người dùng chưa duyệt.
+- Lịch tự động / bot Lark: không gửi được (app chặn) — báo người dùng gửi trong cuộc trò chuyện.
+
+## Khi lỗi
+- Người dùng bấm "Từ chối" ở hộp xác nhận → dừng, báo "chưa gửi".
+- "Đã gửi N tin Zalo trong 1 giờ qua" → dừng hẳn, báo số đã gửi / chưa gửi; không chia nhỏ để lách.
+- Lỗi khác (mất kết nối, người nhận chặn tin lạ) → báo đúng lỗi cho từng người nhận, không gửi lại tự động.`,
+  },
+  {
+    id: 'lw-gmail-doc-thu',
+    name: 'Đọc & tìm thư Gmail',
+    version: 1,
+    command: 'gmail-doc-thu',
+    tags: CONNECTOR_TAGS,
+    contract: { needs: [], produces: ['gmail_doc_tim_thay', 'gmail_doc_da_doc'], checks: ['gmail_doc_da_doc <= gmail_doc_tim_thay'] },
+    description: 'Dùng khi cần TÌM / ĐỌC / TÓM TẮT thư trong Gmail của người dùng (theo người gửi, tiêu đề, thời gian, chưa đọc…), kể cả ghi phần đã trích vào Base.',
+    triggers: ['gmail', 'hộp thư', 'email của', 'thư của', 'đọc mail', 'đọc thư', 'tìm thư', 'tìm email', 'mail mới', 'thư chưa đọc', 'check mail', 'read email'],
+    body: `## Khi nào dùng
+Người dùng muốn tìm/đọc/tóm tắt thư trong Gmail của họ (vd "thư mới của anh A", "hoá đơn tuần này", "thư chưa đọc hôm nay"), hoặc trích nội dung thư vào Base.
+
+## Các bước (đúng thứ tự)
+1. \`gmail_status\` — chưa có tài khoản thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Gmail**, nhập địa chỉ + MẬT KHẨU ỨNG DỤNG 16 ký tự (tạo ở myaccount.google.com/apppasswords, cần bật xác thực 2 bước).
+2. **Tìm**: \`gmail_search\` {query, limit, unreadOnly, mailbox}. \`query\` theo cú pháp ô tìm của Gmail: \`from:\`, \`to:\`, \`subject:\`, \`newer_than:7d\`, \`after:2026/10/01\`, \`has:attachment\`, \`is:unread\`. Thư đã lưu trữ → \`mailbox: "all"\`.
+3. **Đọc**: \`gmail_read\` {id, mailbox} cho đúng thư cần (id lấy từ bước 2, cùng mailbox).
+4. **Báo cáo**: người gửi, ngày, tiêu đề, việc cần làm / số liệu chính; nêu đã tìm với truy vấn nào và đọc bao nhiêu thư. Đính kèm: hiện có tên + cỡ, CHƯA tải được nội dung tệp — nói rõ nếu người dùng cần.
+5. Được nhờ ghi vào Base → dùng công cụ Lark như thường, ghi phần đã trích.
+
+## Luật
+- Đọc KHÔNG đánh dấu đã đọc, không đổi gì trong hộp thư.
+- Chỉ đọc thư liên quan tới việc được nhờ; không lục cả hộp thư.
+- Kỹ năng này KHÔNG gửi thư. Cần trả lời → kỹ năng «Gửi thư Gmail» (/gmail-gui-thu).
+
+## Khi lỗi
+- "Gmail từ chối đăng nhập" → mật khẩu ứng dụng sai/đã thu hồi: báo người dùng tạo mật khẩu ứng dụng mới rồi kết nối lại ở Kỹ năng → Kết nối → Gmail.
+- "chưa cho truy cập IMAP" → báo bật IMAP trong cài đặt Gmail.
+- Không thấy thư khớp → báo đã tìm với truy vấn nào; gợi ý mở rộng (\`mailbox: "all"\`, bỏ bớt điều kiện), không bịa nội dung.`,
+  },
+  {
+    id: 'lw-gmail-gui-thu',
+    name: 'Gửi thư Gmail',
+    version: 1,
+    command: 'gmail-gui-thu',
+    tags: CONNECTOR_TAGS,
+    contract: { needs: [], produces: ['gmail_gui_nguoi_nhan', 'gmail_gui_da_gui'], checks: ['gmail_gui_da_gui <= gmail_gui_nguoi_nhan'] },
+    description: 'Dùng khi người dùng nhờ SOẠN & GỬI / TRẢ LỜI một email từ Gmail của họ — luôn có hộp xác nhận.',
+    triggers: ['gửi mail', 'gửi email', 'gửi thư', 'soạn mail', 'soạn email', 'trả lời mail', 'trả lời email', 'email cho', 'mail cho', 'send email', 'reply email'],
+    body: `## Khi nào dùng
+Người dùng nhờ soạn và gửi một email (hoặc trả lời một thư) từ Gmail của họ.
+
+## Các bước (đúng thứ tự)
+1. \`gmail_status\` — chưa có tài khoản thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Gmail** (mật khẩu ứng dụng).
+2. **Người nhận**: dùng ĐÚNG địa chỉ người dùng đưa — không đoán địa chỉ. Trả lời một thư → \`gmail_search\` + \`gmail_read\` để lấy địa chỉ người gửi và đặt tiêu đề "Re: <tiêu đề cũ>".
+3. **Soạn** tiêu đề + nội dung chữ thuần (tiếng Việt có dấu), đúng ý người dùng; ký tên nếu được nhờ.
+4. **Gửi**: \`gmail_send\` {to, cc, subject, text} — app LUÔN hiện hộp xác nhận. Người dùng từ chối → DỪNG.
+5. **Báo cáo**: đã gửi tới ai, tiêu đề, lúc mấy giờ; có địa chỉ bị từ chối (\`rejected\`) thì nêu rõ.
+
+## Luật
+- Tối đa 10 người nhận mỗi thư; không gửi hàng loạt / quảng cáo (dùng chiến dịch của Social Wave). App chặn ở 40 thư/giờ.
+- Chưa hỗ trợ đính kèm tệp — người dùng cần đính kèm thì nói rõ.
+- Lịch tự động / bot Lark: không gửi được (app chặn).
+
+## Khi lỗi
+- Người dùng từ chối ở hộp xác nhận → dừng, báo "chưa gửi".
+- "Gmail báo đã chạm giới hạn gửi trong ngày" / "Đã gửi N thư trong 1 giờ" → dừng, báo thư nào chưa gửi.
+- Lỗi đăng nhập → báo kết nối lại Gmail (mật khẩu ứng dụng mới).`,
   },
 ];

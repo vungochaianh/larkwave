@@ -70,6 +70,10 @@ const NEVER = new Set([
   'lark_ui_template_apply',
   // Xoá cả BẢNG / automation / khối Workflow: chỉ khi có người bấm duyệt — không quyền nào của quy tắc mở được.
   'lark_web_delete',
+  // Gửi tin Zalo / thư Gmail bằng tài khoản cá nhân: chỉ trong lượt trò chuyện có người bấm duyệt.
+  // (Công cụ ĐỌC Zalo/Gmail cũng bị chặn ở lượt không người trông — connectorGate trong tools/connectors.ts.)
+  'zalo_send_text',
+  'gmail_send',
 ]);
 
 /**

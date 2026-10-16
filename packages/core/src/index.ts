@@ -158,6 +158,8 @@ export const IPC = {
   larkBrowserStopAi: 'tw:larkBrowserStopAi',
   larkBrowserRelease: 'tw:larkBrowserRelease',
   larkWebAccounts: 'tw:larkWebAccounts',
+  /** Kết nối cá nhân cho kỹ năng (Zalo QR, Gmail mật khẩu ứng dụng) — một kênh, nhiều thao tác (ConnectorOp). */
+  connectorsCall: 'tw:connectorsCall',
   larkWebSwitchAccount: 'tw:larkWebSwitchAccount',
   larkWebAddAccount: 'tw:larkWebAddAccount',
   larkWebLogout: 'tw:larkWebLogout',

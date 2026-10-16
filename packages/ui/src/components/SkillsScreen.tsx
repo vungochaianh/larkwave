@@ -13,6 +13,7 @@ import { useRuntime } from '../RuntimeProvider';
 import { useI18n } from '../i18n';
 import { BRAND, CARD_SHADOW, OK, WARN, V } from '../theme';
 import { SkillSetsCard } from './SkillSetsCard';
+import { SkillConnectors } from './SkillConnectors';
 import { IconTile, EmptyState, HowItWorks } from '../kit';
 import type { View } from './HomeScreen';
 
@@ -664,6 +665,8 @@ export function SkillsScreen({
 
       {/* Tự học kỹ năng: công tắc + "Học từ Base" (ở mục kỹ năng rời). */}
       {mode === 'plain' && <SkillLearnToolbar runtime={runtime} onChanged={load} />}
+      {/* Kết nối Zalo / Gmail cho bộ kỹ năng "Zalo & Gmail" — chỉ bản desktop (kết nối nằm trên máy). */}
+      {mode === 'plain' && runtime.kind === 'desktop' && <SkillConnectors runtime={runtime} />}
 
       {shownLinks.length > 0 && !isEmpty && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', marginBottom: 8 }}>

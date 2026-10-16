@@ -30,6 +30,20 @@ export interface TurnFileContext {
    * (larkWebSession.withLarkLane) — hai tab làm hai Base khác nhau không kéo trang của nhau đi.
    */
   lane?: string;
+  /**
+   * Quyền dùng kết nối CÁ NHÂN (Zalo, Gmail) của lượt này — xem tools/connectors.ts. CHỈ lượt trò chuyện
+   * của chính chủ máy mới có (larkService.chat); lượt bot Lark, lịch tự động, lượt chia sẻ: không có.
+   */
+  connectors?: ConnectorAccess;
+}
+
+/**
+ * Kỹ năng đã nạp vào lượt + ĐÚNG những công cụ Zalo/Gmail mà nội dung của chúng dùng tới. Đổi được
+ * giữa lượt (skill_get nạp thêm kỹ năng).
+ */
+export interface ConnectorAccess {
+  skills: string[];
+  tools: string[];
 }
 
 const als = new AsyncLocalStorage<TurnFileContext>();

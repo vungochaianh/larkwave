@@ -178,7 +178,9 @@ const SKILL_COMMAND_BUDGET = 40000;
  *  user's own question, which sits at the tail. */
 const MAIC_PROMPT_MAX = 20000;
 
-import { agentTools, allTools, isAdditiveCall, isAdditiveTool, isClientlessTool, isWriteTool, readOnlyTools } from './tools';
+import { agentTools, allTools, isAdditiveCall, isAdditiveTool, isAlwaysConfirmTool, isClientlessTool, isWriteTool, readOnlyTools } from './tools';
+import { connectorUnlocksOf } from './tools/connectors';
+import type { ConnectorAccess } from './fileContext';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { buildApiHistory as buildApiHistoryMsgs, buildTranscript as buildTranscriptText } from './transcript';
 import { importAsDoc, importAsSheet, readLocalFile, tableFor, uploadToDrive } from './tools/larkWebWrite';
@@ -4389,12 +4391,24 @@ export class LarkService {
    * Base, it's only injected when that Base is active in the conversation — so a user can target a
    * skill to one Base by tagging it with that Base's name. Skills with no base-name tag apply everywhere.
    */
+  /** Công cụ Zalo/Gmail mà các kỹ năng đã nạp vào lượt mở khoá (nội dung nhắc đúng tên công cụ). */
+  private async connectorAccess(skillIds: string[]): Promise<ConnectorAccess> {
+    const access: ConnectorAccess = { skills: [...new Set(skillIds)], tools: [] };
+    for (const id of access.skills) {
+      const body = await this.readSkillBody(id).catch(() => '');
+      for (const t of connectorUnlocksOf(body || '')) if (!access.tools.includes(t)) access.tools.push(t);
+    }
+    return access;
+  }
+
   private async collectSkillsPrompt(
     activeBases?: LarkBaseRef[],
     runner?: string,
     skipIds?: readonly string[],
     /** Câu lệnh của lượt — kỹ năng dựng sẵn chỉ mang ĐỦ thân khi câu lệnh khớp từ khoá của nó. */
     turnPrompt?: string,
+    /** Nhận id các kỹ năng được nạp ĐỦ THÂN vào lượt (để mở khoá kết nối Zalo/Gmail — connectorAccess). */
+    included?: string[],
   ): Promise<string> {
     try {
       const reg = await this.readSkillRegistry();
@@ -4428,9 +4442,10 @@ export class LarkService {
         if (total + block.length > 40000) break; // keep the prompt from bloating
         blocks.push(block);
         total += block.length;
+        included?.push(e.id);
       }
       const indexBlock = index.length
-        ? '\n\n=== KỸ NĂNG DỰNG SẴN (Larkwave · Tệp & dữ liệu) — mục lục ===\n' +
+        ? '\n\n=== KỸ NĂNG DỰNG SẴN (Larkwave) — mục lục ===\n' +
           'Việc khớp một kỹ năng dưới đây mà các bước chưa có trong prompt → gọi `skill_get` {id} để đọc ĐỦ các bước rồi làm đúng theo đó.\n' +
           index.join('\n')
         : '';
@@ -4590,7 +4605,8 @@ export class LarkService {
     // Inject the user's ENABLED skills scoped to THIS turn's runner (their full instructions) into
     // the prompt. The CLI only knows skill NAMES in `-p` mode — not their bodies — so "chạy PBTTCN"
     // wouldn't do anything; this makes the model actually FOLLOW the skill when asked by name.
-    const skillsBlock = (await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds, input.prompt)) + (general ? '' : await this.learnSystemBlock());
+    const includedSkills: string[] = [...commandSkillIds];
+    const skillsBlock = (await this.collectSkillsPrompt(input.activeBases, runner, commandSkillIds, input.prompt, includedSkills)) + (general ? '' : await this.learnSystemBlock());
     // Tự học: người dùng vừa dạy / sửa → dặn gọi skill_save trong lượt này; yêu cầu lặp lại → đề xuất kỹ năng.
     if (!general) {
       const hint = await this.learnHintFor(input.prompt).catch(() => '');
@@ -4649,7 +4665,10 @@ export class LarkService {
     // chạy song song không còn ghi đè được thư mục của hội thoại đang mở.
     // `lane` = trang Lark RIÊNG của hội thoại (larkWebSession.withLarkLane): mọi tool phiên web của lượt
     // này chạy trên trang đó, không kéo trang của tab khác đi.
-    const turnFiles = { outDir: workDir ?? null, attachDir: workDir ?? null, ...(!general && convId ? { lane: convId } : {}) };
+    // Kết nối cá nhân (Zalo/Gmail): CHỈ lượt trò chuyện của chính chủ máy, mở khoá theo kỹ năng đã nạp
+    // (tools/connectors.ts). Lượt bot / lịch / chia sẻ đi đường khác và không có trường này.
+    const connectors = general ? undefined : await this.connectorAccess(includedSkills);
+    const turnFiles = { outDir: workDir ?? null, attachDir: workDir ?? null, ...(!general && convId ? { lane: convId } : {}), ...(connectors ? { connectors } : {}) };
 
     // Materialise any attached files/images into the dir the agent runs in. It MUST be the
     // conversation dir, not a temp one: a temp dir would put this turn in a different Claude
@@ -4715,7 +4734,8 @@ export class LarkService {
      * Cờ này ở trong settings nên đọc lại mỗi lần gần như không tốn gì.
      */
     const confirm = (callId: string, name: string, input: unknown) => {
-      if (!workflowTurn && this.store.getSettings().autoApprove) return Promise.resolve(true);
+      // Gửi Zalo / Gmail (alwaysConfirm) không bao giờ được tự duyệt — kể cả khi "Tự động duyệt" bật.
+      if (!workflowTurn && this.store.getSettings().autoApprove && !isAlwaysConfirmTool(name)) return Promise.resolve(true);
       // Theo TỪNG lần gọi (isAdditiveCall): đính tệp `replace:true` vẫn phải hỏi dù công tắc Tự động bật.
       if (autoApproveTool?.(name) && isAdditiveCall(name, input)) return Promise.resolve(true);
       return new Promise<boolean>((resolve) => this.pending.set(callId, { convId, resolve, name, input }));

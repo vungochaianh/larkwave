@@ -416,7 +416,7 @@ export class SkillHost {
         const text = md(cmd);
         mkdirSync(this.libPath(d.id), { recursive: true });
         writeFileSync(join(this.libPath(d.id), 'SKILL.md'), text);
-        reg.push({ id: d.id, name: d.name, description: d.description, enabled: true, scope: [...ALL_RUNNERS], tags: [...BUILTIN_TAG_LIST], command: cmd, source: 'larkwave-builtin', builtin: d.version, triggers: normTriggers(d.triggers) });
+        reg.push({ id: d.id, name: d.name, description: d.description, enabled: true, scope: [...ALL_RUNNERS], tags: [...(d.tags ?? BUILTIN_TAG_LIST)], command: cmd, source: 'larkwave-builtin', builtin: d.version, triggers: normTriggers(d.triggers) });
         st.installed[d.id] = { version: d.version, hash: sha(text) };
         out.installed.push(d.id);
         changed = true;

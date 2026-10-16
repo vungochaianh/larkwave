@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.5',
+    date: '2026-10-17',
+    items: [
+      "Kỹ năng Zalo & Gmail: kết nối Zalo cá nhân (quét QR) và Gmail (mật khẩu ứng dụng) ở Kỹ năng → Kết nối. Bộ kỹ năng dựng sẵn mới: Đọc & tóm tắt tin Zalo, Gửi tin Zalo, Đọc & tìm thư Gmail, Gửi thư Gmail — gọi bằng /zalo-doc-tin, /zalo-gui-tin, /gmail-doc-thu, /gmail-gui-thu hoặc hỏi tự nhiên.",
+      "Agent KHÔNG tự thao tác Zalo/Gmail: chỉ dùng trong kỹ năng có dùng đúng công cụ đó (dựng sẵn hoặc kỹ năng bạn tự soạn), chỉ trong cuộc trò chuyện của bạn — không chạy ở lịch tự động hay bot Lark trong nhóm. Lần gửi nào cũng hỏi bạn trước, kể cả khi bật Tự động duyệt.",
+      "An toàn khi gửi: Zalo tối thiểu 8 giây giữa hai tin, tối đa 30 tin/giờ; Gmail tối đa 10 người nhận/thư, 40 thư/giờ. Đọc thư không đánh dấu đã đọc; tin Zalo chỉ giữ trong bộ nhớ, không ghi ra đĩa.",
+    ],
+  },
+  {
     version: '0.1.4',
     date: '2026-10-15',
     items: [

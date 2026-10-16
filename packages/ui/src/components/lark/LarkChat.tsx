@@ -776,7 +776,8 @@ export function LarkChat({
       if (ev.gated) {
         // "Nhớ lựa chọn": công cụ ghi này đã được tự duyệt cho hội thoại/skill hiện tại → cho chạy
         // luôn, KHÔNG hiện hộp xác nhận. (Thẻ công cụ vẫn hiện bình thường ở trên.)
-        if (isToolAllowed(sessionId, activeSkillRef.current?.id, ev.name)) {
+        // Gửi Zalo / Gmail: không bao giờ tự cho phép theo lựa chọn đã nhớ — người dùng duyệt từng lần.
+        if (!/^zalo_send|^gmail_send/.test(ev.name) && isToolAllowed(sessionId, activeSkillRef.current?.id, ev.name)) {
           runtime.larkConfirmTool?.(ev.callId, 'allow');
         } else {
           setPendings((p) => [...p, { callId: ev.callId, name: ev.name, input: ev.input, preview: ev.preview }]);

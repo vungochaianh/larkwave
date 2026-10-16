@@ -92,6 +92,8 @@ CLOUDFLARE_API_TOKEN=$CF_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CF_ACCOUNT_ID ALLOW_DE
    (chạy nền).
 5. `node scripts/check-dist-mac.mjs`.
 6. `env -u ELECTRON_RUN_AS_NODE node scripts/boot-smoke.mjs` (≥150 kênh).
+   Rồi `env -u ELECTRON_RUN_AS_NODE node scripts/connectors-smoke.mjs`: kiểm Zalo (QR thật) và Gmail (Google từ chối
+   tài khoản giả) trên ĐÚNG bản đã gom, vì zca-js, nodemailer và imapflow chỉ lộ lỗi gom ở đây. Cần mạng.
 7. `ALLOW_DEPLOY=1 GITLAB_TOKEN=… node scripts/push-installers.mjs` (`--dry-run` trước). Tệp lên gói
    `larkwave-desktop` của registry, project 83700259.
 8. `push-renderer.mjs --min-main 0.1.0 --main-change`.
@@ -105,6 +107,25 @@ Sau khi tải lên:
 
 Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md).
+
+## Kết nối Zalo / Gmail cho kỹ năng (từ 0.1.5)
+
+- Người dùng muốn: **agent không tự thao tác Zalo/Gmail, chỉ dùng qua kỹ năng** — giống Social Wave
+  (`/Users/deveris/Fbinbox_Workspace/fbinbox-sender`), nơi AI không bao giờ cầm kênh.
+- Phiên Zalo chép nguyên từ Social Wave: `apps/desktop/main/runtime/connectors/zalo/session.ts`, kèm bộ test gốc
+  `session.test.ts`. Chỉ thêm phần đọc tin, nhóm và gửi vào nhóm; đừng sửa máy trạng thái QR hay kho khoá.
+- Tin Zalo chỉ giữ trong bộ nhớ (`messages.ts`). Gmail dùng mật khẩu ứng dụng: gửi qua SMTP, đọc qua IMAP ở chế
+  độ `readOnly`.
+- **Cái chốt duy nhất** là `connectorGate` trong `lark/tools/connectors.ts`. Một công cụ `zalo_*` / `gmail_*` chạy khi:
+  - lượt đó có `connectors` trong ngữ cảnh. Chỉ `larkService.chat` (lượt của chính chủ máy) gắn trường này. Bot
+    Lark, lịch tự động và lượt chia sẻ đều KHÔNG có. Thiếu chốt này, người lạ nhắn bot là đọc được Zalo của chủ máy;
+  - và một kỹ năng đã nạp vào lượt nhắc ĐÚNG TÊN công cụ đó (lệnh "/", khớp từ khoá, hoặc `skill_get`).
+- Gửi (`zalo_send_text`, `gmail_send`) mang cờ `alwaysConfirm`: luôn hỏi, thắng cả "Tự động duyệt". Hộp xác nhận
+  không cho "luôn cho phép". Nhịp gửi: Zalo sàn 8 giây và trần 30 tin/giờ; Gmail 10 người nhận/thư và 40 thư/giờ.
+  Đừng hạ các ngưỡng này.
+- Bộ kỹ năng dựng sẵn "Zalo & Gmail" nằm ở `skills/builtinSkills.ts` (`CONNECTOR_TAGS`). Phải có hợp đồng, mục
+  "## Khi lỗi", và chỉ nhắc công cụ có thật; `test/skillsBuiltin.cjs` canh những điều này.
+- Chưa kiểm với tài khoản Zalo/Gmail thật (17/10/2026): chỉ có test với client giả và `connectors-smoke`.
 
 ## Luật kiểm thử với Lark thật (không thương lượng)
 

@@ -196,7 +196,7 @@ if (channels.size < MIN_CHANNELS) {
 }
 
 // Những kênh mà một bản dựng "trắng màn hình" hay đánh rơi: khai báo ở core nhưng core cũ thì mất.
-const MUST_HAVE = ['tw:auth', 'tw:larkStatus', 'tw:larkHostedPush'];
+const MUST_HAVE = ['tw:auth', 'tw:larkStatus', 'tw:larkHostedPush', 'tw:connectorsCall'];
 const missing = MUST_HAVE.filter((c) => !channels.has(c));
 if (missing.length) {
   console.error(`✗ thiếu kênh bắt buộc: ${missing.join(', ')}`);

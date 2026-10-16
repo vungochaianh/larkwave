@@ -481,6 +481,25 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkBrowserResumeAi, (_e, lane?: string) => runtime.larkBrowserResumeAi(laneArg(lane)));
   ipcMain.handle(IPC.larkBrowserRelease, (_e, lane?: string) => runtime.larkBrowserRelease(laneArg(lane) || ''));
   ipcMain.handle(IPC.larkWebAccounts, () => runtime.larkWebAccounts());
+  // Kết nối cá nhân cho kỹ năng — CHỈ người dùng gọi (Kỹ năng → Kết nối). Nhận đúng danh sách thao tác;
+  // mật khẩu ứng dụng Gmail đi vào, KHÔNG bao giờ đi ra (gmailList chỉ trả email + cờ mã hoá).
+  ipcMain.handle(IPC.connectorsCall, async (_e, op: string, payload?: Record<string, unknown>) => {
+    const p = payload && typeof payload === 'object' ? payload : {};
+    if (op.startsWith('zalo')) {
+      const { zaloService } = await import('./runtime/connectors/zalo/zaloService');
+      if (op === 'zaloStatus') return zaloService.status();
+      if (op === 'zaloQrStart') return zaloService.qrStart();
+      if (op === 'zaloQrRetry') return zaloService.qrRetry();
+      if (op === 'zaloQrAbort') return zaloService.qrAbort();
+      if (op === 'zaloLogout') return zaloService.logout(String(p.accountId ?? '').slice(0, 64));
+    } else if (op.startsWith('gmail')) {
+      const { gmailService } = await import('./runtime/connectors/gmail/gmailService');
+      if (op === 'gmailList') return gmailService.list();
+      if (op === 'gmailAdd') return gmailService.add({ email: String(p.email ?? '').slice(0, 200), appPassword: String(p.appPassword ?? '').slice(0, 100), name: p.name ? String(p.name).slice(0, 80) : undefined });
+      if (op === 'gmailRemove') return gmailService.remove(String(p.email ?? '').slice(0, 200));
+    }
+    throw new Error(`Thao tác kết nối không hợp lệ: ${op}`);
+  });
   ipcMain.handle(IPC.larkWebSwitchAccount, (_e, id?: string) => runtime.larkWebSwitchAccount(String(id ?? '').slice(0, 40)));
   ipcMain.handle(IPC.larkWebAddAccount, () => runtime.larkWebAddAccount());
   ipcMain.handle(IPC.larkWebLogout, () => runtime.larkWebLogout());
@@ -711,6 +730,13 @@ if (!gotInstanceLock) {
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
     });
     mainWin = win;
+    // Khôi phục phiên Zalo đã lưu (kỹ năng Zalo) — chạy nền, không chặn khởi động. Chưa từng kết nối thì
+    // không có tệp phiên nào và zca-js không được nạp.
+    setTimeout(() => {
+      void import('./runtime/connectors/zalo/zaloService')
+        .then((m) => m.zaloService.restore())
+        .catch((e) => console.warn('[zalo] restore:', (e as Error)?.message));
+    }, 4000);
     // The Lark web page parks off-screen inside the main window so it keeps painting while hidden.
     try {
       getLarkWebSession().setParkingWindow(win);

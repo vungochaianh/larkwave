@@ -23,6 +23,11 @@ export interface LarkToolDef {
    */
   additive?: boolean;
   /**
+   * Thao tác mà người dùng PHẢI tự duyệt từng lần — thắng cả "Tự động duyệt" toàn cục lẫn công tắc
+   * Tự động: gửi tin Zalo / thư Gmail tới người thật bằng tài khoản cá nhân (tools/connectors.ts).
+   */
+  alwaysConfirm?: boolean;
+  /**
    * Cờ `additive` chỉ đúng với MỘT SỐ input (vd đính tệp: ghi thêm = cộng thêm, `replace:true` = ghi
    * đè). Có hàm này thì tool chỉ được tự duyệt khi nó trả true cho input của lần gọi đó.
    */
