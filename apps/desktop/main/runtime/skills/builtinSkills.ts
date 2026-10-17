@@ -262,7 +262,7 @@ Người dùng muốn xem, tóm tắt hay tìm trong tin nhắn Zalo (của mộ
 4. **Tìm theo từ khoá / thời gian** (vd "ai nhắc tới đơn DH-12") → \`zalo_search_messages\` {query, threadId?, since?, before?}.
 5. **Thiếu tin cũ** (ít tin hơn người dùng cần, hoặc tin cũ nhất mới hơn khoảng được hỏi):
    - \`zalo_sync\` {action:"server", threadId} — lấy thêm từ máy chủ Zalo, rồi đọc lại;
-   - vẫn thiếu → lịch sử xa hơn (nhất là chat 1-1) chỉ có qua Zalo Web: gọi \`zalo_web_open\`, nhờ người dùng mở ĐÚNG hội thoại trong cửa sổ vừa hiện (và bấm Đồng ý đồng bộ trên ĐIỆN THOẠI nếu được hỏi), rồi \`zalo_web_read\` để đọc nội dung đang hiển thị. Xem kỹ năng «Đồng bộ tin Zalo» (/zalo-dong-bo).
+   - vẫn thiếu → lịch sử xa hơn (nhất là chat 1-1) chỉ có qua cửa sổ Zalo Web: \`zalo_web_open\`; nếu báo chưa đăng nhập thì nhờ người dùng QUÉT QR NGAY TRONG CỬA SỔ (KHÔNG dùng nút ở sidebar — phiên khác); rồi nhờ họ bấm vào đúng hội thoại trong cửa sổ, \`zalo_web_read\`. Xem kỹ năng «Đồng bộ tin Zalo» (/zalo-dong-bo).
 6. **Trả lời** đúng điều được hỏi: tóm tắt / liệt kê việc cần làm / trích số liệu. Trích dẫn ngắn kèm người gửi + giờ (giờ Việt Nam). Nêu phạm vi đã đọc: "N tin, từ … đến …".
 7. Được nhờ ghi vào Base → dùng công cụ Lark như thường (vd \`lark_web_write_records\`): ghi phần đã trích/tóm tắt, KHÔNG dán nguyên văn cả hội thoại riêng tư nếu người dùng không yêu cầu.
 
@@ -283,33 +283,39 @@ Người dùng muốn xem, tóm tắt hay tìm trong tin nhắn Zalo (của mộ
   {
     id: 'lw-zalo-dong-bo',
     name: 'Đồng bộ tin Zalo',
-    version: 2,
+    version: 3,
     command: 'zalo-dong-bo',
     tags: CONNECTOR_TAGS,
     contract: { needs: [], produces: ['zalo_dong_bo_so_tin'], checks: ['zalo_dong_bo_so_tin >= 0'] },
-    description: 'Dùng khi cần LẤY THÊM TIN CŨ / ĐỌC LỊCH SỬ Zalo (từ máy chủ Zalo, hoặc qua cửa sổ Zalo Web khi cần lịch sử đầy đủ — người dùng đồng bộ trên điện thoại), hoặc hỏi sổ tin Zalo đang có tới đâu.',
-    triggers: ['đồng bộ zalo', 'đồng bộ tin', 'đồng bộ tin nhắn', 'tin cũ zalo', 'lịch sử zalo', 'lấy thêm tin', 'sync zalo', 'tải tin cũ', 'tin nhắn cũ'],
+    description: 'Dùng khi cần LẤY THÊM TIN CŨ / ĐỌC LỊCH SỬ Zalo (từ máy chủ Zalo, hoặc qua cửa sổ Zalo Web khi cần lịch sử đầy đủ — người dùng đăng nhập + đồng bộ trong cửa sổ đó), hoặc hỏi sổ tin Zalo đang có tới đâu.',
+    triggers: ['đồng bộ zalo', 'đồng bộ tin', 'đồng bộ tin nhắn', 'tin cũ zalo', 'lịch sử zalo', 'lấy thêm tin', 'sync zalo', 'tải tin cũ', 'tin nhắn cũ', 'đọc tiếp'],
     body: `## Khi nào dùng
-Người dùng muốn có thêm tin Zalo CŨ (đọc thấy quá ít tin, cần lịch sử tháng trước…), muốn "đồng bộ tin nhắn", hoặc hỏi Larkwave đang có bao nhiêu tin Zalo.
+Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch sử tuần/tháng trước), "đồng bộ tin nhắn", hoặc hỏi Larkwave đang có bao nhiêu tin.
 
-## Các bước (đúng thứ tự)
-1. \`zalo_status\` — chưa kết nối thì DỪNG, nói ngắn: bấm nút **«Kết nối Zalo (quét QR)»** dưới câu trả lời.
-2. **Xem hiện trạng**: \`zalo_sync\` {action:"status"} → số hội thoại / số tin / tin cũ nhất, có đang lưu trên máy không, cửa sổ Zalo Web đã mở/đăng nhập chưa.
-3. **Lấy từ máy chủ trước** (không làm phiền gì): \`zalo_sync\` {action:"server"} (hoặc kèm \`threadId\` cho một hội thoại). Báo đã thêm bao nhiêu tin.
-4. **Cần lịch sử xa hơn** (nhất là chat 1-1) → **cửa sổ Zalo Web**:
-   - \`zalo_web_open\` — mở trang Zalo chính thức trong Larkwave bằng chính phiên đang đăng nhập (không phải quét QR lại). Nếu nó báo CHƯA đăng nhập, nhờ người dùng quét QR ngay trong cửa sổ đó.
-   - Nói ngắn với người dùng: "Mình đã mở cửa sổ Zalo Web. Bạn mở đúng hội thoại cần xem trong cửa sổ đó; nếu điện thoại hiện thông báo đồng bộ tin nhắn, bấm **Đồng ý** trên điện thoại. Xong báo mình."
-   - \`zalo_web_read\` {scrolls} — đọc nội dung hội thoại ĐANG MỞ trong cửa sổ (tự cuộn lên tải thêm). Trả về chữ của hội thoại; tóm tắt/trích theo yêu cầu, nói rõ "đọc từ cửa sổ Zalo Web".
-5. **Báo cáo**: sổ giờ có bao nhiêu tin / tới đâu; hoặc nội dung đã đọc được từ cửa sổ Web. Gợi ý việc tiếp theo (tóm tắt, tìm theo từ khoá bằng \`zalo_search_messages\`).
+## Các bước (hai đường, thử theo thứ tự)
+### A. Máy chủ Zalo (nhanh, không phiền ai) — thử TRƯỚC
+1. \`zalo_sync\` {action:"status"} xem sổ đang có gì.
+2. \`zalo_sync\` {action:"server"} (kèm \`threadId\` nếu chỉ một hội thoại) → báo đã thêm bao nhiêu tin, rồi tóm tắt/đọc theo yêu cầu.
+   - Nhóm thường lấy được kha khá; chat 1-1 cũ thường KHÔNG có trên máy chủ → sang đường B.
 
-## Luật
-- KHÔNG tự ý bảo điện thoại đồng bộ — việc bấm Đồng ý là ở ĐIỆN THOẠI của người dùng, trong cửa sổ Zalo Web; mình chỉ mở cửa sổ và hướng dẫn.
-- \`zalo_web_read\` đọc hội thoại ĐANG MỞ trong cửa sổ. Nếu nó báo không thấy hội thoại nào, nhờ người dùng bấm vào đúng hội thoại trong cửa sổ rồi thử lại.
-- Cài đặt lưu tin (bật/tắt, giữ bao nhiêu ngày, xoá tin đã lưu) và quản lý cửa sổ Zalo Web nằm ở **Cài đặt → Đồng bộ tin Zalo**; nhắc người dùng chỗ đó khi họ hỏi.
+### B. Cửa sổ Zalo Web (cho lịch sử đầy đủ, nhất là chat 1-1)
+Đây là trang Zalo CHÍNH THỨC mở trong Larkwave, **đăng nhập RIÊNG** (không phải phiên quét QR ở sidebar).
+1. \`zalo_web_open\` — mở cửa sổ. Đọc kết quả:
+   - \`loggedIn:true\` → sang bước 2.
+   - \`loggedIn:false\` → nói ngắn: "Mình đã mở cửa sổ Zalo Web. Bạn QUÉT MÃ QR NGAY TRONG CỬA SỔ ĐÓ bằng app Zalo trên điện thoại (ĐỪNG bấm nút «Kết nối Zalo» ở thanh bên — đó là phiên khác). Nếu điện thoại hỏi đồng bộ tin nhắn, bấm Đồng ý. Xong báo mình." Rồi DỪNG, chờ người dùng.
+2. Nói: "Trong cửa sổ Zalo Web, bạn BẤM VÀO hội thoại «…» cần đọc. Xong nhắn mình «đọc tiếp»."
+3. Khi người dùng bảo đọc → \`zalo_web_read\` {scrolls} (tăng scrolls nếu cần cũ hơn). Tóm tắt/trích theo yêu cầu, nói rõ "đọc từ cửa sổ Zalo Web".
+   - Báo "đang ở trang đăng nhập" → quay lại 1 (chưa đăng nhập xong).
+   - Báo "không có hội thoại nào" → nhờ người dùng bấm đúng hội thoại trong cửa sổ.
+
+## Luật — tránh VÒNG LẶP đăng nhập (quan trọng)
+- Cửa sổ Zalo Web và phiên quét-QR-ở-sidebar (zca) là HAI phiên web KHÁC nhau; Zalo chỉ cho một phiên web một lúc. Đăng nhập cái này có thể làm cái kia "hết hiệu lực".
+- Khi đang làm đường B, nếu \`zalo_status\` báo phiên zca hết hiệu lực thì **mặc kệ** — KHÔNG bảo người dùng quét QR ở sidebar (làm vậy sẽ đá văng đăng nhập của cửa sổ, lặp vô tận). Đọc tin cũ chỉ cần cửa sổ Web.
+- KHÔNG tự bảo điện thoại đồng bộ — việc bấm Đồng ý là ở ĐIỆN THOẠI, trong luồng của cửa sổ; mình chỉ mở cửa sổ và hướng dẫn.
+- Quản lý cửa sổ + cài đặt lưu tin ở **Cài đặt → Đồng bộ tin Zalo**.
 
 ## Khi lỗi
-- \`zalo_web_open\` báo chưa đăng nhập → nhờ người dùng quét QR trong cửa sổ Zalo Web.
-- \`zalo_web_read\` báo đang ở trang đăng nhập / không có hội thoại → nhờ người dùng đăng nhập và mở đúng hội thoại trong cửa sổ.
+- \`zalo_web_open\`/\`zalo_web_read\` báo chưa đăng nhập → nhờ người dùng quét QR TRONG CỬA SỔ (không phải sidebar).
 - "chỉ chạy trong một KỸ NĂNG" → gọi \`skill_get\` {id:"lw-zalo-dong-bo"} rồi làm lại.`,
   },
   {

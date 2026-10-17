@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.8',
+    date: '2026-10-17',
+    items: [
+      "Sửa cửa sổ Zalo Web: nay nhận đúng việc bạn đã đăng nhập trong cửa sổ (trước đây kiểm tra quá sớm nên lúc báo đã đăng nhập, lúc lại báo chưa, khiến trợ lý hỏi tới hỏi lui). Chờ trang ổn định rồi mới kết luận.",
+      "Đăng nhập cửa sổ Zalo Web là RIÊNG, làm NGAY TRONG CỬA SỔ đó (không dùng nút «Kết nối Zalo» ở thanh bên — đó là phiên khác, quét ở đó sẽ đá văng đăng nhập của cửa sổ). Trợ lý được hướng dẫn lại để không còn bắt bạn quét QR lòng vòng.",
+      "Đọc tin cũ qua cửa sổ Zalo Web không cần phiên quét-QR còn sống; đăng nhập trong cửa sổ một lần là đọc được. Giữ cửa sổ mở trong lúc dùng.",
+    ],
+  },
+  {
     version: '0.1.7',
     date: '2026-10-17',
     items: [

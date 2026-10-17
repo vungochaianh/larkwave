@@ -218,9 +218,10 @@ export const connectorTools: LarkToolDef[] = [
   {
     name: 'zalo_web_open',
     description:
-      'MỞ cửa sổ Zalo Web (chat.zalo.me chính thức) ngay trong Larkwave, dùng chính phiên đăng nhập hiện tại (chỉ dùng trong kỹ năng Zalo). ' +
-      'Dùng khi cần đọc lịch sử CŨ mà sổ/máy chủ không có: người dùng tự mở đúng hội thoại trong cửa sổ đó và (nếu điện thoại hỏi) bấm Đồng ý đồng bộ trên ĐIỆN THOẠI; sau đó dùng zalo_web_read. ' +
-      'Trả trạng thái cửa sổ (đã đăng nhập chưa). Chưa đăng nhập ⇒ bảo người dùng quét QR / đồng bộ trong cửa sổ vừa mở.',
+      'MỞ cửa sổ Zalo Web (chat.zalo.me chính thức) ngay trong Larkwave (chỉ dùng trong kỹ năng Zalo). ' +
+      'Dùng khi cần đọc lịch sử CŨ mà sổ/máy chủ không có. KHÔNG cần phiên zca còn sống (cửa sổ này đăng nhập riêng). ' +
+      'Trả trạng thái: `loggedIn:true` ⇒ nhờ người dùng mở đúng hội thoại TRONG CỬA SỔ rồi gọi zalo_web_read. ' +
+      '`loggedIn:false` ⇒ nhờ người dùng QUÉT QR NGAY TRONG CỬA SỔ VỪA HIỆN (KHÔNG dùng nút "Kết nối Zalo" ở sidebar — đó là phiên khác, quét ở đó sẽ đá văng đăng nhập của cửa sổ), và bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi.',
     gated: false,
     inputSchema: { type: 'object', additionalProperties: false, properties: { ...account } },
     exec: async (input) => {
@@ -230,8 +231,8 @@ export const connectorTools: LarkToolDef[] = [
         opened: st.exists,
         loggedIn: st.loggedIn ?? false,
         hint: st.loggedIn
-          ? 'Cửa sổ Zalo Web đã mở và đăng nhập. Nhờ người dùng mở đúng hội thoại cần đọc (và bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi), rồi gọi zalo_web_read.'
-          : 'Cửa sổ Zalo Web vừa mở nhưng CHƯA đăng nhập — nhờ người dùng quét QR trong cửa sổ đó, rồi mở hội thoại cần đọc.',
+          ? 'Cửa sổ Zalo Web đã mở và ĐÃ đăng nhập. Nhờ người dùng BẤM VÀO đúng hội thoại cần đọc trong cửa sổ (và bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi), rồi gọi zalo_web_read. ĐỪNG bảo họ quét QR nữa.'
+          : 'Cửa sổ Zalo Web vừa mở, CHƯA đăng nhập — nhờ người dùng QUÉT QR NGAY TRONG CỬA SỔ ĐÓ (đừng dùng nút "Kết nối Zalo" ở sidebar). Đăng nhập xong, mở hội thoại cần đọc rồi báo mình.',
       };
     },
   },
@@ -239,8 +240,9 @@ export const connectorTools: LarkToolDef[] = [
     name: 'zalo_web_read',
     description:
       'ĐỌC nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (chỉ dùng trong kỹ năng Zalo). Tự cuộn lên để tải thêm lịch sử rồi trả về phần chữ đang hiển thị. ' +
-      'Dùng cho tin CŨ mà zalo_read_chat/zalo_sync không lấy được. Người dùng phải mở đúng hội thoại trong cửa sổ Zalo Web trước (zalo_web_open). ' +
-      'Trả về chữ thô của cả hội thoại (tên người + nội dung + giờ xen kẽ) — tự tóm tắt / trích theo yêu cầu, nói rõ đây là nội dung đọc từ màn hình.',
+      'Dùng cho tin CŨ mà zalo_read_chat/zalo_sync không lấy được. KHÔNG cần phiên zca. Người dùng phải đăng nhập + mở đúng hội thoại TRONG CỬA SỔ Zalo Web trước (zalo_web_open). ' +
+      'Báo "đang ở trang đăng nhập" ⇒ nhờ người dùng quét QR trong cửa sổ. Báo "không có hội thoại nào" ⇒ nhờ họ bấm vào đúng hội thoại trong cửa sổ. ' +
+      'Trả về chữ thô của cả hội thoại (tên người + nội dung + giờ xen kẽ) — tự tóm tắt / trích theo yêu cầu, nói rõ đây là nội dung đọc từ cửa sổ Zalo Web.',
     gated: false,
     inputSchema: { type: 'object', additionalProperties: false, properties: { ...account, scrolls: { type: 'number', description: 'Số lần cuộn lên để tải thêm lịch sử (mặc định 12, càng nhiều càng cũ nhưng lâu hơn).' } } },
     exec: async (input) => {

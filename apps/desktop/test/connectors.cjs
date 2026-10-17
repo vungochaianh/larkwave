@@ -171,12 +171,13 @@ test('nhịp gửi: không trần, chỉ cảnh báo (tin đầu của phiên + 
 test('bộ kỹ năng "Zalo & Gmail": 5 kỹ năng, lệnh /, nhãn riêng; kỹ năng gửi: không trần, cảnh báo, lịch lặp lại', () => {
   const zg = BUILTIN_SKILLS.filter((s) => (s.tags || []).includes('Zalo & Gmail'));
   assert.deepStrictEqual(zg.map((s) => s.command).sort(), ['gmail-doc-thu', 'gmail-gui-thu', 'zalo-doc-tin', 'zalo-dong-bo', 'zalo-gui-tin']);
-  // Đồng bộ qua cửa sổ Zalo Web: kỹ năng phải hướng dẫn mở cửa sổ + người dùng tự bấm Đồng ý trên điện thoại.
+  // Đồng bộ qua cửa sổ Zalo Web: kỹ năng hướng dẫn ĐĂNG NHẬP TRONG CỬA SỔ (không dùng sidebar) + chống vòng lặp.
   const sync = BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-dong-bo');
   assert.match(sync.body, /zalo_web_open/);
   assert.match(sync.body, /zalo_web_read/);
-  assert.match(sync.body, /bấm \*\*Đồng ý\*\* trên điện thoại/);
-  assert.match(sync.body, /KHÔNG tự ý bảo điện thoại đồng bộ/);
+  assert.match(sync.body, /QUÉT MÃ QR NGAY TRONG CỬA SỔ/);
+  assert.match(sync.body, /ĐỪNG bấm nút «Kết nối Zalo» ở thanh bên|KHÔNG bảo người dùng quét QR ở sidebar/);
+  assert.match(sync.body, /VÒNG LẶP/);
   for (const s of zg) {
     assert.ok(s.id.startsWith('lw-') && s.triggers.length >= 8, s.id);
     assert.match(s.body, /Kỹ năng → Kết nối|Kết nối Zalo \(quét QR\)|«Kết nối/, `${s.id}: chỉ chỗ kết nối khi chưa có`);

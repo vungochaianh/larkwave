@@ -60,7 +60,6 @@ class ZaloService {
   private readonly loaded = new Set<string>();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private quitHooked = false;
-  private webSeeded = false;
 
   private connectorsDir(): string {
     return join(app.getPath('userData'), 'connectors');
@@ -430,14 +429,11 @@ class ZaloService {
 
   // ── Cửa sổ Zalo Web nhúng ──────────────────────────────────────────────────────────────────────
 
-  /** Nhét cookie của phiên zca đang đăng nhập vào cửa sổ Zalo Web (một lần) — cùng phiên, khỏi quét QR lại. */
+  /** Thử nhét cookie của phiên zca vào cửa sổ Zalo Web — chỉ có tác dụng khi cửa sổ CHƯA có phiên (zaloWeb tự chặn đè). */
   private async seedWeb(account?: string): Promise<void> {
-    if (this.webSeeded) return;
     try {
-      const s = this.session(account);
-      const cookies = (await s.api?.webCookies?.()) ?? [];
-      await zaloWeb.seedCookies(cookies);
-      this.webSeeded = cookies.length > 0;
+      const cookies = (await this.session(account).api?.webCookies?.()) ?? [];
+      if (cookies.length) await zaloWeb.seedCookies(cookies);
     } catch {
       /* chưa đăng nhập zca — người dùng sẽ tự quét QR trong cửa sổ web */
     }
@@ -458,7 +454,6 @@ class ZaloService {
     return zaloWeb.reload();
   }
   webClose(): ZaloWebStatus {
-    this.webSeeded = false;
     return zaloWeb.close();
   }
   webStatus(): ZaloWebStatus {
