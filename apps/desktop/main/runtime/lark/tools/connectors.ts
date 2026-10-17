@@ -285,9 +285,8 @@ export const connectorTools: LarkToolDef[] = [
       return {
         chat: r.openedChat || r.title || '(không rõ tên)',
         truncated: r.truncated,
-        // Dòng "tìm tin nhắn trước ngày …" của Zalo chỉ giới hạn Ô TÌM KIẾM, KHÔNG phải giới hạn nội dung:
-        // cuộn lên trong hội thoại vẫn nạp được tin cũ hơn. Đừng bảo người dùng là "không có tin".
-        ...(r.webHistoryLimit ? { searchOnlyLimit: `Zalo Web giới hạn Ô TÌM KIẾM: ${r.webHistoryLimit}. Đây KHÔNG phải giới hạn nội dung — cuộn lên trong hội thoại vẫn lấy được tin cũ hơn (dùng \`since\`).` } : {}),
+        // Zalo ghi mốc này NGAY TRONG khung hội thoại = ranh giới nó chịu nạp (đo thật 18/10/2026).
+        ...(r.webHistoryLimit ? { zaloWebOldest: `Zalo Web chỉ nạp tin TỪ ngày ${r.webHistoryLimit} trở đi (Zalo tự ghi trong khung chat). Tin cũ hơn mốc này KHÔNG lấy được qua Zalo Web — chỉ Zalo PC mới có. NÓI RÕ mốc này cho người dùng, đừng để họ chờ.` } : {}),
         ...(r.diag ? { scrolled: r.diag.scrolled, oldestSeen: r.diag.oldestSeen, reachedTop: r.diag.reachedTop } : {}),
         text: r.text,
       };

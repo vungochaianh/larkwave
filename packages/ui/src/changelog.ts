@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.18',
+    date: '2026-10-18',
+    items: [
+      "Trợ lý nói rõ MỐC NGÀY mà Zalo Web chịu nạp: Zalo tự ghi trong khung chat (ví dụ \"tìm tin nhắn trước ngày 04/10/2026 thì dùng Zalo PC\"). Trước đây trợ lý chỉ báo \"không lấy được tin cũ\" khiến bạn tưởng app hỏng, trong khi đó là giới hạn của chính Zalo Web.",
+      "Kèm bản sửa lỗi \"Script failed to execute\" của 0.1.17 — cuộn theo đợt ngắn do app điều phối, có trần thời gian.",
+    ],
+  },
+  {
     version: '0.1.17',
     date: '2026-10-18',
     items: [

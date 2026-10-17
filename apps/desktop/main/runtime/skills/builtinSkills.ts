@@ -306,7 +306,7 @@ Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch s
 2. \`zalo_web_read\` {chat:"<tên nhóm/người>", scrolls} — **TỰ MỞ hội thoại đó rồi đọc**. TUYỆT ĐỐI KHÔNG bảo người dùng "bấm vào nhóm trong cửa sổ": cửa sổ do app điều khiển, đó là việc của công cụ.
    - Trả \`chatNotFound\` + \`candidates\` → chọn tên đúng trong danh sách rồi gọi lại; chỉ khi danh sách trống mới hỏi người dùng tên chính xác.
    - Hỏi theo KHOẢNG THỜI GIAN ("tháng 10", "tuần rồi") → truyền \`since:"YYYY-MM-DD"\`: công cụ tự cuộn tới đúng mốc đó rồi dừng. ĐỪNG tự đoán \`scrolls\`.
-   - Trả \`searchOnlyLimit\` → đó chỉ là giới hạn Ô TÌM KIẾM của Zalo Web, KHÔNG phải giới hạn nội dung. Cuộn lên vẫn lấy được tin cũ hơn — ĐỪNG nói với người dùng là "Zalo Web không có tin cũ".
+   - Trả \`zaloWebOldest\` → Zalo Web chỉ nạp tin TỪ mốc ngày đó trở đi. NÓI RÕ mốc này ngay trong câu trả lời (vd "Zalo Web chỉ có từ 04/10; trước đó phải xem bằng Zalo PC"), đừng chỉ nói "không lấy được".
    - Kết quả kèm \`oldestSeen\` (ngày cũ nhất đã cuộn tới) và \`reachedTop\`. Chưa tới mốc người dùng cần mà \`reachedTop\` chưa bật → gọi lại với \`scrolls\` lớn hơn. \`reachedTop:true\` mà vẫn thiếu → đã hết tin Zalo Web giữ, lúc đó mới báo người dùng.
    - Cần cũ hơn nữa → gọi lại với \`scrolls\` lớn hơn (vd 30).
    - Trả \`empty\` + \`diag\` → thử LẠI ĐÚNG MỘT LẦN với scrolls lớn hơn; vẫn rỗng thì DỪNG và nói thẳng: "bộ đọc của Larkwave không lấy được nội dung từ cửa sổ (không phải nhóm không có tin)", kèm NGUYÊN khối \`diag\`. KHÔNG bắt người dùng bấm/đồng bộ lại, KHÔNG đoán là nhóm trống.

@@ -533,7 +533,8 @@ class ZaloService {
     }
     // Có mốc ngày ⇒ cuộn tới khi chạm mốc (mặc định cho nhiều lượt cuộn hơn, vì lấy cả tháng).
     const r = await zaloWeb.readOpen(opts.scrolls ?? (opts.since ? 120 : 12), opts.since);
-    return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}), ...(opened?.webHistoryLimit ? { webHistoryLimit: opened.webHistoryLimit } : {}) };
+    // `limitDate` (Zalo ghi trong khung chat) là ranh giới THẬT; chuỗi bắt lúc mở chỉ là dự phòng.
+    return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}), ...(r.limitDate || opened?.webHistoryLimit ? { webHistoryLimit: r.limitDate || opened?.webHistoryLimit } : {}) };
   }
 }
 

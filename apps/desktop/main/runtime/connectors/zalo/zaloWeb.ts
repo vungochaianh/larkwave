@@ -48,6 +48,8 @@ export interface ZaloWebStatus {
 }
 
 export interface ZaloWebRead {
+  /** Ngày CŨ NHẤT Zalo Web chịu nạp (Zalo tự ghi trong khung hội thoại). Cũ hơn mốc này chỉ Zalo PC mới có. */
+  limitDate?: string;
   title: string;
   /** Nội dung chữ của hội thoại đang mở (đã cuộn lên để tải thêm lịch sử). */
   text: string;
@@ -134,7 +136,9 @@ function extractScript(maxText: number): string {
       if (top && top.textContent) title = top.textContent.trim().slice(0, 120);
     }
     try { a.scrollTop = a.scrollHeight; } catch (e) {}
-    return { empty: !text, title, text, truncated, how, areaLen, bodyLen: bodyText.length, tag: (a.tagName || '').toLowerCase(), cls: String(a.className || '').slice(0, 80) };
+    // Zalo tự ghi RANH GIỚI lịch sử ngay trong khung hội thoại: "Sử dụng Zalo PC để tìm tin nhắn trước ngày 04/10/2026".
+    const lim = ((text + ' ' + bodyText).match(/tìm tin nhắn trước ngày\s*([\d./-]+)/i) || [])[1] || '';
+    return { empty: !text, title, text, truncated, how, areaLen, bodyLen: bodyText.length, tag: (a.tagName || '').toLowerCase(), cls: String(a.className || '').slice(0, 80), limitDate: lim };
   })()`;
 }
 
@@ -612,6 +616,7 @@ class ZaloWeb {
       bodyLen: number;
       tag: string;
       cls: string;
+      limitDate?: string;
     };
     this.lastReadAt = Date.now();
     return {
@@ -619,6 +624,7 @@ class ZaloWeb {
       title: r.title,
       text: r.text,
       truncated: r.truncated,
+      ...(r.limitDate ? { limitDate: r.limitDate } : {}),
       diag: { how: r.how + (stepErr ? `(cuộn dừng: ${stepErr})` : ''), tag: r.tag, cls: r.cls, bodyLen: r.bodyLen, areaLen: r.areaLen, scrolled: done, reachedTop, oldestSeen },
     };
   }
