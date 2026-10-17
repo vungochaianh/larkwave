@@ -56,7 +56,7 @@ export interface ZaloWebRead {
   /** Không mở hội thoại nào / không thấy vùng tin. */
   empty: boolean;
   /** Đã dò vùng tin bằng cách nào + đo được gì — để chẩn đoán khi đọc ra rỗng. */
-  diag?: { how: string; tag: string; cls: string; bodyLen: number; areaLen: number; scrolled: number };
+  diag?: { how: string; tag: string; cls: string; bodyLen: number; areaLen: number; scrolled: number; reachedTop?: boolean; oldestSeen?: string };
 }
 
 const MAX_TEXT = 200_000;
@@ -66,23 +66,22 @@ const MAX_TEXT = 200_000;
  * lịch sử. THUẦN chuỗi (chạy qua executeJavaScript) nên không phụ thuộc tên lớp CSS hay thay đổi của Zalo.
  */
 /**
- * Đọc nội dung hội thoại đang mở (chạy TRONG trang).
+ * Đọc nội dung hội thoại đang mở (chạy TRONG trang) và CUỘN LÊN tới khi chạm mốc ngày cần lấy.
  *
- * BÀI HỌC 18/10/2026: bản đầu dò vùng tin bằng `getComputedStyle().overflowY === 'auto'|'scroll'` → trên
- * Zalo Web KHÔNG khớp phần tử nào ⇒ luôn trả rỗng, kể cả khi màn hình đang hiện đầy tin. Nay dò theo thứ tự
- * chắc dần, và LUÔN trả về `diag` để biết đã đi nhánh nào (không phải đoán lần nữa):
- *   1. `elementFromPoint` giữa vùng chat (phải màn hình) rồi leo lên tổ tiên CUỘN ĐƯỢC — chắc nhất.
- *   2. Quét toàn trang lấy phần tử có (scrollHeight − clientHeight) lớn nhất.
- *   3. Cùng lắm đọc `document.body` — thà lẫn cột trái còn hơn trả rỗng.
- * Cuộn lên bằng cả `scrollTop = 0` lẫn sự kiện `wheel` (danh sách ảo của Zalo nghe wheel).
+ * BÀI HỌC 18/10/2026:
+ *  - Dò vùng tin bằng `getComputedStyle().overflowY` KHÔNG khớp gì trên Zalo Web ⇒ luôn rỗng. Nay dò theo
+ *    `elementFromPoint` giữa khung chat rồi leo tổ tiên cuộn được; dự phòng quét toàn trang; cùng lắm đọc body.
+ *  - Dừng cuộn khi "chiều cao không đổi 3 lần" là QUÁ SỚM: lúc Zalo đang tải thêm thì chiều cao cũng đứng yên.
+ *    Nay chờ lâu hơn, cần nhiều lần đứng yên hơn, VÀ phải thật sự ở đỉnh (scrollTop ≈ 0) mới coi là hết tin.
+ *  - Có `untilTs` thì cuộn tới khi thấy ngày <= mốc đó rồi dừng (không cuộn thừa).
  */
-function readScript(scrolls: number): string {
+function readScript(scrolls: number, untilTs?: number): string {
   return `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const canScroll = (el) => el && el.scrollHeight > el.clientHeight + 24 && el.clientHeight > 120;
-    const diag = { how: '', tag: '', cls: '', bodyLen: 0, areaLen: 0, scrolled: 0 };
+    const UNTIL = ${untilTs ?? 0};
+    const diag = { how: '', tag: '', cls: '', bodyLen: 0, areaLen: 0, scrolled: 0, reachedTop: false, oldestSeen: '' };
 
-    // 1) Từ điểm giữa vùng chat leo lên tổ tiên cuộn được.
     let area = null;
     const px = Math.round(innerWidth * 0.68), py = Math.round(innerHeight * 0.5);
     let node = document.elementFromPoint(px, py);
@@ -90,7 +89,6 @@ function readScript(scrolls: number): string {
       if (canScroll(node)) { area = node; diag.how = 'point'; break; }
       node = node.parentElement;
     }
-    // 2) Quét toàn trang: phần tử cuộn được "sâu" nhất, nằm lệch phải (vùng chat), không phải cột trái.
     if (!area) {
       let best = null, bestScore = 0;
       for (const el of document.querySelectorAll('div,section,main,ul')) {
@@ -102,22 +100,42 @@ function readScript(scrolls: number): string {
       }
       if (best) { area = best; diag.how = 'scan'; }
     }
-    // 3) Cùng lắm: cả trang.
     if (!area) { area = document.scrollingElement || document.body; diag.how = 'body'; }
-
     diag.tag = (area.tagName || '').toLowerCase();
     diag.cls = String(area.className || '').slice(0, 80);
 
-    // Cuộn lên để Zalo nạp thêm tin cũ (dừng khi chiều cao không tăng nữa).
+    // Ngày CŨ NHẤT đang hiển thị (Zalo chèn vạch ngày "01/10/2026", "Thứ Hai, 01/10").
+    const oldestTs = () => {
+      const t = area.innerText || '';
+      const now = new Date();
+      let min = Infinity, label = '';
+      for (const m of t.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g)) {
+        const d = Number(m[1]), mo = Number(m[2]), y = m[3] ? Number(m[3]) : now.getFullYear();
+        if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
+        const ts = new Date(y, mo - 1, d).getTime();
+        if (ts < min) { min = ts; label = m[0]; }
+      }
+      diag.oldestSeen = label;
+      return min;
+    };
+
     let lastH = -1, stable = 0;
-    for (let i = 0; i < ${Math.max(0, Math.min(scrolls, 80))}; i++) {
+    for (let i = 0; i < ${Math.max(0, Math.min(scrolls, 400))}; i++) {
       try { area.scrollTop = 0; } catch (e) {}
-      try { area.dispatchEvent(new WheelEvent('wheel', { deltaY: -1500, bubbles: true })); } catch (e) {}
-      await sleep(700);
+      try { area.dispatchEvent(new WheelEvent('wheel', { deltaY: -2000, bubbles: true })); } catch (e) {}
+      await sleep(1100);
       diag.scrolled = i + 1;
+      // Đã cuộn tới mốc ngày cần lấy ⇒ dừng, khỏi cuộn thừa.
+      if (UNTIL && oldestTs() <= UNTIL) break;
       const h = area.scrollHeight;
-      if (h === lastH) { if (++stable >= 3) break; } else { stable = 0; lastH = h; }
+      if (h === lastH) {
+        stable++;
+        // Chỉ coi là HẾT TIN khi vừa đứng yên vừa thật sự ở đỉnh (Zalo đang tải cũng đứng yên).
+        if (stable >= 5 && area.scrollTop <= 2) { diag.reachedTop = true; break; }
+        if (stable >= 12) break;
+      } else { stable = 0; lastH = h; }
     }
+    oldestTs();
     try { area.scrollTop = area.scrollHeight; } catch (e) {}
 
     const clean = (x) => (x || '').replace(/\n{3,}/g, '\n\n').trim();
@@ -125,13 +143,11 @@ function readScript(scrolls: number): string {
     diag.areaLen = text.length;
     const bodyText = clean(document.body ? document.body.innerText : '');
     diag.bodyLen = bodyText.length;
-    // Vùng tìm được mà rỗng/quá ngắn ⇒ lấy cả trang, còn hơn báo "không có gì".
     if (text.length < 20 && bodyText.length > text.length) { text = bodyText; diag.how += '+body'; }
 
     const truncated = text.length > ${MAX_TEXT};
     if (truncated) text = text.slice(-${MAX_TEXT});
 
-    // Tên hội thoại: thử vài chỗ, cuối cùng lấy dòng chữ đầu của nửa phải màn hình.
     let title = '';
     const h1 = document.querySelector('[class*="header"] [class*="name"], [class*="conv"] [class*="title"], header h1, header h2');
     if (h1 && h1.textContent) title = h1.textContent.trim().slice(0, 120);
@@ -539,13 +555,13 @@ class ZaloWeb {
   }
 
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
-  async readOpen(scrolls = 12): Promise<ZaloWebRead> {
+  async readOpen(scrolls = 12, untilTs?: number): Promise<ZaloWebRead> {
     if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở. Dùng zalo_web_open, rồi mở đúng hội thoại cần đọc TRONG CỬA SỔ ĐÓ.');
     await this.settle(4000);
     if (this.status().loggedIn === false) {
       throw new Error('Cửa sổ Zalo Web đang ở trang đăng nhập. Người dùng cần ĐĂNG NHẬP NGAY TRONG CỬA SỔ ĐÓ (quét QR), và nếu điện thoại hỏi thì bấm Đồng ý đồng bộ, rồi mở hội thoại cần đọc.');
     }
-    const r = (await this.win!.webContents.executeJavaScript(readScript(scrolls), true)) as ZaloWebRead;
+    const r = (await this.win!.webContents.executeJavaScript(readScript(scrolls, untilTs), true)) as ZaloWebRead;
     this.lastReadAt = Date.now();
     return r;
   }

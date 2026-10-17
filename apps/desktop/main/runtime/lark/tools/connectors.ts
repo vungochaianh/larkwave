@@ -252,14 +252,17 @@ export const connectorTools: LarkToolDef[] = [
       properties: {
         ...account,
         chat: str('TÊN hội thoại/nhóm cần đọc — công cụ tự mở nó trong cửa sổ. Bỏ trống = đọc hội thoại đang mở.'),
-        scrolls: { type: 'number', description: 'Số lần cuộn lên để tải thêm lịch sử (mặc định 12, càng nhiều càng cũ nhưng lâu hơn).' },
+        since: str('Cuộn lên TỚI ngày này rồi dừng (YYYY-MM-DD hoặc ISO). Dùng khi người dùng hỏi theo khoảng thời gian — chính xác và nhanh hơn tự đoán `scrolls`.'),
+        scrolls: { type: 'number', description: 'Số lần cuộn lên (mặc định 12; có `since` thì mặc định 120). Mỗi lần ~1 giây.' },
       },
     },
     exec: async (input) => {
       connectorGate('zalo_web_read');
+      const since = parseWhen(input.since, 'since');
       const r = await (await zalo()).webRead({
         ...(typeof input.scrolls === 'number' ? { scrolls: input.scrolls } : {}),
         ...(input.chat ? { chat: String(input.chat) } : {}),
+        ...(since !== undefined ? { since } : {}),
       });
       if (r.chatNotFound) {
         return {
@@ -282,7 +285,10 @@ export const connectorTools: LarkToolDef[] = [
       return {
         chat: r.openedChat || r.title || '(không rõ tên)',
         truncated: r.truncated,
-        ...(r.webHistoryLimit ? { webHistoryLimit: `Zalo Web tự giới hạn: ${r.webHistoryLimit}. Tin cũ hơn mốc này KHÔNG có trên Zalo Web — nói thật với người dùng, chỉ Zalo PC mới có.` } : {}),
+        // Dòng "tìm tin nhắn trước ngày …" của Zalo chỉ giới hạn Ô TÌM KIẾM, KHÔNG phải giới hạn nội dung:
+        // cuộn lên trong hội thoại vẫn nạp được tin cũ hơn. Đừng bảo người dùng là "không có tin".
+        ...(r.webHistoryLimit ? { searchOnlyLimit: `Zalo Web giới hạn Ô TÌM KIẾM: ${r.webHistoryLimit}. Đây KHÔNG phải giới hạn nội dung — cuộn lên trong hội thoại vẫn lấy được tin cũ hơn (dùng \`since\`).` } : {}),
+        ...(r.diag ? { scrolled: r.diag.scrolled, oldestSeen: r.diag.oldestSeen, reachedTop: r.diag.reachedTop } : {}),
         text: r.text,
       };
     },

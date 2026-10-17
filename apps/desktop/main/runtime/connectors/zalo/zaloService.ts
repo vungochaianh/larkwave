@@ -513,7 +513,7 @@ class ZaloService {
    * Đọc hội thoại trong cửa sổ Zalo Web. Có `chat` thì TỰ MỞ hội thoại đó trước (không bắt người dùng bấm
    * — lỗi UX 18/10/2026); không có thì đọc hội thoại đang mở.
    */
-  async webRead(opts: { scrolls?: number; chat?: string } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[]; webHistoryLimit?: string }> {
+  async webRead(opts: { scrolls?: number; chat?: string; since?: number } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[]; webHistoryLimit?: string }> {
     this.store();
     await zaloWeb.open(false); // đảm bảo cửa sổ tồn tại (không bắt buộc hiện ra)
     let opened: { opened: boolean; clicked?: string; candidates: string[]; webHistoryLimit?: string } | null = null;
@@ -531,7 +531,8 @@ class ZaloService {
         };
       }
     }
-    const r = await zaloWeb.readOpen(opts.scrolls ?? 12);
+    // Có mốc ngày ⇒ cuộn tới khi chạm mốc (mặc định cho nhiều lượt cuộn hơn, vì lấy cả tháng).
+    const r = await zaloWeb.readOpen(opts.scrolls ?? (opts.since ? 120 : 12), opts.since);
     return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}), ...(opened?.webHistoryLimit ? { webHistoryLimit: opened.webHistoryLimit } : {}) };
   }
 }

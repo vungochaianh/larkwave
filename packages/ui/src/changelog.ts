@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.16',
+    date: '2026-10-18',
+    items: [
+      "Đọc lịch sử Zalo theo KHOẢNG THỜI GIAN: hỏi \"tóm tắt nhóm X tháng 10\" thì app tự cuộn lên tới đúng ngày 1/10 rồi dừng, thay vì đoán số lần cuộn. Cách dừng cuộn cũng chặt hơn — trước đây hay dừng sớm giữa lúc Zalo đang tải thêm.",
+      "Nói lại cho đúng: dòng \"dùng Zalo PC để tìm tin nhắn trước ngày …\" của Zalo chỉ giới hạn Ô TÌM KIẾM, không phải giới hạn nội dung. Cuộn lên trong hội thoại vẫn lấy được tin cũ hơn, và trợ lý không còn nói nhầm là \"Zalo Web không có tin cũ\".",
+    ],
+  },
+  {
     version: '0.1.15',
     date: '2026-10-18',
     items: [
