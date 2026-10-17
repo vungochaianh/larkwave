@@ -264,7 +264,16 @@ export const connectorTools: LarkToolDef[] = [
       if (r.chatNotFound) {
         return { chatNotFound: r.chatNotFound, candidates: r.candidates, note: `Không thấy hội thoại tên "${r.chatNotFound}" trong cửa sổ. Xem "candidates" rồi gọi lại với đúng tên; nếu danh sách trống thì cửa sổ chưa tải xong.` };
       }
-      if (r.empty) return { empty: true, note: 'Mở được nhưng chưa thấy nội dung — gọi lại (kèm `chat`) sau vài giây, hoặc tăng `scrolls`.' };
+      if (r.empty) {
+        return {
+          empty: true,
+          diag: r.diag,
+          note:
+            'Mở được hội thoại nhưng ĐỌC RA RỖNG. Thử lại MỘT lần với `scrolls` lớn hơn; vẫn rỗng thì DỪNG, ' +
+            'báo người dùng đây là lỗi bộ đọc của Larkwave (không phải nhóm không có tin) và ĐƯA NGUYÊN khối `diag` ' +
+            'này vào câu trả lời để nhóm phát triển sửa. KHÔNG bắt người dùng bấm lại hay đồng bộ lại.',
+        };
+      }
       return { chat: r.openedChat || r.title || '(không rõ tên)', truncated: r.truncated, text: r.text };
     },
   },

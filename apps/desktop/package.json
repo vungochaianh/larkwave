@@ -1,6 +1,6 @@
 {
   "name": "@larkwave/desktop",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "private": true,
   "description": "Larkwave desktop (Nextron) — Lark × Agents + Trợ lý AI chạy trên CLI AI của máy (Claude/Codex/Gemini/Grok).",
   "author": "Larkwave",

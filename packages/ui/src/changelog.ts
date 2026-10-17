@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.14',
+    date: '2026-10-18',
+    items: [
+      "Sửa lỗi đọc cửa sổ Zalo Web ra rỗng: cách dò vùng tin nhắn cũ không khớp với giao diện Zalo nên không lấy được gì, kể cả khi màn hình đang hiện đầy tin. Nay dò theo ba cách chắc dần (từ đúng điểm giữa khung chat, quét toàn trang, cuối cùng đọc cả trang) và cuộn bằng cả hai kiểu để nạp thêm tin cũ.",
+      "Nếu vẫn đọc ra rỗng, trợ lý sẽ nói thẳng là lỗi bộ đọc của Larkwave (không phải nhóm không có tin) và kèm thông tin chẩn đoán, thay vì bắt bạn bấm/đồng bộ lại.",
+    ],
+  },
+  {
     version: '0.1.13',
     date: '2026-10-18',
     items: [

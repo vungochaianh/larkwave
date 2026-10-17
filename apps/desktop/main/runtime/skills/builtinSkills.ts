@@ -306,6 +306,7 @@ Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch s
 2. \`zalo_web_read\` {chat:"<tên nhóm/người>", scrolls} — **TỰ MỞ hội thoại đó rồi đọc**. TUYỆT ĐỐI KHÔNG bảo người dùng "bấm vào nhóm trong cửa sổ": cửa sổ do app điều khiển, đó là việc của công cụ.
    - Trả \`chatNotFound\` + \`candidates\` → chọn tên đúng trong danh sách rồi gọi lại; chỉ khi danh sách trống mới hỏi người dùng tên chính xác.
    - Cần cũ hơn nữa → gọi lại với \`scrolls\` lớn hơn (vd 30).
+   - Trả \`empty\` + \`diag\` → thử LẠI ĐÚNG MỘT LẦN với scrolls lớn hơn; vẫn rỗng thì DỪNG và nói thẳng: "bộ đọc của Larkwave không lấy được nội dung từ cửa sổ (không phải nhóm không có tin)", kèm NGUYÊN khối \`diag\`. KHÔNG bắt người dùng bấm/đồng bộ lại, KHÔNG đoán là nhóm trống.
    - Báo "đang ở trang đăng nhập" → quay lại bước 1 (đăng nhập chưa xong).
 3. Tóm tắt/trích theo yêu cầu, nói rõ "đọc từ cửa sổ Zalo Web".
 

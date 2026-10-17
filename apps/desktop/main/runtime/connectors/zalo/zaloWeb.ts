@@ -55,6 +55,8 @@ export interface ZaloWebRead {
   truncated: boolean;
   /** Không mở hội thoại nào / không thấy vùng tin. */
   empty: boolean;
+  /** Đã dò vùng tin bằng cách nào + đo được gì — để chẩn đoán khi đọc ra rỗng. */
+  diag?: { how: string; tag: string; cls: string; bodyLen: number; areaLen: number; scrolled: number };
 }
 
 const MAX_TEXT = 200_000;
@@ -63,34 +65,81 @@ const MAX_TEXT = 200_000;
  * Lái cửa sổ (chạy trong trang). Đọc innerText vùng tin lớn nhất, cuộn lên `scrolls` lần để Zalo tải thêm
  * lịch sử. THUẦN chuỗi (chạy qua executeJavaScript) nên không phụ thuộc tên lớp CSS hay thay đổi của Zalo.
  */
+/**
+ * Đọc nội dung hội thoại đang mở (chạy TRONG trang).
+ *
+ * BÀI HỌC 18/10/2026: bản đầu dò vùng tin bằng `getComputedStyle().overflowY === 'auto'|'scroll'` → trên
+ * Zalo Web KHÔNG khớp phần tử nào ⇒ luôn trả rỗng, kể cả khi màn hình đang hiện đầy tin. Nay dò theo thứ tự
+ * chắc dần, và LUÔN trả về `diag` để biết đã đi nhánh nào (không phải đoán lần nữa):
+ *   1. `elementFromPoint` giữa vùng chat (phải màn hình) rồi leo lên tổ tiên CUỘN ĐƯỢC — chắc nhất.
+ *   2. Quét toàn trang lấy phần tử có (scrollHeight − clientHeight) lớn nhất.
+ *   3. Cùng lắm đọc `document.body` — thà lẫn cột trái còn hơn trả rỗng.
+ * Cuộn lên bằng cả `scrollTop = 0` lẫn sự kiện `wheel` (danh sách ảo của Zalo nghe wheel).
+ */
 function readScript(scrolls: number): string {
   return `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    // Vùng cuộn LỚN NHẤT trên trang = khung tin nhắn (danh sách hội thoại bên trái nhỏ hơn nhiều).
-    const scrollables = [...document.querySelectorAll('*')].filter((el) => {
-      const s = getComputedStyle(el);
-      return (s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 40 && el.clientHeight > 180;
-    });
-    scrollables.sort((a, b) => b.clientHeight * b.scrollWidth - a.clientHeight * a.scrollWidth);
-    const area = scrollables[0];
-    if (!area) return { empty: true, title: (document.title || ''), text: '' };
-    // Cuộn LÊN ĐẦU lặp lại để Zalo nạp thêm tin cũ (dừng khi chiều cao không tăng nữa).
+    const canScroll = (el) => el && el.scrollHeight > el.clientHeight + 24 && el.clientHeight > 120;
+    const diag = { how: '', tag: '', cls: '', bodyLen: 0, areaLen: 0, scrolled: 0 };
+
+    // 1) Từ điểm giữa vùng chat leo lên tổ tiên cuộn được.
+    let area = null;
+    const px = Math.round(innerWidth * 0.68), py = Math.round(innerHeight * 0.5);
+    let node = document.elementFromPoint(px, py);
+    while (node && node !== document.body) {
+      if (canScroll(node)) { area = node; diag.how = 'point'; break; }
+      node = node.parentElement;
+    }
+    // 2) Quét toàn trang: phần tử cuộn được "sâu" nhất, nằm lệch phải (vùng chat), không phải cột trái.
+    if (!area) {
+      let best = null, bestScore = 0;
+      for (const el of document.querySelectorAll('div,section,main,ul')) {
+        if (!canScroll(el)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 240 || r.height < 160) continue;
+        const score = (el.scrollHeight - el.clientHeight) * (r.left > innerWidth * 0.25 ? 2 : 1);
+        if (score > bestScore) { bestScore = score; best = el; }
+      }
+      if (best) { area = best; diag.how = 'scan'; }
+    }
+    // 3) Cùng lắm: cả trang.
+    if (!area) { area = document.scrollingElement || document.body; diag.how = 'body'; }
+
+    diag.tag = (area.tagName || '').toLowerCase();
+    diag.cls = String(area.className || '').slice(0, 80);
+
+    // Cuộn lên để Zalo nạp thêm tin cũ (dừng khi chiều cao không tăng nữa).
     let lastH = -1, stable = 0;
     for (let i = 0; i < ${Math.max(0, Math.min(scrolls, 80))}; i++) {
-      area.scrollTop = 0;
-      await sleep(650);
+      try { area.scrollTop = 0; } catch (e) {}
+      try { area.dispatchEvent(new WheelEvent('wheel', { deltaY: -1500, bubbles: true })); } catch (e) {}
+      await sleep(700);
+      diag.scrolled = i + 1;
       const h = area.scrollHeight;
       if (h === lastH) { if (++stable >= 3) break; } else { stable = 0; lastH = h; }
     }
-    area.scrollTop = area.scrollHeight;
-    let text = (area.innerText || '').replace(/\\n{3,}/g, '\\n\\n').trim();
+    try { area.scrollTop = area.scrollHeight; } catch (e) {}
+
+    const clean = (x) => (x || '').replace(/\n{3,}/g, '\n\n').trim();
+    let text = clean(area.innerText);
+    diag.areaLen = text.length;
+    const bodyText = clean(document.body ? document.body.innerText : '');
+    diag.bodyLen = bodyText.length;
+    // Vùng tìm được mà rỗng/quá ngắn ⇒ lấy cả trang, còn hơn báo "không có gì".
+    if (text.length < 20 && bodyText.length > text.length) { text = bodyText; diag.how += '+body'; }
+
     const truncated = text.length > ${MAX_TEXT};
     if (truncated) text = text.slice(-${MAX_TEXT});
-    // Tên hội thoại: tiêu đề trên cùng của khung tin (heading gần nhất phía trên vùng tin).
+
+    // Tên hội thoại: thử vài chỗ, cuối cùng lấy dòng chữ đầu của nửa phải màn hình.
     let title = '';
-    const h = document.querySelector('[class*="header"] [class*="name"], [class*="conv"] [class*="title"]');
-    if (h && h.textContent) title = h.textContent.trim().slice(0, 120);
-    return { empty: !text, title, text, truncated };
+    const h1 = document.querySelector('[class*="header"] [class*="name"], [class*="conv"] [class*="title"], header h1, header h2');
+    if (h1 && h1.textContent) title = h1.textContent.trim().slice(0, 120);
+    if (!title) {
+      const top = document.elementFromPoint(Math.round(innerWidth * 0.68), 40);
+      if (top && top.textContent) title = top.textContent.trim().slice(0, 120);
+    }
+    return { empty: !text, title, text, truncated, diag };
   })()`;
 }
 
