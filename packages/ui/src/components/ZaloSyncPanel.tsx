@@ -25,6 +25,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
   const [unsupported, setUnsupported] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const autoAdopted = useRef(false);
+  const [adoptMsg, setAdoptMsg] = useState<{ ok: boolean; note: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (!call) return null;
@@ -36,12 +37,13 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
       if (s.web.loggedIn === true && !s.accounts.some((a) => a.status === 'ready') && !autoAdopted.current) {
         autoAdopted.current = true;
         try {
-          await call('zaloWebAdopt');
+          const r = (await call('zaloWebAdopt')) as { ok?: boolean; note?: string };
+          setAdoptMsg({ ok: !!r?.ok, note: r?.note || '' });
           const s2 = (await call('zaloSyncStatus')) as ZaloSyncStatus;
           setSt(s2);
           return s2;
-        } catch {
-          /* lõi cũ chưa có zaloWebAdopt / gộp lỗi — người dùng bấm nút gộp tay */
+        } catch (e) {
+          setAdoptMsg({ ok: false, note: `Lõi chưa hỗ trợ gộp phiên (cần .dmg 0.1.9): ${String((e as Error)?.message || e).slice(0, 200)}` });
         }
       }
       return s;
@@ -182,11 +184,36 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
               message={t('zsync.unified', 'Đây là nơi đăng nhập Zalo DUY NHẤT. Larkwave dùng chung phiên này cho cả đọc lịch sử (cửa sổ) lẫn gửi tin / lấy nhóm từ máy chủ — không phải quét QR ở thanh bên nữa. Giữ cửa sổ này mở trong lúc dùng.')}
             />
             <Space wrap>
-              <Button size="small" icon={<GlobalOutlined />} loading={busy === 'adopt'} onClick={() => run('adopt', () => call('zaloWebAdopt'), (r) => (r as { note?: string })?.note)}>
+              <Button
+                size="small"
+                type={ready ? 'default' : 'primary'}
+                icon={<GlobalOutlined />}
+                loading={busy === 'adopt'}
+                onClick={async () => {
+                  setBusy('adopt');
+                  try {
+                    const r = (await call('zaloWebAdopt')) as { ok?: boolean; note?: string };
+                    setAdoptMsg({ ok: !!r?.ok, note: r?.note || '' });
+                  } catch (e) {
+                    setAdoptMsg({ ok: false, note: `Lỗi gọi gộp phiên: ${String((e as Error)?.message || e).slice(0, 250)}` });
+                  } finally {
+                    setBusy(null);
+                    await refresh();
+                  }
+                }}
+              >
                 {ready ? t('zsync.adoptAgain', 'Gộp lại phiên để gửi tin') : t('zsync.adopt', 'Bật gửi tin bằng phiên này')}
               </Button>
               {ready && <Tag color="green">{t('zsync.sendReady', 'gửi tin: sẵn sàng')}</Tag>}
             </Space>
+            {adoptMsg && (
+              <Alert
+                type={adoptMsg.ok ? 'success' : 'error'}
+                showIcon
+                style={{ fontSize: 12 }}
+                message={adoptMsg.note || (adoptMsg.ok ? 'Đã gộp phiên.' : 'Chưa gộp được phiên.')}
+              />
+            )}
           </div>
         )}
         <Alert
