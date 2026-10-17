@@ -6,6 +6,7 @@ import { getStoredToken, removeStoredToken, storeToken, tokenEnvVar } from './cl
 import { getActiveKey, clearActiveKey } from './claudeKeyStore';
 import { contextUsageFromResult, CONTEXT_WARN_THRESHOLD } from './contextBudget';
 import { isAnthropicApiKey, notApiKeyMessage } from './claudeKeyKind';
+import { checkAnthropicKey, type FetchLike } from '@larkwave/core';
 
 /**
  * macOS/Linux GUI apps don't inherit the shell PATH, so `spawn('claude')` fails
@@ -312,23 +313,9 @@ export async function clearClaudeToken(): Promise<ClaudeStatus> {
 export async function validateKey(key: string): Promise<KeyValidation> {
   const k = key.trim();
   if (!isAnthropicApiKey(k)) return { ok: false, error: notApiKeyMessage(k) };
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (res.ok) return { ok: true, model: 'claude-haiku-4-5' };
-    if (res.status === 401 || res.status === 403) return { ok: false, error: 'Key không hợp lệ hoặc đã bị thu hồi.' };
-    if (res.status === 429) return { ok: false, error: 'Bị giới hạn tần suất — thử lại sau.' };
-    return { ok: false, error: `Không kiểm tra được key (HTTP ${res.status}).` };
-  } catch (e) {
-    return { ok: false, error: `Lỗi mạng khi kiểm tra key: ${(e as Error).message}` };
-  }
+  // Đăng nhập bằng /v1/models (không tốn token, không phụ thuộc model) rồi mới thử dùng — lỗi hết credit
+  // không còn thành "HTTP 400" vô nghĩa (xem @larkwave/core anthropicKeyCheck).
+  return checkAnthropicKey(k, fetch as unknown as FetchLike);
 }
 
 /** Run Claude headlessly and yield BuildEvents as it works. */

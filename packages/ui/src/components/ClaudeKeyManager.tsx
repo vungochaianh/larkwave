@@ -8,6 +8,7 @@ import { V } from '../theme';
 import { useI18n } from '../i18n';
 import { API_KEYS_CHANGED_EVENT } from './lark/engineChip';
 import { isAnthropicApiKey } from '../claudeKeyKind';
+import { checkAnthropicKey, type FetchLike } from '@larkwave/core';
 
 /**
  * Câu từ chối của LÕI ≤0.1.3: nó chỉ nhận đúng tiền tố `sk-ant-api…`, nên từ chối cả API key hợp lệ dạng
@@ -76,6 +77,10 @@ export function ClaudeKeyManager({
             'Bản cài Larkwave trên máy này còn cũ nên chưa kiểm được API key dạng mới (sk-ant-usr-…). Key có thể vẫn đúng: bấm "Thêm key" để dùng ngay, hoặc cài bản mới nhất ở toolswave.net/larkwave.',
           ),
         });
+      } else if (!res.ok && /\(HTTP \d+\)/.test(res.error || '') && !/Anthropic từ chối đăng nhập/.test(res.error || '')) {
+        // Lõi ≤0.1.5 chỉ báo "Không kiểm tra được key (HTTP 400)" và vứt câu của Anthropic — tự kiểm lại
+        // trực tiếp để nói đúng nguyên nhân (thường là tài khoản chưa nạp credit, key vẫn ĐÚNG).
+        setCheck(await checkAnthropicKey(k, window.fetch.bind(window) as unknown as FetchLike, { browser: true }));
       } else setCheck(res);
     } finally {
       setChecking(false);
@@ -123,8 +128,18 @@ export function ClaudeKeyManager({
       window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT)); // chip của màn chat làm mới ngay
       setLabel('');
       setKey('');
-      setCheck(null);
-      message.success(t('ui.keys.added', 'Đã thêm API key.'));
+      // Key vừa thêm bị lõi đánh dấu "không hợp lệ": lõi ≤0.1.5 coi MỌI lỗi khác 200 là key sai (kể cả
+      // "hết credit"). Kiểm lại trực tiếp để nói đúng — key đã được lưu và đang dùng dù kết quả ra sao.
+      const added = [...next.keys].sort((x, y) => (y.addedAt || '').localeCompare(x.addedAt || ''))[0];
+      if (added && added.valid === false) {
+        const again = await checkAnthropicKey(k, window.fetch.bind(window) as unknown as FetchLike, { browser: true }).catch(() => null);
+        setCheck(again);
+        if (again?.ok) message.success(t('ui.keys.added', 'Đã thêm API key.'));
+        else message.warning(t('ui.keys.addedUnverified', 'Đã thêm key, nhưng Anthropic chưa chấp nhận — xem lý do bên dưới.'));
+      } else {
+        setCheck(null);
+        message.success(t('ui.keys.added', 'Đã thêm API key.'));
+      }
       onActiveChange?.();
     } catch (e) {
       const msg = (e as Error)?.message || '';
@@ -244,10 +259,10 @@ export function ClaudeKeyManager({
           />
           {check && (
             <Alert
-              type={check.ok ? 'success' : 'error'}
+              type={check.ok ? (check.warning ? 'warning' : 'success') : 'error'}
               showIcon
-              icon={check.ok ? <CheckCircleFilled /> : undefined}
-              message={check.ok ? `${t('ui.keys.validKey', 'Key hợp lệ')}${check.model ? ` (${t('ui.keys.triedModel', 'đã thử')} ${check.model})` : ''}` : check.error}
+              icon={check.ok && !check.warning ? <CheckCircleFilled /> : undefined}
+              message={check.ok ? check.warning || `${t('ui.keys.validKey', 'Key hợp lệ')}${check.model ? ` (${t('ui.keys.triedModel', 'đã thử')} ${check.model})` : ''}` : check.error}
             />
           )}
           <Space>

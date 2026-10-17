@@ -116,6 +116,8 @@ export interface KeyValidation {
   model?: string;
   /** Friendly Vietnamese reason when not ok. */
   error?: string;
+  /** Key ĐÚNG nhưng chưa dùng được ngay (vd tài khoản hết credit) — câu tiếng Việt kèm việc cần làm. */
+  warning?: string;
 }
 
 /**

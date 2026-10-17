@@ -1,4 +1,5 @@
 export * from './runtime';
+export * from './anthropicKeyCheck';
 export * from './skillCommand';
 export * from './skillContract';
 export * from './skillLearning';
