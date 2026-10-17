@@ -88,7 +88,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {!embedded && (
         <Paragraph type="secondary" style={{ margin: 0, fontSize: 12.5 }}>
-          {t('zsync.lead', 'Trợ lý chỉ đọc được tin Zalo mà Larkwave đang có. Lấy thêm tin cũ từ máy chủ Zalo, hoặc mở cửa sổ Zalo Web để xem/đồng bộ lịch sử đầy đủ (bạn bấm Đồng ý trên điện thoại).')}
+          {t('zsync.lead2', 'Đăng nhập Zalo MỘT LẦN bằng cửa sổ Zalo Web bên dưới (quét QR trong cửa sổ). Một đăng nhập đó dùng cho cả ĐỌC lịch sử lẫn GỬI tin. Trợ lý chỉ đọc được tin Larkwave đang có.')}
         </Paragraph>
       )}
 
@@ -108,7 +108,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
         accounts.map((a) => (
           <div key={a.accountId} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Text strong>{a.label}</Text>
-            <Tag color={a.status === 'ready' ? 'green' : 'orange'}>{a.status === 'ready' ? t('zsync.ready', 'đang kết nối') : a.status}</Tag>
+            <Tag color={a.status === 'ready' ? 'green' : 'default'}>{a.status === 'ready' ? t('zsync.ready', 'đã đăng nhập') : t('zsync.notHere', 'chưa đăng nhập ở đây')}</Tag>
             <Text type="secondary" style={{ fontSize: 12.5 }}>
               {a.messages
                 ? `${a.threads} ${t('zsync.threads', 'hội thoại')} · ${a.messages.toLocaleString('vi-VN')} ${t('zsync.msgs', 'tin')}${a.oldestTs ? ` · ${t('zsync.oldest', 'cũ nhất')} ${day(a.oldestTs)}` : ''}${a.storedBytes ? ` · ${t('zsync.stored', 'đã lưu')} ${mb(a.storedBytes)}` : ''}`
@@ -117,20 +117,6 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
           </div>
         ))
       )}
-
-      {/* Lấy từ máy chủ — dùng kết nối QR (zca), KHÔNG dùng cửa sổ Web */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <Space wrap>
-          <Button icon={<CloudDownloadOutlined />} disabled={!ready} loading={busy === 'server'} onClick={() => run('server', () => call('zaloHistoryFetch'), (r) => (r as { note?: string })?.note)}>
-            {t('zsync.server', 'Lấy thêm tin cũ từ máy chủ')}
-          </Button>
-        </Space>
-        <Text type="secondary" style={{ fontSize: 11.5 }}>
-          {ready
-            ? t('zsync.serverHint', 'Lấy lịch sử NHÓM từ máy chủ Zalo qua kết nối QR. Không cần cửa sổ Web. (Chat 1-1 cũ thường chỉ có qua cửa sổ Web.)')
-            : t('zsync.serverOff', 'Nút này cần kết nối QR (Kỹ năng → Kết nối → Zalo) đang bật. Nó đang tắt vì phiên QR đã đăng xuất — thường do bạn đăng nhập bằng cửa sổ Zalo Web (Zalo chỉ cho 1 phiên web). Dùng cửa sổ Web để đọc, hoặc kết nối lại QR (sẽ làm cửa sổ Web đăng xuất).')}
-        </Text>
-      </div>
 
       {/* Cửa sổ Zalo Web */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: `1px solid ${V.borderSub}`, borderRadius: 10 }}>
@@ -196,6 +182,17 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
           style={{ fontSize: 11.5 }}
           message={t('zsync.oneSession2', 'Lưu ý: Zalo chỉ cho một phiên web một lúc. Hãy đăng nhập Zalo Ở ĐÂY (trong cửa sổ). Nếu bạn còn bấm "Kết nối Zalo (quét QR)" ở Kỹ năng hay mở chat.zalo.me nơi khác, phiên sẽ bị đẩy qua đẩy lại.')}
         />
+      </div>
+
+      {/* Lấy từ máy chủ — phụ: chỉ chạy khi phiên đã sẵn sàng (gộp từ cửa sổ Web, hoặc kết nối QR) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Space wrap>
+          <Button size="small" icon={<CloudDownloadOutlined />} disabled={!ready} loading={busy === 'server'} onClick={() => run('server', () => call('zaloHistoryFetch'), (r) => (r as { note?: string })?.note)}>
+            {t('zsync.server', 'Lấy thêm tin cũ từ máy chủ')}
+          </Button>
+          {!ready && <Text type="secondary" style={{ fontSize: 11.5 }}>{t('zsync.serverNeedLogin', '(bật sau khi bạn đăng nhập trong cửa sổ Zalo Web)')}</Text>}
+        </Space>
+        {ready && <Text type="secondary" style={{ fontSize: 11.5 }}>{t('zsync.serverHint', 'Lấy lịch sử NHÓM từ máy chủ Zalo. (Chat 1-1 cũ thường chỉ có qua cửa sổ Web.)')}</Text>}
       </div>
 
       {/* Cài đặt lưu tin */}
