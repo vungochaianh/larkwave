@@ -2288,6 +2288,7 @@ export type ConnectorOp =
   | 'zaloWebReload'
   | 'zaloWebClose'
   | 'zaloWebStatus'
+  | 'zaloWebAdopt'
   | 'zaloWebRead'
   | 'gmailList'
   | 'gmailAdd'

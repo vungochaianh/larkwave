@@ -174,11 +174,27 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
         {web?.exists && !web.loggedIn && (
           <Alert type="info" showIcon style={{ fontSize: 12.5 }} message={t('zsync.webLoginHint', 'Cửa sổ đang ở trang đăng nhập — quét QR / đăng nhập ngay trong cửa sổ đó. Nếu điện thoại hỏi "đồng bộ tin nhắn", bấm Đồng ý để có lịch sử cũ.')} />
         )}
+        {web?.loggedIn && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Alert
+              type="success"
+              showIcon
+              style={{ fontSize: 12 }}
+              message={t('zsync.unified', 'Đây là nơi đăng nhập Zalo DUY NHẤT. Larkwave dùng chung phiên này cho cả đọc lịch sử (cửa sổ) lẫn gửi tin / lấy nhóm từ máy chủ — không phải quét QR ở thanh bên nữa. Giữ cửa sổ này mở trong lúc dùng.')}
+            />
+            <Space wrap>
+              <Button size="small" icon={<GlobalOutlined />} loading={busy === 'adopt'} onClick={() => run('adopt', () => call('zaloWebAdopt'), (r) => (r as { note?: string })?.note)}>
+                {ready ? t('zsync.adoptAgain', 'Gộp lại phiên để gửi tin') : t('zsync.adopt', 'Bật gửi tin bằng phiên này')}
+              </Button>
+              {ready && <Tag color="green">{t('zsync.sendReady', 'gửi tin: sẵn sàng')}</Tag>}
+            </Space>
+          </div>
+        )}
         <Alert
-          type="warning"
+          type="info"
           showIcon
-          style={{ fontSize: 12 }}
-          message={t('zsync.oneSession', 'Zalo chỉ cho một phiên web đăng nhập cùng lúc. Cửa sổ này và phần "Kết nối Zalo (quét QR)" ở Kỹ năng là HAI phiên khác nhau — đăng nhập cửa sổ sẽ làm phiên QR đăng xuất, và ngược lại. Để ĐỌC lịch sử cũ: dùng cửa sổ này. Để GỬI tin / nhận tin realtime: dùng kết nối QR.')}
+          style={{ fontSize: 11.5 }}
+          message={t('zsync.oneSession2', 'Lưu ý: Zalo chỉ cho một phiên web một lúc. Hãy đăng nhập Zalo Ở ĐÂY (trong cửa sổ). Nếu bạn còn bấm "Kết nối Zalo (quét QR)" ở Kỹ năng hay mở chat.zalo.me nơi khác, phiên sẽ bị đẩy qua đẩy lại.')}
         />
       </div>
 

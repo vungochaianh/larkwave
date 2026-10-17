@@ -511,6 +511,7 @@ function registerIpc(win: BrowserWindow) {
       if (op === 'zaloWebReload') return zaloService.webReload();
       if (op === 'zaloWebClose') return zaloService.webClose();
       if (op === 'zaloWebStatus') return zaloService.webStatus();
+      if (op === 'zaloWebAdopt') return zaloService.adoptWebSession();
       if (op === 'zaloWebRead') return zaloService.webRead({ ...(p.scrolls !== undefined ? { scrolls: Number(p.scrolls) } : {}) });
     } else if (op.startsWith('gmail')) {
       const { gmailService } = await import('./runtime/connectors/gmail/gmailService');

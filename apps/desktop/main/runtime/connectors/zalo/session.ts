@@ -692,6 +692,17 @@ export class ZaloSessionManager {
         }
     }
 
+    /**
+     * GỘP PHIÊN: đăng nhập zca bằng credentials cho sẵn (cookie lấy từ cửa sổ Zalo Web + imei nonce tự sinh).
+     * Dùng để zca và cửa sổ Zalo Web DÙNG CHUNG một phiên web (Zalo chỉ cho 1 phiên/lúc) — xem zaloWeb.ts.
+     * Cookie hợp lệ là đủ để `getLoginInfo` nhận phiên; imei chỉ là nonce bắt tay phía zca (không cần khớp cửa sổ).
+     */
+    async loginWithCredentials(creds: ZaloCredentials): Promise<ZaloSession> {
+        const client = await this.clientOrCreate();
+        const api = await client.login(creds);
+        return this.attach(api, creds);
+    }
+
     // ── Đăng nhập bằng QR ────────────────────────────────────────────────────
 
     /**

@@ -13,9 +13,10 @@
  *  - "Cửa sổ Zalo Web" (zaloWeb.ts): mở chat.zalo.me CHÍNH THỨC bằng cookie của phiên này (cùng phiên, khỏi
  *    quét QR lại); người dùng tự đồng bộ trên điện thoại rồi Larkwave ĐỌC NỘI DUNG ĐANG HIỂN THỊ (không giải mã).
  */
+import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { app, safeStorage } from 'electron';
-import { ZaloSessionManager, type ChannelContext, type QrLoginSnapshot, type ZaloMessage, type ZaloSession } from './session';
+import { ZaloSessionManager, type ChannelContext, type QrLoginSnapshot, type ZaloCredentials, type ZaloMessage, type ZaloSession } from './session';
 import { ZaloMessageBook, MAX_PER_THREAD, MAX_THREADS, fold, type ZaloThreadSummary } from './messages';
 import { ZaloStore, PERSIST_MAX_THREADS, retentionCutoff, type ZaloSyncSettings } from './zaloStore';
 import { zaloWeb, type ZaloWebRead, type ZaloWebStatus } from './zaloWeb';
@@ -60,6 +61,7 @@ class ZaloService {
   private readonly loaded = new Set<string>();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private quitHooked = false;
+  private adoptTried = false;
 
   private connectorsDir(): string {
     return join(app.getPath('userData'), 'connectors');
@@ -439,10 +441,43 @@ class ZaloService {
     }
   }
 
+  /**
+   * GỘP PHIÊN: lấy phiên đã đăng nhập trong CỬA SỔ ZALO WEB đưa cho zca (gửi tin / lấy nhóm từ máy chủ dùng
+   * CHUNG một phiên — Zalo chỉ cho 1 phiên web/lúc). Cookie của cửa sổ là đủ; imei là nonce zca tự sinh.
+   */
+  async adoptWebSession(): Promise<{ ok: boolean; account?: string; note: string }> {
+    if (zaloWeb.status().loggedIn !== true) return { ok: false, note: 'Cửa sổ Zalo Web chưa đăng nhập — đăng nhập (quét QR) TRONG CỬA SỔ đó trước.' };
+    const sess = await zaloWeb.exportSession();
+    if (!sess) return { ok: false, note: 'Chưa lấy được phiên từ cửa sổ Zalo Web (chưa đăng nhập xong?).' };
+    const imei = `${randomUUID()}-${createHash('md5').update(sess.userAgent).digest('hex')}`;
+    const creds: ZaloCredentials = { imei, userAgent: sess.userAgent, cookie: { cookies: sess.cookies }, language: 'vi' };
+    try {
+      const session = await this.manager().loginWithCredentials(creds);
+      this.adoptTried = true;
+      return { ok: true, account: session.label, note: `Đã gộp phiên: "${session.label}" giờ gửi tin / lấy nhóm từ máy chủ dùng chung phiên của cửa sổ Zalo Web.` };
+    } catch (e) {
+      return { ok: false, note: `Chưa gộp được phiên: ${(e as Error)?.message || e}. Vẫn đọc được lịch sử qua cửa sổ; muốn gửi tin thì kết nối QR ở Kỹ năng (sẽ làm cửa sổ đăng xuất).` };
+    }
+  }
+
+  /** Tự gộp MỘT lần khi cửa sổ đã đăng nhập mà zca chưa sẵn sàng — để "một đăng nhập" chạy ngầm, không cần bấm. */
+  private async autoAdopt(): Promise<void> {
+    if (this.adoptTried) return;
+    if (zaloWeb.status().loggedIn !== true) return;
+    if (this.manager().readySessions().length) {
+      this.adoptTried = true;
+      return;
+    }
+    this.adoptTried = true;
+    await this.adoptWebSession().catch(() => undefined);
+  }
+
   /** Mở (và hiện) cửa sổ Zalo Web. Nhét sẵn cookie phiên để vào thẳng, không phải quét QR lại. */
   async webOpen(opts: { account?: string; show?: boolean } = {}): Promise<ZaloWebStatus> {
     await this.seedWeb(opts.account);
-    return zaloWeb.open(opts.show !== false);
+    const st = await zaloWeb.open(opts.show !== false);
+    if (st.loggedIn === true) void this.autoAdopt();
+    return st;
   }
   webShow(): ZaloWebStatus {
     return zaloWeb.show();

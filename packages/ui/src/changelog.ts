@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.9',
+    date: '2026-10-17',
+    items: [
+      "Zalo giờ chỉ cần MỘT lần đăng nhập: đăng nhập trong cửa sổ Zalo Web (quét QR trong đó) là xong — Larkwave dùng chung phiên đó cho cả ĐỌC lịch sử lẫn GỬI tin / lấy nhóm từ máy chủ, không phải quét QR riêng ở thanh bên nữa (Zalo chỉ cho một phiên web một lúc).",
+      "Thêm nút «Bật gửi tin bằng phiên này» ở Cài đặt → Đồng bộ tin Zalo (tự bật sẵn sau khi bạn đăng nhập cửa sổ). Sửa lời mô tả cho đúng: cửa sổ Zalo Web là nơi đăng nhập Zalo chính.",
+      "Lưu ý: phần gộp phiên để gửi tin là mới, cần thử trên tài khoản Zalo thật; nếu gửi chưa được thì bấm lại nút gộp phiên, hoặc báo mình.",
+    ],
+  },
+  {
     version: '0.1.8',
     date: '2026-10-17',
     items: [

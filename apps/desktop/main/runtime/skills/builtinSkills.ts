@@ -331,7 +331,7 @@ Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch s
 Người dùng nhờ nhắn/gửi tin Zalo cho một người hoặc một nhóm (kể cả "trả lời tin này"), một lần hay lặp lại theo giờ ("cứ 1 phút gửi một lần", "mỗi sáng 8h nhắn nhóm…").
 
 ## Các bước (đúng thứ tự)
-1. \`zalo_status\` — chưa kết nối thì DỪNG, nói ngắn: bấm nút **«Kết nối Zalo (quét QR)»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Zalo).
+1. \`zalo_status\` — chưa kết nối thì DỪNG, nói ngắn: cách gọn nhất là mở **Cài đặt → Đồng bộ tin Zalo → Mở cửa sổ Zalo Web**, đăng nhập (quét QR) TRONG CỬA SỔ đó rồi bấm «Bật gửi tin bằng phiên này» — một lần đăng nhập dùng cho cả gửi lẫn đọc. (Hoặc nút «Kết nối Zalo (quét QR)» ở Kỹ năng, nhưng nếu đang dùng cửa sổ Zalo Web thì cách đó sẽ làm cửa sổ đăng xuất — Zalo chỉ cho 1 phiên web.)
 2. **Xác định người nhận** chắc chắn đúng người/nhóm: \`zalo_find_user\` {phone} / \`zalo_list_friends\` {query} / \`zalo_list_groups\` {query} / \`zalo_list_chats\` {query}. Nhiều kết quả cùng tên → hỏi lại người dùng, KHÔNG đoán. Đã rõ (vd "nhóm đó" vừa nói ở trên) thì dùng luôn threadId đã có.
 3. **Soạn** đúng ý người dùng (giữ nguyên câu chữ nếu họ đã viết sẵn). Cần giờ hiện tại → lấy từ dòng "Bây giờ là …" ở khối ngữ cảnh của lượt (lúc chạy theo lịch: dòng giờ ở đầu prompt).
 4. **Gửi một lần**: \`zalo_send_text\` {threadId, text, isGroup, recipientName}. Công tắc "Tự động" bật → gửi luôn; tắt → app hiện hộp xác nhận. Nhiều người nhận → gọi lần lượt, mỗi người một tin.

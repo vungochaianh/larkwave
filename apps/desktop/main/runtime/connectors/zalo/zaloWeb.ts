@@ -20,7 +20,7 @@ import type { ZaloWebCookie } from './session';
 
 const ZALO_WEB_URL = 'https://chat.zalo.me/';
 const PARTITION = 'persist:zalo-web';
-const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36';
+export const ZALO_WEB_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36';
 
 /** Đã ĐĂNG NHẬP khi URL đã ổn định ở chat.zalo.me (KHÔNG phải trang login). Chưa: host id.zalo.me, hoặc /login, /qr. */
 function urlLoggedIn(url: string): boolean | undefined {
@@ -191,7 +191,7 @@ class ZaloWeb {
         win.show();
         win.focus();
       }
-      await win.loadURL(ZALO_WEB_URL, { userAgent: CHROME_UA }).catch(() => undefined);
+      await win.loadURL(ZALO_WEB_URL, { userAgent: ZALO_WEB_UA }).catch(() => undefined);
       await this.settle();
     } else if (show && !hiddenMode()) {
       this.win!.show();
@@ -242,6 +242,28 @@ class ZaloWeb {
       loggedIn: urlLoggedIn(url),
       ...(this.lastReadAt ? { lastReadAt: this.lastReadAt } : {}),
     };
+  }
+
+  /**
+   * Lấy phiên web hiện tại (cookie trong partition + UA) để GỘP sang zca (loginWithCredentials). Dạng cookie
+   * theo tough-cookie JSON để zca `parseCookies` nạp được. Chưa đăng nhập ⇒ null.
+   */
+  async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string } | null> {
+    if (!this.alive() || this.status().loggedIn !== true) return null;
+    const cs = await electronSession.fromPartition(PARTITION).cookies.get({}).catch(() => []);
+    const cookies = cs
+      .filter((c) => /(^|\.)(zalo\.me|zadn\.vn|zdn\.vn)$/i.test(c.domain || ''))
+      .map((c) => ({
+        key: c.name,
+        value: c.value,
+        domain: (c.domain || '').replace(/^\./, ''),
+        path: c.path || '/',
+        secure: !!c.secure,
+        httpOnly: !!c.httpOnly,
+        hostOnly: !(c.domain || '').startsWith('.'),
+        ...(c.expirationDate ? { expires: new Date(c.expirationDate * 1000).toISOString() } : {}),
+      }));
+    return cookies.length ? { cookies, userAgent: ZALO_WEB_UA } : null;
   }
 
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
