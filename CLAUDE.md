@@ -5,9 +5,8 @@ Toolswave ngày 06/10/2026. Màn chính là **Lark × Agents**: chat với một
 web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo automation/workflow (luôn để
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
-
 **Trạng thái (17/10/2026):**
-- Bản **0.1.6 macOS đã phát hành**: https://toolswave.net/larkwave.
+- Bản **0.1.7 macOS đã phát hành**: https://toolswave.net/larkwave.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows.
 - Bản cài ký ad-hoc, chưa notarize.
@@ -114,8 +113,26 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   (`/Users/deveris/Fbinbox_Workspace/fbinbox-sender`), nơi AI không bao giờ cầm kênh.
 - Phiên Zalo chép nguyên từ Social Wave: `apps/desktop/main/runtime/connectors/zalo/session.ts`, kèm bộ test gốc
   `session.test.ts`. Chỉ thêm phần đọc tin, nhóm và gửi vào nhóm; đừng sửa máy trạng thái QR hay kho khoá.
-- Tin Zalo chỉ giữ trong bộ nhớ (`messages.ts`). Gmail dùng mật khẩu ứng dụng: gửi qua SMTP, đọc qua IMAP ở chế
-  độ `readOnly`.
+- Tin Zalo ở `messages.ts` (sổ trong bộ nhớ); từ 0.1.7 lưu được ra đĩa MÃ HOÁ (`zaloStore.ts`, safeStorage) khi
+  người dùng bật ở Cài đặt → Đồng bộ tin Zalo. Gmail dùng mật khẩu ứng dụng: gửi qua SMTP, đọc qua IMAP `readOnly`.
+
+### Đọc tin Zalo CŨ (0.1.7) — KHÔNG giải mã tệp đồng bộ
+- Vì sao: Larkwave đăng nhập Zalo như thiết bị "Web" nên chỉ thấy tin từ lúc kết nối + ít tin máy chủ còn giữ.
+  Lịch sử đầy đủ (nhất là chat 1-1) nằm trên điện thoại.
+- Ba đường, theo thứ tự ưu tiên:
+  1. **Lịch sử nhóm**: `groupHistory` dùng kho tin cloud `getrecentv2` (endpoint cũ `/api/group/history` Zalo đã bỏ
+     → 404/rỗng, chính là bug "đọc nhóm chỉ ra vài tin"). Phân trang lùi bằng `lastMsgId`.
+  2. **`fetchHistory`** (nút "Lấy thêm tin cũ từ máy chủ" / `zalo_sync {action:"server"}`): nhóm qua cloud + 1-1/nhóm
+     qua `requestOldMessages` của listener. Không cần điện thoại.
+  3. **Cửa sổ Zalo Web** (`zaloWeb.ts`): mở chat.zalo.me CHÍNH THỨC trong một BrowserWindow, NHÉT cookie phiên zca
+     (`webCookies()` trong session.ts) nên cùng một phiên web (Zalo chỉ cho 1 phiên web/lúc → không đá nhau, khỏi
+     quét QR lại). Người dùng tự mở hội thoại + bấm Đồng ý đồng bộ trên ĐIỆN THOẠI; `zalo_web_read` đọc innerText
+     vùng tin (cuộn lên tải thêm). Đọc nội dung đã hiển thị, KHÔNG parse class CSS, KHÔNG giải mã.
+- **CẤM**: KHÔNG viết mã giải mã tệp đồng bộ `.db.crypt`/`pull_mobile_msg` (định dạng riêng của Zalo) — bộ lọc an
+  toàn chặn, và đã bỏ hẳn hướng đó. Lịch sử cũ chỉ lấy qua 3 đường trên.
+- Công cụ: `zalo_search_messages` (tìm chữ/thời gian), `zalo_sync` (status/server), `zalo_web_open`, `zalo_web_read`.
+  Kỹ năng: 'Đọc & tóm tắt tin Zalo' (v3) + 'Đồng bộ tin Zalo' (/zalo-dong-bo). Giao diện: `ZaloSyncPanel.tsx`.
+- Phần đọc nội dung cửa sổ Web là best-effort (selector/innerText) — CHƯA thử trên Zalo thật.
 - **Cái chốt duy nhất** là `connectorGate` trong `lark/tools/connectors.ts`. Một công cụ `zalo_*` / `gmail_*` chạy khi:
   - lượt đó có `connectors` trong ngữ cảnh. Chỉ hai nơi gắn trường này: `larkService.chat` (lượt của chính chủ
     máy) và `runAutomationAgent` cho lịch có `rule.connectorTools`. Bot Lark và lượt chia sẻ KHÔNG BAO GIỜ có.
