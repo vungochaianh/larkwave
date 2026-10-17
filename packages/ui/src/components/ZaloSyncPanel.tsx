@@ -118,12 +118,19 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
         ))
       )}
 
-      {/* Lấy từ máy chủ */}
-      <Space wrap>
-        <Button icon={<CloudDownloadOutlined />} disabled={!ready} loading={busy === 'server'} onClick={() => run('server', () => call('zaloHistoryFetch'), (r) => (r as { note?: string })?.note)}>
-          {t('zsync.server', 'Lấy thêm tin cũ từ máy chủ')}
-        </Button>
-      </Space>
+      {/* Lấy từ máy chủ — dùng kết nối QR (zca), KHÔNG dùng cửa sổ Web */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Space wrap>
+          <Button icon={<CloudDownloadOutlined />} disabled={!ready} loading={busy === 'server'} onClick={() => run('server', () => call('zaloHistoryFetch'), (r) => (r as { note?: string })?.note)}>
+            {t('zsync.server', 'Lấy thêm tin cũ từ máy chủ')}
+          </Button>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 11.5 }}>
+          {ready
+            ? t('zsync.serverHint', 'Lấy lịch sử NHÓM từ máy chủ Zalo qua kết nối QR. Không cần cửa sổ Web. (Chat 1-1 cũ thường chỉ có qua cửa sổ Web.)')
+            : t('zsync.serverOff', 'Nút này cần kết nối QR (Kỹ năng → Kết nối → Zalo) đang bật. Nó đang tắt vì phiên QR đã đăng xuất — thường do bạn đăng nhập bằng cửa sổ Zalo Web (Zalo chỉ cho 1 phiên web). Dùng cửa sổ Web để đọc, hoặc kết nối lại QR (sẽ làm cửa sổ Web đăng xuất).')}
+        </Text>
+      </div>
 
       {/* Cửa sổ Zalo Web */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: `1px solid ${V.borderSub}`, borderRadius: 10 }}>
@@ -134,7 +141,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
           {web?.exists && !web.visible && <Tag>{t('zsync.webHidden', 'đang ẩn')}</Tag>}
         </div>
         <Text type="secondary" style={{ fontSize: 12.5 }}>
-          {t('zsync.webDesc', 'Mở trang Zalo chính thức ngay trong Larkwave bằng chính phiên đã đăng nhập (không cần quét QR lại). Mở đúng hội thoại trong cửa sổ này, bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi — Larkwave sẽ đọc được lịch sử hiển thị ở đó. Giữ cửa sổ này mở trong lúc dùng.')}
+          {t('zsync.webDesc2', 'Mở trang Zalo chính thức ngay trong Larkwave. ĐĂNG NHẬP RIÊNG trong cửa sổ này (quét QR trong cửa sổ), rồi mở đúng hội thoại, bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi — Larkwave đọc được lịch sử hiển thị ở đó (kể cả chat 1-1 cũ). Giữ cửa sổ mở trong lúc dùng.')}
         </Text>
         <Space wrap>
           {!web?.exists || !web.visible ? (
@@ -167,6 +174,12 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
         {web?.exists && !web.loggedIn && (
           <Alert type="info" showIcon style={{ fontSize: 12.5 }} message={t('zsync.webLoginHint', 'Cửa sổ đang ở trang đăng nhập — quét QR / đăng nhập ngay trong cửa sổ đó. Nếu điện thoại hỏi "đồng bộ tin nhắn", bấm Đồng ý để có lịch sử cũ.')} />
         )}
+        <Alert
+          type="warning"
+          showIcon
+          style={{ fontSize: 12 }}
+          message={t('zsync.oneSession', 'Zalo chỉ cho một phiên web đăng nhập cùng lúc. Cửa sổ này và phần "Kết nối Zalo (quét QR)" ở Kỹ năng là HAI phiên khác nhau — đăng nhập cửa sổ sẽ làm phiên QR đăng xuất, và ngược lại. Để ĐỌC lịch sử cũ: dùng cửa sổ này. Để GỬI tin / nhận tin realtime: dùng kết nối QR.')}
+        />
       </div>
 
       {/* Cài đặt lưu tin */}
@@ -230,9 +243,9 @@ export function ZaloSyncFaq() {
   const qa: [string, string, string][] = [
     ['few', t('zsync.q1', 'Vì sao trợ lý chỉ đọc được vài tin Zalo?'), t('zsync.a1', 'Larkwave đăng nhập Zalo như một thiết bị "Web". Thiết bị mới chỉ thấy tin đến từ lúc kết nối, cộng một ít tin gần đây máy chủ Zalo còn giữ. Lịch sử đầy đủ (nhất là chat 1-1) nằm trên điện thoại của bạn.')],
     ['server', t('zsync.q2', '"Lấy thêm tin cũ từ máy chủ" lấy được gì?'), t('zsync.a2', 'Lấy thêm những gì Zalo còn lưu trên máy chủ — nhóm thường được khá nhiều, chat 1-1 thường ít. Không cần điện thoại, bấm là chạy. Cần cũ hơn nữa thì dùng cửa sổ Zalo Web.')],
-    ['web', t('zsync.q3', 'Cửa sổ Zalo Web dùng thế nào?'), t('zsync.a3', 'Bấm "Mở cửa sổ Zalo Web" — nó mở trang Zalo chính thức bằng chính phiên bạn đã đăng nhập (không phải quét QR lại). Mở đúng hội thoại cần xem; nếu điện thoại hiện thông báo "đồng bộ tin nhắn", bấm Đồng ý trên điện thoại. Khi tin đã hiện trong cửa sổ, nhờ trợ lý đọc ("đọc hội thoại Zalo đang mở giúp tôi"). Giữ cửa sổ này mở trong lúc dùng.')],
+    ['web', t('zsync.q3', 'Cửa sổ Zalo Web dùng thế nào?'), t('zsync.a3b', 'Bấm "Mở cửa sổ Zalo Web" — nó mở trang Zalo chính thức. Lần đầu bạn QUÉT QR NGAY TRONG CỬA SỔ đó (đây là lần đăng nhập riêng của cửa sổ). Mở đúng hội thoại cần xem; nếu điện thoại hiện thông báo "đồng bộ tin nhắn", bấm Đồng ý trên điện thoại. Khi tin đã hiện trong cửa sổ, nhờ trợ lý đọc ("đọc hội thoại Zalo đang mở giúp tôi"). Giữ cửa sổ này mở trong lúc dùng.')],
     ['safe', t('zsync.q4', 'Có an toàn không? Tin lưu ở đâu?'), t('zsync.a4', 'Cửa sổ Zalo Web là trang Zalo chính thức chạy trên máy bạn, dùng phiên của bạn — Larkwave không tự gửi tin nhắn đi đâu. Chỉ khi bạn nhờ trợ lý đọc/tìm, phần tin đó mới được gửi cho mô hình AI đang chạy lượt đó (Claude, Gemini…; dùng gói Larkwave thì đi qua máy chủ Toolswave). Bật "Lưu tin trên máy" thì sổ tin mã hoá bằng kho khoá của máy và chỉ nằm trên máy này.')],
-    ['kick', t('zsync.q5', 'Có làm văng Zalo đang dùng không?'), t('zsync.a5', 'Cửa sổ Zalo Web dùng chung phiên QR mà Larkwave đã đăng nhập nên thường không phát sinh phiên mới. Lưu ý: Zalo chỉ cho một phiên web một lúc — nếu bạn còn mở chat.zalo.me trên trình duyệt khác, hai bên có thể đẩy nhau ra và phải quét QR lại. Zalo trên điện thoại không bị đăng xuất.')],
+    ['kick', t('zsync.q5', 'Có làm văng Zalo đang dùng không?'), t('zsync.a5b', 'CÓ — nhưng chỉ phiên WEB. Zalo chỉ cho một phiên web đăng nhập cùng lúc, nên đăng nhập cửa sổ Zalo Web sẽ làm phần "Kết nối Zalo (quét QR)" ở Kỹ năng đăng xuất (và ngược lại). Đây là giới hạn của Zalo. Cách dùng: ĐỌC lịch sử cũ thì dùng cửa sổ; GỬI tin / nhận realtime thì dùng kết nối QR; cần cả hai thì chuyển qua lại. Zalo trên ĐIỆN THOẠI không bao giờ bị đăng xuất.')],
     ['ai', t('zsync.q6', 'Trợ lý dùng tin Zalo thế nào?'), t('zsync.a6', 'Hỏi tự nhiên trong Lark × Agents: "tóm tắt nhóm Kho tháng 9", "tìm tin nhắc tới đơn DH-12", "đọc hội thoại Zalo đang mở". Trợ lý chỉ đọc khi bạn hỏi, và chỉ trong cuộc trò chuyện của chính bạn — bot Lark trong nhóm hay người được chia sẻ không đọc được Zalo của bạn.')],
     ['off', t('zsync.q7', 'Tắt lưu hoặc xoá tin thì sao?'), t('zsync.a7', 'Tắt "Lưu tin trên máy" thì bản đã lưu bị xoá ngay; tin chỉ còn trong lúc app mở. "Xoá tin đã lưu" xoá sạch sổ tin của Larkwave. Tin trên Zalo (điện thoại, máy chủ) không bị ảnh hưởng. Đăng xuất Zalo trong Larkwave cũng xoá sổ tin của tài khoản đó.')],
   ];
