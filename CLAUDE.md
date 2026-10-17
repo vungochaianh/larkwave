@@ -117,12 +117,21 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 - Tin Zalo chỉ giữ trong bộ nhớ (`messages.ts`). Gmail dùng mật khẩu ứng dụng: gửi qua SMTP, đọc qua IMAP ở chế
   độ `readOnly`.
 - **Cái chốt duy nhất** là `connectorGate` trong `lark/tools/connectors.ts`. Một công cụ `zalo_*` / `gmail_*` chạy khi:
-  - lượt đó có `connectors` trong ngữ cảnh. Chỉ `larkService.chat` (lượt của chính chủ máy) gắn trường này. Bot
-    Lark, lịch tự động và lượt chia sẻ đều KHÔNG có. Thiếu chốt này, người lạ nhắn bot là đọc được Zalo của chủ máy;
-  - và một kỹ năng đã nạp vào lượt nhắc ĐÚNG TÊN công cụ đó (lệnh "/", khớp từ khoá, hoặc `skill_get`).
-- Gửi (`zalo_send_text`, `gmail_send`) mang cờ `alwaysConfirm`: luôn hỏi, thắng cả "Tự động duyệt". Hộp xác nhận
-  không cho "luôn cho phép". Nhịp gửi: Zalo sàn 8 giây và trần 30 tin/giờ; Gmail 10 người nhận/thư và 40 thư/giờ.
-  Đừng hạ các ngưỡng này.
+  - lượt đó có `connectors` trong ngữ cảnh. Chỉ hai nơi gắn trường này: `larkService.chat` (lượt của chính chủ
+    máy) và `runAutomationAgent` cho lịch có `rule.connectorTools`. Bot Lark và lượt chia sẻ KHÔNG BAO GIỜ có.
+    Thiếu chốt này, người lạ nhắn bot là đọc được Zalo của chủ máy;
+  - và tên công cụ đã được mở: một kỹ năng đã nạp nhắc ĐÚNG TÊN (lệnh "/", khớp từ khoá, `skill_get`), hoặc
+    quyền của lịch.
+- Lịch: `connectorGrantForSchedule` tính quyền LÚC TẠO lịch, và chỉ cấp khi lượt đang tạo có `connectors`. Lịch có
+  connector luôn chạy `runOn:'desktop'`. Gửi trong lịch thuộc loại `send` của unattendedPolicy (cần quyền Gửi tin).
+- Gửi (`zalo_send_text`, `gmail_send`) là thao tác ghi như mọi thao tác khác: Tự động TẮT thì hỏi, BẬT thì chạy
+  luôn. **Không có trần số tin.** Người dùng đổi ý ngày 17/10/2026: "muốn gửi thế nào thì gửi, chỉ cần cảnh báo
+  tài khoản Zalo". `connectors/sendPace.ts` chỉ giữ sàn 2 giây và trả `warning`. Đừng thêm lại trần hay
+  `alwaysConfirm`.
+- Công tắc "Tự động" của hội thoại Lark: `autoApproveTool` trả `'all'` ⇒ mọi thao tác ghi chạy luôn, TRỪ xoá
+  (`isDeleteToolName` trong `larkToolExec.ts`). Lượt không người trông vẫn dùng hàm trả boolean (chỉ cộng thêm).
+- Lịch có `maxRuns` (đủ số lần thì tự tắt) và nhịp chu kỳ tính từ lúc BẮT ĐẦU chạy. Mỗi lượt chat và mỗi lần lịch
+  chạy đều kèm dòng giờ Việt Nam (`nowLine` trong `systemPrompt.ts`).
 - Bộ kỹ năng dựng sẵn "Zalo & Gmail" nằm ở `skills/builtinSkills.ts` (`CONNECTOR_TAGS`). Phải có hợp đồng, mục
   "## Khi lỗi", và chỉ nhắc công cụ có thật; `test/skillsBuiltin.cjs` canh những điều này.
 - Chưa kiểm với tài khoản Zalo/Gmail thật (17/10/2026): chỉ có test với client giả và `connectors-smoke`.

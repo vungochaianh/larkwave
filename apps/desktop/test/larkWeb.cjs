@@ -340,11 +340,11 @@ const test = async (name, fn) => {
     assert.ok(sp.buildWorkflowSystemPrompt({ openApi: true }).includes('bitable_workflow_create'));
     assert.ok(/CHƯA CHỌN BASE/.test(sp.buildWorkflowSystemPrompt({})));
   });
-  await test('larkService: (hợp nhất) KHÔNG dùng Tự động duyệt chung cho lượt Lark; công tắc riêng chỉ duyệt tool additive', () => {
+  await test('larkService: (hợp nhất) KHÔNG dùng Tự động duyệt chung cho lượt Lark; công tắc riêng BẬT = mọi thao tác trừ xoá', () => {
     const src = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
     assert.ok(/const autoApprove = workflowTurn \? false/.test(src));
     assert.ok(/!workflowTurn && this\.store\.getSettings\(\)\.autoApprove/.test(src));
-    assert.ok(/const autoApproveTool = workflowTurn \? \(name: string\) => this\.workflowAutoOn\(\) && isAdditiveTool\(name\)/.test(src));
+    assert.ok(/const autoApproveTool = workflowTurn \? \(_name: string\): boolean \| 'all' => \(this\.workflowAutoOn\(\) \? 'all' : false\)/.test(src), 'Tự động BẬT ⇒ "all" (mọi thao tác trừ xoá)');
     assert.ok(/workflowAuto !== false/.test(src), 'mặc định BẬT');
   });
 
@@ -366,6 +366,20 @@ const test = async (name, fn) => {
     assert.strictEqual(exec.needsConfirmation({ name: 'x', gated: false }, {}), false);
     assert.strictEqual(exec.needsConfirmation({ name: 'x', gated: true }, {}, true), false, 'preflight đã chặn → không hỏi');
     assert.strictEqual(exec.needsConfirmation({ name: 'x', gated: true }, { autoApprove: true }), false);
+  });
+  await test("công tắc Tự động BẬT ('all'): mọi thao tác ghi chạy luôn — sửa, ghi đè, gửi tin, tạo lịch — TRỪ xoá", () => {
+    const all = { autoApproveTool: () => 'all' };
+    const gated = tools.allTools().filter((x) => x.gated);
+    const dels = gated.filter((x) => exec.isDeleteToolName(x.name));
+    assert.ok(dels.length >= 3 && dels.some((x) => x.name === 'lark_web_delete'), 'có tool xoá để kiểm');
+    for (const t of gated) assert.strictEqual(exec.needsConfirmation(t, all, false, {}), exec.isDeleteToolName(t.name), t.name);
+    for (const n of ['lark_web_update_records', 'messaging_send_message', 'schedule_agent_job', 'zalo_send_text', 'gmail_send']) {
+      const t = tools.resolveTool(n);
+      if (t) assert.strictEqual(exec.needsConfirmation(t, all), false, n + ' không hỏi khi Tự động bật');
+    }
+    // TẮT ⇒ hỏi mọi thao tác ghi không cộng thêm (như cũ).
+    for (const t of gated.filter((x) => !x.additive)) assert.strictEqual(exec.needsConfirmation(t, { autoApproveTool: () => false }), true, t.name);
+    assert.ok(!exec.isDeleteToolName('lark_web_update_records') && exec.isDeleteToolName('bitable_delete_record') && exec.isDeleteToolName('bitable_remove_role_member'));
   });
   await test('additive chỉ gắn cho thao tác CỘNG THÊM: không tool xoá/sửa/bật/gửi nào là additive', () => {
     const add = tools.allTools().filter((t) => t.additive);

@@ -208,6 +208,9 @@ export class AutomationEngine {
       ...(input.files ? { files: input.files } : {}),
       ...(input.permissions ? { permissions: input.permissions } : {}),
       ...(input.runOn ? { runOn: input.runOn } : {}),
+      // Giới hạn số lần: 0/âm từ giao diện = gỡ giới hạn (ghi undefined để `...prev, ...clean` xoá được).
+      ...(input.maxRuns !== undefined ? { maxRuns: Number(input.maxRuns) > 0 ? Math.floor(Number(input.maxRuns)) : undefined } : {}),
+      ...(Array.isArray(input.connectorTools) ? { connectorTools: input.connectorTools.map(String).slice(0, 20) } : {}),
     };
     if (input.id) {
       const idx = list.findIndex((r) => r.id === input.id);
@@ -255,7 +258,10 @@ export class AutomationEngine {
       if (same >= 0) {
         // Cập nhật tại chỗ và GIỮ NGUYÊN lastRunAt: nếu xoá đi thì lịch vừa "được tạo lại" sẽ
         // coi khung giờ hôm nay là chưa chạy và bắn thêm một lần nữa.
-        list[same] = { ...list[same], ...clean, id: list[same].id };
+        const prev = list[same];
+        // Lịch đã tự tắt vì đủ số lần mà người dùng đặt lại ⇒ đếm lại từ đầu (không thì chạy 1 lần rồi tắt).
+        const capped = !!prev.maxRuns && (prev.runCount ?? 0) >= prev.maxRuns && !prev.enabled && clean.enabled;
+        list[same] = { ...prev, ...clean, id: prev.id, ...(capped ? { runCount: 0 } : {}) };
       } else {
         list.push({
           ...clean,
@@ -282,7 +288,11 @@ export class AutomationEngine {
   setEnabled(id: string, on: boolean): StoredAutomation[] {
     const list = this.ensure();
     const r = list.find((x) => x.id === id);
-    if (r) r.enabled = on;
+    if (r) {
+      // Bật lại một lịch đã tự tắt vì đủ số lần ⇒ chạy lại đủ N lần nữa (không thì chạy 1 lần rồi tắt ngay).
+      if (on && !r.enabled && r.maxRuns && (r.runCount ?? 0) >= r.maxRuns) r.runCount = 0;
+      r.enabled = on;
+    }
     this.flush();
     this.start();
     return list;
@@ -393,7 +403,9 @@ export class AutomationEngine {
         await this.runAction(rule, { record_id: 'schedule', fields: {} }, c as LarkClient);
         matched = 1;
         fired = 1;
-        rule.lastRunAt = new Date().toISOString();
+        // Mốc = lúc BẮT ĐẦU: "cứ 1 phút một lần" tính từ đầu lần trước, không phải từ lúc nó chạy xong
+        // (một lượt agent mất 20–40 giây ⇒ tính từ lúc xong thì thực tế thành 1 phút rưỡi).
+        rule.lastRunAt = new Date(beganMs).toISOString();
         rule.lastError = undefined;
         rule.runCount = (rule.runCount ?? 0) + 1;
         this.flush();
@@ -422,7 +434,7 @@ export class AutomationEngine {
       this.flush();
     } catch (e) {
       error = (e as Error)?.message || 'Lỗi khi chạy quy tắc.';
-      rule.lastRunAt = new Date().toISOString();
+      rule.lastRunAt = new Date(rule.triggerType === 'schedule' ? beganMs : Date.now()).toISOString();
       rule.lastError = error;
       rule.runCount = (rule.runCount ?? 0) + 1;
       // Lần HỎNG cũng phải vào lịch sử — đó mới là lúc người ta mở ra xem. Ghi ở đây chứ không ở
@@ -439,6 +451,11 @@ export class AutomationEngine {
       this.flush();
     } finally {
       this.running.delete(id);
+      // Đủ số lần ("30 lần là dừng") ⇒ TẮT, không xoá: lịch sử còn đó, bật lại được.
+      if (rule.maxRuns && (rule.runCount ?? 0) >= rule.maxRuns && rule.enabled) {
+        rule.enabled = false;
+        this.flush();
+      }
     }
     return { matched, fired, error };
   }

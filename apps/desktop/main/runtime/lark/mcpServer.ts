@@ -43,7 +43,7 @@ export interface McpToolContext {
    *  as non-gated so the UI shows no modal). */
   autoApprove?: boolean;
   /** Xem ToolExecContext.autoApproveTool / needsConfirmation. */
-  autoApproveTool?: (name: string) => boolean;
+  autoApproveTool?: (name: string) => boolean | 'all';
   /** Nhịp giữ kết nối SSE khi tools/call đang chờ (mặc định MCP_HEARTBEAT_MS) — test đặt ngắn. */
   heartbeatMs?: number;
   /** Xem ToolExecContext.allowVersionHint — mặc định KHÔNG nhắc. */

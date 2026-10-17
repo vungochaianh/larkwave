@@ -29,6 +29,8 @@ export interface LarkMaicAgentDeps {
   sessionId?: string;
   extraTools?: LarkToolDef[];
   autoApprove: boolean;
+  /** Công tắc "Tự động" của hội thoại Lark: 'all' = mọi thao tác ghi chạy luôn, trừ xoá (needsConfirmation). */
+  autoApproveTool?: (name: string) => boolean | 'all';
   awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
   allowVersionHint?: boolean;
   signal?: AbortSignal;

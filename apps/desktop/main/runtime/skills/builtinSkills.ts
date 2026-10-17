@@ -278,30 +278,37 @@ Người dùng muốn xem hoặc tóm tắt tin nhắn Zalo (của một ngườ
   {
     id: 'lw-zalo-gui-tin',
     name: 'Gửi tin Zalo',
-    version: 2,
+    version: 3,
     command: 'zalo-gui-tin',
     tags: CONNECTOR_TAGS,
-    contract: { needs: [], produces: ['zalo_gui_nguoi_nhan', 'zalo_gui_da_gui'], checks: ['zalo_gui_da_gui <= zalo_gui_nguoi_nhan'] },
-    description: 'Dùng khi người dùng nhờ NHẮN / GỬI / TRẢ LỜI tin Zalo cho một người hoặc một nhóm bằng Zalo của họ — luôn có hộp xác nhận.',
-    triggers: ['nhắn zalo', 'gửi zalo', 'gửi tin zalo', 'nhắn tin zalo', 'trả lời zalo', 'zalo cho', 'qua zalo', 'send zalo', 'zalo message to'],
+    contract: { needs: [], produces: ['zalo_gui_nguoi_nhan', 'zalo_gui_da_gui'], checks: ['zalo_gui_nguoi_nhan >= 1'] },
+    description: 'Dùng khi người dùng nhờ NHẮN / GỬI / TRẢ LỜI tin Zalo cho một người hoặc một nhóm bằng Zalo của họ — gửi ngay, hoặc LẶP LẠI theo lịch (vd cứ 1 phút gửi 1 tin, 30 lần thì dừng).',
+    triggers: ['nhắn zalo', 'gửi zalo', 'gửi tin zalo', 'nhắn tin zalo', 'trả lời zalo', 'zalo cho', 'qua zalo', 'vào nhóm zalo', 'send zalo', 'zalo message to'],
     body: `## Khi nào dùng
-Người dùng nhờ nhắn/gửi một tin Zalo cho một người hoặc một nhóm (kể cả "trả lời tin này").
+Người dùng nhờ nhắn/gửi tin Zalo cho một người hoặc một nhóm (kể cả "trả lời tin này"), một lần hay lặp lại theo giờ ("cứ 1 phút gửi một lần", "mỗi sáng 8h nhắn nhóm…").
 
 ## Các bước (đúng thứ tự)
 1. \`zalo_status\` — chưa kết nối thì DỪNG, nói ngắn: bấm nút **«Kết nối Zalo (quét QR)»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Zalo).
-2. **Xác định người nhận** chắc chắn đúng MỘT người/nhóm: \`zalo_find_user\` {phone} / \`zalo_list_friends\` {query} / \`zalo_list_groups\` {query} / \`zalo_list_chats\` {query}. Không chắc → hỏi lại người dùng, KHÔNG đoán.
-3. **Soạn** đúng ý người dùng (giữ nguyên câu chữ nếu họ đã viết sẵn). Nhiều người nhận → tối đa 10 người mỗi lượt, mỗi người một tin riêng (cá nhân hoá tên nếu được nhờ).
-4. **Gửi**: \`zalo_send_text\` {threadId, text, isGroup, recipientName} — app LUÔN hiện hộp xác nhận người nhận + nội dung. Người dùng từ chối → DỪNG, không thử cách khác.
-5. **Báo cáo**: đã gửi cho ai (tên), lúc mấy giờ; lỗi thì nêu đúng lỗi.
+2. **Xác định người nhận** chắc chắn đúng người/nhóm: \`zalo_find_user\` {phone} / \`zalo_list_friends\` {query} / \`zalo_list_groups\` {query} / \`zalo_list_chats\` {query}. Nhiều kết quả cùng tên → hỏi lại người dùng, KHÔNG đoán. Đã rõ (vd "nhóm đó" vừa nói ở trên) thì dùng luôn threadId đã có.
+3. **Soạn** đúng ý người dùng (giữ nguyên câu chữ nếu họ đã viết sẵn). Cần giờ hiện tại → lấy từ dòng "Bây giờ là …" ở khối ngữ cảnh của lượt (lúc chạy theo lịch: dòng giờ ở đầu prompt).
+4. **Gửi một lần**: \`zalo_send_text\` {threadId, text, isGroup, recipientName}. Công tắc "Tự động" bật → gửi luôn; tắt → app hiện hộp xác nhận. Nhiều người nhận → gọi lần lượt, mỗi người một tin.
+5. **Gửi lặp lại / theo giờ** → KHÔNG tự đếm hay chờ trong lượt chat: tạo lịch bằng \`schedule_agent_job\`:
+   - \`mode:"interval"\` + \`intervalSec\` (≥60; "1 phút" = 60), hoặc \`mode:"daily"\` + \`atHour\`/\`atMinute\`;
+   - \`max_runs\` = số lần rồi tự tắt ("30 lần là đóng" → 30);
+   - \`permissions:{send_messages:true}\`;
+   - \`prompt\` TỰ CHỨA, nhắc ĐÚNG TÊN \`zalo_send_text\` + threadId + isGroup + tên người/nhóm + nội dung, vd: "Gửi giờ hiện tại (lấy từ dòng giờ ở đầu prompt, dạng HH:mm:ss dd/mm/yyyy) vào nhóm Zalo «Tên nhóm» bằng \`zalo_send_text\` {threadId:"…", isGroup:true}. Chỉ gửi đúng 1 tin rồi kết thúc."
+   Không cần hỏi lại người dùng có "duyệt" không: lịch chạy tự động, không ai bấm gì nữa.
+   Đang chạy THEO LỊCH (prompt mở đầu bằng dòng "[Bây giờ là …]") → chỉ làm đúng việc của MỘT lần chạy (gửi 1 tin), KHÔNG tạo lịch mới.
+6. **Báo cáo**: đã gửi cho ai (tên), lúc mấy giờ — hoặc đã tạo lịch gì (nhịp, số lần, lúc tự tắt) và tắt/sửa ở đâu (trang Tự động hoá). Lỗi thì nêu đúng lỗi.
 
 ## Luật
-- KHÔNG gửi hàng loạt / quảng cáo: quá 10 người hoặc cả danh sách khách → khuyên dùng chiến dịch của Social Wave (có nhịp gửi, danh sách từ chối, báo cáo). App chặn ở 30 tin/giờ, mỗi tin cách ≥8 giây.
-- Không tự thêm link, số tài khoản hay nội dung người dùng chưa duyệt.
-- Lịch tự động / bot Lark: không gửi được (app chặn) — báo người dùng gửi trong cuộc trò chuyện.
+- KHÔNG giới hạn số tin — người dùng muốn gửi bao nhiêu, gửi thế nào thì làm theo. Chỉ CẢNH BÁO MỘT LẦN (khi kết quả có \`warning\`, hoặc khi tạo lịch gửi dày): Zalo có thể hạn chế/khoá tài khoản cá nhân gửi dày, gửi nội dung lặp lại hay nhắn người lạ. Cảnh báo xong vẫn làm, không hỏi lại.
+- Không tự thêm link, số tài khoản hay nội dung người dùng không yêu cầu.
+- Bot Lark trong nhóm / lượt chia sẻ cho bạn bè: không dùng được Zalo (app chặn) — chỉ chủ máy.
 
 ## Khi lỗi
 - Người dùng bấm "Từ chối" ở hộp xác nhận → dừng, báo "chưa gửi".
-- "Đã gửi N tin Zalo trong 1 giờ qua" → dừng hẳn, báo số đã gửi / chưa gửi; không chia nhỏ để lách.
+- "chỉ chạy trong một KỸ NĂNG" → gọi \`skill_get\` {id:"lw-zalo-gui-tin"} rồi làm lại.
 - Lỗi khác (mất kết nối, người nhận chặn tin lạ) → báo đúng lỗi cho từng người nhận, không gửi lại tự động.`,
   },
   {
@@ -336,30 +343,31 @@ Người dùng muốn tìm/đọc/tóm tắt thư trong Gmail của họ (vd "th
   {
     id: 'lw-gmail-gui-thu',
     name: 'Gửi thư Gmail',
-    version: 2,
+    version: 3,
     command: 'gmail-gui-thu',
     tags: CONNECTOR_TAGS,
-    contract: { needs: [], produces: ['gmail_gui_nguoi_nhan', 'gmail_gui_da_gui'], checks: ['gmail_gui_da_gui <= gmail_gui_nguoi_nhan'] },
-    description: 'Dùng khi người dùng nhờ SOẠN & GỬI / TRẢ LỜI một email từ Gmail của họ — luôn có hộp xác nhận.',
+    contract: { needs: [], produces: ['gmail_gui_nguoi_nhan', 'gmail_gui_da_gui'], checks: ['gmail_gui_nguoi_nhan >= 1'] },
+    description: 'Dùng khi người dùng nhờ SOẠN & GỬI / TRẢ LỜI email từ Gmail của họ — gửi ngay, hoặc lặp lại theo lịch (vd mỗi sáng gửi báo cáo).',
     triggers: ['gửi mail', 'gửi email', 'gửi thư', 'soạn mail', 'soạn email', 'trả lời mail', 'trả lời email', 'email cho', 'mail cho', 'send email', 'reply email'],
     body: `## Khi nào dùng
-Người dùng nhờ soạn và gửi một email (hoặc trả lời một thư) từ Gmail của họ.
+Người dùng nhờ soạn và gửi email (hoặc trả lời một thư) từ Gmail của họ, một lần hay lặp lại theo giờ.
 
 ## Các bước (đúng thứ tự)
 1. \`gmail_status\` — chưa có tài khoản thì DỪNG, nói ngắn: bấm nút **«Kết nối Gmail»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Gmail).
 2. **Người nhận**: dùng ĐÚNG địa chỉ người dùng đưa — không đoán địa chỉ. Trả lời một thư → \`gmail_search\` + \`gmail_read\` để lấy địa chỉ người gửi và đặt tiêu đề "Re: <tiêu đề cũ>".
-3. **Soạn** tiêu đề + nội dung chữ thuần (tiếng Việt có dấu), đúng ý người dùng; ký tên nếu được nhờ.
-4. **Gửi**: \`gmail_send\` {to, cc, subject, text} — app LUÔN hiện hộp xác nhận. Người dùng từ chối → DỪNG.
-5. **Báo cáo**: đã gửi tới ai, tiêu đề, lúc mấy giờ; có địa chỉ bị từ chối (\`rejected\`) thì nêu rõ.
+3. **Soạn** tiêu đề + nội dung chữ thuần (tiếng Việt có dấu), đúng ý người dùng; ký tên nếu được nhờ. Cần giờ/ngày hiện tại → dòng "Bây giờ là …" của lượt.
+4. **Gửi một lần**: \`gmail_send\` {to, cc, subject, text}. Công tắc "Tự động" bật → gửi luôn; tắt → app hiện hộp xác nhận.
+5. **Gửi lặp lại / theo giờ** → tạo lịch bằng \`schedule_agent_job\` (\`mode\`, \`intervalSec\`/\`atHour\`, \`max_runs\` nếu có số lần, \`permissions:{send_messages:true}\`), \`prompt\` tự chứa nhắc ĐÚNG TÊN \`gmail_send\` + người nhận + tiêu đề + nội dung.
+6. **Báo cáo**: đã gửi tới ai, tiêu đề, lúc mấy giờ (hoặc lịch đã tạo); có địa chỉ bị từ chối (\`rejected\`) thì nêu rõ.
 
 ## Luật
-- Tối đa 10 người nhận mỗi thư; không gửi hàng loạt / quảng cáo (dùng chiến dịch của Social Wave). App chặn ở 40 thư/giờ.
+- Không giới hạn số thư; tối đa 100 người nhận mỗi thư (giới hạn của Gmail). Kết quả có \`warning\` (gửi dày / nhiều người nhận) → nhắc MỘT lần: Google giới hạn ~500 thư/ngày, có thể tạm khoá gửi hoặc đưa vào Spam. Nhắc xong vẫn làm.
 - Chưa hỗ trợ đính kèm tệp — người dùng cần đính kèm thì nói rõ.
-- Lịch tự động / bot Lark: không gửi được (app chặn).
+- Bot Lark trong nhóm / lượt chia sẻ: không dùng được Gmail (app chặn) — chỉ chủ máy.
 
 ## Khi lỗi
 - Người dùng từ chối ở hộp xác nhận → dừng, báo "chưa gửi".
-- "Gmail báo đã chạm giới hạn gửi trong ngày" / "Đã gửi N thư trong 1 giờ" → dừng, báo thư nào chưa gửi.
+- "Gmail báo đã chạm giới hạn gửi trong ngày" → dừng, báo thư nào chưa gửi.
 - Lỗi đăng nhập → báo kết nối lại Gmail (mật khẩu ứng dụng mới).`,
   },
 ];

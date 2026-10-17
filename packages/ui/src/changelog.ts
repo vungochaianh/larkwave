@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.6',
+    date: '2026-10-17',
+    items: [
+      "Công tắc \"Tự động\" làm đúng tên gọi: bật lên thì mọi thao tác chạy luôn không hỏi — thêm, sửa, ghi đè, gửi tin Lark/Zalo/Gmail, tạo lịch. Chỉ thao tác XOÁ còn hỏi. Áp cho mọi cách chạy (Claude/Gemini trên máy, API key riêng, gói Larkwave).",
+      "Gửi tin Zalo / thư Gmail không còn bị chặn số lượng: bỏ trần 30 tin Zalo/giờ và 40 thư/giờ, Gmail tới 100 người nhận/thư. App chỉ CẢNH BÁO rủi ro (Zalo có thể hạn chế/khoá tài khoản cá nhân gửi dày) — gửi thế nào là quyền của bạn.",
+      "Lịch tự động gửi được Zalo/Gmail: nói \"cứ 1 phút gửi giờ hiện tại vào nhóm Zalo X, 30 lần thì dừng\" là agent tạo lịch chạy luôn, không cần bấm duyệt. Lịch mới có \"chạy N lần rồi tự tắt\", nhịp tính từ lúc bắt đầu mỗi lần chạy (đúng 1 phút một lần).",
+      "Agent biết giờ hiện tại (giờ Việt Nam) ở mỗi lượt chat và mỗi lần lịch chạy — không còn trả lời \"mình không có đồng hồ\".",
+      "Chỉ lịch do chính bạn tạo từ cuộc trò chuyện của mình mới dùng được Zalo/Gmail; bot Lark trong nhóm và lượt chia sẻ cho bạn bè vẫn không chạm được.",
+    ],
+  },
+  {
     version: '0.1.5',
     date: '2026-10-17',
     items: [

@@ -102,7 +102,7 @@ t('lượt sẽ HỎNG xếp trước CLI cũ: chưa cài / cần đăng nhập 
   assert.strictEqual(eng.engineModel({ ...base, runners: [{ ...CLAUDE, ready: false }] }).dot, 'error');
 });
 t('tooltip công tắc Tự động nói rõ: cộng thêm chạy luôn, xoá/sửa/gửi vẫn hỏi, không bao giờ tự bật', () => {
-  assert.ok(/Xoá, sửa, ghi đè, gửi tin vẫn hỏi/.test(eng.autoTip(true)) && /Không bao giờ tự bật/.test(eng.autoTip(true)));
+  assert.ok(/Chỉ XOÁ còn hỏi/.test(eng.autoTip(true)) && /Không bao giờ tự bật/.test(eng.autoTip(true)));
   assert.ok(/Hỏi trước khi ghi/.test(eng.autoTip(false)));
 });
 
@@ -202,7 +202,7 @@ t('chưa có custom app: chỉ tool phiên web + tệp; có app: đủ cả Open
   assert.ok(all.includes('bitable_create_record') && all.includes('lark_web_create_workflows'));
   assert.ok(tools.agentTools({ withOpenApi: true, mode: 'ask' }).every((x) => !x.gated));
 });
-t('chốt duyệt: tool CỘNG THÊM tự chạy khi Tự động BẬT; xoá/sửa/gửi tin luôn hỏi; Tự động TẮT → mọi ghi hỏi', () => {
+t('chốt duyệt (hàm tự duyệt trả boolean — lượt không người trông): chỉ tool CỘNG THÊM tự chạy; xoá/sửa/gửi tin hỏi; TẮT → mọi ghi hỏi', () => {
   const on = { autoApproveTool: (n) => tools.isAdditiveTool(n) };
   const off = { autoApproveTool: () => false };
   for (const n of ['lark_web_create_workflows', 'lark_web_create_automations', 'lark_web_add_table', 'bitable_create_record', 'bitable_batch_create_records', 'bitable_create_field', 'bitable_workflow_create']) {
@@ -315,12 +315,12 @@ t('prompt: "workflow" = KHỐI (lark_web_create_workflows), "automation" chỉ k
   assert.deepStrictEqual(sp.mergeTurnBases([{ appToken: 'A', name: 'a' }], { appToken: 'A', name: 'a' }).length, 1);
   assert.deepStrictEqual(sp.mergeTurnBases(undefined, { appToken: 'B', name: 'b' }).map((b) => b.appToken), ['B']);
 });
-t('larkService: mọi lượt Lark không đòi custom app; bộ công cụ = agentTools; Tự động chỉ duyệt tool cộng thêm', () => {
+t('larkService: mọi lượt Lark không đòi custom app; bộ công cụ = agentTools; Tự động BẬT = mọi thao tác trừ xoá', () => {
   const src = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
   assert.ok(/const workflowTurn = !general;/.test(src));
   assert.ok(!/Chưa kết nối Lark\. Hãy nhập App ID \+ App Secret ở panel kết nối\.' \};\n      yield \{ type: 'done' \};\n      return;\n    \}\n    \/\/ Khoá theo TỪNG/.test(src));
   assert.ok((src.match(/toolsOverride: agentTools\(\{ withOpenApi: !!client, mode: input\.mode \}\), autoApproveTool/g) || []).length >= 2);
-  assert.ok(/const autoApproveTool = workflowTurn \? \(name: string\) => this\.workflowAutoOn\(\) && isAdditiveTool\(name\)/.test(src));
+  assert.ok(/const autoApproveTool = workflowTurn \? \(_name: string\): boolean \| 'all' => \(this\.workflowAutoOn\(\) \? 'all' : false\)/.test(src), 'Tự động BẬT ⇒ "all" (mọi thao tác trừ xoá)');
   assert.ok(/onApi = !!\(apiMode && apiKey && !general && client/.test(src), 'đường API chỉ khi có client');
 });
 

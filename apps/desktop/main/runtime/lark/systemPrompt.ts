@@ -257,8 +257,10 @@ function basesLine(bases: { appToken: string; name: string }[]): string {
 
 /** Dòng chế độ ghi theo công tắc "Tự động (không hỏi lại)". */
 function autoLine(auto: boolean): string {
+  // Người dùng (17/10/2026): đã chuyển sang Tự động mà agent "cứ liên tục hỏi". Bản cũ chỉ tự chạy thao tác
+  // cộng thêm, còn sửa/ghi đè/gửi tin vẫn hiện hộp xác nhận — nay CHỈ xoá còn hỏi (larkToolExec.needsConfirmation).
   return auto
-    ? 'CHẾ ĐỘ: TỰ ĐỘNG (không hỏi lại) — thao tác CỘNG THÊM (tạo workflow/automation TẮT, thêm bảng/cột/lựa chọn, thêm bản ghi mới) chạy NGAY không cần xin phép. Xoá / sửa / ghi đè / gửi tin: cứ GỌI TOOL — ứng dụng tự hiện hộp xác nhận, đó là lần hỏi DUY NHẤT. Yêu cầu đã rõ thì làm luôn: KHÔNG hỏi lại bằng chat/`ask_user` kiểu "bạn có chắc không", "bạn chọn giúp mình bước tiếp theo".'
+    ? 'CHẾ ĐỘ: TỰ ĐỘNG (không hỏi lại) — MỌI thao tác chạy NGAY không cần xin phép: thêm, sửa, ghi đè, gửi tin (Lark/Zalo/Gmail), tạo lịch (`schedule_agent_job`), tạo workflow/automation TẮT. CHỈ thao tác XOÁ là ứng dụng còn hiện hộp xác nhận. Yêu cầu đã rõ thì làm luôn: KHÔNG hỏi lại bằng chat/`ask_user` kiểu "bạn có chắc không", "bạn duyệt giúp", "bạn chọn giúp mình bước tiếp theo"; KHÔNG từ chối viện cớ "cần người bấm duyệt".'
     : 'CHẾ ĐỘ: HỎI TRƯỚC KHI GHI — mỗi lần gọi tool ghi, ứng dụng tự hiện hộp xác nhận vẽ sẵn thiết kế; bạn KHÔNG cần (và không được) dùng `ask_user` để xin phép thêm lần nữa.';
 }
 
@@ -273,6 +275,21 @@ function autoLine(auto: boolean): string {
  * Nên mọi thứ đổi theo lượt đi ở đây (đầu tin nhắn của lượt), còn đổi LUẬT/CÔNG CỤ thì mở phiên mới
  * (xem LarkService.promptFingerprint).
  */
+const WEEKDAY_VI = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+/**
+ * "Bây giờ là 14:05:09, Thứ Bảy 17/10/2026 (giờ Việt Nam, UTC+7)".
+ *
+ * Model không có đồng hồ: người dùng đặt "cứ 1 phút gửi giờ hiện tại vào nhóm" và agent trả lời "mình
+ * không có đồng hồ". Mỗi lượt chat và mỗi lần lịch chạy đều kèm dòng này (đo LÚC chạy, không lúc tạo lịch).
+ */
+export function nowLine(d: Date = new Date()): string {
+  // Cộng thẳng +7h rồi đọc theo UTC: Việt Nam không đổi giờ mùa hè, và không phụ thuộc ICU/múi giờ của máy.
+  const t = new Date(d.getTime() + 7 * 3_600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `Bây giờ là ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())}, ${WEEKDAY_VI[t.getUTCDay()]} ${p(t.getUTCDate())}/${p(t.getUTCMonth() + 1)}/${t.getUTCFullYear()} (giờ Việt Nam, UTC+7).`;
+}
+
 export function buildTurnContextBlock(ctx: {
   bases: { appToken: string; name: string }[];
   me?: { name: string };
@@ -280,12 +297,15 @@ export function buildTurnContextBlock(ctx: {
   layout?: 'chat' | 'frame';
   versionLine?: string;
   skills?: string;
+  /** Mốc "bây giờ" (mặc định lúc dựng khối) — xem nowLine. */
+  now?: Date;
 }): string {
   const lines = [
     '[NGỮ CẢNH LƯỢT NÀY — mới nhất; THẮNG mọi thông tin cùng loại ở lời nhắc hệ thống hay ở các lượt trước]',
     `- ${basesLine(ctx.bases)}`,
     ctx.me?.name ? `- Người dùng đang đăng nhập Lark: ${ctx.me.name} ("tôi" = người này).` : '',
     `- ${autoLine(ctx.auto !== false)}`,
+    `- ${nowLine(ctx.now)}`,
     `- Trang Lark của hội thoại này nằm ở ${whereText(ctx.layout)}.`,
     ctx.versionLine ? `- ${ctx.versionLine}` : '',
     ctx.skills?.trim() ? ctx.skills.trim() : '',

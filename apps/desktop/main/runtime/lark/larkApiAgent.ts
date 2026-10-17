@@ -36,6 +36,8 @@ export interface LarkApiAgentDeps {
    */
   allowVersionHint?: boolean;
   autoApprove?: boolean;
+  /** Công tắc "Tự động" của hội thoại Lark: 'all' = mọi thao tác ghi chạy luôn, trừ xoá (needsConfirmation). */
+  autoApproveTool?: (name: string) => boolean | 'all';
   awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
   signal?: AbortSignal;
   /** Thư mục tệp của lượt (xem fileContext) — truyền thẳng vào createToolBridge. */

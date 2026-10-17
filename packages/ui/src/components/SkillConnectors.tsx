@@ -182,7 +182,7 @@ export function SkillConnectors({
               </Button>
             )}
             <Text type="secondary" style={{ fontSize: 11.5, display: 'block', marginTop: 8 }}>
-              {t('skills.conn.zaloNote', 'Quét bằng app Zalo trên điện thoại. Đọc được tin nhóm gần đây và tin 1-1 Zalo đồng bộ/đến trong lúc app mở. Gửi: tối đa 30 tin/giờ, mỗi tin cách ≥8 giây.')}
+              {t('skills.conn.zaloNote2', 'Quét bằng app Zalo trên điện thoại. Đọc được tin nhóm gần đây và tin 1-1 Zalo đồng bộ/đến trong lúc app mở. Gửi: không giới hạn số tin — nhưng Zalo có thể hạn chế/khoá tài khoản cá nhân gửi dày, gửi nội dung lặp lại hay nhắn người lạ; bạn tự cân nhắc.')}
             </Text>
           </div>
 

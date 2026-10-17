@@ -805,6 +805,13 @@ export interface LarkAutomationInput {
    * máy này: cần phiên Lark web hoặc thư mục tệp trên máy). Máy chạy hộ bỏ qua quy tắc 'desktop'.
    */
   runOn?: 'auto' | 'desktop';
+  /** Chạy đủ N lần (kể cả lần hỏng) thì TỰ TẮT — "cứ 1 phút gửi một lần, 30 lần là dừng". Bỏ trống = không giới hạn. */
+  maxRuns?: number;
+  /**
+   * Công cụ Zalo/Gmail lượt chạy được dùng. CHỈ cấp lúc chủ máy tạo lịch từ hội thoại của mình
+   * (connectorGrantForSchedule) — lịch từ bot/lượt chia sẻ không có. Có trường này ⇒ lịch chỉ chạy trên máy này.
+   */
+  connectorTools?: string[];
 }
 /** Thư mục của một quy tắc tự động hoá (màn sửa quy tắc hiển thị). */
 export interface LarkAutomationFolderInfo {

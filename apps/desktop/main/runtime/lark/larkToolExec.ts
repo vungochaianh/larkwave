@@ -17,7 +17,7 @@ export interface ToolExecContext {
   ask: (callId: string, question: string, choices?: string[]) => Promise<string>;
   autoApprove?: boolean;
   /** Tự duyệt riêng từng tool (chế độ Tạo workflow: tool cộng-thêm khi công tắc Tự động bật). */
-  autoApproveTool?: (name: string) => boolean;
+  autoApproveTool?: (name: string) => boolean | 'all';
   /**
    * Lượt này có được phép nhắc "cài lại bản mới" không.
    *
@@ -136,6 +136,11 @@ export async function executeLarkTool(
   }
 }
 
+/** Thao tác XOÁ (bảng/bản ghi/cột/view/workflow/vai trò, lark_web_delete) — chế độ Tự động vẫn hỏi. */
+export function isDeleteToolName(name: string): boolean {
+  return /(^|_)(delete|remove)(_|$)/.test(String(name || ''));
+}
+
 /**
  * Thao tác này có phải DỪNG chờ người dùng bấm "Cho phép" không — luật DUY NHẤT, dùng chung cho
  * cầu MCP (Claude CLI), toolBridge (API/MAIC) và executeLarkTool (orchestrator). Ba chỗ từng tự
@@ -150,7 +155,7 @@ export async function executeLarkTool(
  */
 export function needsConfirmation(
   tool: { gated?: boolean; additive?: boolean; alwaysConfirm?: boolean; name: string; additiveWhen?: (input: Record<string, any>) => boolean },
-  ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean },
+  ctx: { autoApprove?: boolean; autoApproveTool?: (name: string) => boolean | 'all' },
   preflightBlocked = false,
   input?: unknown,
   /** Kết quả `additiveCheck` của lần gọi (undefined = tool không có / không kết luận được). */
@@ -160,6 +165,11 @@ export function needsConfirmation(
   // Gửi tin/thư thật bằng tài khoản cá nhân: luôn hỏi, kể cả khi "Tự động duyệt" đang bật.
   if (tool.alwaysConfirm) return true;
   if (ctx.autoApprove) return false;
+  // Công tắc "Tự động" của CUỘC TRÒ CHUYỆN (larkService trả 'all'): mọi thao tác ghi chạy luôn — thêm, sửa,
+  // ghi đè, gửi tin Lark/Zalo/Gmail — TRỪ XOÁ (không hoàn tác được) vẫn hỏi. Người dùng muốn (17/10/2026):
+  // đã bật Tự động thì làm luôn, không hỏi liên tục. Lượt không người trông vẫn trả boolean (chỉ cộng thêm,
+  // còn lại theo quyền của quy tắc) nên không đi nhánh này.
+  if (ctx.autoApproveTool?.(tool.name) === 'all' && !isDeleteToolName(tool.name)) return false;
   // Cộng thêm theo TỪNG lần gọi: vd đính tệp ghi thêm thì tự duyệt, `replace:true` (ghi đè) thì hỏi.
   const staticAdditive = !!tool.additive && (!tool.additiveWhen || safeAdditiveWhen(tool.additiveWhen, input));
   // Kiểm ĐỘNG (vd ghi theo khoá `match_by`: chỉ thêm mới / không đổi gì = cộng thêm; có dòng cần SỬA =

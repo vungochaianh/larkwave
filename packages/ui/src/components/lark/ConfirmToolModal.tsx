@@ -52,9 +52,9 @@ export function ConfirmToolModal({
   // (bitable_workflow_update) thì không: thay toàn bộ bước của thứ người dùng làm, phải duyệt tận mắt.
   const del = pending?.name === 'lark_web_delete' ? deleteViewOf(pending.preview) : null;
   // XOÁ không bao giờ được "nhớ": mỗi lần xoá phải là một lần người dùng nhìn danh sách và bấm.
-  // Không "luôn cho phép" cho: xoá, sửa workflow, và GỬI tin Zalo / thư Gmail bằng tài khoản cá nhân
-  // (lõi cũng luôn hỏi hai tool gửi — alwaysConfirm — nên nhớ lựa chọn ở đây là vô nghĩa và gây hiểu nhầm).
-  const canRemember = !(wf?.update) && pending?.name !== 'bitable_workflow_update' && !/delete|remove|^zalo_send|^gmail_send/.test(pending?.name || '');
+  // Không "luôn cho phép" cho: xoá và sửa workflow. Gửi Zalo/Gmail nay như mọi thao tác ghi (người dùng muốn
+  // gửi thế nào thì gửi, 17/10/2026) — nhớ được trong hội thoại.
+  const canRemember = !(wf?.update) && pending?.name !== 'bitable_workflow_update' && !/delete|remove/.test(pending?.name || '');
 
   return (
     <Modal

@@ -673,7 +673,8 @@ export function AutomationsPanel({ runtime, page = false }: { runtime: RuntimeAd
                       {r.lastError ? (
                         <span style={{ color: '#cf1322' }}>{tr('chat.errorColon', 'Lỗi')}: {r.lastError}</span>
                       ) : r.lastRunAt ? (
-                        `${tr('chat.lastRun', 'Chạy lần cuối')}: ${new Date(r.lastRunAt).toLocaleString('vi-VN')} · ${r.runCount ?? 0} ${tr('chat.timesUnit', 'lần')}`
+                        `${tr('chat.lastRun', 'Chạy lần cuối')}: ${new Date(r.lastRunAt).toLocaleString('vi-VN')} · ${r.runCount ?? 0}${r.maxRuns ? `/${r.maxRuns}` : ''} ${tr('chat.timesUnit', 'lần')}` +
+                        (r.maxRuns && (r.runCount ?? 0) >= r.maxRuns && !r.enabled ? ` · ${tr('auto.maxRunsDone', 'đã đủ số lần — tự tắt')}` : '')
                       ) : (
                         tr('chat.notRun', 'Chưa chạy')
                       )}

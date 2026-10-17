@@ -9,7 +9,7 @@
  * Luật:
  *  - Mật khẩu ứng dụng MÃ HOÁ khi lưu (safeStorage = Keychain/DPAPI), không bao giờ lên renderer.
  *  - ĐỌC mở hộp thư `readOnly` — đọc không đánh dấu "đã đọc", không đổi gì trong hộp thư.
- *  - GỬI tuần tự, sàn 5 giây, trần 40 thư/giờ. Gửi hàng loạt là việc của chiến dịch Social Wave.
+ *  - GỬI tuần tự, sàn 2 giây, KHÔNG trần — chỉ trả `warning` khi gửi dày / nhiều người nhận (sendPace.ts).
  *  - Câu lỗi đi qua hideSecret(): lỗi SMTP/IMAP hay chép lại lệnh AUTH.
  * Agent chỉ chạm tới đây qua công cụ `gmail_*`, và chỉ trong lượt có kỹ năng Gmail (connectorGate).
  */
@@ -17,8 +17,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, safeStorage } from 'electron';
 
-export const GMAIL_SEND_FLOOR_MS = 5_000;
-export const GMAIL_SENDS_PER_HOUR = 40;
+import { GMAIL_MAX_RECIPIENTS, GMAIL_SEND_FLOOR_MS, gmailSendWarning, lastHour } from '../sendPace';
+
 const BODY_MAX = 60_000;
 
 interface StoredGmail {
@@ -291,7 +291,7 @@ class GmailService {
     }
   }
 
-  /** Gửi một thư chữ. Tuần tự, sàn 5 giây, trần 40 thư/giờ/tài khoản. */
+  /** Gửi một thư chữ. Tuần tự, sàn 2 giây, không trần (cảnh báo khi gửi dày — sendPace). */
   send(opts: { account?: string; to: string; cc?: string; subject: string; text: string }) {
     const job = this.chain.then(() => this.sendNow(opts));
     this.chain = job.catch(() => undefined);
@@ -303,12 +303,13 @@ class GmailService {
     const to = String(opts.to || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
     const cc = String(opts.cc || '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
     if (!to.length || ![...to, ...cc].every(isGmailAddress)) throw new Error('Địa chỉ người nhận không hợp lệ.');
-    if (to.length + cc.length > 10) throw new Error('Tối đa 10 người nhận mỗi thư. Gửi nhiều hơn thì dùng chiến dịch của Social Wave.');
+    if (to.length + cc.length > GMAIL_MAX_RECIPIENTS) throw new Error(`Tối đa ${GMAIL_MAX_RECIPIENTS} người nhận mỗi thư (giới hạn của Gmail) — chia thành nhiều thư.`);
     if (!String(opts.subject || '').trim()) throw new Error('Thiếu tiêu đề thư.');
     if (!String(opts.text || '').trim()) throw new Error('Thư trống.');
     const now = Date.now();
-    const log = (this.sent.get(acc.email) ?? []).filter((t) => now - t < 3_600_000);
-    if (log.length >= GMAIL_SENDS_PER_HOUR) throw new Error(`Đã gửi ${log.length} thư trong 1 giờ qua — dừng để Google không khoá gửi.`);
+    const first = !this.sent.has(acc.email);
+    const log = lastHour(this.sent.get(acc.email) ?? [], now);
+    const warning = gmailSendWarning(log.length, to.length + cc.length, first);
     const wait = this.lastSendAt + GMAIL_SEND_FLOOR_MS - now;
     if (wait > 0) await sleep(wait);
     const nodemailer = await import('nodemailer');
@@ -324,7 +325,7 @@ class GmailService {
       this.lastSendAt = Date.now();
       log.push(this.lastSendAt);
       this.sent.set(acc.email, log);
-      return { ok: true, account: acc.email, to, cc, subject: String(opts.subject).trim(), messageId: info.messageId, accepted: info.accepted, rejected: info.rejected };
+      return { ok: true, account: acc.email, to, cc, subject: String(opts.subject).trim(), messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, ...(warning ? { warning } : {}) };
     } catch (e) {
       throw new Error(friendlyGmailError(e, [acc.pass]));
     } finally {

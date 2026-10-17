@@ -9,7 +9,7 @@
 const assert = require('node:assert');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
-const { buildTurnContextBlock, buildWebSessionPrompt } = require('../.test-build/runtime/lark/systemPrompt.js');
+const { buildTurnContextBlock, buildWebSessionPrompt, nowLine } = require('../.test-build/runtime/lark/systemPrompt.js');
 
 const block = buildTurnContextBlock({
   bases: [{ appToken: 'YppHb', name: 'Base Test' }],
@@ -29,6 +29,16 @@ assert.ok(!/Hỏi đáp|HỎI ĐÁP|chế độ "Thực thi"/.test(block));
 const off = buildTurnContextBlock({ bases: [], auto: false });
 assert.ok(off.includes('CHƯA CHỌN BASE') && off.includes('HỎI TRƯỚC KHI GHI') && !off.includes('Người dùng đang đăng nhập'));
 console.log('✓ buildTurnContextBlock: Base / tài khoản / chế độ Tự động / kỹ năng ở đầu MỖI lượt, không nhắc chế độ Hỏi đáp');
+
+// Giờ hiện tại (giờ Việt Nam) ở MỖI lượt — người dùng đặt "cứ 1 phút gửi giờ hiện tại", agent đáp "mình không có đồng hồ".
+// 2026-10-17T07:05:09Z = 14:05:09 Thứ Bảy 17/10/2026 ở Việt Nam; 2026-10-17T18:30:00Z đã sang Chủ nhật 18/10 ở VN.
+assert.strictEqual(nowLine(new Date('2026-10-17T07:05:09Z')), 'Bây giờ là 14:05:09, Thứ Bảy 17/10/2026 (giờ Việt Nam, UTC+7).');
+assert.match(nowLine(new Date('2026-10-17T18:30:00Z')), /^Bây giờ là 01:30:00, Chủ nhật 18\/10\/2026/);
+assert.ok(buildTurnContextBlock({ bases: [], now: new Date('2026-10-17T07:05:09Z') }).includes('- Bây giờ là 14:05:09, Thứ Bảy 17/10/2026'));
+assert.ok(/CHỈ thao tác XOÁ là ứng dụng còn hiện hộp xác nhận/.test(block) && !/Xoá \/ sửa \/ ghi đè \/ gửi tin: cứ GỌI TOOL/.test(block), 'Tự động BẬT: chỉ xoá còn hỏi');
+const srcT = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
+assert.ok(/const runText = ctx \? `\[\$\{nowLine\(\)\}\]/.test(srcT), 'lượt tự động hoá kèm giờ của chính lần chạy');
+console.log('✓ giờ hiện tại (giờ VN) ở mỗi lượt chat + mỗi lần lịch chạy; Tự động BẬT = chỉ xoá còn hỏi');
 
 // Lời nhắc hệ thống (phiên web) dùng ĐÚNG câu chữ của khối từng lượt — hai nơi không được lệch nhau.
 const sys = buildWebSessionPrompt({ bases: [{ appToken: 'YppHb', name: 'Base Test' }], auto: true, standalone: true });

@@ -25,7 +25,7 @@ export function createToolBridge(
     client: LarkClient;
     extraTools?: LarkToolDef[];
     autoApprove?: boolean;
-    autoApproveTool?: (name: string) => boolean;
+    autoApproveTool?: (name: string) => boolean | 'all';
     awaitConfirm(callId: string, name: string, input: unknown): Promise<boolean>;
     allowVersionHint?: boolean;
     /**

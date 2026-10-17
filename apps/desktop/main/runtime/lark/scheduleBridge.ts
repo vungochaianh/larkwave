@@ -28,6 +28,8 @@ export interface ScheduleAgentInput {
   /** Quyền khi chạy tự động — CHỈ những gì người dùng đồng ý (công cụ đặt lịch luôn hỏi duyệt). */
   permissions?: { overwriteCells?: boolean; replaceAttachments?: boolean; sendMessages?: boolean; deleteRecords?: boolean };
   runOn?: 'auto' | 'desktop';
+  /** Chạy đủ N lần thì tự tắt (vd "30 lần là dừng"). Bỏ trống = không giới hạn. */
+  maxRuns?: number;
 }
 
 export interface ScheduleAgentResult {
@@ -39,6 +41,12 @@ export interface ScheduleAgentResult {
   folder?: string;
   inputs?: string[];
   inputErrors?: string[];
+  /** Số lần chạy tối đa (nếu có). */
+  maxRuns?: number;
+  /** Công cụ Zalo/Gmail lịch được dùng (chỉ khi tạo từ hội thoại của chủ máy). */
+  connectorTools?: string[];
+  /** Quyền đã cấp cho lịch (để agent nói đúng với người dùng). */
+  permissions?: ScheduleAgentInput['permissions'];
 }
 
 type Creator = (input: ScheduleAgentInput) => Promise<ScheduleAgentResult>;

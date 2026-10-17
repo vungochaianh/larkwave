@@ -4,19 +4,15 @@
  * agent KHÔNG cầm phiên: nó chỉ gọi các hàm ở đây qua công cụ `zalo_*`, và chỉ trong lượt có kỹ năng
  * Zalo (connectorGate trong lark/tools/connectors.ts).
  *
- * Luật gửi (lấy từ Social Wave, đừng hạ):
- *  - SÀN 8 giây giữa hai tin (ZALO_MIN_INTERVAL_MS bên Social Wave). Gửi dồn là cách nhanh nhất để
- *    Zalo khoá tài khoản.
- *  - TRẦN 30 tin mỗi giờ cho mỗi tài khoản. Agent không phải công cụ gửi tin hàng loạt — việc đó là
- *    của Social Wave (có chiến dịch, danh sách từ chối, sổ ghi).
+ * Luật gửi (sendPace.ts): KHÔNG có trần — người dùng muốn gửi bao nhiêu thì gửi. Chỉ giữ sàn 2 giây
+ * giữa hai tin và trả `warning` (rủi ro Zalo khoá tài khoản) ở tin đầu của phiên app và khi gửi dày.
  */
 import { join } from 'node:path';
 import { app } from 'electron';
 import { ZaloSessionManager, type ChannelContext, type QrLoginSnapshot, type ZaloSession } from './session';
 import { ZaloMessageBook, fold, type ZaloThreadSummary } from './messages';
+import { ZALO_SEND_FLOOR_MS, lastHour, zaloSendWarning } from '../sendPace';
 
-export const ZALO_SEND_FLOOR_MS = 8_000;
-export const ZALO_SENDS_PER_HOUR = 30;
 export const ZALO_TEXT_MAX = 2_000;
 
 export interface ZaloAccountView {
@@ -166,7 +162,7 @@ class ZaloService {
     return { account: s.label, found: !!u, ...(u ? { userId: u.uid, name: u.name } : {}) };
   }
 
-  /** Gửi CHỮ vào một hội thoại. Tuần tự, sàn 8 giây, trần 30 tin/giờ/tài khoản. */
+  /** Gửi CHỮ vào một hội thoại. Tuần tự, sàn 2 giây, không trần (cảnh báo khi gửi dày — sendPace). */
   send(opts: { account?: string; threadId: string; text: string; isGroup?: boolean }) {
     const job = this.sendChain.then(() => this.sendNow(opts));
     this.sendChain = job.catch(() => undefined);
@@ -179,10 +175,9 @@ class ZaloService {
     if (!text) throw new Error('Tin trống.');
     if (text.length > ZALO_TEXT_MAX) throw new Error(`Tin dài ${text.length} ký tự — tối đa ${ZALO_TEXT_MAX}. Chia nhỏ hoặc rút gọn.`);
     const now = Date.now();
-    const log = (this.sent.get(s.accountId) ?? []).filter((t) => now - t < 3_600_000);
-    if (log.length >= ZALO_SENDS_PER_HOUR) {
-      throw new Error(`Đã gửi ${log.length} tin Zalo trong 1 giờ qua — dừng ở đây để Zalo không khoá tài khoản. Gửi số lượng lớn thì dùng chiến dịch của Social Wave.`);
-    }
+    const first = !this.sent.has(s.accountId);
+    const log = lastHour(this.sent.get(s.accountId) ?? [], now);
+    const warning = zaloSendWarning(log.length, first);
     const wait = this.lastSendAt + ZALO_SEND_FLOOR_MS - now;
     if (wait > 0) await sleep(wait);
     const isGroup = opts.isGroup ?? this.book.isGroup(s.accountId, opts.threadId) ?? false;
@@ -191,7 +186,7 @@ class ZaloService {
     log.push(this.lastSendAt);
     this.sent.set(s.accountId, log);
     this.manager().markActivity(s.accountId);
-    return { ok: true, account: s.label, threadId: opts.threadId, isGroup, msgId: res.msgId, sentAt: new Date(this.lastSendAt).toISOString() };
+    return { ok: true, account: s.label, threadId: opts.threadId, isGroup, msgId: res.msgId, sentAt: new Date(this.lastSendAt).toISOString(), ...(warning ? { warning } : {}) };
   }
 
   private readonly groupNamesAt = new Map<string, number>();

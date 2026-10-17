@@ -10,18 +10,25 @@ import { currentTurnFiles, type ConnectorAccess } from '../fileContext';
  * nhịp gửi, danh sách từ chối và sổ ghi. Ở đây làm đúng tinh thần đó bằng một CHỐT duy nhất
  * (connectorGate), áp cho mọi công cụ dưới:
  *
- *  1. Chỉ trong LƯỢT TRÒ CHUYỆN CỦA CHÍNH CHỦ MÁY (larkService.chat gắn `connectors` vào ngữ cảnh
- *     lượt). Lượt bot Lark trong nhóm (người lạ nhắn tới), lịch tự động, lượt chia sẻ cho bạn bè:
- *     KHÔNG có ⇒ bị từ chối. Thiếu chốt này, người lạ nhắn bot "đọc tin Zalo của chủ máy" là đọc được.
+ *  1. Chỉ trong LƯỢT CỦA CHÍNH CHỦ MÁY: hội thoại của chủ máy (larkService.chat gắn `connectors` vào
+ *     ngữ cảnh lượt), hoặc một LỊCH mà chủ máy tạo từ hội thoại của mình (quy tắc mang `connectorTools`,
+ *     xem connectorGrantForSchedule). Lượt bot Lark trong nhóm (người lạ nhắn tới), lượt chia sẻ cho bạn
+ *     bè, lịch tạo từ nơi khác: KHÔNG có ⇒ bị từ chối. Thiếu chốt này, người lạ nhắn bot "đọc tin Zalo
+ *     của chủ máy" là đọc được.
  *  2. Chỉ khi lượt đó có một KỸ NĂNG nhắc ĐÚNG TÊN công cụ đó (kỹ năng dựng sẵn, hoặc kỹ năng người
  *     dùng tự soạn) — nạp qua lệnh "/", khớp từ khoá, hoặc `skill_get`. Mở theo TỪNG công cụ: kỹ năng
  *     "Đọc tin Zalo" không nhắc `zalo_send_text` nên không gửi được. Agent không tự nảy ra việc nhắn
  *     Zalo cho ai đó ngoài một quy trình người dùng đã duyệt.
- *  3. Gửi (`zalo_send_text`, `gmail_send`) luôn HỎI — `alwaysConfirm`, thắng cả "Tự động duyệt" — và
- *     dịch vụ giữ sàn/trần nhịp gửi (zaloService / gmailService).
+ *  3. Gửi (`zalo_send_text`, `gmail_send`) là thao tác ghi như mọi thao tác khác: công tắc "Tự động" TẮT
+ *     thì hỏi, BẬT thì chạy luôn; lịch thì theo quyền "Gửi tin" của quy tắc. Người dùng muốn (17/10/2026):
+ *     "muốn gửi thế nào thì gửi, chỉ cần cảnh báo tài khoản Zalo" — bản 0.1.5 luôn hỏi + chặn 30 tin/giờ
+ *     làm agent từ chối cả việc người dùng đã nói rõ. Dịch vụ chỉ giữ sàn nhịp gửi ngắn và trả `warning`
+ *     khi gửi dày (zaloService / gmailService), không chặn.
  */
 
 export type ConnectorKind = 'zalo' | 'gmail';
+
+const kindOf = (tool: string): ConnectorKind => (tool.startsWith('gmail_') ? 'gmail' : 'zalo');
 
 /** Công cụ Zalo/Gmail mà nội dung một kỹ năng dùng tới (đúng tên công cụ có thật). */
 export function connectorUnlocksOf(body: string): string[] {
@@ -29,6 +36,27 @@ export function connectorUnlocksOf(body: string): string[] {
   for (const m of String(body || '').matchAll(/\b(?:zalo|gmail)_[a-z_]+\b/g)) if (KNOWN.has(m[0])) names.add(m[0]);
   return [...names];
 }
+
+/**
+ * Công cụ Zalo/Gmail một LỊCH được dùng khi chạy — tính LÚC TẠO LỊCH, từ lượt đang tạo nó.
+ *
+ * Chỉ lượt có `connectors` (hội thoại của chính chủ máy) mới cấp được; lượt bot/chia sẻ/lịch khác ⇒ rỗng.
+ * Cấp: công cụ prompt của lịch nhắc ĐÚNG TÊN, cộng các công cụ lượt đó đã mở (qua kỹ năng) CÙNG LOẠI với
+ * thứ prompt nhắc tới (prompt nói "Zalo" thì chỉ mở công cụ Zalo) — để lượt chạy còn tra được nhóm/người.
+ */
+export function connectorGrantForSchedule(prompt: string, access: ConnectorAccess | undefined = currentTurnFiles()?.connectors): string[] {
+  if (!access) return [];
+  const named = connectorUnlocksOf(prompt);
+  const kinds = new Set<ConnectorKind>(named.map(kindOf));
+  if (/\bzalo\b/i.test(prompt)) kinds.add('zalo');
+  if (/\bgmail\b/i.test(prompt)) kinds.add('gmail');
+  const out = new Set(named);
+  for (const t of access.tools) if (KNOWN.has(t) && kinds.has(kindOf(t))) out.add(t);
+  return [...out];
+}
+
+/** Công cụ GỬI (tin/thư thật tới người thật). */
+export const CONNECTOR_SEND_TOOLS = ['zalo_send_text', 'gmail_send'];
 
 /** `skill_get` vừa nạp một kỹ năng giữa lượt ⇒ mở thêm công cụ nó dùng (chỉ khi lượt có quyền). */
 export function noteSkillLoaded(id: string, body: string): void {
@@ -46,10 +74,10 @@ const SKILL_HINT: Record<ConnectorKind, string> = {
 
 /** Chốt chung — xem đầu tệp. Ném lỗi ⇒ kết quả lỗi về thẳng model, không chạm tới kết nối. */
 export function connectorGate(tool: string, access: ConnectorAccess | undefined = currentTurnFiles()?.connectors): void {
-  const kind: ConnectorKind = tool.startsWith('gmail_') ? 'gmail' : 'zalo';
+  const kind = kindOf(tool);
   if (!access) {
     throw new Error(
-      `${LABEL[kind]} chỉ dùng được trong cuộc trò chuyện của chính chủ máy — không chạy ở lịch tự động, bot Lark trong nhóm hay lượt chia sẻ cho bạn bè.`,
+      `${LABEL[kind]} chỉ dùng được trong cuộc trò chuyện của chính chủ máy, hoặc một lịch chủ máy tạo từ cuộc trò chuyện đó (schedule_agent_job, prompt nhắc đúng tên công cụ) — không chạy cho bot Lark trong nhóm hay lượt chia sẻ cho bạn bè.`,
     );
   }
   if (!access.tools.includes(tool)) {
@@ -148,9 +176,8 @@ export const connectorTools: LarkToolDef[] = [
   {
     name: 'zalo_send_text',
     description:
-      'GỬI một tin chữ Zalo vào một hội thoại (người hoặc nhóm) bằng tài khoản Zalo của người dùng — chỉ dùng trong kỹ năng Zalo. LUÔN hỏi người dùng (hộp xác nhận hiện đúng người nhận + nội dung). Mỗi tin cách nhau ≥8 giây, tối đa 30 tin/giờ. Đây là tin THẬT tới người thật.',
+      'GỬI một tin chữ Zalo vào một hội thoại (người hoặc nhóm) bằng tài khoản Zalo của người dùng — chỉ dùng trong kỹ năng Zalo. Thao tác ghi: công tắc "Tự động" bật thì chạy luôn, tắt thì app hỏi; lịch chạy theo quyền "Gửi tin". KHÔNG có giới hạn số tin — người dùng muốn gửi bao nhiêu thì gửi; kết quả có `warning` khi gửi dày (Zalo có thể khoá tài khoản gửi nhiều/gửi người lạ) → nói lại cảnh báo đó MỘT lần rồi làm tiếp. Đây là tin THẬT tới người thật.',
     gated: true,
-    alwaysConfirm: true,
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -218,9 +245,8 @@ export const connectorTools: LarkToolDef[] = [
   {
     name: 'gmail_send',
     description:
-      'GỬI một thư chữ từ Gmail của người dùng — chỉ dùng trong kỹ năng Gmail. LUÔN hỏi người dùng (hộp xác nhận hiện người nhận, tiêu đề, nội dung). Tối đa 10 người nhận/thư, cách nhau ≥5 giây, 40 thư/giờ. Đây là thư THẬT.',
+      'GỬI một thư chữ từ Gmail của người dùng — chỉ dùng trong kỹ năng Gmail. Thao tác ghi: công tắc "Tự động" bật thì chạy luôn, tắt thì app hỏi; lịch chạy theo quyền "Gửi tin". Tối đa 100 người nhận/thư; kết quả có `warning` khi gửi dày (Google có thể tạm khoá gửi) → nói lại MỘT lần. Đây là thư THẬT.',
     gated: true,
-    alwaysConfirm: true,
     inputSchema: {
       type: 'object',
       additionalProperties: false,

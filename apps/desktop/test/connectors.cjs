@@ -1,9 +1,11 @@
 /**
  * Kết nối Zalo / Gmail cho kỹ năng (17/10/2026). Người dùng muốn: "agent không được thao tác, chỉ cấu
  * thành skills — giống fbinbox_workspace". Các bài dưới giữ đúng ba chốt:
- *   1. chỉ lượt trò chuyện của CHÍNH CHỦ MÁY (bot Lark do người lạ nhắn, lịch tự động: bị từ chối);
+ *   1. chỉ lượt của CHÍNH CHỦ MÁY (hội thoại của chủ máy, hoặc lịch chủ máy tạo từ đó; bot Lark do người
+ *      lạ nhắn, lượt chia sẻ: bị từ chối);
  *   2. chỉ công cụ mà một KỸ NĂNG đã nạp nhắc ĐÚNG TÊN (kỹ năng đọc không mở được lệnh gửi);
- *   3. gửi luôn hỏi — thắng cả "Tự động duyệt".
+ *   3. gửi là thao tác ghi như mọi thao tác khác — Tự động bật thì chạy luôn, không trần số tin, chỉ cảnh
+ *      báo (người dùng đổi ý 17/10/2026: "muốn gửi thế nào thì gửi, cảnh báo tài khoản Zalo là được").
  *
  *   bash apps/desktop/test/run.sh
  */
@@ -27,6 +29,7 @@ const UP = require(join(B, 'lark', 'unattendedPolicy.js'));
 const { BUILTIN_SKILLS } = require(join(B, 'skills', 'builtinSkills.js'));
 const { ZaloMessageBook, fold, MAX_PER_THREAD } = require(join(B, 'connectors', 'zalo', 'messages.js'));
 const G = require(join(B, 'connectors', 'gmail', 'gmailService.js'));
+const P = require(join(B, 'connectors', 'sendPace.js'));
 
 let failed = 0;
 const pending = [];
@@ -107,31 +110,70 @@ test('chốt: lượt của chủ máy nhưng chưa nạp kỹ năng ⇒ "agent 
   assert.ok(!access.tools.includes('zalo_send_text'));
 });
 
-// ── 3. Gửi luôn hỏi ─────────────────────────────────────────────────────────────────────────────
-test('gửi Zalo / Gmail: gated + alwaysConfirm — hỏi kể cả khi "Tự động duyệt" bật; không chạy ở lượt không người trông', () => {
+// ── 3. Gửi = thao tác ghi thường; lịch của chủ máy được gửi ──────────────────────────────────────
+test('gửi Zalo / Gmail: gated (Tự động TẮT ⇒ hỏi), Tự động BẬT ⇒ chạy luôn; lượt tự động = loại "Gửi tin"', () => {
   for (const name of ['zalo_send_text', 'gmail_send']) {
     const t = T.allTools().find((x) => x.name === name);
-    assert.ok(t && t.gated && t.alwaysConfirm, name);
-    assert.strictEqual(EX.needsConfirmation(t, { autoApprove: true, autoApproveTool: () => true }), true, `${name} vẫn phải hỏi`);
-    assert.ok(T.isAlwaysConfirmTool(name));
-    assert.strictEqual(UP.gatedCategory(t), 'never', `${name}: lượt tự động không bao giờ được gửi`);
+    assert.ok(t && t.gated && !t.alwaysConfirm, name);
+    assert.ok(!T.isAlwaysConfirmTool(name), `${name} không còn "luôn hỏi"`);
+    assert.strictEqual(EX.needsConfirmation(t, { autoApproveTool: () => false }), true, `${name}: Tự động tắt ⇒ hỏi`);
+    assert.strictEqual(EX.needsConfirmation(t, { autoApproveTool: () => 'all' }), false, `${name}: Tự động bật ⇒ không hỏi`);
+    assert.strictEqual(EX.needsConfirmation(t, { autoApprove: true }), false, `${name}: Tự động duyệt chung ⇒ không hỏi`);
+    assert.strictEqual(UP.gatedCategory(t), 'send', `${name}: lịch gửi được khi có quyền "Gửi tin"`);
+    assert.strictEqual(UP.unattendedDecision(t, {}, { sendMessages: true }).allow, true);
+    assert.strictEqual(UP.unattendedDecision(t, {}, { sendMessages: false }).allow, false, 'không có quyền gửi ⇒ bỏ qua');
+    assert.doesNotMatch(t.description, /LUÔN hỏi|30 tin|40 thư/);
   }
-  const other = T.allTools().find((x) => x.name === 'lark_web_attach_file') || T.allTools().find((x) => x.gated && !x.alwaysConfirm);
-  assert.strictEqual(EX.needsConfirmation(other, { autoApprove: true }), false, 'các tool ghi khác vẫn theo Tự động duyệt như cũ');
   for (const name of ['zalo_read_chat', 'gmail_search', 'gmail_read', 'zalo_list_chats']) assert.ok(!T.allTools().find((x) => x.name === name).gated, `${name} chỉ đọc`);
   // Không cần custom app Lark (chạy bằng kết nối riêng của app).
   assert.ok(T.agentTools({ withOpenApi: false }).some((t) => t.name === 'zalo_send_text'));
 });
 
+test('lịch: chỉ lượt của chủ máy cấp được Zalo/Gmail; cấp đúng công cụ prompt nhắc + công cụ cùng loại đã mở', async () => {
+  const prompt = 'Gửi giờ hiện tại vào nhóm Zalo «Test» bằng `zalo_send_text` {threadId:"g1", isGroup:true}.';
+  // Bot Lark / lượt chia sẻ / lịch khác: không có quyền lượt ⇒ không cấp gì.
+  assert.deepStrictEqual(C.connectorGrantForSchedule(prompt, undefined), []);
+  assert.deepStrictEqual(await FC.withTurnFiles({}, async () => C.connectorGrantForSchedule(prompt)), []);
+  // Hội thoại của chủ máy, kỹ năng gửi Zalo đã nạp: cấp công cụ Zalo, KHÔNG cấp Gmail.
+  const access = { skills: ['lw-zalo-gui-tin'], tools: ['zalo_status', 'zalo_list_groups', 'zalo_send_text', 'gmail_send'] };
+  const g = await FC.withTurnFiles({ connectors: access }, async () => C.connectorGrantForSchedule(prompt));
+  assert.ok(g.includes('zalo_send_text') && g.includes('zalo_list_groups') && !g.includes('gmail_send'), JSON.stringify(g));
+  // Chưa nạp kỹ năng nhưng prompt nhắc đúng tên ⇒ vẫn cấp đúng công cụ đó (người dùng đã nói rõ việc).
+  assert.deepStrictEqual(C.connectorGrantForSchedule(prompt, { skills: [], tools: [] }), ['zalo_send_text']);
+  // Prompt không nhắc Zalo/Gmail ⇒ không cấp, dù lượt có mở.
+  assert.deepStrictEqual(C.connectorGrantForSchedule('Mỗi sáng tóm tắt Base bán hàng', access), []);
+  // Lượt chạy của lịch mang đúng các công cụ đó ⇒ chốt cho qua, công cụ khác vẫn bị chặn.
+  const run = { skills: [], tools: g };
+  C.connectorGate('zalo_send_text', run);
+  assert.throws(() => C.connectorGate('gmail_send', run), /không tự thao tác Gmail/);
+});
+
+test('nhịp gửi: không trần, chỉ cảnh báo (tin đầu của phiên + khi gửi dày); Gmail tới 100 người nhận', () => {
+  assert.ok(P.ZALO_SEND_FLOOR_MS <= 2000 && P.GMAIL_SEND_FLOOR_MS <= 2000);
+  assert.match(P.zaloSendWarning(0, true), /khoá tài khoản/);
+  assert.strictEqual(P.zaloSendWarning(3, false), undefined);
+  assert.match(P.zaloSendWarning(29, false), /Đã gửi 30 tin Zalo/);
+  assert.match(P.zaloSendWarning(100, false), /khoá/, 'tin thứ 101 trong giờ vẫn chỉ là cảnh báo');
+  assert.strictEqual(P.gmailSendWarning(2, 3, false), undefined);
+  assert.match(P.gmailSendWarning(2, 50, false), /50 người nhận/);
+  assert.strictEqual(P.GMAIL_MAX_RECIPIENTS, 100);
+  assert.deepStrictEqual(P.lastHour([0, 1000, 3_700_000], 3_700_500), [1000, 3_700_000].filter((t) => 3_700_500 - t < 3_600_000));
+});
+
 // ── 4. Kỹ năng dựng sẵn ─────────────────────────────────────────────────────────────────────────
-test('bộ kỹ năng "Zalo & Gmail": 4 kỹ năng, lệnh /, nhãn riêng, nói rõ giới hạn + luôn hỏi khi gửi', () => {
+test('bộ kỹ năng "Zalo & Gmail": 4 kỹ năng, lệnh /, nhãn riêng; kỹ năng gửi: không trần, cảnh báo, lịch lặp lại', () => {
   const zg = BUILTIN_SKILLS.filter((s) => (s.tags || []).includes('Zalo & Gmail'));
   assert.deepStrictEqual(zg.map((s) => s.command).sort(), ['gmail-doc-thu', 'gmail-gui-thu', 'zalo-doc-tin', 'zalo-gui-tin']);
   for (const s of zg) {
     assert.ok(s.id.startsWith('lw-') && s.triggers.length >= 8, s.id);
     assert.match(s.body, /Kỹ năng → Kết nối/, `${s.id}: chỉ chỗ kết nối khi chưa có`);
   }
-  assert.match(BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-gui-tin').body, /hộp xác nhận[\s\S]*Social Wave/);
+  const zs = BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-gui-tin');
+  assert.ok(zs.version >= 3);
+  assert.match(zs.body, /KHÔNG giới hạn số tin/);
+  assert.match(zs.body, /khoá tài khoản/);
+  assert.match(zs.body, /schedule_agent_job[\s\S]*max_runs[\s\S]*send_messages:true[\s\S]*zalo_send_text/);
+  for (const s of zg) assert.doesNotMatch(s.body, /30 tin\/giờ|40 thư\/giờ|không gửi được \(app chặn\)/, s.id);
   assert.match(BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-doc-tin').body, /KHÔNG bịa/);
 });
 

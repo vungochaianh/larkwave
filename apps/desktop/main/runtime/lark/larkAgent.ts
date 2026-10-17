@@ -106,7 +106,7 @@ export interface LarkAgentDeps {
   allowFileTools?: boolean;
   autoApprove?: boolean;
   /** Tự duyệt theo từng tool — xem needsConfirmation (chỉ tool `additive` mới được). */
-  autoApproveTool?: (name: string) => boolean;
+  autoApproveTool?: (name: string) => boolean | 'all';
   /** Temp dir holding the turn's attachments; when set, the CLI runs there with the
    *  Read tool enabled so Claude can read + analyse the files. */
   attachDir?: string;

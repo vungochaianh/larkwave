@@ -15,7 +15,10 @@ export const automationTools: LarkToolDef[] = [
       'một việc lặp lại tự động — vd "mỗi ngày 9h chạy PBTTCN", "tự động đối chiếu công nợ hàng ngày", "cứ 2 tiếng chạy 1 lần". ' +
       '`prompt` = TOÀN BỘ việc cần chạy mỗi lần (viết đầy đủ, tự chứa, vì lúc chạy sẽ là phiên mới không có ngữ cảnh hội thoại này). ' +
       'Lịch: mode="daily" + atHour/atMinute (+days: 0=CN..6=T7, bỏ trống = mỗi ngày) HOẶC mode="interval" + intervalSec (>=60). ' +
-      'Tuỳ chọn postToChatId = chat_id nhóm Lark để tự gửi báo cáo mỗi lần. Đây là hành động GHI (tạo lịch) — sẽ hỏi xác nhận. ' +
+      'Tuỳ chọn postToChatId = chat_id nhóm Lark để tự gửi báo cáo mỗi lần. max_runs = chạy đủ N lần thì TỰ TẮT ("30 lần là dừng"). ' +
+      'Lịch có GỬI tin (Lark/Zalo/Gmail) ⇒ đặt permissions.send_messages=true; lịch dùng Zalo/Gmail ⇒ prompt phải nhắc ĐÚNG TÊN công cụ (vd `zalo_send_text`) kèm threadId/người nhận cụ thể. ' +
+      'Lúc chạy, prompt được kèm GIỜ HIỆN TẠI của lần chạy đó (Asia/Ho_Chi_Minh) — việc như "gửi giờ hiện tại" làm được. ' +
+      'Đây là hành động GHI (tạo lịch) — công tắc "Tự động" tắt thì app hỏi xác nhận. ' +
       'Tool này CHỈ tạo lịch, KHÔNG chạy việc ngay bây giờ. ' +
       'Lịch chạy ở chế độ THỰC THI (được ghi dữ liệu) trừ khi đặt readOnly=true.',
     inputSchema: {
@@ -38,6 +41,7 @@ export const automationTools: LarkToolDef[] = [
           description: 'daily: các thứ chạy 0(CN)-6(T7); bỏ trống = chạy mỗi ngày.',
         },
         intervalSec: { type: 'number', description: 'interval: số giây giữa 2 lần chạy (>=60).' },
+        max_runs: { type: 'number', description: 'Chạy đủ số lần này thì tự TẮT lịch (vd 30). Bỏ trống = chạy mãi.' },
         postToChatId: str('chat_id nhóm Lark để gửi báo cáo mỗi lần chạy (tuỳ chọn).'),
         readOnly: {
           type: 'boolean',
@@ -75,7 +79,7 @@ export const automationTools: LarkToolDef[] = [
           properties: {
             overwrite_cells: { type: 'boolean', description: 'Sửa bản ghi có sẵn / ghi theo khoá có dòng phải sửa.' },
             replace_attachments: { type: 'boolean', description: 'Đính thay tệp (xoá tệp cũ).' },
-            send_messages: { type: 'boolean', description: 'Gửi tin / tệp vào nhóm.' },
+            send_messages: { type: 'boolean', description: 'Gửi tin / tệp vào nhóm Lark, gửi tin Zalo (zalo_send_text), gửi thư Gmail (gmail_send).' },
             delete_records: { type: 'boolean', description: 'Xoá bản ghi/bảng/cột.' },
           },
         },
@@ -96,6 +100,7 @@ export const automationTools: LarkToolDef[] = [
         atMinute: typeof input.atMinute === 'number' ? input.atMinute : undefined,
         days: Array.isArray(input.days) ? input.days.filter((d) => typeof d === 'number') : undefined,
         intervalSec: typeof input.intervalSec === 'number' ? input.intervalSec : undefined,
+        maxRuns: typeof input.max_runs === 'number' && input.max_runs > 0 ? Math.floor(input.max_runs) : undefined,
         postToChatId: input.postToChatId ? String(input.postToChatId) : undefined,
         saveConversation: true,
         notify: true,

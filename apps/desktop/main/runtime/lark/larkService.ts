@@ -179,7 +179,7 @@ const SKILL_COMMAND_BUDGET = 40000;
 const MAIC_PROMPT_MAX = 20000;
 
 import { agentTools, allTools, isAdditiveCall, isAdditiveTool, isAlwaysConfirmTool, isClientlessTool, isWriteTool, readOnlyTools } from './tools';
-import { connectorUnlocksOf } from './tools/connectors';
+import { CONNECTOR_SEND_TOOLS, connectorGrantForSchedule, connectorUnlocksOf } from './tools/connectors';
 import type { ConnectorAccess } from './fileContext';
 import { extractOfficeText, officeKindFor } from './ooxml';
 import { buildApiHistory as buildApiHistoryMsgs, buildTranscript as buildTranscriptText } from './transcript';
@@ -211,7 +211,8 @@ import { runLarkMaicAgent } from './larkMaicAgent';
 import { getActiveKey } from '../claudeKeyStore';
 import { getProviderKey } from '../runners/runnerTokenStore';
 import { resolveTool } from './tools';
-import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildTurnContextBlock, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases } from './systemPrompt';
+import { isDeleteToolName } from './larkToolExec';
+import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildTurnContextBlock, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases, nowLine } from './systemPrompt';
 import { versionPromptLine } from '../versionHint';
 import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
@@ -426,6 +427,13 @@ export class LarkService {
     // schedule_agent_job tool → a run_agent time-schedule automation.
     setAgentScheduler(async (i) => {
       const promptKey = i.prompt.trim();
+      // Zalo/Gmail cho lịch: chỉ khi lượt ĐANG tạo lịch là hội thoại của chủ máy (có `connectors` trong ngữ
+      // cảnh lượt) — bot/lượt chia sẻ không cấp được. Xem connectorGrantForSchedule.
+      const connectorTools = connectorGrantForSchedule(i.prompt);
+      // Prompt nhắc đúng công cụ GỬI ⇒ việc của lịch chính là gửi: cấp luôn quyền "Gửi tin" (người dùng nói
+      // "không cần bấm duyệt, tự động chạy" — bắt họ vào trang Tự động hoá bật thêm một ô nữa là vô lý).
+      const sendsByName = connectorUnlocksOf(i.prompt).some((t) => CONNECTOR_SEND_TOOLS.includes(t)) && connectorTools.some((t) => CONNECTOR_SEND_TOOLS.includes(t));
+      const permissions = { ...(i.permissions ?? {}), ...(sendsByName ? { sendMessages: true } : {}) };
       const list = this.automation.upsert({
         name: i.name?.trim() || i.prompt.slice(0, 40).trim() || 'Lịch AI',
         enabled: true,
@@ -449,9 +457,11 @@ export class LarkService {
         },
         // Quyền: CHỈ những gì người dùng đồng ý trong hội thoại (công cụ đặt lịch luôn hỏi duyệt, hộp
         // xác nhận hiện đủ quyền). Không nêu = không cấp gì.
-        permissions: i.permissions ?? {},
+        permissions,
         ...(i.files ? { files: i.files } : {}),
-        ...(i.runOn ? { runOn: i.runOn } : {}),
+        // Zalo/Gmail chỉ có trên máy này (phiên Zalo, mật khẩu ứng dụng) — máy chạy hộ không làm được.
+        ...(connectorTools.length ? { runOn: 'desktop' as const, connectorTools } : i.runOn ? { runOn: i.runOn } : {}),
+        ...(i.maxRuns ? { maxRuns: i.maxRuns } : {}),
       });
       // KHÔNG lấy phần tử cuối: `upsert` nay gộp lịch trùng vào mục có sẵn (xem chống trùng ở
       // AutomationEngine.upsert), nên mục vừa tạo/cập nhật có thể nằm ở giữa danh sách. Lấy cuối
@@ -485,7 +495,17 @@ export class LarkService {
           }
         }
       }
-      return { id: created?.id || '', name: created?.name || i.name || 'Lịch AI', when, ...(folder ? { folder } : {}), ...(inputs.length ? { inputs } : {}), ...(inputErrors.length ? { inputErrors } : {}) };
+      return {
+        id: created?.id || '',
+        name: created?.name || i.name || 'Lịch AI',
+        when: i.maxRuns ? `${when}, ${i.maxRuns} lần rồi tự tắt` : when,
+        ...(i.maxRuns ? { maxRuns: i.maxRuns } : {}),
+        ...(connectorTools.length ? { connectorTools } : {}),
+        permissions,
+        ...(folder ? { folder } : {}),
+        ...(inputs.length ? { inputs } : {}),
+        ...(inputErrors.length ? { inputErrors } : {}),
+      };
     });
     // CMS Bitable sync: the desktop keeps the connector session (cookies/csrf) fresh so the
     // user never has to re-capture it via the browser extension.
@@ -1456,7 +1476,9 @@ export class LarkService {
     const baseTools = agentTools({ withOpenApi: !!client, mode }).filter((t) => !excludedFromUnattended(t.name));
     const turnTools = ctx?.wrap ? ctx.wrap(baseTools) : baseTools;
     try {
-      for await (const ev of runLarkAgent(text.slice(0, maxChars), mode, {
+      // Lượt tự động hoá kèm GIỜ của chính lần chạy này — "cứ 1 phút gửi giờ hiện tại vào nhóm" (xem nowLine).
+      const runText = ctx ? `[${nowLine()}]\n\n${text.slice(0, maxChars)}` : text.slice(0, maxChars);
+      for await (const ev of runLarkAgent(runText, mode, {
         client: client ?? undefined,
         systemPrompt,
         runner: 'claude',
@@ -1633,7 +1655,15 @@ export class LarkService {
         attachNames.length ? { dir: folder.root, names: attachNames } : undefined,
         900_000,
         {
-          files: { outDir: runDir, attachDir: folder.root, extraRoots: [folder.root], noUpload: true },
+          // Zalo/Gmail: chỉ lịch chủ máy tạo từ hội thoại của mình mới mang `connectorTools` (xem
+          // connectorGrantForSchedule) — lịch khác không có trường `connectors` ⇒ connectorGate từ chối.
+          files: {
+            outDir: runDir,
+            attachDir: folder.root,
+            extraRoots: [folder.root],
+            noUpload: true,
+            ...(rule.connectorTools?.length ? { connectors: { skills: [], tools: [...rule.connectorTools] } } : {}),
+          },
           cwd: folder.root,
           decide: (tool, input) => {
             const d = unattendedDecision(tool, input, perms);
@@ -4648,7 +4678,8 @@ export class LarkService {
     // — tạo nháp TẮT, thêm bảng/cột/lựa chọn. Xoá / ghi đè vẫn hỏi (needsConfirmation). Đọc lại
     // mỗi lần hỏi để bật/tắt giữa lượt có tác dụng ngay.
     const autoApprove = workflowTurn ? false : this.store.getSettings().autoApprove ?? false;
-    const autoApproveTool = workflowTurn ? (name: string) => this.workflowAutoOn() && isAdditiveTool(name) : undefined;
+    // Tự động BẬT ⇒ 'all': mọi thao tác ghi chạy luôn, trừ xoá (needsConfirmation). TẮT ⇒ hỏi mọi thao tác ghi.
+    const autoApproveTool = workflowTurn ? (_name: string): boolean | 'all' => (this.workflowAutoOn() ? 'all' : false) : undefined;
 
     // Pin EVERY turn of this conversation to one working directory so `claude --resume` always
     // looks in the bucket the previous turns wrote to (see workDirPath). Best-effort: if the dir
@@ -4734,10 +4765,11 @@ export class LarkService {
      * Cờ này ở trong settings nên đọc lại mỗi lần gần như không tốn gì.
      */
     const confirm = (callId: string, name: string, input: unknown) => {
-      // Gửi Zalo / Gmail (alwaysConfirm) không bao giờ được tự duyệt — kể cả khi "Tự động duyệt" bật.
+      // Tool `alwaysConfirm` (nay không còn tool nào; gửi Zalo/Gmail đã bỏ cờ này 17/10/2026) không được tự duyệt.
       if (!workflowTurn && this.store.getSettings().autoApprove && !isAlwaysConfirmTool(name)) return Promise.resolve(true);
       // Theo TỪNG lần gọi (isAdditiveCall): đính tệp `replace:true` vẫn phải hỏi dù công tắc Tự động bật.
-      if (autoApproveTool?.(name) && isAdditiveCall(name, input)) return Promise.resolve(true);
+      const auto = autoApproveTool?.(name);
+      if (auto === 'all' ? !isDeleteToolName(name) : auto && isAdditiveCall(name, input)) return Promise.resolve(true);
       return new Promise<boolean>((resolve) => this.pending.set(callId, { convId, resolve, name, input }));
     };
 
@@ -4758,6 +4790,7 @@ export class LarkService {
           sessionId: conversationId,
           extraTools: this.plugins.collectTools(),
           autoApprove,
+          autoApproveTool,
           // Lượt trò chuyện của chính người ngồi trước máy — chỉ ở đây mới nhắc cài lại bản mới.
           allowVersionHint: true,
           awaitConfirm: confirm,
@@ -4775,6 +4808,7 @@ export class LarkService {
           history,
           extraTools: this.plugins.collectTools(),
           autoApprove,
+          autoApproveTool,
           // Lượt TRÒ CHUYỆN của chính người ngồi trước máy — chỉ ở đây mới nhắc cài lại bản mới.
           allowVersionHint: true,
           awaitConfirm: confirm,
@@ -4909,6 +4943,7 @@ export class LarkService {
             attachNames,
             generalMode: general,
             cwd: workDir ?? (general ? attachDir : undefined),
+            ...(workflowTurn ? { toolsOverride: agentTools({ withOpenApi: !!client, mode: input.mode }), autoApproveTool } : {}),
             awaitConfirm: confirm,
             awaitAsk: (callId, question, choices) =>
               new Promise<string>((resolve) => {
@@ -4935,6 +4970,7 @@ export class LarkService {
               history,
               extraTools: this.plugins.collectTools(),
               autoApprove,
+              autoApproveTool,
               awaitConfirm: confirm,
               signal: abort.signal,
             });

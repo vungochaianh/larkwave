@@ -352,7 +352,9 @@ const t = async (name, fn) => {
   await t('mã nguồn: lượt tự động dùng thư mục riêng + luật không người trông + biên bản + kỹ năng; máy chạy hộ cũng vậy', () => {
     const svc = readFileSync(join(__dirname, '..', 'main', 'runtime', 'lark', 'larkService.ts'), 'utf8');
     const body = svc.slice(svc.indexOf('private async runAutomationAgent('), svc.indexOf('private async fetchAutoSource('));
-    assert.ok(/files: \{ outDir: runDir, attachDir: folder\.root, extraRoots: \[folder\.root\], noUpload: true \}/.test(body), 'thư mục riêng + không sao lưu tệp mỗi lần chạy');
+    assert.ok(/files: \{\s*outDir: runDir,\s*attachDir: folder\.root,\s*extraRoots: \[folder\.root\],\s*noUpload: true,/.test(body), 'thư mục riêng + không sao lưu tệp mỗi lần chạy');
+    // Zalo/Gmail chỉ khi quy tắc mang connectorTools (lịch chủ máy tạo từ hội thoại của mình).
+    assert.ok(/rule\.connectorTools\?\.length \? \{ connectors: \{ skills: \[\], tools: \[\.\.\.rule\.connectorTools\] \} \} : \{\}/.test(body), 'quyền Zalo/Gmail của lịch đi theo quy tắc');
     assert.ok(/rm\(automationRoot\(this\.baseDir, id\)/.test(svc), 'xoá quy tắc thì xoá thư mục của nó');
     assert.ok(/unattendedDecision\(tool, input, perms\)/.test(body));
     assert.ok(/wrapToolsForReport\(tools, report\)/.test(body));

@@ -310,4 +310,69 @@ t('là chủ ⇒ chạy bình thường', async () => {
   assert.strictEqual(seen.length, 1);
 });
 
+// ── "Cứ 1 phút gửi một lần, 30 lần là dừng" (17/10/2026) ───────────────────────
+console.log('\nmaxRuns + nhịp tính từ lúc BẮT ĐẦU');
+const mkCap = () => {
+  let saved = [];
+  const seen = [];
+  const e = new AutomationEngine(
+    () => ({}),
+    () => saved,
+    (l) => { saved = l; },
+    async () => true,
+    { run: async () => { seen.push(1); await new Promise((r) => setTimeout(r, 15)); return 'x'; }, notify: () => {} },
+  );
+  e.start = () => {};
+  return { e, seen, get saved() { return saved; } };
+};
+t('đủ maxRuns ⇒ quy tắc TỰ TẮT (không xoá); chưa đủ thì vẫn bật', async () => {
+  const c = mkCap();
+  const l = c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60, maxRuns: 3 });
+  const id = l[0].id;
+  assert.strictEqual(l[0].maxRuns, 3);
+  for (let k = 0; k < 2; k++) await c.e.execute(id);
+  assert.strictEqual(c.saved[0].enabled, true, 'mới 2/3 lần');
+  await c.e.execute(id);
+  assert.strictEqual(c.saved[0].runCount, 3);
+  assert.strictEqual(c.saved[0].enabled, false, 'đủ 3/3 ⇒ tắt');
+  assert.strictEqual(c.saved.length, 1, 'không xoá — lịch sử còn đó');
+  // Bật lại ⇒ đếm lại từ đầu (không thì chạy 1 lần rồi tắt ngay).
+  c.e.setEnabled(id, true);
+  assert.strictEqual(c.saved[0].runCount, 0);
+  assert.strictEqual(c.saved[0].enabled, true);
+});
+t('đặt lại đúng lịch đã tự tắt (cùng prompt + nhịp) ⇒ bật lại và đếm lại từ đầu', async () => {
+  const c = mkCap();
+  const l = c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60, maxRuns: 1 });
+  await c.e.execute(l[0].id);
+  assert.strictEqual(c.saved[0].enabled, false);
+  c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60, maxRuns: 1 });
+  assert.strictEqual(c.saved.length, 1);
+  assert.strictEqual(c.saved[0].enabled, true);
+  assert.strictEqual(c.saved[0].runCount, 0);
+});
+t('maxRuns 0 từ giao diện = gỡ giới hạn; không gửi trường = giữ nguyên', () => {
+  const c = mkCap();
+  const l = c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60, maxRuns: 5 });
+  c.e.upsert({ ...lichAgent(), id: l[0].id, schedule: { mode: 'interval' }, intervalSec: 60 });
+  assert.strictEqual(c.saved[0].maxRuns, 5);
+  c.e.upsert({ ...lichAgent(), id: l[0].id, schedule: { mode: 'interval' }, intervalSec: 60, maxRuns: 0 });
+  assert.strictEqual(c.saved[0].maxRuns, undefined);
+});
+t('lịch theo chu kỳ: lastRunAt = lúc BẮT ĐẦU lần chạy ("cứ 1 phút" không trôi thành 1 phút + thời gian chạy)', async () => {
+  const c = mkCap();
+  const l = c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60 });
+  const before = Date.now();
+  await c.e.execute(l[0].id);
+  const last = Date.parse(c.saved[0].lastRunAt);
+  assert.ok(last >= before && last < before + 12, `lastRunAt phải là lúc bắt đầu (lệch ${last - before}ms, lượt chạy mất ≥15ms)`);
+});
+t('connectorTools đi theo quy tắc (giao diện sửa mà không gửi trường này thì GIỮ NGUYÊN)', () => {
+  const c = mkCap();
+  const l = c.e.upsert({ ...lichAgent(), schedule: { mode: 'interval' }, intervalSec: 60, connectorTools: ['zalo_send_text'], runOn: 'desktop' });
+  c.e.upsert({ ...lichAgent(), id: l[0].id, schedule: { mode: 'interval' }, intervalSec: 120 });
+  assert.deepStrictEqual(c.saved[0].connectorTools, ['zalo_send_text']);
+  assert.strictEqual(c.saved[0].intervalSec, 120);
+});
+
 (async()=>{ await Promise.all(waits); console.log(`\n${pass} ca đạt (tổng).`); })();

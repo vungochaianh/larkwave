@@ -121,7 +121,7 @@ export function engineWarn(i: EngineInput, r: RunnerLite | undefined, runnerLabe
 /** Tooltip của công tắc "Tự động". */
 export function autoTip(on: boolean): string {
   return on
-    ? 'Tự động: tạo workflow/automation (luôn TẮT), thêm bảng/cột/bản ghi mới chạy ngay không hỏi. Xoá, sửa, ghi đè, gửi tin vẫn hỏi. Không bao giờ tự bật workflow.'
+    ? 'Tự động: mọi thao tác chạy ngay không hỏi — thêm, sửa, ghi đè, gửi tin Lark/Zalo/Gmail, tạo lịch. Chỉ XOÁ còn hỏi. Không bao giờ tự bật workflow.'
     : 'Hỏi trước khi ghi: mọi thao tác ghi đều hiện hộp xác nhận vẽ sẵn thiết kế.';
 }
 
