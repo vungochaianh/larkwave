@@ -66,88 +66,66 @@ const MAX_TEXT = 200_000;
  * lịch sử. THUẦN chuỗi (chạy qua executeJavaScript) nên không phụ thuộc tên lớp CSS hay thay đổi của Zalo.
  */
 /**
- * Đọc nội dung hội thoại đang mở (chạy TRONG trang) và CUỘN LÊN tới khi chạm mốc ngày cần lấy.
+ * Tìm KHUNG TIN NHẮN trong trang. Dùng lại cho mọi script ngắn bên dưới.
  *
- * BÀI HỌC 18/10/2026:
- *  - Dò vùng tin bằng `getComputedStyle().overflowY` KHÔNG khớp gì trên Zalo Web ⇒ luôn rỗng. Nay dò theo
- *    `elementFromPoint` giữa khung chat rồi leo tổ tiên cuộn được; dự phòng quét toàn trang; cùng lắm đọc body.
- *  - Dừng cuộn khi "chiều cao không đổi 3 lần" là QUÁ SỚM: lúc Zalo đang tải thêm thì chiều cao cũng đứng yên.
- *    Nay chờ lâu hơn, cần nhiều lần đứng yên hơn, VÀ phải thật sự ở đỉnh (scrollTop ≈ 0) mới coi là hết tin.
- *  - Có `untilTs` thì cuộn tới khi thấy ngày <= mốc đó rồi dừng (không cuộn thừa).
+ * Dò theo `elementFromPoint` giữa khung chat rồi leo tổ tiên cuộn được (chắc nhất); dự phòng quét toàn
+ * trang; cùng lắm trả cả trang. KHÔNG dựa vào `overflowY` của CSS — Zalo Web không khớp (bài học 18/10/2026).
  */
-function readScript(scrolls: number, untilTs?: number): string {
+const AREA_FN = `function __lwArea() {
+  const canScroll = (el) => el && el.scrollHeight > el.clientHeight + 24 && el.clientHeight > 120;
+  let a = null;
+  let n = document.elementFromPoint(Math.round(innerWidth * 0.68), Math.round(innerHeight * 0.5));
+  while (n && n !== document.body) { if (canScroll(n)) { a = n; break; } n = n.parentElement; }
+  if (!a) {
+    let best = null, bs = 0;
+    for (const el of document.querySelectorAll('div,section,main,ul')) {
+      if (!canScroll(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 240 || r.height < 160) continue;
+      const sc = (el.scrollHeight - el.clientHeight) * (r.left > innerWidth * 0.25 ? 2 : 1);
+      if (sc > bs) { bs = sc; best = el; }
+    }
+    a = best;
+  }
+  return a || document.scrollingElement || document.body;
+}`;
+
+/**
+ * MỘT ĐỢT cuộn ngắn (vài lần) rồi trả về trạng thái. Vòng lặp nằm ở PHÍA APP, không phải trong trang.
+ *
+ * BÀI HỌC 18/10/2026: bản trước cuộn cả trăm vòng TRONG MỘT script và đọc `innerText` (ép tính lại bố cục
+ * cả hội thoại) mỗi vòng ⇒ chạy vài phút, trang nặng, Electron trả "Script failed to execute" và chết trước
+ * khi kịp cuộn tới nơi. Nay mỗi lần gọi chỉ cuộn `n` lần và đọc `textContent` (rẻ, không ép bố cục) phần đầu
+ * khung để dò vạch ngày.
+ */
+function scrollStepScript(n: number): string {
   return `(async () => {
+    ${AREA_FN}
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const canScroll = (el) => el && el.scrollHeight > el.clientHeight + 24 && el.clientHeight > 120;
-    const UNTIL = ${untilTs ?? 0};
-    const diag = { how: '', tag: '', cls: '', bodyLen: 0, areaLen: 0, scrolled: 0, reachedTop: false, oldestSeen: '' };
-
-    let area = null;
-    const px = Math.round(innerWidth * 0.68), py = Math.round(innerHeight * 0.5);
-    let node = document.elementFromPoint(px, py);
-    while (node && node !== document.body) {
-      if (canScroll(node)) { area = node; diag.how = 'point'; break; }
-      node = node.parentElement;
+    const a = __lwArea();
+    for (let i = 0; i < ${Math.max(1, Math.min(n, 12))}; i++) {
+      try { a.scrollTop = 0; } catch (e) {}
+      try { a.dispatchEvent(new WheelEvent('wheel', { deltaY: -2000, bubbles: true })); } catch (e) {}
+      await sleep(900);
     }
-    if (!area) {
-      let best = null, bestScore = 0;
-      for (const el of document.querySelectorAll('div,section,main,ul')) {
-        if (!canScroll(el)) continue;
-        const r = el.getBoundingClientRect();
-        if (r.width < 240 || r.height < 160) continue;
-        const score = (el.scrollHeight - el.clientHeight) * (r.left > innerWidth * 0.25 ? 2 : 1);
-        if (score > bestScore) { bestScore = score; best = el; }
-      }
-      if (best) { area = best; diag.how = 'scan'; }
-    }
-    if (!area) { area = document.scrollingElement || document.body; diag.how = 'body'; }
-    diag.tag = (area.tagName || '').toLowerCase();
-    diag.cls = String(area.className || '').slice(0, 80);
+    const head = (a.textContent || '').slice(0, 8000);
+    return { h: a.scrollHeight, top: a.scrollTop, head, len: (a.textContent || '').length };
+  })()`;
+}
 
-    // Ngày CŨ NHẤT đang hiển thị (Zalo chèn vạch ngày "01/10/2026", "Thứ Hai, 01/10").
-    const oldestTs = () => {
-      const t = area.innerText || '';
-      const now = new Date();
-      let min = Infinity, label = '';
-      for (const m of t.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g)) {
-        const d = Number(m[1]), mo = Number(m[2]), y = m[3] ? Number(m[3]) : now.getFullYear();
-        if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
-        const ts = new Date(y, mo - 1, d).getTime();
-        if (ts < min) { min = ts; label = m[0]; }
-      }
-      diag.oldestSeen = label;
-      return min;
-    };
-
-    let lastH = -1, stable = 0;
-    for (let i = 0; i < ${Math.max(0, Math.min(scrolls, 400))}; i++) {
-      try { area.scrollTop = 0; } catch (e) {}
-      try { area.dispatchEvent(new WheelEvent('wheel', { deltaY: -2000, bubbles: true })); } catch (e) {}
-      await sleep(1100);
-      diag.scrolled = i + 1;
-      // Đã cuộn tới mốc ngày cần lấy ⇒ dừng, khỏi cuộn thừa.
-      if (UNTIL && oldestTs() <= UNTIL) break;
-      const h = area.scrollHeight;
-      if (h === lastH) {
-        stable++;
-        // Chỉ coi là HẾT TIN khi vừa đứng yên vừa thật sự ở đỉnh (Zalo đang tải cũng đứng yên).
-        if (stable >= 5 && area.scrollTop <= 2) { diag.reachedTop = true; break; }
-        if (stable >= 12) break;
-      } else { stable = 0; lastH = h; }
-    }
-    oldestTs();
-    try { area.scrollTop = area.scrollHeight; } catch (e) {}
-
+/** Lấy nội dung + thông tin chẩn đoán (chạy MỘT lần, sau khi đã cuộn xong). */
+function extractScript(maxText: number): string {
+  return `(() => {
+    ${AREA_FN}
+    const a = __lwArea();
     const clean = (x) => (x || '').replace(/\n{3,}/g, '\n\n').trim();
-    let text = clean(area.innerText);
-    diag.areaLen = text.length;
+    let text = clean(a.innerText);
+    const areaLen = text.length;
     const bodyText = clean(document.body ? document.body.innerText : '');
-    diag.bodyLen = bodyText.length;
-    if (text.length < 20 && bodyText.length > text.length) { text = bodyText; diag.how += '+body'; }
-
-    const truncated = text.length > ${MAX_TEXT};
-    if (truncated) text = text.slice(-${MAX_TEXT});
-
+    let how = 'area';
+    if (text.length < 20 && bodyText.length > text.length) { text = bodyText; how = 'body'; }
+    const truncated = text.length > ${maxText};
+    if (truncated) text = text.slice(-${maxText});
     let title = '';
     const h1 = document.querySelector('[class*="header"] [class*="name"], [class*="conv"] [class*="title"], header h1, header h2');
     if (h1 && h1.textContent) title = h1.textContent.trim().slice(0, 120);
@@ -155,8 +133,27 @@ function readScript(scrolls: number, untilTs?: number): string {
       const top = document.elementFromPoint(Math.round(innerWidth * 0.68), 40);
       if (top && top.textContent) title = top.textContent.trim().slice(0, 120);
     }
-    return { empty: !text, title, text, truncated, diag };
+    try { a.scrollTop = a.scrollHeight; } catch (e) {}
+    return { empty: !text, title, text, truncated, how, areaLen, bodyLen: bodyText.length, tag: (a.tagName || '').toLowerCase(), cls: String(a.className || '').slice(0, 80) };
   })()`;
+}
+
+/** Ngày CŨ NHẤT thấy trong một đoạn chữ (vạch ngày của Zalo: "01/10/2026", "Thứ Hai, 01/10"). */
+function oldestDate(text: string): { ts: number; label: string } {
+  const now = new Date();
+  let ts = Infinity;
+  let label = '';
+  for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g)) {
+    const d = Number(m[1]);
+    const mo = Number(m[2]);
+    if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
+    const t = new Date(m[3] ? Number(m[3]) : now.getFullYear(), mo - 1, d).getTime();
+    if (t < ts) {
+      ts = t;
+      label = m[0];
+    }
+  }
+  return { ts, label };
 }
 
 /**
@@ -554,16 +551,76 @@ class ZaloWeb {
     return { opened, ...(found.label ? { clicked: found.label } : {}), candidates, ...(webHistoryLimit ? { webHistoryLimit } : {}) };
   }
 
-  /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
+  /**
+   * Đọc hội thoại ĐANG MỞ: cuộn lên từng ĐỢT NGẮN (vòng lặp ở đây, không phải trong trang) cho tới khi chạm
+   * `untilTs`, hoặc chạm đỉnh hội thoại, hoặc hết `scrolls` / hết giờ. Rồi lấy nội dung một lần.
+   */
   async readOpen(scrolls = 12, untilTs?: number): Promise<ZaloWebRead> {
     if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở. Dùng zalo_web_open, rồi mở đúng hội thoại cần đọc TRONG CỬA SỔ ĐÓ.');
     await this.settle(4000);
     if (this.status().loggedIn === false) {
-      throw new Error('Cửa sổ Zalo Web đang ở trang đăng nhập. Người dùng cần ĐĂNG NHẬP NGAY TRONG CỬA SỔ ĐÓ (quét QR), và nếu điện thoại hỏi thì bấm Đồng ý đồng bộ, rồi mở hội thoại cần đọc.');
+      throw new Error('Cửa sổ Zalo Web đang ở trang đăng nhập. Người dùng cần ĐĂNG NHẬP NGAY TRONG CỬA SỔ ĐÓ (quét QR), và nếu điện thoại hỏi thì bấm Đồng ý đồng bộ.');
     }
-    const r = (await this.win!.webContents.executeJavaScript(readScript(scrolls, untilTs), true)) as ZaloWebRead;
+    const wc = this.win!.webContents;
+    const BATCH = 6;
+    const budgetMs = 150_000; // trần giờ: thà trả về phần đã cuộn còn hơn treo rồi hỏng cả lượt
+    const t0 = Date.now();
+    let done = 0;
+    let reachedTop = false;
+    let oldestSeen = '';
+    let lastH = -1;
+    let stable = 0;
+    let stepErr = '';
+
+    while (done < Math.max(1, Math.min(scrolls, 400)) && Date.now() - t0 < budgetMs) {
+      const n = Math.min(BATCH, scrolls - done);
+      type Step = { h: number; top: number; head: string; len: number };
+      let st: Step | null = null;
+      try {
+        st = (await wc.executeJavaScript(scrollStepScript(n), true)) as Step;
+      } catch (e) {
+        // Một đợt hỏng (trang vừa vẽ lại) thì dừng cuộn, vẫn lấy phần đang có — đừng để hỏng cả lượt đọc.
+        stepErr = String((e as Error)?.message || e).slice(0, 120);
+        break;
+      }
+      done += n;
+      if (!st) break;
+      const od = oldestDate(st.head);
+      if (od.label) oldestSeen = od.label;
+      if (untilTs && Number.isFinite(od.ts) && od.ts <= untilTs) break; // đã tới mốc ngày cần lấy
+      if (st.h === lastH) {
+        stable++;
+        // Chỉ coi là HẾT TIN khi vừa đứng yên vừa thật sự ở đỉnh (Zalo đang tải cũng đứng yên).
+        if (stable >= 3 && st.top <= 2) {
+          reachedTop = true;
+          break;
+        }
+        if (stable >= 8) break;
+      } else {
+        stable = 0;
+        lastH = st.h;
+      }
+    }
+
+    const r = (await wc.executeJavaScript(extractScript(MAX_TEXT), true)) as {
+      empty: boolean;
+      title: string;
+      text: string;
+      truncated: boolean;
+      how: string;
+      areaLen: number;
+      bodyLen: number;
+      tag: string;
+      cls: string;
+    };
     this.lastReadAt = Date.now();
-    return r;
+    return {
+      empty: r.empty,
+      title: r.title,
+      text: r.text,
+      truncated: r.truncated,
+      diag: { how: r.how + (stepErr ? `(cuộn dừng: ${stepErr})` : ''), tag: r.tag, cls: r.cls, bodyLen: r.bodyLen, areaLen: r.areaLen, scrolled: done, reachedTop, oldestSeen },
+    };
   }
 }
 

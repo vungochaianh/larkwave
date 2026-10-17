@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.17',
+    date: '2026-10-18',
+    items: [
+      "Sửa lỗi \"zalo_web_read: Script failed to execute\": phần đọc chạy một mạch cả trăm vòng cuộn và quét lại toàn bộ nội dung mỗi vòng nên trang quá tải và chết giữa chừng — chưa kịp cuộn tới ngày cần. Nay cuộn theo từng đợt ngắn do app điều phối, có trần thời gian, và một đợt lỗi cũng không làm hỏng cả lượt đọc.",
+      "Báo cáo rõ hơn sau mỗi lần đọc: đã cuộn bao nhiêu đợt, ngày cũ nhất chạm tới, đã lên tới đầu hội thoại chưa.",
+    ],
+  },
+  {
     version: '0.1.16',
     date: '2026-10-18',
     items: [
