@@ -13,6 +13,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.10',
+    date: '2026-10-18',
+    items: [
+      "Sửa gộp phiên Zalo lỗi \"Đăng nhập thất bại\": cookie đăng nhập của cửa sổ Zalo Web chỉ gắn chat.zalo.me nên không tới được các máy chủ con của Zalo khi gộp — nay cấp cookie cho cả tên miền .zalo.me. Nếu vẫn lỗi, câu báo lỗi giờ cho biết có những cookie phiên nào để dò tiếp.",
+    ],
+  },
+  {
     version: '0.1.9',
     date: '2026-10-17',
     items: [

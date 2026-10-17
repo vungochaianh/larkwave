@@ -451,12 +451,16 @@ class ZaloService {
     if (!sess) return { ok: false, note: 'Chưa lấy được phiên từ cửa sổ Zalo Web (chưa đăng nhập xong?).' };
     const imei = `${randomUUID()}-${createHash('md5').update(sess.userAgent).digest('hex')}`;
     const creds: ZaloCredentials = { imei, userAgent: sess.userAgent, cookie: { cookies: sess.cookies }, language: 'vi' };
+    // Chẩn đoán (chỉ TÊN cookie, không có giá trị) — để biết có đủ cookie phiên không khi gộp lỗi.
+    const want = ['zpsid', 'zpw_sek', 'zpw_enk', 'app.login', '__zi'];
+    const have = want.filter((n) => sess.names.some((x) => x.toLowerCase().startsWith(n.toLowerCase())));
+    const diag = `(${sess.cookies.length} cookie; thấy: ${have.join(', ') || 'KHÔNG có cookie phiên nào'})`;
     try {
       const session = await this.manager().loginWithCredentials(creds);
       this.adoptTried = true;
       return { ok: true, account: session.label, note: `Đã gộp phiên: "${session.label}" giờ gửi tin / lấy nhóm từ máy chủ dùng chung phiên của cửa sổ Zalo Web.` };
     } catch (e) {
-      return { ok: false, note: `Chưa gộp được phiên: ${(e as Error)?.message || e}. Vẫn đọc được lịch sử qua cửa sổ; muốn gửi tin thì kết nối QR ở Kỹ năng (sẽ làm cửa sổ đăng xuất).` };
+      return { ok: false, note: `Chưa gộp được phiên: ${(e as Error)?.message || e} ${diag}. Vẫn ĐỌC được lịch sử qua cửa sổ bình thường.` };
     }
   }
 

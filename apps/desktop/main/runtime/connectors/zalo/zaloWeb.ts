@@ -248,22 +248,28 @@ class ZaloWeb {
    * Lấy phiên web hiện tại (cookie trong partition + UA) để GỘP sang zca (loginWithCredentials). Dạng cookie
    * theo tough-cookie JSON để zca `parseCookies` nạp được. Chưa đăng nhập ⇒ null.
    */
-  async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string } | null> {
+  async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string; names: string[] } | null> {
     if (!this.alive() || this.status().loggedIn !== true) return null;
     const cs = await electronSession.fromPartition(PARTITION).cookies.get({}).catch(() => []);
-    const cookies = cs
-      .filter((c) => /(^|\.)(zalo\.me|zadn\.vn|zdn\.vn)$/i.test(c.domain || ''))
-      .map((c) => ({
+    const zaloish = cs.filter((c) => /(^|\.)(zalo\.me|zadn\.vn|zdn\.vn|zaloapp\.com)$/i.test(c.domain || ''));
+    // BÀI HỌC 18/10: cookie đăng nhập của Zalo Web thường chỉ gắn host chat.zalo.me (hostOnly). zca gọi sang
+    // wpa.chat.zalo.me / tdb.zalo.me… nên cookie hostOnly KHÔNG được gửi kèm → getLoginInfo "Đăng nhập thất bại".
+    // Vì vậy xuất cho zca dưới dạng cookie TÊN MIỀN `.zalo.me` (gửi tới mọi máy chủ con), không hostOnly.
+    const cookies = zaloish.map((c) => {
+      const d = (c.domain || '').replace(/^\./, '');
+      const parent = /(^|\.)zalo\.me$/i.test(d) ? 'zalo.me' : d;
+      return {
         key: c.name,
         value: c.value,
-        domain: (c.domain || '').replace(/^\./, ''),
-        path: c.path || '/',
+        domain: parent,
+        path: '/',
         secure: !!c.secure,
         httpOnly: !!c.httpOnly,
-        hostOnly: !(c.domain || '').startsWith('.'),
+        hostOnly: false,
         ...(c.expirationDate ? { expires: new Date(c.expirationDate * 1000).toISOString() } : {}),
-      }));
-    return cookies.length ? { cookies, userAgent: ZALO_WEB_UA } : null;
+      };
+    });
+    return cookies.length ? { cookies, userAgent: ZALO_WEB_UA, names: cs.map((c) => c.name) } : null;
   }
 
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
