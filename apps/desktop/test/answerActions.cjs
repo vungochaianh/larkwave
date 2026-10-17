@@ -5,7 +5,7 @@
  * định gửi — tệ hơn hẳn việc họ phải gõ tay. Nên phần lớn ca dưới đây là ca PHẢI IM.
  */
 const assert = require('node:assert');
-const { extractChoices, needsExecuteMode } = require('../.test-build/ui/answerActions.js');
+const { extractChoices, needsExecuteMode, connectActions } = require('../.test-build/ui/answerActions.js');
 
 let pass = 0;
 const t = (name, fn) => { fn(); pass += 1; console.log('  ✓', name); };
@@ -79,4 +79,15 @@ t('KHÔNG bắt câu chỉ nhắc tới việc thực thi một cách bình thư
   ]) assert.ok(!needsExecuteMode(s), s);
 });
 
+
+t('trợ lý bảo đi kết nối ⇒ nút mở thẳng modal (lỗi thật: "add zalo như thế nào")', () => {
+  const real = 'Kiểm tra vừa rồi cho thấy chưa có tài khoản Zalo nào được kết nối. Bạn tự kết nối trong Larkwave, mình không làm thay được:\n\nTrên thanh bên của Larkwave, mở Kỹ năng → Kết nối → Zalo.\nLarkwave hiện một mã QR.';
+  assert.deepStrictEqual(connectActions(real), ['zalo']);
+  assert.deepStrictEqual(connectActions('Zalo (Lan) đang **mất kết nối** — quét lại QR'), ['zalo']);
+  assert.deepStrictEqual(connectActions('Gmail từ chối đăng nhập: cần mật khẩu ứng dụng 16 ký tự'), ['gmail']);
+  assert.deepStrictEqual(connectActions('Claude CLI chưa đăng nhập trên máy này'), ['claude']);
+  assert.deepStrictEqual(connectActions('Anthropic báo: Your credit balance is too low to access the Anthropic API.'), ['claudeKeys']);
+  assert.deepStrictEqual(connectActions('Đã gửi tin Zalo cho anh Nam lúc 9:05.'), [], 'nhắc Zalo nhưng không phải chuyện kết nối');
+  assert.deepStrictEqual(connectActions('Tóm tắt 12 thư Gmail tuần này: …'), []);
+});
 console.log(`\n${pass} ca đạt.`);

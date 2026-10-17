@@ -246,7 +246,7 @@ ${FACTS_NOTE}`,
   {
     id: 'lw-zalo-doc-tin',
     name: 'Đọc & tóm tắt tin Zalo',
-    version: 1,
+    version: 2,
     command: 'zalo-doc-tin',
     tags: CONNECTOR_TAGS,
     contract: { needs: [], produces: ['zalo_doc_so_tin'], checks: ['zalo_doc_so_tin >= 1'] },
@@ -256,7 +256,7 @@ ${FACTS_NOTE}`,
 Người dùng muốn xem hoặc tóm tắt tin nhắn Zalo (của một người, một nhóm, hay "tin mới gần đây"), trích thông tin từ tin Zalo (đơn hàng, yêu cầu của khách…), hoặc ghi phần đã trích vào Base.
 
 ## Các bước (đúng thứ tự)
-1. \`zalo_status\` — chưa có tài khoản nào kết nối thì DỪNG và hướng dẫn: mở **Kỹ năng → Kết nối → Zalo**, quét mã QR bằng app Zalo trên điện thoại.
+1. \`zalo_status\` — chưa có tài khoản nào kết nối thì DỪNG và nói ngắn: bấm nút **«Kết nối Zalo (quét QR)»** hiện ngay dưới câu trả lời này (app mở sẵn mã QR; hoặc Kỹ năng → Kết nối → Zalo), quét bằng app Zalo trên điện thoại. Đừng tả dài từng bước trong app.
 2. **Tìm hội thoại**: \`zalo_list_chats\` {query: tên người/nhóm hoặc chữ trong tin}; nhóm thì \`zalo_list_groups\` {query}; có số điện thoại thì \`zalo_find_user\` {phone}. Nhiều kết quả cùng tên → hỏi người dùng chọn (nêu tên + tin gần nhất), KHÔNG đoán.
 3. **Đọc**: \`zalo_read_chat\` {threadId, limit} (mặc định 50 tin cuối).
 4. **Trả lời** đúng điều được hỏi: tóm tắt / liệt kê việc cần làm / trích số liệu. Trích dẫn ngắn kèm người gửi + giờ (giờ Việt Nam). Nêu phạm vi đã đọc: "N tin, từ … đến …".
@@ -278,7 +278,7 @@ Người dùng muốn xem hoặc tóm tắt tin nhắn Zalo (của một ngườ
   {
     id: 'lw-zalo-gui-tin',
     name: 'Gửi tin Zalo',
-    version: 1,
+    version: 2,
     command: 'zalo-gui-tin',
     tags: CONNECTOR_TAGS,
     contract: { needs: [], produces: ['zalo_gui_nguoi_nhan', 'zalo_gui_da_gui'], checks: ['zalo_gui_da_gui <= zalo_gui_nguoi_nhan'] },
@@ -288,7 +288,7 @@ Người dùng muốn xem hoặc tóm tắt tin nhắn Zalo (của một ngườ
 Người dùng nhờ nhắn/gửi một tin Zalo cho một người hoặc một nhóm (kể cả "trả lời tin này").
 
 ## Các bước (đúng thứ tự)
-1. \`zalo_status\` — chưa kết nối thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Zalo**, quét QR.
+1. \`zalo_status\` — chưa kết nối thì DỪNG, nói ngắn: bấm nút **«Kết nối Zalo (quét QR)»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Zalo).
 2. **Xác định người nhận** chắc chắn đúng MỘT người/nhóm: \`zalo_find_user\` {phone} / \`zalo_list_friends\` {query} / \`zalo_list_groups\` {query} / \`zalo_list_chats\` {query}. Không chắc → hỏi lại người dùng, KHÔNG đoán.
 3. **Soạn** đúng ý người dùng (giữ nguyên câu chữ nếu họ đã viết sẵn). Nhiều người nhận → tối đa 10 người mỗi lượt, mỗi người một tin riêng (cá nhân hoá tên nếu được nhờ).
 4. **Gửi**: \`zalo_send_text\` {threadId, text, isGroup, recipientName} — app LUÔN hiện hộp xác nhận người nhận + nội dung. Người dùng từ chối → DỪNG, không thử cách khác.
@@ -307,7 +307,7 @@ Người dùng nhờ nhắn/gửi một tin Zalo cho một người hoặc một
   {
     id: 'lw-gmail-doc-thu',
     name: 'Đọc & tìm thư Gmail',
-    version: 1,
+    version: 2,
     command: 'gmail-doc-thu',
     tags: CONNECTOR_TAGS,
     contract: { needs: [], produces: ['gmail_doc_tim_thay', 'gmail_doc_da_doc'], checks: ['gmail_doc_da_doc <= gmail_doc_tim_thay'] },
@@ -317,7 +317,7 @@ Người dùng nhờ nhắn/gửi một tin Zalo cho một người hoặc một
 Người dùng muốn tìm/đọc/tóm tắt thư trong Gmail của họ (vd "thư mới của anh A", "hoá đơn tuần này", "thư chưa đọc hôm nay"), hoặc trích nội dung thư vào Base.
 
 ## Các bước (đúng thứ tự)
-1. \`gmail_status\` — chưa có tài khoản thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Gmail**, nhập địa chỉ + MẬT KHẨU ỨNG DỤNG 16 ký tự (tạo ở myaccount.google.com/apppasswords, cần bật xác thực 2 bước).
+1. \`gmail_status\` — chưa có tài khoản thì DỪNG, nói ngắn: bấm nút **«Kết nối Gmail»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Gmail), nhập địa chỉ + MẬT KHẨU ỨNG DỤNG 16 ký tự (tạo ở myaccount.google.com/apppasswords, cần bật xác thực 2 bước).
 2. **Tìm**: \`gmail_search\` {query, limit, unreadOnly, mailbox}. \`query\` theo cú pháp ô tìm của Gmail: \`from:\`, \`to:\`, \`subject:\`, \`newer_than:7d\`, \`after:2026/10/01\`, \`has:attachment\`, \`is:unread\`. Thư đã lưu trữ → \`mailbox: "all"\`.
 3. **Đọc**: \`gmail_read\` {id, mailbox} cho đúng thư cần (id lấy từ bước 2, cùng mailbox).
 4. **Báo cáo**: người gửi, ngày, tiêu đề, việc cần làm / số liệu chính; nêu đã tìm với truy vấn nào và đọc bao nhiêu thư. Đính kèm: hiện có tên + cỡ, CHƯA tải được nội dung tệp — nói rõ nếu người dùng cần.
@@ -336,7 +336,7 @@ Người dùng muốn tìm/đọc/tóm tắt thư trong Gmail của họ (vd "th
   {
     id: 'lw-gmail-gui-thu',
     name: 'Gửi thư Gmail',
-    version: 1,
+    version: 2,
     command: 'gmail-gui-thu',
     tags: CONNECTOR_TAGS,
     contract: { needs: [], produces: ['gmail_gui_nguoi_nhan', 'gmail_gui_da_gui'], checks: ['gmail_gui_da_gui <= gmail_gui_nguoi_nhan'] },
@@ -346,7 +346,7 @@ Người dùng muốn tìm/đọc/tóm tắt thư trong Gmail của họ (vd "th
 Người dùng nhờ soạn và gửi một email (hoặc trả lời một thư) từ Gmail của họ.
 
 ## Các bước (đúng thứ tự)
-1. \`gmail_status\` — chưa có tài khoản thì DỪNG, hướng dẫn: **Kỹ năng → Kết nối → Gmail** (mật khẩu ứng dụng).
+1. \`gmail_status\` — chưa có tài khoản thì DỪNG, nói ngắn: bấm nút **«Kết nối Gmail»** ngay dưới câu trả lời (hoặc Kỹ năng → Kết nối → Gmail).
 2. **Người nhận**: dùng ĐÚNG địa chỉ người dùng đưa — không đoán địa chỉ. Trả lời một thư → \`gmail_search\` + \`gmail_read\` để lấy địa chỉ người gửi và đặt tiêu đề "Re: <tiêu đề cũ>".
 3. **Soạn** tiêu đề + nội dung chữ thuần (tiếng Việt có dấu), đúng ý người dùng; ký tên nếu được nhờ.
 4. **Gửi**: \`gmail_send\` {to, cc, subject, text} — app LUÔN hiện hộp xác nhận. Người dùng từ chối → DỪNG.

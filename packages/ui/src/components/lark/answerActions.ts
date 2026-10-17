@@ -80,3 +80,26 @@ export function extractChoices(text: string): AnswerChoice[] {
   if (new Set(keys).size !== keys.length) return [];
   return out.slice(0, 4);
 }
+
+/** Đích "sửa nhanh" mà một câu trả lời đang nhắc tới (khớp FixTarget của fix/fixRules — giữ tệp này thuần). */
+export type AnswerConnect = 'zalo' | 'gmail' | 'claude' | 'claudeKeys';
+
+const CONNECT_RULES: [AnswerConnect, RegExp][] = [
+  // "chưa có tài khoản Zalo nào được kết nối", "Kỹ năng → Kết nối → Zalo", "quét mã QR … Zalo", "Zalo mất kết nối".
+  ['zalo', /(kết\s*nối|đăng\s*nhập|quét(?:\s*(?:lại|mã))*\s*QR)[^.\n]{0,60}\bzalo\b|\bzalo\b[^.\n]{0,60}(chưa[^.\n]{0,25}kết\s*nối|mất\s*kết\s*nối|quét(?:\s*(?:lại|mã))*\s*QR|đăng\s*nhập\s*lại)/i],
+  ['gmail', /(kết\s*nối|đăng\s*nhập)[^.\n]{0,60}\bgmail\b|\bgmail\b[^.\n]{0,60}(chưa[^.\n]{0,25}kết\s*nối|từ\s*chối\s*đăng\s*nhập|mật\s*khẩu\s*ứng\s*dụng)/i],
+  ['claude', /đăng\s*nhập(?:\s*lại)?\s*claude|claude(?:\s*cli)?[^.\n]{0,30}chưa\s*đăng\s*nhập/i],
+  ['claudeKeys', /(credit\s*balance\s*is\s*too\s*low|hết\s*credit|chưa\s*(?:có|nạp)[^.\n]{0,20}credit)/i],
+];
+
+/**
+ * Câu trả lời đang bảo người dùng KẾT NỐI / ĐĂNG NHẬP một thứ (Zalo, Gmail, Claude…) ⇒ nút mở THẲNG modal
+ * đó (FixCenter) ngay dưới câu trả lời. Lỗi thật 17/10/2026: hỏi "add zalo như thế nào", trợ lý kiểm
+ * (zalo_status trả danh sách rỗng — không phải lỗi, nên thẻ công cụ không có nút) rồi trả lời bằng chữ
+ * "mở Kỹ năng → Kết nối → Zalo". Nút ở đây chỉ MỞ modal, không gửi gì đi — bắt nhầm cũng vô hại.
+ */
+export function connectActions(text: string): AnswerConnect[] {
+  const src = (text || '').replace(/[*_`]+/g, '');
+  return CONNECT_RULES.filter(([, re]) => re.test(src)).map(([k]) => k);
+}
+

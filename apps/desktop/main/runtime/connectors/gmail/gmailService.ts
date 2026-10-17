@@ -189,7 +189,7 @@ class GmailService {
 
   private account(email?: string): { email: string; pass: string; name?: string } {
     const list = this.load();
-    if (!list.length) throw new Error('Chưa kết nối Gmail. Mở Kỹ năng → Kết nối → Gmail, nhập địa chỉ và mật khẩu ứng dụng.');
+    if (!list.length) throw new Error('Chưa kết nối Gmail. Người dùng bấm nút «Kết nối Gmail» (hiện dưới câu trả lời / nút khiên «Kiểm tra» trên thanh đầu), nhập địa chỉ và mật khẩu ứng dụng.');
     const a = email ? list.find((x) => x.email === String(email).trim().toLowerCase()) : list[0];
     if (!a) throw new Error(`Không thấy Gmail "${email}". Đang có: ${list.map((x) => x.email).join(', ')}.`);
     return { email: a.email, pass: this.open(a.pass), name: a.name };

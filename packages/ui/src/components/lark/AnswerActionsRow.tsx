@@ -1,9 +1,17 @@
 'use client';
 import { Button, Space, Tooltip } from 'antd';
-import { ThunderboltOutlined } from '@ant-design/icons';
+import { LinkOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { openFix } from '../fix/fixRules';
 import { BRAND, V } from '../../theme';
 import type { LarkChatMode } from '@larkwave/core';
-import { extractChoices, needsExecuteMode } from './answerActions';
+import { connectActions, extractChoices, needsExecuteMode, type AnswerConnect } from './answerActions';
+
+const CONNECT_LABEL: Record<AnswerConnect, string> = {
+  zalo: 'Kết nối Zalo (quét QR)',
+  gmail: 'Kết nối Gmail',
+  claude: 'Đăng nhập Claude',
+  claudeKeys: 'Kiểm / đổi API key',
+};
 
 /**
  * Hàng nút ngay dưới câu trả lời của trợ lý.
@@ -36,7 +44,9 @@ export function AnswerActionsRow({
   const choices = extractChoices(text);
   // Đang ở Thực thi rồi mà vẫn mời bật Thực thi thì vô nghĩa — nên hỏi cả chế độ HIỆN TẠI.
   const wantExecute = mode === 'ask' && needsExecuteMode(text);
-  if (!choices.length && !wantExecute) return null;
+  // Trợ lý bảo đi kết nối / đăng nhập ⇒ nút mở thẳng modal (không bắt người dùng lần vào Cài đặt).
+  const connects = connectActions(text);
+  if (!choices.length && !wantExecute && !connects.length) return null;
 
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${V.borderSub}` }}>
@@ -53,6 +63,11 @@ export function AnswerActionsRow({
             </Button>
           </Tooltip>
         )}
+        {connects.map((c) => (
+          <Button key={`fix-${c}`} type="primary" size="small" icon={<LinkOutlined />} onClick={() => openFix(c, tr('chat.fixFromAnswer', 'Mở từ câu trả lời của trợ lý.'))}>
+            {tr(`chat.connect.${c}`, CONNECT_LABEL[c])}
+          </Button>
+        ))}
         {choices.map((c) => (
           <Tooltip key={c.key} title={c.text}>
             <Button

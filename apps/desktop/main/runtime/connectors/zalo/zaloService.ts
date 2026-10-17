@@ -99,7 +99,7 @@ class ZaloService {
       throw new Error(
         any.length
           ? `Zalo (${any[0].label}) đang ${any[0].status === 'reconnecting' ? 'nối lại' : 'mất kết nối'} — mở Kỹ năng → Kết nối Zalo để đăng nhập lại bằng QR.`
-          : 'Chưa kết nối Zalo. Mở Kỹ năng → Kết nối → Zalo và quét mã QR bằng app Zalo trên điện thoại.',
+          : 'Chưa kết nối Zalo. Người dùng bấm nút «Kết nối Zalo (quét QR)» (hiện dưới câu trả lời / nút khiên «Kiểm tra» trên thanh đầu) rồi quét mã bằng app Zalo trên điện thoại.',
       );
     }
     if (!account) return ready[0];
