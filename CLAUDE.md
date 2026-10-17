@@ -6,7 +6,7 @@ web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
 **Trạng thái (17/10/2026):**
-- Bản **0.1.7 macOS đã phát hành**: https://toolswave.net/larkwave.
+- Bản **0.1.8 macOS đã phát hành**: https://toolswave.net/larkwave.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows.
 - Bản cài ký ad-hoc, chưa notarize.
@@ -132,7 +132,8 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   toàn chặn, và đã bỏ hẳn hướng đó. Lịch sử cũ chỉ lấy qua 3 đường trên.
 - Công cụ: `zalo_search_messages` (tìm chữ/thời gian), `zalo_sync` (status/server), `zalo_web_open`, `zalo_web_read`.
   Kỹ năng: 'Đọc & tóm tắt tin Zalo' (v3) + 'Đồng bộ tin Zalo' (/zalo-dong-bo). Giao diện: `ZaloSyncPanel.tsx`.
-- Phần đọc nội dung cửa sổ Web là best-effort (selector/innerText) — CHƯA thử trên Zalo thật.
+- Đăng nhập cửa sổ Zalo Web là RIÊNG (partition persist:zalo-web), đăng nhập TRONG CỬA SỔ — khác phiên zca (QR sidebar); Zalo chỉ 1 phiên web/lúc nên hai bên đá nhau. 0.1.8: phát hiện đăng nhập phải CHỜ trang ổn định (`settle`, theo did-navigate) rồi mới kết luận theo host — đọc getURL() tức thời là sai (chat.zalo.me chưa redirect sang id.zalo.me). Kỹ năng/công cụ cấm đẩy người dùng sang nút QR sidebar khi đang dùng cửa sổ (gây vòng lặp "hết hiệu lực").
+- Phần đọc nội dung cửa sổ Web là best-effort (innerText vùng cuộn lớn nhất) — CHƯA thử trên Zalo thật.
 - **Cái chốt duy nhất** là `connectorGate` trong `lark/tools/connectors.ts`. Một công cụ `zalo_*` / `gmail_*` chạy khi:
   - lượt đó có `connectors` trong ngữ cảnh. Chỉ hai nơi gắn trường này: `larkService.chat` (lượt của chính chủ
     máy) và `runAutomationAgent` cho lịch có `rule.connectorTools`. Bot Lark và lượt chia sẻ KHÔNG BAO GIỜ có.
