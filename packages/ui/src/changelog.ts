@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.19',
+    date: '2026-10-18',
+    items: [
+      "Hết lỗi mù \"Script failed to execute\": mọi lệnh Larkwave chạy trong cửa sổ Zalo Web nay được bọc để KHÔNG BAO GIỜ ném lỗi trống — nếu hỏng thì báo đúng câu lỗi thật, và một lệnh hỏng không làm mất cả lượt đọc (vẫn trả phần đã lấy được).",
+      "Mở cửa sổ Zalo Web không còn thất bại chỉ vì trang chặn bộ nhớ cục bộ khi app dò phiên đăng nhập.",
+    ],
+  },
+  {
     version: '0.1.18',
     date: '2026-10-18',
     items: [

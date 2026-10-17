@@ -178,7 +178,8 @@ const IMEI_SCAN = `(() => {
       }
     } catch (e) { /* storage bị chặn */ }
   };
-  scan(localStorage); scan(sessionStorage);
+  try { scan(localStorage); } catch (e) { /* trang chặn localStorage */ }
+  try { scan(sessionStorage); } catch (e) { /* trang chặn sessionStorage */ }
   return { hits, keys: keys.slice(0, 60) };
 })()`;
 
@@ -201,6 +202,27 @@ class ZaloWeb {
 
   private alive(): boolean {
     return !!this.win && !this.win.isDestroyed();
+  }
+
+  /**
+   * Chạy MỘT biểu thức JS trong trang và KHÔNG BAO GIỜ ném.
+   *
+   * BÀI HỌC 18/10/2026: chỉ cần script ném một lỗi bất kỳ (ví dụ trang chặn `localStorage`) là Electron trả
+   * đúng một câu "Script failed to execute…" — không nói lỗi gì, ở đâu. Người dùng gặp bốn lượt liên tiếp mà
+   * mình không có manh mối nào. Nay bọc try/catch NGAY TRONG trang: luôn trả `{ok,value}` hoặc `{ok:false,error}`
+   * với câu lỗi THẬT, và nơi gọi tự quyết định đi tiếp hay dừng — một script hỏng không giết cả lượt.
+   */
+  private async runJs<T>(expr: string): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+    if (!this.alive()) return { ok: false, error: 'cửa sổ Zalo Web chưa mở' };
+    const wrapped = `(async () => { try { return { __ok: true, v: await (${expr}) }; } catch (e) { return { __ok: false, e: String((e && e.message) || e).slice(0, 300) }; } })()`;
+    try {
+      const r = (await this.win!.webContents.executeJavaScript(wrapped, true)) as { __ok?: boolean; v?: T; e?: string };
+      if (r?.__ok) return { ok: true, value: r.v as T };
+      return { ok: false, error: r?.e || 'script trả về rỗng' };
+    } catch (e) {
+      // Chỉ còn lại các ca ngoài tầm try trong trang: trang vừa điều hướng, context bị huỷ…
+      return { ok: false, error: `không chạy được script trong trang (${String((e as Error)?.message || e).slice(0, 160)})` };
+    }
   }
 
   /** Có cookie phiên Zalo trong partition chưa (đã từng đăng nhập ở cửa sổ này). */
@@ -418,14 +440,10 @@ class ZaloWeb {
    */
   /** imei mà CHÍNH cửa sổ đã dùng để đăng nhập (phiên Zalo gắn với thiết bị này) — xem IMEI_SCAN. */
   async readImei(): Promise<{ imei?: string; key?: string; keys: string[] }> {
-    if (!this.alive()) return { keys: [] };
-    try {
-      const r = (await this.win!.webContents.executeJavaScript(IMEI_SCAN, true)) as { hits: { key: string; imei: string }[]; keys: string[] };
-      const hit = r?.hits?.[0];
-      return { ...(hit ? { imei: hit.imei, key: hit.key } : {}), keys: r?.keys ?? [] };
-    } catch {
-      return { keys: [] };
-    }
+    const r = await this.runJs<{ hits: { key: string; imei: string }[]; keys: string[] }>(IMEI_SCAN);
+    if (!r.ok) return { keys: [] };
+    const hit = r.value?.hits?.[0];
+    return { ...(hit ? { imei: hit.imei, key: hit.key } : {}), keys: r.value?.keys ?? [] };
   }
 
   async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string; names: string[]; imei?: string; imeiKey?: string; storeKeys: string[] } | null> {
@@ -462,15 +480,14 @@ class ZaloWeb {
    * TOẠ ĐỘ của hàng kết quả rồi bắn CLICK CHUỘT THẬT bằng `webContents.sendInputEvent` (sự kiện tin cậy, y
    * như người dùng bấm), rồi KIỂM CHỨNG đã rời màn hình chào mừng chưa.
    */
-  async openChat(name: string): Promise<{ opened: boolean; clicked?: string; candidates: string[]; webHistoryLimit?: string }> {
+  async openChat(name: string): Promise<{ opened: boolean; clicked?: string; candidates: string[]; webHistoryLimit?: string; scriptError?: string }> {
     if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở.');
     const wc = this.win!.webContents;
     const want = String(name || '').trim();
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     // 1) Gõ tên vào ô tìm (cột trái) để Zalo lọc danh sách.
-    await wc
-      .executeJavaScript(
+    await this.runJs<boolean>(
         `(() => {
           const want = ${JSON.stringify(want)};
           const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height > 14 && r.left < innerWidth * 0.5; };
@@ -487,14 +504,11 @@ class ZaloWeb {
           }
           return true;
         })()`,
-        true,
-      )
-      .catch(() => false);
+    );
     await sleep(1600);
 
     // 2) Tìm TOẠ ĐỘ hàng kết quả khớp tên (ở cột trái, dưới ô tìm).
-    const found = (await wc
-      .executeJavaScript(
+    const foundR = await this.runJs<{ ok: boolean; x?: number; y?: number; label?: string; candidates: string[]; limit?: string }>(
         `(() => {
           const want = ${JSON.stringify(want)};
           const fold = (x) => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
@@ -520,9 +534,9 @@ class ZaloWeb {
           const r = el.getBoundingClientRect();
           return { ok: true, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), label: (el.textContent || '').trim().slice(0, 80), candidates, limit };
         })()`,
-        true,
-      )
-      .catch(() => null)) as { ok: boolean; x?: number; y?: number; label?: string; candidates: string[]; limit?: string } | null;
+    );
+    if (foundR.ok !== true) return { opened: false, candidates: [], scriptError: foundR.error };
+    const found = foundR.value;
 
     const candidates = found?.candidates ?? [];
     const webHistoryLimit = found?.limit || undefined;
@@ -538,8 +552,7 @@ class ZaloWeb {
     await sleep(1800);
 
     // 4) Kiểm chứng: đã rời màn hình chào mừng / đã có khung tin chưa.
-    const opened = (await wc
-      .executeJavaScript(
+    const okR = await this.runJs<boolean>(
         `(() => {
           const t = document.body ? document.body.innerText : '';
           if (/Chào mừng đến với Zalo/i.test(t)) return false;
@@ -548,11 +561,11 @@ class ZaloWeb {
           while (n && n !== document.body) { if (n.scrollHeight > n.clientHeight + 24 && n.clientHeight > 120) { deep = true; break; } n = n.parentElement; }
           return deep || t.length > 400;
         })()`,
-        true,
-      )
-      .catch(() => false)) as boolean;
+    );
+    const opened = okR.ok === true ? !!okR.value : false;
+    const okErr = okR.ok === true ? '' : okR.error;
 
-    return { opened, ...(found.label ? { clicked: found.label } : {}), candidates, ...(webHistoryLimit ? { webHistoryLimit } : {}) };
+    return { opened, ...(found.label ? { clicked: found.label } : {}), candidates, ...(webHistoryLimit ? { webHistoryLimit } : {}), ...(okErr ? { scriptError: okErr } : {}) };
   }
 
   /**
@@ -565,7 +578,6 @@ class ZaloWeb {
     if (this.status().loggedIn === false) {
       throw new Error('Cửa sổ Zalo Web đang ở trang đăng nhập. Người dùng cần ĐĂNG NHẬP NGAY TRONG CỬA SỔ ĐÓ (quét QR), và nếu điện thoại hỏi thì bấm Đồng ý đồng bộ.');
     }
-    const wc = this.win!.webContents;
     const BATCH = 6;
     const budgetMs = 150_000; // trần giờ: thà trả về phần đã cuộn còn hơn treo rồi hỏng cả lượt
     const t0 = Date.now();
@@ -579,14 +591,13 @@ class ZaloWeb {
     while (done < Math.max(1, Math.min(scrolls, 400)) && Date.now() - t0 < budgetMs) {
       const n = Math.min(BATCH, scrolls - done);
       type Step = { h: number; top: number; head: string; len: number };
-      let st: Step | null = null;
-      try {
-        st = (await wc.executeJavaScript(scrollStepScript(n), true)) as Step;
-      } catch (e) {
+      const stR = await this.runJs<Step>(scrollStepScript(n));
+      if (stR.ok !== true) {
         // Một đợt hỏng (trang vừa vẽ lại) thì dừng cuộn, vẫn lấy phần đang có — đừng để hỏng cả lượt đọc.
-        stepErr = String((e as Error)?.message || e).slice(0, 120);
+        stepErr = stR.error.slice(0, 160);
         break;
       }
+      const st = stR.value;
       done += n;
       if (!st) break;
       const od = oldestDate(st.head);
@@ -606,18 +617,19 @@ class ZaloWeb {
       }
     }
 
-    const r = (await wc.executeJavaScript(extractScript(MAX_TEXT), true)) as {
-      empty: boolean;
-      title: string;
-      text: string;
-      truncated: boolean;
-      how: string;
-      areaLen: number;
-      bodyLen: number;
-      tag: string;
-      cls: string;
-      limitDate?: string;
-    };
+    type Extract = { empty: boolean; title: string; text: string; truncated: boolean; how: string; areaLen: number; bodyLen: number; tag: string; cls: string; limitDate?: string };
+    const rR = await this.runJs<Extract>(extractScript(MAX_TEXT));
+    if (rR.ok !== true) {
+      // Trả về RỖNG kèm lý do THẬT, không ném — nơi gọi báo đúng lỗi cho người dùng.
+      return {
+        empty: true,
+        title: '',
+        text: '',
+        truncated: false,
+        diag: { how: `lỗi đọc: ${rR.error}`, tag: '', cls: '', bodyLen: 0, areaLen: 0, scrolled: done, reachedTop, oldestSeen },
+      };
+    }
+    const r = rR.value;
     this.lastReadAt = Date.now();
     return {
       empty: r.empty,

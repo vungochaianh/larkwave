@@ -269,17 +269,18 @@ export const connectorTools: LarkToolDef[] = [
           chatNotFound: r.chatNotFound,
           candidates: r.candidates,
           ...(r.webHistoryLimit ? { webHistoryLimit: r.webHistoryLimit } : {}),
-          note: `Không MỞ được hội thoại "${r.chatNotFound}" trong cửa sổ Zalo Web. Xem "candidates" (những mục cửa sổ đang thấy) rồi gọi lại với đúng tên. Danh sách trống ⇒ cửa sổ chưa tải xong hoặc chưa đăng nhập.`,
+          note: `Không MỞ được hội thoại "${r.chatNotFound}" trong cửa sổ Zalo Web${r.scriptError ? ` (lỗi: ${r.scriptError})` : ''}. Xem "candidates" (những mục cửa sổ đang thấy) rồi gọi lại với đúng tên. Danh sách trống ⇒ cửa sổ chưa tải xong hoặc chưa đăng nhập.`,
         };
       }
       if (r.empty) {
         return {
           empty: true,
           diag: r.diag,
+          ...(r.scriptError ? { scriptError: r.scriptError } : {}),
           note:
             'Mở được hội thoại nhưng ĐỌC RA RỖNG. Thử lại MỘT lần với `scrolls` lớn hơn; vẫn rỗng thì DỪNG, ' +
-            'báo người dùng đây là lỗi bộ đọc của Larkwave (không phải nhóm không có tin) và ĐƯA NGUYÊN khối `diag` ' +
-            'này vào câu trả lời để nhóm phát triển sửa. KHÔNG bắt người dùng bấm lại hay đồng bộ lại.',
+            'báo người dùng đây là lỗi bộ đọc của Larkwave (không phải nhóm không có tin) và ĐƯA NGUYÊN `diag.how` ' +
+            '(trong đó có CÂU LỖI THẬT) vào câu trả lời để nhóm phát triển sửa. KHÔNG bắt người dùng bấm lại hay đồng bộ lại.',
         };
       }
       return {
