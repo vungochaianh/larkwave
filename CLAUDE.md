@@ -6,8 +6,8 @@ web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
 
-**Trạng thái (13/10/2026):**
-- Bản **0.1.3 macOS đã phát hành**: https://toolswave.net/larkwave.
+**Trạng thái (17/10/2026):**
+- Bản **0.1.6 macOS đã phát hành**: https://toolswave.net/larkwave.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows.
 - Bản cài ký ad-hoc, chưa notarize.
