@@ -144,7 +144,7 @@ export function FixCenter() {
         ? 'API key Claude'
         : target === 'zalo'
           ? 'Kết nối Zalo'
-          : target === 'zaloSync'
+          : target === 'zaloSync' || target === 'zaloWeb'
             ? 'Đồng bộ tin Zalo'
             : target === 'gmail'
               ? 'Kết nối Gmail'
@@ -159,7 +159,7 @@ export function FixCenter() {
       {target === 'claudeKeys' && <ClaudeKeyManager embedded onActiveChange={() => void check()} />}
       {target === 'zalo' && <SkillConnectors runtime={runtime} only="zalo" autoQr onConnected={() => setTimeout(close, 1200)} />}
       {target === 'gmail' && <SkillConnectors runtime={runtime} only="gmail" onConnected={() => setTimeout(close, 800)} />}
-      {target === 'zaloSync' && <ZaloSyncPanel runtime={runtime} embedded />}
+      {(target === 'zaloSync' || target === 'zaloWeb') && <ZaloSyncPanel runtime={runtime} embedded openWeb={target === 'zaloWeb'} />}
       {target === 'checklist' && <Checklist issues={issues} checking={checking} onRecheck={() => void check()} />}
     </Modal>
   );

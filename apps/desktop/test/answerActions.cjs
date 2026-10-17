@@ -90,4 +90,17 @@ t('trợ lý bảo đi kết nối ⇒ nút mở thẳng modal (lỗi thật: "a
   assert.deepStrictEqual(connectActions('Đã gửi tin Zalo cho anh Nam lúc 9:05.'), [], 'nhắc Zalo nhưng không phải chuyện kết nối');
   assert.deepStrictEqual(connectActions('Tóm tắt 12 thư Gmail tuần này: …'), []);
 });
+
+/**
+ * Lỗi thật 18/10/2026: trợ lý bảo "quét QR TRONG CỬA SỔ Zalo Web", nhưng app lại gắn nút "Kết nối Zalo
+ * (quét QR)" của thanh bên — đó là phiên zca RIÊNG, quét ở đó đá văng đăng nhập của cửa sổ ⇒ người dùng
+ * quay vòng. Nói tới cửa sổ Zalo Web thì CHỈ được gắn nút mở cửa sổ đó.
+ */
+t('câu trả lời nói về CỬA SỔ Zalo Web ⇒ nút mở cửa sổ, KHÔNG kèm nút quét-QR thanh bên', () => {
+  const a = connectActions('Cửa sổ Zalo Web chưa đăng nhập. Trong cửa sổ Zalo Web vừa hiện, quét mã QR bằng app Zalo trên điện thoại.');
+  assert.ok(a.includes('zaloWeb'), 'phải có nút mở cửa sổ');
+  assert.ok(!a.includes('zalo'), 'KHÔNG được kèm nút quét-QR của thanh bên (phiên khác, đá nhau)');
+  // Không nhắc cửa sổ ⇒ vẫn là đường kết nối cũ.
+  assert.deepStrictEqual(connectActions('Chưa kết nối Zalo — quét mã QR ở Kỹ năng → Kết nối → Zalo'), ['zalo']);
+});
 console.log(`\n${pass} ca đạt.`);

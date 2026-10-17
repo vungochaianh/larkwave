@@ -82,10 +82,20 @@ export function extractChoices(text: string): AnswerChoice[] {
 }
 
 /** Đích "sửa nhanh" mà một câu trả lời đang nhắc tới (khớp FixTarget của fix/fixRules — giữ tệp này thuần). */
-export type AnswerConnect = 'zalo' | 'gmail' | 'claude' | 'claudeKeys' | 'zaloSync';
+export type AnswerConnect = 'zalo' | 'zaloWeb' | 'gmail' | 'claude' | 'claudeKeys' | 'zaloSync';
+
+/**
+ * Câu trả lời đang nói về CỬA SỔ ZALO WEB (nơi đăng nhập Zalo duy nhất từ 0.1.9). Khi đó TUYỆT ĐỐI không
+ * gắn nút "Kết nối Zalo (quét QR)" của thanh bên: đó là phiên zca RIÊNG, quét ở đó sẽ đá văng đăng nhập của
+ * cửa sổ → người dùng quay vòng mãi (lỗi thật 18/10/2026). Chỉ gắn nút mở chính cửa sổ đó.
+ */
+const WEB_WINDOW = /cửa\s*sổ\s*zalo\s*web|zalo\s*web/i;
 
 const CONNECT_RULES: [AnswerConnect, RegExp][] = [
+  // Nói tới cửa sổ Zalo Web ⇒ mở thẳng cửa sổ đó (một đăng nhập duy nhất).
+  ['zaloWeb', WEB_WINDOW],
   // "chưa có tài khoản Zalo nào được kết nối", "Kỹ năng → Kết nối → Zalo", "quét mã QR … Zalo", "Zalo mất kết nối".
+  // KHÔNG áp dụng khi câu trả lời đang nói về cửa sổ Zalo Web (xem WEB_WINDOW).
   ['zalo', /(kết\s*nối|đăng\s*nhập|quét(?:\s*(?:lại|mã))*\s*QR)[^.\n]{0,60}\bzalo\b|\bzalo\b[^.\n]{0,60}(chưa[^.\n]{0,25}kết\s*nối|mất\s*kết\s*nối|quét(?:\s*(?:lại|mã))*\s*QR|đăng\s*nhập\s*lại)/i],
   ['gmail', /(kết\s*nối|đăng\s*nhập)[^.\n]{0,60}\bgmail\b|\bgmail\b[^.\n]{0,60}(chưa[^.\n]{0,25}kết\s*nối|từ\s*chối\s*đăng\s*nhập|mật\s*khẩu\s*ứng\s*dụng)/i],
   ['claude', /đăng\s*nhập(?:\s*lại)?\s*claude|claude(?:\s*cli)?[^.\n]{0,30}chưa\s*đăng\s*nhập/i],
@@ -102,6 +112,8 @@ const CONNECT_RULES: [AnswerConnect, RegExp][] = [
  */
 export function connectActions(text: string): AnswerConnect[] {
   const src = (text || '').replace(/[*_`]+/g, '');
-  return CONNECT_RULES.filter(([, re]) => re.test(src)).map(([k]) => k);
+  const hit = CONNECT_RULES.filter(([, re]) => re.test(src)).map(([k]) => k);
+  // Một đăng nhập duy nhất: đã có nút mở cửa sổ Zalo Web thì BỎ nút quét-QR của thanh bên (phiên khác, đá nhau).
+  return hit.includes('zaloWeb') ? hit.filter((k) => k !== 'zalo') : hit;
 }
 

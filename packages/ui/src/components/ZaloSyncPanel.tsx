@@ -17,7 +17,16 @@ const mb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max
  * WEB nhúng — người dùng mở, (nếu được hỏi) bấm Đồng ý đồng bộ trên điện thoại, trợ lý đọc nội dung đang hiển
  * thị. Cộng cài đặt lưu tin trên máy + hỏi đáp. Lõi < 0.1.7 không có các thao tác này ⇒ báo cần cài bản mới.
  */
-export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; embedded?: boolean }) {
+export function ZaloSyncPanel({
+  runtime,
+  embedded,
+  openWeb,
+}: {
+  runtime: RuntimeAdapter;
+  embedded?: boolean;
+  /** Mở thẳng cửa sổ Zalo Web khi vừa hiện (bấm nút "Mở cửa sổ Zalo Web" dưới câu trả lời của trợ lý). */
+  openWeb?: boolean;
+}) {
   const { t } = useI18n();
   const { message } = AntApp.useApp();
   const call = runtime.connectorsCall?.bind(runtime);
@@ -56,6 +65,21 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Mở sẵn cửa sổ Zalo Web (một lần) khi được gọi từ nút dưới câu trả lời của trợ lý.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!openWeb || !call || autoOpened.current) return;
+    autoOpened.current = true;
+    void (async () => {
+      try {
+        await call('zaloWebOpen', { show: true });
+      } catch {
+        /* lõi cũ chưa có cửa sổ Zalo Web */
+      }
+      await refresh();
+    })();
+  }, [openWeb, call, refresh]);
 
   // Cửa sổ Web đang mở → nhịp hỏi lại trạng thái (đăng nhập xong thì nút đổi).
   const webExists = !!st?.web.exists;

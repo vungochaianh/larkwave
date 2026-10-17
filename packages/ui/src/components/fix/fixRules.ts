@@ -8,7 +8,7 @@
  * AppShell) mở đúng modal.
  */
 
-export type FixTarget = 'checklist' | 'claude' | 'claudeKeys' | 'zalo' | 'zaloSync' | 'gmail' | `runner:${string}`;
+export type FixTarget = 'checklist' | 'claude' | 'claudeKeys' | 'zalo' | 'zaloWeb' | 'zaloSync' | 'gmail' | `runner:${string}`;
 
 export const OPEN_FIX_EVENT = 'larkwave:open-fix';
 /** FixCenter báo số việc CẦN sửa (error + warn) sau mỗi lần kiểm — FixBadge hiện số này. */
