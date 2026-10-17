@@ -492,6 +492,26 @@ function registerIpc(win: BrowserWindow) {
       if (op === 'zaloQrRetry') return zaloService.qrRetry();
       if (op === 'zaloQrAbort') return zaloService.qrAbort();
       if (op === 'zaloLogout') return zaloService.logout(String(p.accountId ?? '').slice(0, 64));
+      // Đồng bộ tin (Cài đặt → Đồng bộ tin Zalo).
+      const acc = p.account ? String(p.account).slice(0, 80) : undefined;
+      if (op === 'zaloSyncStatus') return zaloService.syncStatus();
+      if (op === 'zaloSyncSettings') {
+        return zaloService.saveSyncSettings({
+          ...(typeof p.persist === 'boolean' ? { persist: p.persist } : {}),
+          ...(p.retentionDays !== undefined ? { retentionDays: Number(p.retentionDays) } : {}),
+          ...(p.perThread !== undefined ? { perThread: Number(p.perThread) } : {}),
+        });
+      }
+      if (op === 'zaloHistoryFetch') return zaloService.fetchHistory({ account: acc, ...(p.threadId ? { threadId: String(p.threadId).slice(0, 80) } : {}) });
+      if (op === 'zaloStoreClear') return zaloService.clearStore(p.accountId ? String(p.accountId).slice(0, 64) : undefined);
+      // Cửa sổ Zalo Web nhúng.
+      if (op === 'zaloWebOpen') return zaloService.webOpen({ account: acc, show: p.show !== false });
+      if (op === 'zaloWebShow') return zaloService.webShow();
+      if (op === 'zaloWebHide') return zaloService.webHide();
+      if (op === 'zaloWebReload') return zaloService.webReload();
+      if (op === 'zaloWebClose') return zaloService.webClose();
+      if (op === 'zaloWebStatus') return zaloService.webStatus();
+      if (op === 'zaloWebRead') return zaloService.webRead({ ...(p.scrolls !== undefined ? { scrolls: Number(p.scrolls) } : {}) });
     } else if (op.startsWith('gmail')) {
       const { gmailService } = await import('./runtime/connectors/gmail/gmailService');
       if (op === 'gmailList') return gmailService.list();

@@ -5,6 +5,7 @@ import { ApiOutlined, DeleteOutlined, LogoutOutlined, MailOutlined, MessageOutli
 import type { GmailConnectorAccount, RuntimeAdapter, ZaloConnectorStatus, ZaloQrSnapshot } from '@larkwave/core';
 import { useI18n } from '../i18n';
 import { OK, V, WARN } from '../theme';
+import { openFix } from './fix/fixRules';
 
 const { Text } = Typography;
 
@@ -14,7 +15,8 @@ const QR_LIVE = new Set(['starting', 'awaiting-scan', 'scanned', 'authenticating
 /**
  * "Kết nối cho kỹ năng": Zalo cá nhân (quét QR) và Gmail (mật khẩu ứng dụng). Chỉ NGƯỜI DÙNG kết nối ở
  * đây; agent không tự thao tác — nó chỉ dùng kết nối qua công cụ zalo_ / gmail_ BÊN TRONG một kỹ năng
- * (bộ dựng sẵn "Zalo & Gmail" hoặc kỹ năng tự soạn), và lần gửi nào cũng hỏi.
+ * (bộ dựng sẵn "Zalo & Gmail" hoặc kỹ năng tự soạn). Gửi là thao tác ghi: công tắc Tự động tắt thì hỏi.
+ * Đồng bộ tin cũ: Cài đặt → Đồng bộ tin Zalo (ZaloSyncPanel).
  */
 export function SkillConnectors({
   runtime,
@@ -179,6 +181,11 @@ export function SkillConnectors({
             {!showQr && (
               <Button style={{ marginTop: 8 }} icon={<QrcodeOutlined />} loading={busy === 'zqs'} onClick={() => void run('zqs', () => call('zaloQrStart'))}>
                 {zaloAccounts.length ? t('skills.conn.zaloAdd', 'Thêm tài khoản Zalo (quét QR)') : t('skills.conn.zaloConnect', 'Kết nối Zalo (quét QR)')}
+              </Button>
+            )}
+            {zaloAccounts.some((a) => a.status === 'ready') && (
+              <Button size="small" type="link" style={{ paddingLeft: 0, marginTop: 6 }} onClick={() => openFix('zaloSync')}>
+                {t('skills.conn.zaloSync', 'Đồng bộ tin cũ (máy chủ / điện thoại) →')}
               </Button>
             )}
             <Text type="secondary" style={{ fontSize: 11.5, display: 'block', marginTop: 8 }}>

@@ -82,7 +82,7 @@ export function extractChoices(text: string): AnswerChoice[] {
 }
 
 /** Đích "sửa nhanh" mà một câu trả lời đang nhắc tới (khớp FixTarget của fix/fixRules — giữ tệp này thuần). */
-export type AnswerConnect = 'zalo' | 'gmail' | 'claude' | 'claudeKeys';
+export type AnswerConnect = 'zalo' | 'gmail' | 'claude' | 'claudeKeys' | 'zaloSync';
 
 const CONNECT_RULES: [AnswerConnect, RegExp][] = [
   // "chưa có tài khoản Zalo nào được kết nối", "Kỹ năng → Kết nối → Zalo", "quét mã QR … Zalo", "Zalo mất kết nối".
@@ -90,6 +90,8 @@ const CONNECT_RULES: [AnswerConnect, RegExp][] = [
   ['gmail', /(kết\s*nối|đăng\s*nhập)[^.\n]{0,60}\bgmail\b|\bgmail\b[^.\n]{0,60}(chưa[^.\n]{0,25}kết\s*nối|từ\s*chối\s*đăng\s*nhập|mật\s*khẩu\s*ứng\s*dụng)/i],
   ['claude', /đăng\s*nhập(?:\s*lại)?\s*claude|claude(?:\s*cli)?[^.\n]{0,30}chưa\s*đăng\s*nhập/i],
   ['claudeKeys', /(credit\s*balance\s*is\s*too\s*low|hết\s*credit|chưa\s*(?:có|nạp)[^.\n]{0,20}credit)/i],
+  // "đồng bộ từ điện thoại", "đồng bộ tin nhắn cũ Zalo", "Cài đặt → Đồng bộ tin Zalo".
+  ['zaloSync', /đồng\s*bộ[^.\n]{0,40}(từ\s*điện\s*thoại|tin(?:\s*nhắn)?(?:\s*cũ)?[^.\n]{0,10}\bzalo\b|lịch\s*sử[^.\n]{0,20}\bzalo\b)|đồng\s*bộ\s*tin\s*zalo/i],
 ];
 
 /**

@@ -85,6 +85,13 @@ test('mở khoá theo TỪNG công cụ: chỉ tên công cụ có thật; kỹ 
   assert.ok(by['lw-zalo-gui-tin'].includes('zalo_send_text'));
   assert.ok(by['lw-gmail-doc-thu'].includes('gmail_read') && !by['lw-gmail-doc-thu'].includes('gmail_send'));
   assert.ok(by['lw-gmail-gui-thu'].includes('gmail_send'));
+  // Đồng bộ: kỹ năng đọc + kỹ năng đồng bộ mở zalo_sync / zalo_web_*, KHÔNG mở lệnh gửi.
+  for (const id of ['lw-zalo-doc-tin', 'lw-zalo-dong-bo']) {
+    assert.ok(by[id].includes('zalo_sync'), `${id} mở zalo_sync`);
+    assert.ok(!by[id].includes('zalo_send_text'), `${id} không mở lệnh gửi`);
+  }
+  assert.ok(by['lw-zalo-doc-tin'].includes('zalo_search_messages'));
+  assert.ok(by['lw-zalo-dong-bo'].includes('zalo_web_open') && by['lw-zalo-dong-bo'].includes('zalo_web_read'), 'kỹ năng đồng bộ mở cửa sổ Zalo Web');
   for (const id of ['lw-xuat-bang', 'lw-nhap-bang', 'lw-dinh-tep-bitable']) assert.deepStrictEqual(by[id], [], `${id} không đụng Zalo/Gmail`);
 });
 
@@ -161,12 +168,18 @@ test('nhịp gửi: không trần, chỉ cảnh báo (tin đầu của phiên + 
 });
 
 // ── 4. Kỹ năng dựng sẵn ─────────────────────────────────────────────────────────────────────────
-test('bộ kỹ năng "Zalo & Gmail": 4 kỹ năng, lệnh /, nhãn riêng; kỹ năng gửi: không trần, cảnh báo, lịch lặp lại', () => {
+test('bộ kỹ năng "Zalo & Gmail": 5 kỹ năng, lệnh /, nhãn riêng; kỹ năng gửi: không trần, cảnh báo, lịch lặp lại', () => {
   const zg = BUILTIN_SKILLS.filter((s) => (s.tags || []).includes('Zalo & Gmail'));
-  assert.deepStrictEqual(zg.map((s) => s.command).sort(), ['gmail-doc-thu', 'gmail-gui-thu', 'zalo-doc-tin', 'zalo-gui-tin']);
+  assert.deepStrictEqual(zg.map((s) => s.command).sort(), ['gmail-doc-thu', 'gmail-gui-thu', 'zalo-doc-tin', 'zalo-dong-bo', 'zalo-gui-tin']);
+  // Đồng bộ qua cửa sổ Zalo Web: kỹ năng phải hướng dẫn mở cửa sổ + người dùng tự bấm Đồng ý trên điện thoại.
+  const sync = BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-dong-bo');
+  assert.match(sync.body, /zalo_web_open/);
+  assert.match(sync.body, /zalo_web_read/);
+  assert.match(sync.body, /bấm \*\*Đồng ý\*\* trên điện thoại/);
+  assert.match(sync.body, /KHÔNG tự ý bảo điện thoại đồng bộ/);
   for (const s of zg) {
     assert.ok(s.id.startsWith('lw-') && s.triggers.length >= 8, s.id);
-    assert.match(s.body, /Kỹ năng → Kết nối/, `${s.id}: chỉ chỗ kết nối khi chưa có`);
+    assert.match(s.body, /Kỹ năng → Kết nối|Kết nối Zalo \(quét QR\)|«Kết nối/, `${s.id}: chỉ chỗ kết nối khi chưa có`);
   }
   const zs = BUILTIN_SKILLS.find((s) => s.id === 'lw-zalo-gui-tin');
   assert.ok(zs.version >= 3);

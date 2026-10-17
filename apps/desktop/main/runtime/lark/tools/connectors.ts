@@ -93,6 +93,18 @@ const gmail = async () => (await import('../../connectors/gmail/gmailService')).
 
 const account = { account: str('Tài khoản (bỏ trống = tài khoản đầu tiên đang kết nối).') };
 
+/**
+ * Mốc thời gian từ agent → ms. Nhận ISO đầy đủ, hoặc "YYYY-MM-DD" (hiểu theo giờ Việt Nam, đầu ngày).
+ * Sai dạng ⇒ NÉM, để agent biết chứ không lặng lẽ bỏ điều kiện lọc.
+ */
+export function parseWhen(v: unknown, label: string): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  const s = String(v).trim();
+  const ms = /^\d{4}-\d{2}-\d{2}$/.test(s) ? Date.parse(`${s}T00:00:00+07:00`) : Date.parse(s);
+  if (!Number.isFinite(ms)) throw new Error(`${label} không đúng dạng ngày (dùng YYYY-MM-DD hoặc ISO, vd 2026-09-01).`);
+  return ms;
+}
+
 export const connectorTools: LarkToolDef[] = [
   // ── Zalo ──────────────────────────────────────────────────────────────────────────────────────
   {
@@ -130,17 +142,112 @@ export const connectorTools: LarkToolDef[] = [
   {
     name: 'zalo_read_chat',
     description:
-      'Đọc tin của MỘT hội thoại Zalo theo `threadId` (từ zalo_list_chats / zalo_list_groups / zalo_find_user), cũ → mới (chỉ dùng trong kỹ năng Zalo). Nhóm: lấy thêm lịch sử từ Zalo. Chat 1-1: chỉ có tin Zalo đã đồng bộ/đến từ lúc kết nối.',
+      'Đọc tin của MỘT hội thoại Zalo theo `threadId` (từ zalo_list_chats / zalo_list_groups / zalo_find_user), cũ → mới (chỉ dùng trong kỹ năng Zalo). Nhóm: tự lấy thêm lịch sử từ kho tin cloud của Zalo. Đọc lùi về quá khứ: gọi lại với `before` = `olderBefore` của lần trước. Thiếu tin cũ ⇒ zalo_sync.',
     gated: false,
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       required: ['threadId'],
-      properties: { ...account, threadId: str('Id hội thoại.'), limit: { type: 'number', description: 'Số tin cuối (mặc định 50, tối đa 200).' } },
+      properties: {
+        ...account,
+        threadId: str('Id hội thoại.'),
+        limit: { type: 'number', description: 'Số tin cuối (mặc định 50, tối đa 200).' },
+        since: str('Chỉ tin TỪ thời điểm này (YYYY-MM-DD theo giờ VN, hoặc ISO).'),
+        before: str('Chỉ tin TRƯỚC thời điểm này (YYYY-MM-DD hoặc ISO) — để đọc lùi theo trang.'),
+      },
     },
     exec: async (input) => {
       connectorGate('zalo_read_chat');
-      return (await zalo()).read({ account: input.account, threadId: String(input.threadId || ''), limit: input.limit });
+      return (await zalo()).read({ account: input.account, threadId: String(input.threadId || ''), limit: input.limit, since: parseWhen(input.since, 'since'), before: parseWhen(input.before, 'before') });
+    },
+  },
+  {
+    name: 'zalo_search_messages',
+    description:
+      'TÌM tin Zalo theo chữ (không phân biệt dấu, mọi từ đều phải có) và/hoặc khoảng thời gian — trong một hội thoại (`threadId`) hoặc mọi hội thoại — gồm cả tin đã đồng bộ từ điện thoại (chỉ dùng trong kỹ năng Zalo). Mới nhất trước. Dùng để trả lời câu hỏi kiểu "ai nhắc tới đơn DH-12", "tháng 9 nhóm X bàn gì về giá".',
+    gated: false,
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ...account,
+        query: str('Từ khoá (bỏ trống = mọi tin trong khoảng thời gian).'),
+        threadId: str('Chỉ tìm trong hội thoại này (bỏ trống = mọi hội thoại).'),
+        since: str('Từ thời điểm (YYYY-MM-DD hoặc ISO).'),
+        before: str('Trước thời điểm (YYYY-MM-DD hoặc ISO).'),
+        limit: { type: 'number', description: 'Số kết quả (mặc định 30, tối đa 200).' },
+      },
+    },
+    exec: async (input) => {
+      connectorGate('zalo_search_messages');
+      return (await zalo()).search({
+        account: input.account,
+        query: String(input.query || ''),
+        ...(input.threadId ? { threadId: String(input.threadId) } : {}),
+        since: parseWhen(input.since, 'since'),
+        before: parseWhen(input.before, 'before'),
+        limit: input.limit,
+      });
+    },
+  },
+  {
+    name: 'zalo_sync',
+    description:
+      'ĐỒNG BỘ tin Zalo từ MÁY CHỦ khi sổ thiếu tin cũ (chỉ dùng trong kỹ năng Zalo). `action`:\n' +
+      '- "status": xem sổ đang có bao nhiêu tin, cũ nhất từ khi nào, cài đặt lưu tin, cửa sổ Zalo Web đang mở/đăng nhập chưa.\n' +
+      '- "server": lấy thêm tin cũ từ máy chủ Zalo (nhóm: kho tin cloud; 1-1: các trang tin cũ Zalo còn giữ). Không cần điện thoại.\n' +
+      'Lịch sử CŨ HƠN nữa (nhất là chat 1-1) không có trên máy chủ — dùng cửa sổ Zalo Web: zalo_web_open rồi zalo_web_read.',
+    gated: false,
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['action'],
+      properties: {
+        ...account,
+        action: { type: 'string', enum: ['status', 'server'] },
+        threadId: str('"server": chỉ lấy thêm cho hội thoại này (bỏ trống = mọi hội thoại).'),
+      },
+    },
+    exec: async (input) => {
+      connectorGate('zalo_sync');
+      const z = await zalo();
+      if (String(input.action) === 'server') return z.fetchHistory({ account: input.account, ...(input.threadId ? { threadId: String(input.threadId) } : {}) });
+      return z.syncStatus();
+    },
+  },
+  {
+    name: 'zalo_web_open',
+    description:
+      'MỞ cửa sổ Zalo Web (chat.zalo.me chính thức) ngay trong Larkwave, dùng chính phiên đăng nhập hiện tại (chỉ dùng trong kỹ năng Zalo). ' +
+      'Dùng khi cần đọc lịch sử CŨ mà sổ/máy chủ không có: người dùng tự mở đúng hội thoại trong cửa sổ đó và (nếu điện thoại hỏi) bấm Đồng ý đồng bộ trên ĐIỆN THOẠI; sau đó dùng zalo_web_read. ' +
+      'Trả trạng thái cửa sổ (đã đăng nhập chưa). Chưa đăng nhập ⇒ bảo người dùng quét QR / đồng bộ trong cửa sổ vừa mở.',
+    gated: false,
+    inputSchema: { type: 'object', additionalProperties: false, properties: { ...account } },
+    exec: async (input) => {
+      connectorGate('zalo_web_open');
+      const st = await (await zalo()).webOpen({ account: input.account, show: true });
+      return {
+        opened: st.exists,
+        loggedIn: st.loggedIn ?? false,
+        hint: st.loggedIn
+          ? 'Cửa sổ Zalo Web đã mở và đăng nhập. Nhờ người dùng mở đúng hội thoại cần đọc (và bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi), rồi gọi zalo_web_read.'
+          : 'Cửa sổ Zalo Web vừa mở nhưng CHƯA đăng nhập — nhờ người dùng quét QR trong cửa sổ đó, rồi mở hội thoại cần đọc.',
+      };
+    },
+  },
+  {
+    name: 'zalo_web_read',
+    description:
+      'ĐỌC nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (chỉ dùng trong kỹ năng Zalo). Tự cuộn lên để tải thêm lịch sử rồi trả về phần chữ đang hiển thị. ' +
+      'Dùng cho tin CŨ mà zalo_read_chat/zalo_sync không lấy được. Người dùng phải mở đúng hội thoại trong cửa sổ Zalo Web trước (zalo_web_open). ' +
+      'Trả về chữ thô của cả hội thoại (tên người + nội dung + giờ xen kẽ) — tự tóm tắt / trích theo yêu cầu, nói rõ đây là nội dung đọc từ màn hình.',
+    gated: false,
+    inputSchema: { type: 'object', additionalProperties: false, properties: { ...account, scrolls: { type: 'number', description: 'Số lần cuộn lên để tải thêm lịch sử (mặc định 12, càng nhiều càng cũ nhưng lâu hơn).' } } },
+    exec: async (input) => {
+      connectorGate('zalo_web_read');
+      const r = await (await zalo()).webRead({ ...(typeof input.scrolls === 'number' ? { scrolls: input.scrolls } : {}) });
+      if (r.empty) return { empty: true, note: 'Không thấy hội thoại nào đang mở trong cửa sổ Zalo Web. Nhờ người dùng bấm vào đúng hội thoại trong cửa sổ đó rồi thử lại.' };
+      return { chat: r.title || '(không rõ tên)', truncated: r.truncated, text: r.text };
     },
   },
   {

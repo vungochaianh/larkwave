@@ -31,6 +31,8 @@
  * selfListen bật để thấy cả tin mình gửi, xin tin cũ khi vừa kết nối), danh sách/lịch sử NHÓM và gửi vào
  * nhóm — chuyển tin lên qua `onMessages` của bộ quản lý. Agent không chạm tới tệp này: mọi việc đi qua
  * connectors/zalo/zaloService.ts và chỉ trong lượt có kỹ năng Zalo (xem connectorGate).
+ * (3) 17/10/2026: lịch sử nhóm qua kho tin cloud (endpoint cũ Zalo đã bỏ, trả 404/rỗng), phân trang tin cũ
+ * (requestOldMessages), và xuất cookie phiên web cho cửa sổ Zalo Web (zaloWeb.ts) — xem createZcaClient.
  */
 
 import {promises as fs} from 'node:fs';
@@ -51,6 +53,10 @@ export interface ZaloMessage {
     threadId: string;
     isGroup: boolean;
     msgId: string;
+    /** Id phía máy gửi — dùng khớp tin đồng bộ từ điện thoại với tin app đã thấy. */
+    cliMsgId?: string;
+    /** 'phone' = tin nhập từ đồng bộ điện thoại. Bỏ trống = tin Zalo Web (trực tiếp / lịch sử máy chủ). */
+    source?: 'phone';
     fromId: string;
     fromName: string;
     isSelf: boolean;
@@ -111,6 +117,24 @@ export interface ZaloApi {
     groupHistory?(groupId: string, count: number): Promise<ZaloMessage[]>;
     /** Larkwave: gửi chữ vào một hội thoại người HOẶC nhóm. */
     sendTextTo?(text: string, threadId: string, isGroup: boolean): Promise<{msgId: string | null}>;
+    /** Larkwave: lịch sử nhóm từ kho tin cloud (getrecentv2) — MỘT trang, mới → cũ; `cursor` = trang tiếp. */
+    groupCloudPage?(groupId: string, count: number, cursor?: string): Promise<{messages: ZaloMessage[]; cursor?: string; hasMore: boolean}>;
+    /** Larkwave: xin Zalo thêm một trang tin cũ (1-1 hoặc nhóm) qua listener. Trả các tin trang đó. */
+    requestOlder?(isGroup: boolean, lastMsgId?: string): Promise<ZaloMessage[]>;
+    /** Larkwave: cookie của phiên web hiện tại — để nhét vào cửa sổ Zalo Web (cùng phiên, khỏi quét QR lại). */
+    webCookies?(): Promise<ZaloWebCookie[]>;
+}
+
+/** Một cookie của phiên Zalo web, dạng đặt được vào Electron session. */
+export interface ZaloWebCookie {
+    name: string;
+    value: string;
+    domain?: string;
+    path?: string;
+    secure?: boolean;
+    httpOnly?: boolean;
+    /** Giây epoch; bỏ trống = cookie phiên. */
+    expirationDate?: number;
 }
 
 export interface ZaloCredentials {
@@ -1062,6 +1086,7 @@ export async function createZcaClient(log: ChannelContext['log']): Promise<ZaloC
             threadId: String(m.threadId ?? ''),
             isGroup: m.type === zca.ThreadType.Group,
             msgId: String(d.msgId ?? d.cliMsgId ?? ''),
+            ...(d.cliMsgId !== undefined && d.cliMsgId !== null ? {cliMsgId: String(d.cliMsgId)} : {}),
             fromId: String(d.uidFrom ?? ''),
             fromName: String(d.dName ?? ''),
             isSelf: !!m.isSelf,
@@ -1070,7 +1095,43 @@ export async function createZcaClient(log: ChannelContext['log']): Promise<ZaloC
         };
     };
 
-    const adapt = (api: ZcaApi): ZaloApi => ({
+    const adapt = (api: ZcaApi): ZaloApi => {
+        const anyApi = api as unknown as Record<string, any>;
+        /** Endpoint riêng của Larkwave qua `api.custom` (cùng cách ký/mã hoá như hàm có sẵn của zca-js). */
+        const custom = <P, R>(name: string, cb: (a: {ctx: any; utils: any; props: P}) => Promise<R>): ((props: P) => Promise<R>) => {
+            if (!(name in anyApi)) anyApi.custom(name, cb);
+            return (props: P) => anyApi[name](props) as Promise<R>;
+        };
+        const cloudPage = custom<{groupId: string; count: number; cursor?: string}, any>('lwGroupCloudPage', async ({ctx, utils, props}) => {
+            const host = anyApi.zpwServiceMap?.group_cloud_message?.[0];
+            if (!host) throw new Error('Zalo không cấp dịch vụ group_cloud_message cho phiên này');
+            const base = utils.makeURL(`${host}/api/cm/getrecentv2`);
+            const params = {groupId: String(props.groupId).replace(/^g/, ''), globalMsgId: Number(props.cursor) || 0, count: props.count, msgIds: [], imei: ctx.imei, src: 3};
+            const enc = utils.encodeAES(JSON.stringify(params));
+            if (!enc) throw new Error('Không mã hoá được tham số');
+            const res = await utils.request(utils.makeURL(base, {params: enc, nretry: 0}), {method: 'GET'});
+            return utils.resolve(res, (r: {data: unknown}) => (typeof r.data === 'string' ? JSON.parse(r.data) : r.data));
+        });
+        /**
+         * Cookie của phiên web hiện tại, đọc từ bộ cookie của zca-js (`ctx.cookie`, một CookieJar của tough-cookie).
+         * Dùng để nhét vào cửa sổ Zalo Web (zaloWeb.ts) → cùng một phiên đăng nhập, Zalo không đá nhau, khỏi quét QR lại.
+         */
+        const cookies = custom<void, ZaloWebCookie[]>('lwWebCookies', async ({ctx}) => {
+            const jar = ctx.cookie;
+            if (!jar?.serialize) return [];
+            const data = await jar.serialize();
+            return ((data?.cookies ?? []) as Record<string, unknown>[]).map((c) => ({
+                name: String(c.key ?? ''),
+                value: String(c.value ?? ''),
+                domain: c.domain ? String(c.domain) : undefined,
+                path: c.path ? String(c.path) : '/',
+                secure: !!c.secure,
+                httpOnly: !!c.httpOnly,
+                ...(typeof c.expires === 'string' && c.expires !== 'Infinity' ? {expirationDate: Math.floor(new Date(c.expires).getTime() / 1000)} : {}),
+            })).filter((c) => c.name && c.value);
+        });
+
+        return {
         ownId: () => api.getOwnId(),
         account: async () => {
             const info = await api.fetchAccountInfo();
@@ -1125,6 +1186,23 @@ export async function createZcaClient(log: ChannelContext['log']): Promise<ZaloC
             return out;
         },
         groupHistory: async (groupId, count) => {
+            // Endpoint cũ (`/api/group/history`) Zalo đã bỏ: trả 404/rỗng — đây là lý do "đọc nhóm chỉ ra vài tin".
+            // Kho tin cloud (getrecentv2) phân trang lùi theo `lastMsgId` (zca-js PR #370, đã kiểm trên tài khoản thật).
+            try {
+                const out: ZaloMessage[] = [];
+                let cursor: string | undefined;
+                for (let i = 0; i < 20 && out.length < count; i++) {
+                    const page = await cloudPage({groupId, count: Math.min(50, count - out.length), cursor});
+                    const raw = Array.isArray(page?.groupMsgs) ? page.groupMsgs : [];
+                    out.push(...raw.map((m: unknown) => norm(new zca.GroupMessage(api.getOwnId(), m as never) as never)));
+                    const next = page?.lastMsgId ? String(page.lastMsgId) : undefined;
+                    if (!page?.hasMore || !next || next === cursor || !raw.length) break;
+                    cursor = next;
+                }
+                if (out.length) return out;
+            } catch (err) {
+                log('debug', '[zalo] lịch sử nhóm (cloud) lỗi — thử endpoint cũ', err);
+            }
             const res = await api.getGroupChatHistory(groupId, count);
             return (res?.groupMsgs ?? []).map((m) => norm(m as never));
         },
@@ -1161,7 +1239,35 @@ export async function createZcaClient(log: ChannelContext['log']): Promise<ZaloC
                 log('debug', '[zalo] listener.stop() lỗi', err);
             }
         },
-    });
+        groupCloudPage: async (groupId, count, cursor) => {
+            const page = await cloudPage({groupId, count: Math.max(1, Math.min(50, count)), cursor});
+            const raw = Array.isArray(page?.groupMsgs) ? page.groupMsgs : [];
+            const messages = raw.map((m: unknown) => norm(new zca.GroupMessage(api.getOwnId(), m as never) as never));
+            const next = page?.lastMsgId ? String(page.lastMsgId) : undefined;
+            return {messages, cursor: next, hasMore: !!page?.hasMore && !!next && next !== cursor};
+        },
+        requestOlder: (isGroup, lastMsgId) =>
+            new Promise<ZaloMessage[]>((resolve) => {
+                const type = isGroup ? zca.ThreadType.Group : zca.ThreadType.User;
+                const on = (msgs: unknown[], t: unknown) => {
+                    if (t === type) done((msgs ?? []).map((m) => norm(m as never)));
+                };
+                const timer = setTimeout(() => done([]), 12_000);
+                const done = (out: ZaloMessage[]) => {
+                    clearTimeout(timer);
+                    api.listener.off('old_messages', on as never);
+                    resolve(out);
+                };
+                api.listener.on('old_messages', on as never);
+                try {
+                    api.listener.requestOldMessages(type, (lastMsgId ?? null) as never);
+                } catch {
+                    done([]);
+                }
+            }),
+        webCookies: () => cookies(undefined),
+        };
+    };
 
     const toCredentials = (creds: ZaloCredentials): Parameters<typeof zalo.login>[0] => ({
         imei: creds.imei,

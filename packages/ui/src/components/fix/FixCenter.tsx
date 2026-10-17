@@ -9,6 +9,7 @@ import { AgentGuideModal } from '../AgentGuideModal';
 import { ClaudeConnect } from '../ClaudeConnect';
 import { ClaudeKeyManager } from '../ClaudeKeyManager';
 import { SkillConnectors } from '../SkillConnectors';
+import { ZaloSyncPanel } from '../ZaloSyncPanel';
 import { FIX_ISSUES_EVENT, OPEN_FIX_EVENT, healthIssues, openFix, type FixTarget, type HealthIssue, type OpenFixDetail } from './fixRules';
 
 const { Text } = Typography;
@@ -137,7 +138,17 @@ export function FixCenter() {
   }
 
   const title =
-    target === 'claude' ? 'Kết nối Claude' : target === 'claudeKeys' ? 'API key Claude' : target === 'zalo' ? 'Kết nối Zalo' : target === 'gmail' ? 'Kết nối Gmail' : 'Kiểm tra sẵn sàng';
+    target === 'claude'
+      ? 'Kết nối Claude'
+      : target === 'claudeKeys'
+        ? 'API key Claude'
+        : target === 'zalo'
+          ? 'Kết nối Zalo'
+          : target === 'zaloSync'
+            ? 'Đồng bộ tin Zalo'
+            : target === 'gmail'
+              ? 'Kết nối Gmail'
+              : 'Kiểm tra sẵn sàng';
 
   return (
     <Modal open title={title} onCancel={close} footer={null} width={target === 'checklist' ? 560 : 640} destroyOnClose>
@@ -148,6 +159,7 @@ export function FixCenter() {
       {target === 'claudeKeys' && <ClaudeKeyManager embedded onActiveChange={() => void check()} />}
       {target === 'zalo' && <SkillConnectors runtime={runtime} only="zalo" autoQr onConnected={() => setTimeout(close, 1200)} />}
       {target === 'gmail' && <SkillConnectors runtime={runtime} only="gmail" onConnected={() => setTimeout(close, 800)} />}
+      {target === 'zaloSync' && <ZaloSyncPanel runtime={runtime} embedded />}
       {target === 'checklist' && <Checklist issues={issues} checking={checking} onRecheck={() => void check()} />}
     </Modal>
   );

@@ -2270,7 +2270,62 @@ export type ToolswaveMigrationEvent =
   | { phase: 'error'; message: string; auto: boolean };
 
 // ── Kết nối cá nhân cho kỹ năng (Zalo / Gmail) ──────────────────────────────────────────────────
-export type ConnectorOp = 'zaloStatus' | 'zaloQrStart' | 'zaloQrRetry' | 'zaloQrAbort' | 'zaloLogout' | 'gmailList' | 'gmailAdd' | 'gmailRemove';
+export type ConnectorOp =
+  | 'zaloStatus'
+  | 'zaloQrStart'
+  | 'zaloQrRetry'
+  | 'zaloQrAbort'
+  | 'zaloLogout'
+  // Đồng bộ tin Zalo (lõi ≥ 0.1.7 — lõi cũ báo "Thao tác kết nối không hợp lệ").
+  | 'zaloSyncStatus'
+  | 'zaloSyncSettings'
+  | 'zaloHistoryFetch'
+  | 'zaloStoreClear'
+  // Cửa sổ Zalo Web nhúng.
+  | 'zaloWebOpen'
+  | 'zaloWebShow'
+  | 'zaloWebHide'
+  | 'zaloWebReload'
+  | 'zaloWebClose'
+  | 'zaloWebStatus'
+  | 'zaloWebRead'
+  | 'gmailList'
+  | 'gmailAdd'
+  | 'gmailRemove';
+
+export interface ZaloSyncSettings {
+  /** Lưu sổ tin trên máy (mã hoá bằng kho khoá của hệ điều hành). */
+  persist: boolean;
+  /** Giữ tin N ngày; 0 = giữ tới khi xoá. */
+  retentionDays: number;
+  /** Tối đa số tin mỗi hội thoại khi lưu trên máy. */
+  perThread: number;
+}
+
+export interface ZaloWebStatus {
+  /** Cửa sổ Zalo Web đã được tạo chưa. */
+  exists: boolean;
+  visible: boolean;
+  /** Đoán theo URL: đã vào ứng dụng hay còn ở trang đăng nhập. */
+  loggedIn?: boolean;
+  url?: string;
+  title?: string;
+  lastReadAt?: number;
+}
+
+export interface ZaloWebRead {
+  title: string;
+  text: string;
+  truncated: boolean;
+  empty: boolean;
+}
+
+export interface ZaloSyncStatus {
+  settings: ZaloSyncSettings;
+  persistAvailable: boolean;
+  accounts: { accountId: string; label: string; status: ZaloConnectorAccount['status']; threads: number; messages: number; phoneMessages: number; oldestTs?: number; storedBytes: number }[];
+  web: ZaloWebStatus;
+}
 
 export type ZaloQrState = 'idle' | 'starting' | 'awaiting-scan' | 'scanned' | 'authenticating' | 'success' | 'expired' | 'declined' | 'error' | 'aborted';
 

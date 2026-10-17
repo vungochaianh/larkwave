@@ -75,12 +75,12 @@ const hashTree = (d) => {
   const before = userLib();
   const h = new SkillHost(D);
 
-  await t('cài lần đầu: 11 kỹ năng lw-* (7 Tệp & dữ liệu + 4 Zalo & Gmail), bật, dùng chung mọi model, đúng nhãn, thư mục CLI larkwave-lw-*', () => {
+  await t('cài lần đầu: 12 kỹ năng lw-* (7 Tệp & dữ liệu + 5 Zalo & Gmail), bật, dùng chung mọi model, đúng nhãn, thư mục CLI larkwave-lw-*', () => {
     const r = h.ensureBuiltins(BUILTIN_SKILLS);
-    assert.strictEqual(r.installed.length, 10, JSON.stringify(r));
+    assert.strictEqual(r.installed.length, 11, JSON.stringify(r));
     assert.deepStrictEqual(r.kept, ['lw-tep-len-lark'], 'trùng id với kỹ năng KHÔNG dựng sẵn → không đụng');
     const list = h.list().filter((s) => s.builtin);
-    assert.strictEqual(list.length, 10);
+    assert.strictEqual(list.length, 11);
     for (const s of list) {
       assert.ok(s.id.startsWith('lw-') && s.enabled && s.scope.length === 4, s.id);
       assert.deepStrictEqual(s.tags, /^lw-(zalo|gmail)-/.test(s.id) ? ['Larkwave', 'Zalo & Gmail'] : ['Larkwave', 'Tệp & dữ liệu']);

@@ -6,11 +6,19 @@
  *
  * Luật gửi (sendPace.ts): KHÔNG có trần — người dùng muốn gửi bao nhiêu thì gửi. Chỉ giữ sàn 2 giây
  * giữa hai tin và trả `warning` (rủi ro Zalo khoá tài khoản) ở tin đầu của phiên app và khi gửi dày.
+ *
+ * ĐỒNG BỘ TIN (17/10/2026, cấu hình ở Cài đặt → Đồng bộ tin Zalo):
+ *  - Lưu sổ tin trên máy (mã hoá, zaloStore.ts), giữ theo số ngày đã chọn.
+ *  - "Lấy thêm tin cũ từ máy chủ" (fetchHistory): nhóm qua kho tin cloud, chat 1-1 qua trang tin cũ của listener.
+ *  - "Cửa sổ Zalo Web" (zaloWeb.ts): mở chat.zalo.me CHÍNH THỨC bằng cookie của phiên này (cùng phiên, khỏi
+ *    quét QR lại); người dùng tự đồng bộ trên điện thoại rồi Larkwave ĐỌC NỘI DUNG ĐANG HIỂN THỊ (không giải mã).
  */
 import { join } from 'node:path';
-import { app } from 'electron';
-import { ZaloSessionManager, type ChannelContext, type QrLoginSnapshot, type ZaloSession } from './session';
-import { ZaloMessageBook, fold, type ZaloThreadSummary } from './messages';
+import { app, safeStorage } from 'electron';
+import { ZaloSessionManager, type ChannelContext, type QrLoginSnapshot, type ZaloMessage, type ZaloSession } from './session';
+import { ZaloMessageBook, MAX_PER_THREAD, MAX_THREADS, fold, type ZaloThreadSummary } from './messages';
+import { ZaloStore, PERSIST_MAX_THREADS, retentionCutoff, type ZaloSyncSettings } from './zaloStore';
+import { zaloWeb, type ZaloWebRead, type ZaloWebStatus } from './zaloWeb';
 import { ZALO_SEND_FLOOR_MS, lastHour, zaloSendWarning } from '../sendPace';
 
 export const ZALO_TEXT_MAX = 2_000;
@@ -29,7 +37,17 @@ export interface ZaloStatusView {
   qr: QrLoginSnapshot;
 }
 
+export interface ZaloSyncStatusView {
+  settings: ZaloSyncSettings;
+  /** Máy có kho khoá để lưu mã hoá. */
+  persistAvailable: boolean;
+  accounts: { accountId: string; label: string; status: ZaloSession['status']; threads: number; messages: number; phoneMessages: number; oldestTs?: number; storedBytes: number }[];
+  /** Trạng thái cửa sổ Zalo Web nhúng. */
+  web: ZaloWebStatus;
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const SAVE_DEBOUNCE_MS = 4_000;
 
 class ZaloService {
   private mgr: ZaloSessionManager | null = null;
@@ -38,18 +56,107 @@ class ZaloService {
   private readonly sent = new Map<string, number[]>(); // accountId → mốc gửi trong 1 giờ qua
   private lastSendAt = 0;
   private sendChain: Promise<unknown> = Promise.resolve();
+  private storeInst: ZaloStore | null = null;
+  private readonly loaded = new Set<string>();
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private quitHooked = false;
+  private webSeeded = false;
+
+  private connectorsDir(): string {
+    return join(app.getPath('userData'), 'connectors');
+  }
+
+  private store(): ZaloStore {
+    this.storeInst ??= new ZaloStore(this.connectorsDir(), {
+      available: () => {
+        try {
+          return safeStorage.isEncryptionAvailable();
+        } catch {
+          return false;
+        }
+      },
+      encrypt: (t) => safeStorage.encryptString(t),
+      decrypt: (b) => safeStorage.decryptString(b),
+    });
+    return this.storeInst;
+  }
+
+  private persisting(): boolean {
+    return this.store().settings().persist && this.store().canPersist();
+  }
+
+  private applyLimits(): void {
+    if (this.persisting()) this.book.setLimits(this.store().settings().perThread, PERSIST_MAX_THREADS);
+    else this.book.setLimits(MAX_PER_THREAD, MAX_THREADS);
+  }
+
+  /** Nạp sổ đã lưu của một tài khoản (một lần), rồi bỏ tin quá hạn giữ. */
+  private ensureLoaded(accountId: string): void {
+    if (this.loaded.has(accountId)) return;
+    this.loaded.add(accountId);
+    this.applyLimits();
+    if (!this.persisting()) return;
+    this.book.restore(accountId, this.store().load(accountId));
+    const cut = retentionCutoff(this.store().settings().retentionDays);
+    if (cut !== undefined) this.book.pruneBefore(accountId, cut);
+    this.hookQuit();
+  }
+
+  private hookQuit(): void {
+    if (this.quitHooked) return;
+    this.quitHooked = true;
+    try {
+      app.on('before-quit', () => this.flush());
+    } catch {
+      /* chạy ngoài electron (kiểm thử) */
+    }
+  }
+
+  private scheduleSave(): void {
+    if (this.saveTimer || !this.persisting()) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.flush();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  /** Ghi các tài khoản có thay đổi ra đĩa (mã hoá). */
+  flush(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (!this.persisting()) return;
+    const cut = retentionCutoff(this.store().settings().retentionDays);
+    for (const id of this.book.dirtyAccounts()) {
+      if (cut !== undefined) this.book.pruneBefore(id, cut);
+      this.book.takeDirty(id);
+      try {
+        this.store().save(id, this.book.snapshot(id));
+      } catch (e) {
+        console.warn('[zalo] lưu sổ tin lỗi:', (e as Error)?.message);
+      }
+    }
+  }
+
+  private addMessages(accountId: string, msgs: ZaloMessage[]): number {
+    this.ensureLoaded(accountId);
+    const n = this.book.add(accountId, msgs);
+    if (n) this.scheduleSave();
+    return n;
+  }
 
   private manager(): ZaloSessionManager {
     if (this.mgr) return this.mgr;
     const ctx: ChannelContext = {
-      userDataDir: join(app.getPath('userData'), 'connectors'),
+      userDataDir: this.connectorsDir(),
       // Không in `meta`: lỗi của zca-js có thể chép cả cookie/request.
       log: (level, msg) => {
         if (level === 'error' || level === 'warn') console.warn(msg);
       },
       emit: () => undefined, // giao diện tự hỏi trạng thái (zaloStatus) trong lúc mở bảng QR
     };
-    this.mgr = new ZaloSessionManager({ ctx, onMessages: (accountId, msgs) => this.book.add(accountId, msgs) });
+    this.mgr = new ZaloSessionManager({ ctx, onMessages: (accountId, msgs) => this.addMessages(accountId, msgs) });
     return this.mgr;
   }
 
@@ -81,9 +188,13 @@ class ZaloService {
   qrAbort(): boolean {
     return this.manager().abortQr();
   }
+  /** Đăng xuất = ngắt hẳn tài khoản trên máy này: xoá luôn sổ tin đã lưu của nó. */
   async logout(accountId: string): Promise<ZaloStatusView> {
     await this.manager().logout(accountId);
     this.book.clear(accountId);
+    this.book.takeDirty(accountId);
+    this.store().remove(accountId);
+    this.loaded.delete(accountId);
     return this.status();
   }
 
@@ -98,10 +209,14 @@ class ZaloService {
           : 'Chưa kết nối Zalo. Người dùng bấm nút «Kết nối Zalo (quét QR)» (hiện dưới câu trả lời / nút khiên «Kiểm tra» trên thanh đầu) rồi quét mã bằng app Zalo trên điện thoại.',
       );
     }
-    if (!account) return ready[0];
-    const q = fold(account);
-    const hit = ready.find((s) => s.accountId === account || fold(s.label) === q || (s.phone && s.phone.replace(/\D/g, '').endsWith(account.replace(/\D/g, ''))));
-    if (!hit) throw new Error(`Không thấy tài khoản Zalo "${account}" đang kết nối. Đang có: ${ready.map((s) => s.label).join(', ')}.`);
+    let hit = ready[0];
+    if (account) {
+      const q = fold(account);
+      const found = ready.find((s) => s.accountId === account || fold(s.label) === q || (s.phone && s.phone.replace(/\D/g, '').endsWith(account.replace(/\D/g, ''))));
+      if (!found) throw new Error(`Không thấy tài khoản Zalo "${account}" đang kết nối. Đang có: ${ready.map((s) => s.label).join(', ')}.`);
+      hit = found;
+    }
+    this.ensureLoaded(hit.accountId);
     return hit;
   }
 
@@ -112,29 +227,50 @@ class ZaloService {
     return {
       account: s.label,
       threads,
-      ...(threads.length ? {} : { note: 'Chưa có tin nào trong sổ. Zalo đồng bộ tin gần đây vài giây sau khi kết nối; tin cũ hơn thời điểm đó và chat 1-1 chưa từng mở trên máy này có thể không có.' }),
+      ...(threads.length
+        ? {}
+        : { note: 'Chưa có tin nào trong sổ. Thử zalo_sync {action:"server"} để lấy thêm tin cũ từ máy chủ; cần lịch sử cũ hơn (chat 1-1) thì mở cửa sổ Zalo Web (zalo_web_open) + đồng bộ trên điện thoại rồi zalo_web_read.' }),
     };
   }
 
-  async read(opts: { account?: string; threadId: string; limit?: number }) {
+  async read(opts: { account?: string; threadId: string; limit?: number; since?: number; before?: number }) {
     const s = this.session(opts.account);
     const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
-    // Nhóm: lấy thêm lịch sử từ Zalo (có API); chat 1-1 thì chỉ có những gì listener đã thấy.
+    // Nhóm: lấy thêm lịch sử từ kho tin cloud của Zalo; chat 1-1 thì đọc sổ (+ zalo_sync để xin thêm).
     if (this.book.isGroup(s.accountId, opts.threadId) !== false && s.api?.groupHistory) {
       try {
-        const hist = await s.api.groupHistory(opts.threadId, Math.min(limit, 100));
-        if (hist.length) this.book.add(s.accountId, hist);
+        const hist = await s.api.groupHistory(opts.threadId, Math.min(Math.max(limit, 50), 200));
+        if (hist.length) this.addMessages(s.accountId, hist);
       } catch {
         /* không phải nhóm, hoặc Zalo từ chối — đọc những gì sổ đang có */
       }
     }
-    const msgs = this.book.read(s.accountId, opts.threadId, limit);
+    const msgs = this.book.read(s.accountId, opts.threadId, limit, { since: opts.since, before: opts.before });
     this.manager().markActivity(s.accountId);
+    const first = msgs[0];
     return {
       account: s.label,
       threadId: opts.threadId,
-      messages: msgs.map((m) => ({ from: m.isSelf ? 'Tôi' : m.fromName || m.fromId, isSelf: m.isSelf, text: m.text, time: new Date(m.ts).toISOString() })),
-      ...(msgs.length ? {} : { note: 'Không có tin nào của hội thoại này trong sổ (chat 1-1: chỉ có tin Zalo đã đồng bộ/đến từ lúc kết nối).' }),
+      messages: msgs.map((m) => ({ from: m.isSelf ? 'Tôi' : m.fromName || m.fromId, isSelf: m.isSelf, text: m.text, time: new Date(m.ts).toISOString(), ...(m.source ? { source: m.source } : {}) })),
+      ...(first ? { olderBefore: new Date(first.ts).toISOString() } : {}),
+      ...(msgs.length
+        ? {}
+        : { note: 'Không có tin nào của hội thoại này trong sổ (trong khoảng đã chọn). Thử zalo_sync {action:"server", threadId}; lịch sử cũ hơn thì đọc trong cửa sổ Zalo Web (zalo_web_read).' }),
+    };
+  }
+
+  /** Tìm tin theo chữ / khoảng thời gian trong sổ (gồm tin đã đồng bộ). */
+  async search(opts: { account?: string; query: string; threadId?: string; since?: number; before?: number; limit?: number }) {
+    const s = this.session(opts.account);
+    await this.ensureGroupNames(s);
+    const hits = this.book.search(s.accountId, opts);
+    const st = this.book.stats(s.accountId);
+    return {
+      account: s.label,
+      found: hits.length,
+      results: hits.map((h) => ({ threadId: h.threadId, chat: h.title, isGroup: h.isGroup, from: h.message.isSelf ? 'Tôi' : h.message.fromName || h.message.fromId, text: h.message.text, time: new Date(h.message.ts).toISOString() })),
+      searched: { threads: st.threads, messages: st.messages, ...(st.oldestTs ? { oldest: new Date(st.oldestTs).toISOString() } : {}) },
+      ...(hits.length ? {} : { note: 'Không thấy tin khớp trong sổ. Sổ chỉ có tin app đã thấy/đã đồng bộ — xem "searched".' }),
     };
   }
 
@@ -200,6 +336,139 @@ class ZaloService {
     } catch {
       /* không lấy được tên nhóm — vẫn liệt kê theo id */
     }
+  }
+
+  // ── Đồng bộ ───────────────────────────────────────────────────────────────────────────────────
+
+  syncSettings(): ZaloSyncSettings {
+    return this.store().settings();
+  }
+
+  saveSyncSettings(patch: Partial<ZaloSyncSettings>): ZaloSyncStatusView {
+    const before = this.store().settings();
+    const next = this.store().saveSettings(patch);
+    this.applyLimits();
+    const ids = this.manager().sessions().map((s) => s.accountId);
+    // Tắt lưu: xoá bản đã lưu ngay (sổ trong bộ nhớ còn tới khi tắt app).
+    if (!next.persist && before.persist) for (const id of ids) this.store().remove(id);
+    if (next.persist && this.store().canPersist()) {
+      // Vừa BẬT lưu / đổi số ngày giữ: nạp bản cũ (nếu có), bỏ tin quá hạn, ghi ngay những gì đang có.
+      const cut = retentionCutoff(next.retentionDays);
+      for (const id of ids) {
+        if (!before.persist) {
+          this.loaded.delete(id);
+          this.ensureLoaded(id);
+        }
+        if (cut !== undefined) this.book.pruneBefore(id, cut);
+        this.book.takeDirty(id);
+        this.store().save(id, this.book.snapshot(id));
+      }
+    }
+    return this.syncStatus();
+  }
+
+  /** Xoá sổ tin (bộ nhớ + đĩa) của một tài khoản, hoặc mọi tài khoản. */
+  clearStore(accountId?: string): ZaloSyncStatusView {
+    const ids = accountId ? [accountId] : this.manager().sessions().map((s) => s.accountId);
+    for (const id of ids) {
+      this.book.clear(id);
+      this.book.takeDirty(id);
+      this.store().remove(id);
+    }
+    return this.syncStatus();
+  }
+
+  syncStatus(): ZaloSyncStatusView {
+    const sessions = this.manager().sessions();
+    for (const s of sessions) this.ensureLoaded(s.accountId);
+    return {
+      settings: this.store().settings(),
+      persistAvailable: this.store().canPersist(),
+      accounts: sessions.map((s) => ({ accountId: s.accountId, label: s.label, status: s.status, ...this.book.stats(s.accountId), storedBytes: this.store().bytes(s.accountId) })),
+      web: zaloWeb.status(),
+    };
+  }
+
+  /**
+   * Lấy thêm tin cũ từ MÁY CHỦ Zalo (không cần điện thoại): một nhóm qua kho tin cloud, hoặc từng trang tin
+   * cũ của listener (1-1 + nhóm). Có nhịp nghỉ giữa các trang để không bị Zalo coi là bất thường.
+   */
+  async fetchHistory(opts: { account?: string; threadId?: string; pages?: number }): Promise<{ account: string; added: number; pages: number; note: string }> {
+    const s = this.session(opts.account);
+    const api = s.api;
+    if (!api) throw new Error('Phiên Zalo chưa sẵn sàng.');
+    const maxPages = Math.max(1, Math.min(opts.pages ?? 6, 20));
+    let added = 0;
+    let pages = 0;
+    if (opts.threadId && this.book.isGroup(s.accountId, opts.threadId) !== false && api.groupHistory) {
+      const hist = await api.groupHistory(opts.threadId, Math.min(50 * maxPages, 1000)).catch(() => [] as ZaloMessage[]);
+      added += this.addMessages(s.accountId, hist);
+      pages = Math.ceil(hist.length / 50);
+    }
+    if (api.requestOlder && (!opts.threadId || this.book.isGroup(s.accountId, opts.threadId) === false)) {
+      for (const isGroup of opts.threadId ? [false] : [false, true]) {
+        for (let i = 0; i < maxPages; i++) {
+          const batch = await api.requestOlder(isGroup, this.book.oldestMsgId(s.accountId, isGroup));
+          pages++;
+          const n = this.addMessages(s.accountId, batch);
+          added += n;
+          if (!batch.length || !n) break;
+          await sleep(700);
+        }
+      }
+    }
+    this.manager().markActivity(s.accountId);
+    return {
+      account: s.label,
+      added,
+      pages,
+      note: added
+        ? `Đã thêm ${added} tin cũ vào sổ.`
+        : 'Máy chủ Zalo không trả thêm tin cũ nào. Lịch sử xa hơn (nhất là chat 1-1) chỉ có trên điện thoại — mở cửa sổ Zalo Web (zalo_web_open), đồng bộ trên điện thoại rồi đọc bằng zalo_web_read.',
+    };
+  }
+
+  // ── Cửa sổ Zalo Web nhúng ──────────────────────────────────────────────────────────────────────
+
+  /** Nhét cookie của phiên zca đang đăng nhập vào cửa sổ Zalo Web (một lần) — cùng phiên, khỏi quét QR lại. */
+  private async seedWeb(account?: string): Promise<void> {
+    if (this.webSeeded) return;
+    try {
+      const s = this.session(account);
+      const cookies = (await s.api?.webCookies?.()) ?? [];
+      await zaloWeb.seedCookies(cookies);
+      this.webSeeded = cookies.length > 0;
+    } catch {
+      /* chưa đăng nhập zca — người dùng sẽ tự quét QR trong cửa sổ web */
+    }
+  }
+
+  /** Mở (và hiện) cửa sổ Zalo Web. Nhét sẵn cookie phiên để vào thẳng, không phải quét QR lại. */
+  async webOpen(opts: { account?: string; show?: boolean } = {}): Promise<ZaloWebStatus> {
+    await this.seedWeb(opts.account);
+    return zaloWeb.open(opts.show !== false);
+  }
+  webShow(): ZaloWebStatus {
+    return zaloWeb.show();
+  }
+  webHide(): ZaloWebStatus {
+    return zaloWeb.hide();
+  }
+  webReload(): Promise<ZaloWebStatus> {
+    return zaloWeb.reload();
+  }
+  webClose(): ZaloWebStatus {
+    this.webSeeded = false;
+    return zaloWeb.close();
+  }
+  webStatus(): ZaloWebStatus {
+    return zaloWeb.status();
+  }
+
+  /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (người dùng tự mở đúng hội thoại + đồng bộ điện thoại). */
+  async webRead(opts: { scrolls?: number } = {}): Promise<ZaloWebRead> {
+    await zaloWeb.open(false); // đảm bảo cửa sổ tồn tại (không bắt buộc hiện ra)
+    return zaloWeb.readOpen(opts.scrolls ?? 12);
   }
 }
 

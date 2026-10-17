@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Card, Typography, Space, Tag, Button, Input, Switch, Alert, List, Modal, Popconfirm, Spin, Tooltip, message, Grid } from 'antd';
-import { ApiOutlined, CheckCircleFilled, ReloadOutlined, CloudServerOutlined, CopyOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
+import { ApiOutlined, CheckCircleFilled, ReloadOutlined, CloudServerOutlined, CopyOutlined, MessageOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
 import type { AgentClientStatus, AgentWebhookTokenInfo, RunnerStatusInfo, TelegramLinkResponse } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { ClaudeConnect } from './ClaudeConnect';
@@ -13,6 +13,7 @@ import { IconTile, MICRO, PageHeader } from '../kit';
 import type { View } from './HomeScreen';
 import { useI18n } from '../i18n';
 import { ToolswaveImportCard } from '../account/ToolswaveImport';
+import { ZaloSyncPanel } from './ZaloSyncPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -783,6 +784,13 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
     return () => mq.removeEventListener?.('change', apply);
   }, []);
   const cols = narrow ? 1 : 2;
+  const runtime = useRuntime();
+  // Đồng bộ tin Zalo: chỉ bản desktop (kết nối Zalo nằm ở lõi trên máy).
+  const zaloCard = runtime.connectorsCall ? (
+    <Card title={<CardTitle icon={<MessageOutlined />} color={OK}>{t('zsync.title', 'Đồng bộ tin Zalo')}</CardTitle>} style={CARD_STYLE}>
+      <ZaloSyncPanel runtime={runtime} />
+    </Card>
+  ) : null;
 
   const apiKeysCard = (
     <Card
@@ -825,6 +833,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
       {cols === 1 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <RunnersPanel />
+          {zaloCard}
           {apiKeysCard}
           {devicesCard}
           <RemoteControlPanel onNav={onNav} />
@@ -833,6 +842,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
             <RunnersPanel />
+            {zaloCard}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
             {apiKeysCard}

@@ -11,6 +11,7 @@ const CONNECT_LABEL: Record<AnswerConnect, string> = {
   gmail: 'Kết nối Gmail',
   claude: 'Đăng nhập Claude',
   claudeKeys: 'Kiểm / đổi API key',
+  zaloSync: 'Đồng bộ tin Zalo',
 };
 
 /**

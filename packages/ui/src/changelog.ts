@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.7',
+    date: '2026-10-17',
+    items: [
+      "Đọc được nhiều tin nhóm Zalo hơn: sửa lỗi chỉ ra vài tin — nay lấy lịch sử nhóm từ kho tin đám mây của Zalo (tự lật nhiều trang).",
+      "Lấy thêm tin Zalo cũ từ máy chủ (không cần điện thoại): nút «Lấy thêm tin cũ từ máy chủ» ở Cài đặt → Đồng bộ tin Zalo, và trợ lý tự làm khi bạn hỏi tới tin cũ.",
+      "Cửa sổ Zalo Web ngay trong Larkwave: mở trang Zalo chính thức bằng chính phiên đã đăng nhập (khỏi quét QR lại). Bạn mở đúng hội thoại, bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi — trợ lý đọc được lịch sử hiển thị ở đó (kể cả chat 1-1 cũ). Quản lý cửa sổ (mở/ẩn/tải lại/đóng) ở Cài đặt → Đồng bộ tin Zalo.",
+      "Lưu tin Zalo trên máy (mã hoá, tuỳ chọn): tắt app mở lại vẫn còn; chọn giữ bao nhiêu ngày / tối đa mỗi hội thoại; có nút xoá. Máy không có kho khoá thì không lưu dạng thường.",
+      "Trợ lý tìm tin Zalo theo từ khoá và theo khoảng thời gian, đọc lùi về quá khứ; kèm mục Hỏi đáp về đồng bộ ngay trong Cài đặt.",
+    ],
+  },
+  {
     version: '0.1.6',
     date: '2026-10-17',
     items: [
