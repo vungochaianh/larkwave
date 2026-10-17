@@ -13,6 +13,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.13',
+    date: '2026-10-18',
+    items: [
+      "Cửa sổ Zalo Web GIỮ ĐĂNG NHẬP qua lần tắt app: quét QR một lần là dùng mãi, không phải quét lại mỗi lần mở Larkwave. Phiên được lưu mã hoá bằng kho khoá của máy (máy không có kho khoá thì không lưu), tự xoá sau 30 ngày, và bấm \"Đóng hẳn\" là xoá ngay.",
+    ],
+  },
+  {
     version: '0.1.12',
     date: '2026-10-18',
     items: [

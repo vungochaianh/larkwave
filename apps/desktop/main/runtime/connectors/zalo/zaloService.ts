@@ -79,6 +79,8 @@ class ZaloService {
       encrypt: (t) => safeStorage.encryptString(t),
       decrypt: (b) => safeStorage.decryptString(b),
     });
+    // Cửa sổ Zalo Web giữ đăng nhập qua lần tắt app bằng chính kho mã hoá này.
+    zaloWeb.setPersist({ load: () => this.storeInst!.loadWebCookies(), save: (c) => void this.storeInst!.saveWebCookies(c) });
     return this.storeInst;
   }
 
@@ -107,7 +109,10 @@ class ZaloService {
     if (this.quitHooked) return;
     this.quitHooked = true;
     try {
-      app.on('before-quit', () => this.flush());
+      app.on('before-quit', () => {
+        this.flush();
+        void zaloWeb.flush(); // giữ đăng nhập cửa sổ cho lần mở sau
+      });
     } catch {
       /* chạy ngoài electron (kiểm thử) */
     }
@@ -481,6 +486,7 @@ class ZaloService {
 
   /** Mở (và hiện) cửa sổ Zalo Web. Nhét sẵn cookie phiên để vào thẳng, không phải quét QR lại. */
   async webOpen(opts: { account?: string; show?: boolean } = {}): Promise<ZaloWebStatus> {
+    this.store(); // nối kho giữ cookie cửa sổ trước khi mở (xem zaloWeb.setPersist)
     await this.seedWeb(opts.account);
     const st = await zaloWeb.open(opts.show !== false);
     if (st.loggedIn === true) void this.autoAdopt();
@@ -496,6 +502,7 @@ class ZaloService {
     return zaloWeb.reload();
   }
   webClose(): ZaloWebStatus {
+    this.store().clearWebCookies();
     return zaloWeb.close();
   }
   webStatus(): ZaloWebStatus {
@@ -507,6 +514,7 @@ class ZaloService {
    * — lỗi UX 18/10/2026); không có thì đọc hội thoại đang mở.
    */
   async webRead(opts: { scrolls?: number; chat?: string } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[] }> {
+    this.store();
     await zaloWeb.open(false); // đảm bảo cửa sổ tồn tại (không bắt buộc hiện ra)
     let opened: { opened: boolean; clicked?: string; candidates: string[] } | null = null;
     if (opts.chat?.trim()) {

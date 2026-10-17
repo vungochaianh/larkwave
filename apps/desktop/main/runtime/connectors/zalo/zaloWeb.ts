@@ -123,6 +123,15 @@ class ZaloWeb {
   /** URL mới nhất sau mỗi lần điều hướng — để biết trang đã ổn định ở đâu (xem BÀI HỌC ở đầu tệp). */
   private navUrl = '';
   private lastNavAt = 0;
+  /** Lưu/nạp cookie cửa sổ qua các lần tắt app (zaloService nối vào kho mã hoá). */
+  private persist: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void } | null = null;
+  private saveTimer: ReturnType<typeof setInterval> | null = null;
+  private restored = false;
+
+  /** Nối kho giữ cookie cửa sổ (mã hoá) — xem zaloStore.loadWebCookies/saveWebCookies. */
+  setPersist(p: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void }): void {
+    this.persist = p;
+  }
 
   private alive(): boolean {
     return !!this.win && !this.win.isDestroyed();
@@ -137,6 +146,56 @@ class ZaloWeb {
     } catch {
       return false;
     }
+  }
+
+  /** Toàn bộ cookie Zalo trong partition, dạng lưu được (không có loggedIn requirement). */
+  async dumpCookies(): Promise<ZaloWebCookie[]> {
+    try {
+      const cs = await electronSession.fromPartition(PARTITION).cookies.get({});
+      return cs
+        .filter((c) => /(^|\.)(zalo\.me|zadn\.vn|zdn\.vn|zaloapp\.com)$/i.test(c.domain || ''))
+        .map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain,
+          path: c.path || '/',
+          secure: !!c.secure,
+          httpOnly: !!c.httpOnly,
+          ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Đặt một danh sách cookie vào partition (dùng cho cả nạp-lại-sau-khi-tắt-app lẫn seed từ zca). */
+  private async applyCookies(cookies: ZaloWebCookie[]): Promise<void> {
+    const ses = electronSession.fromPartition(PARTITION);
+    for (const c of cookies) {
+      const bare = c.domain?.replace(/^\./, '') || 'zalo.me';
+      const url = `https://${bare}${c.path && c.path.startsWith('/') ? c.path : '/'}`;
+      try {
+        await ses.cookies.set({
+          url,
+          name: c.name,
+          value: c.value,
+          ...(c.domain && c.domain.startsWith('.') ? { domain: c.domain } : {}),
+          path: c.path || '/',
+          secure: c.secure ?? true,
+          httpOnly: c.httpOnly,
+          ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+        });
+      } catch {
+        /* một cookie lỗi không chặn các cookie còn lại */
+      }
+    }
+  }
+
+  /** Ghi cookie hiện tại xuống kho (chỉ khi đang đăng nhập — đừng lưu trạng thái đăng xuất đè lên bản tốt). */
+  private async saveNow(): Promise<void> {
+    if (!this.persist || !this.alive() || this.status().loggedIn !== true) return;
+    const cs = await this.dumpCookies();
+    if (cs.length) this.persist.save(cs);
   }
 
   /**
@@ -209,12 +268,21 @@ class ZaloWeb {
       this.lastNavAt = Date.now();
       this.track(win.webContents);
       this.win = win;
+      // Nạp lại cookie đã lưu từ lần chạy trước ⇒ không phải quét QR lại mỗi lần mở app.
+      if (!this.restored && this.persist) {
+        this.restored = true;
+        const saved = this.persist.load();
+        if (saved.length && !(await this.hasSession())) await this.applyCookies(saved);
+      }
       if (show && !hiddenMode()) {
         win.show();
         win.focus();
       }
       await win.loadURL(ZALO_WEB_URL, { userAgent: ZALO_WEB_UA }).catch(() => undefined);
       await this.settle();
+      void this.saveNow(); // vừa vào được (cookie nạp lại còn sống, hoặc vừa đăng nhập)
+      // Người dùng quét QR sau đó / Zalo làm mới cookie ⇒ ghi lại định kỳ.
+      this.saveTimer ??= setInterval(() => void this.saveNow(), 90_000);
     } else if (show && !hiddenMode()) {
       this.win!.show();
       this.win!.focus();
@@ -231,8 +299,14 @@ class ZaloWeb {
   }
 
   hide(): ZaloWebStatus {
+    void this.saveNow();
     if (this.alive()) this.win!.hide();
     return this.status();
+  }
+
+  /** Ghi cookie ngay (gọi lúc thoát app). */
+  flush(): Promise<void> {
+    return this.saveNow();
   }
 
   async reload(): Promise<ZaloWebStatus> {
@@ -244,10 +318,16 @@ class ZaloWeb {
     return this.status();
   }
 
+  /** Đóng hẳn = người dùng chủ động bỏ cửa sổ: XOÁ luôn cookie đã lưu (không giữ chìa khoá Zalo lại). */
   close(): ZaloWebStatus {
+    if (this.saveTimer) {
+      clearInterval(this.saveTimer);
+      this.saveTimer = null;
+    }
     if (this.alive()) this.win!.close();
     this.win = null;
     this.seeded = false;
+    this.restored = false;
     return { exists: false, visible: false };
   }
 

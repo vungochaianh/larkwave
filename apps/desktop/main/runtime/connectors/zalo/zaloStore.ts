@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ZaloBookSnapshot } from './messages';
+import type { ZaloWebCookie } from './session';
 
 export interface ZaloSyncSettings {
   /** Lưu sổ tin trên máy (mã hoá). Tắt = chỉ trong bộ nhớ, tắt app là mất. */
@@ -104,6 +105,40 @@ export class ZaloStore {
 
   remove(accountId: string): void {
     rmSync(this.bookPath(accountId), { force: true });
+  }
+
+  // ── Cookie của CỬA SỔ Zalo Web ────────────────────────────────────────────────────────────────
+  // Zalo cấp phần lớn cookie phiên theo kiểu KHÔNG lưu đĩa, nên tắt app là cửa sổ mất đăng nhập và
+  // người dùng phải quét QR lại mỗi lần (phản hồi thật 18/10/2026). Ta tự giữ chúng — MÃ HOÁ bằng kho
+  // khoá của máy, không bao giờ ghi dạng thường (đây là chìa khoá vào Zalo của người dùng).
+  private webPath(): string {
+    return this.file('zalo-web-session.bin');
+  }
+
+  loadWebCookies(): ZaloWebCookie[] {
+    if (!this.crypto.available() || !existsSync(this.webPath())) return [];
+    try {
+      const v = JSON.parse(this.crypto.decrypt(readFileSync(this.webPath()))) as { v: 1; at: number; cookies: ZaloWebCookie[] };
+      // Quá 30 ngày thì bỏ: phiên Zalo chắc chắn đã chết, giữ lại chỉ tổ rủi ro.
+      if (v?.v !== 1 || !Array.isArray(v.cookies) || Date.now() - (v.at || 0) > 30 * 86_400_000) return [];
+      return v.cookies;
+    } catch {
+      return [];
+    }
+  }
+
+  /** Ghi nguyên tử. Không có kho khoá ⇒ KHÔNG ghi (người dùng sẽ phải quét QR lại — chấp nhận được). */
+  saveWebCookies(cookies: ZaloWebCookie[]): boolean {
+    if (!this.crypto.available() || !cookies.length) return false;
+    const p = this.webPath();
+    const tmp = `${p}.tmp`;
+    writeFileSync(tmp, this.crypto.encrypt(JSON.stringify({ v: 1, at: Date.now(), cookies })));
+    renameSync(tmp, p);
+    return true;
+  }
+
+  clearWebCookies(): void {
+    rmSync(this.webPath(), { force: true });
   }
 
   bytes(accountId: string): number {

@@ -143,6 +143,25 @@ test('ZaloStore: lưu cài đặt + đọc lại', () => {
   assert.strictEqual(store.settings().retentionDays, 365);
 });
 
+test('cookie cửa sổ Zalo Web: lưu/nạp qua lần tắt app, mã hoá, hết hạn 30 ngày, xoá được', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'zweb-'));
+  let available = false;
+  const xor = (b) => Buffer.from(b.map((x) => x ^ 0x5a));
+  const store = new ZaloStore(dir, { available: () => available, encrypt: (t) => xor(Buffer.from(t, 'utf8')), decrypt: (b) => xor(Buffer.from(b)).toString('utf8') });
+  const cookies = [{ name: 'zpsid', value: 'bí-mật', domain: '.zalo.me', path: '/', secure: true, httpOnly: true }];
+
+  // Không kho khoá ⇒ KHÔNG ghi chìa khoá Zalo ra đĩa.
+  assert.strictEqual(store.saveWebCookies(cookies), false);
+  assert.deepStrictEqual(store.loadWebCookies(), []);
+
+  available = true;
+  assert.strictEqual(store.saveWebCookies(cookies), true);
+  assert.strictEqual(store.loadWebCookies()[0].value, 'bí-mật', 'mở app lại vẫn còn đăng nhập');
+  assert.strictEqual(store.saveWebCookies([]), false, 'rỗng thì không ghi đè bản tốt');
+  store.clearWebCookies();
+  assert.deepStrictEqual(store.loadWebCookies(), [], 'đóng hẳn cửa sổ ⇒ xoá chìa khoá');
+});
+
 if (failed) {
   console.error(`\n${failed} bài lỗi`);
   process.exit(1);
