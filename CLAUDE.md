@@ -6,7 +6,7 @@ web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
 **Trạng thái (17/10/2026):**
-- Bản **0.1.8 macOS đã phát hành**: https://toolswave.net/larkwave.
+- Bản **0.1.9 macOS đã phát hành**: https://toolswave.net/larkwave.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows.
 - Bản cài ký ad-hoc, chưa notarize.
@@ -132,7 +132,8 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   toàn chặn, và đã bỏ hẳn hướng đó. Lịch sử cũ chỉ lấy qua 3 đường trên.
 - Công cụ: `zalo_search_messages` (tìm chữ/thời gian), `zalo_sync` (status/server), `zalo_web_open`, `zalo_web_read`.
   Kỹ năng: 'Đọc & tóm tắt tin Zalo' (v3) + 'Đồng bộ tin Zalo' (/zalo-dong-bo). Giao diện: `ZaloSyncPanel.tsx`.
-- Đăng nhập cửa sổ Zalo Web là RIÊNG (partition persist:zalo-web), đăng nhập TRONG CỬA SỔ — khác phiên zca (QR sidebar); Zalo chỉ 1 phiên web/lúc nên hai bên đá nhau. 0.1.8: phát hiện đăng nhập phải CHỜ trang ổn định (`settle`, theo did-navigate) rồi mới kết luận theo host — đọc getURL() tức thời là sai (chat.zalo.me chưa redirect sang id.zalo.me). Kỹ năng/công cụ cấm đẩy người dùng sang nút QR sidebar khi đang dùng cửa sổ (gây vòng lặp "hết hiệu lực").
+- **0.1.9: MỘT đăng nhập duy nhất.** Zalo chỉ cho 1 phiên web/lúc → trước đó cửa sổ Web (partition persist:zalo-web) và phiên zca (QR sidebar) là 2 lần đăng nhập, ĐÁ NHAU (người dùng gặp: đăng nhập cửa sổ → zca logged-out → nút "lấy từ máy chủ" tắt). Nay: cửa sổ Web là nơi đăng nhập CHÍNH; `zaloWeb.exportSession()` lấy cookie partition → `ZaloSessionManager.loginWithCredentials()` đăng nhập zca bằng CHÍNH cookie đó (cookie hợp lệ là đủ cho getLoginInfo; imei là nonce zca tự sinh, KHÔNG cần khớp) → zca + cửa sổ dùng CHUNG một phiên, hết đá nhau. `zaloService.adoptWebSession()` + `autoAdopt()` (tự chạy 1 lần khi cửa sổ đăng nhập mà zca chưa ready); nút «Bật gửi tin bằng phiên này» (IPC zaloWebAdopt). CHƯA thử Zalo thật — gộp phiên có thể vẫn bị server coi là client mới và đá; cần người dùng xác nhận.
+- 0.1.8: phát hiện đăng nhập phải CHỜ trang ổn định (`settle`, theo did-navigate) rồi mới kết luận theo host — đọc getURL() tức thời là sai (chat.zalo.me chưa redirect sang id.zalo.me).
 - Phần đọc nội dung cửa sổ Web là best-effort (innerText vùng cuộn lớn nhất) — CHƯA thử trên Zalo thật.
 - **Cái chốt duy nhất** là `connectorGate` trong `lark/tools/connectors.ts`. Một công cụ `zalo_*` / `gmail_*` chạy khi:
   - lượt đó có `connectors` trong ngữ cảnh. Chỉ hai nơi gắn trường này: `larkService.chat` (lượt của chính chủ
