@@ -449,12 +449,15 @@ class ZaloService {
     if (zaloWeb.status().loggedIn !== true) return { ok: false, note: 'Cửa sổ Zalo Web chưa đăng nhập — đăng nhập (quét QR) TRONG CỬA SỔ đó trước.' };
     const sess = await zaloWeb.exportSession();
     if (!sess) return { ok: false, note: 'Chưa lấy được phiên từ cửa sổ Zalo Web (chưa đăng nhập xong?).' };
-    const imei = `${randomUUID()}-${createHash('md5').update(sess.userAgent).digest('hex')}`;
+    // Phiên Zalo gắn với THIẾT BỊ: phải dùng ĐÚNG imei cửa sổ đã đăng nhập, không được sinh mới.
+    // Bằng chứng 18/10/2026: cookie đủ (13 cookie, có zpsid + zpw_sek) mà imei sinh mới ⇒ "Đăng nhập thất bại".
+    const imei = sess.imei || `${randomUUID()}-${createHash('md5').update(sess.userAgent).digest('hex')}`;
     const creds: ZaloCredentials = { imei, userAgent: sess.userAgent, cookie: { cookies: sess.cookies }, language: 'vi' };
-    // Chẩn đoán (chỉ TÊN cookie, không có giá trị) — để biết có đủ cookie phiên không khi gộp lỗi.
+    // Chẩn đoán (chỉ TÊN cookie/khoá, không có giá trị).
     const want = ['zpsid', 'zpw_sek', 'zpw_enk', 'app.login', '__zi'];
     const have = want.filter((n) => sess.names.some((x) => x.toLowerCase().startsWith(n.toLowerCase())));
-    const diag = `(${sess.cookies.length} cookie; thấy: ${have.join(', ') || 'KHÔNG có cookie phiên nào'})`;
+    const dev = sess.imei ? `imei cửa sổ: có (${sess.imeiKey})` : `imei cửa sổ: KHÔNG tìm thấy (${sess.storeKeys.length} khoá lưu trữ)`;
+    const diag = `(${sess.cookies.length} cookie; thấy: ${have.join(', ') || 'KHÔNG có cookie phiên nào'}; ${dev})`;
     try {
       const session = await this.manager().loginWithCredentials(creds);
       this.adoptTried = true;

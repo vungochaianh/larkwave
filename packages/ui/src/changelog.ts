@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.11',
+    date: '2026-10-18',
+    items: [
+      "Gộp phiên Zalo: dùng ĐÚNG mã thiết bị mà cửa sổ Zalo Web đã đăng nhập, thay vì tạo mã mới. Đo trên máy thật cho thấy cookie đã đủ (zpsid, zpw_sek) nhưng Zalo vẫn từ chối vì phiên gắn với thiết bị — đây là mảnh còn thiếu để một đăng nhập dùng được cho cả đọc lẫn gửi.",
+      "Câu báo lỗi gộp phiên nói thêm có tìm thấy mã thiết bị của cửa sổ hay không, để biết chính xác còn kẹt ở đâu.",
+    ],
+  },
+  {
     version: '0.1.10',
     date: '2026-10-18',
     items: [

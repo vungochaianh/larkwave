@@ -94,6 +94,28 @@ function readScript(scrolls: number): string {
   })()`;
 }
 
+/**
+ * imei của Zalo Web = `<uuid>-<md5(userAgent)>` (zca sinh y khuôn này trong generateZaloUUID). Trang lưu nó
+ * trong localStorage; KHÔNG dò theo tên khoá (Zalo đổi tên bất cứ lúc nào) mà dò theo ĐÚNG KHUÔN chuỗi —
+ * khuôn này đặc trưng nên gần như không nhầm với giá trị khác.
+ */
+const IMEI_SCAN = `(() => {
+  const RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9a-f]{32}/i;
+  const hits = []; const keys = [];
+  const scan = (store) => {
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i); keys.push(k);
+        const v = store.getItem(k) || '';
+        const m = RE.exec(v);
+        if (m) hits.push({ key: k, imei: m[0] });
+      }
+    } catch (e) { /* storage bị chặn */ }
+  };
+  scan(localStorage); scan(sessionStorage);
+  return { hits, keys: keys.slice(0, 60) };
+})()`;
+
 class ZaloWeb {
   private win: BrowserWindow | null = null;
   private seeded = false;
@@ -248,7 +270,19 @@ class ZaloWeb {
    * Lấy phiên web hiện tại (cookie trong partition + UA) để GỘP sang zca (loginWithCredentials). Dạng cookie
    * theo tough-cookie JSON để zca `parseCookies` nạp được. Chưa đăng nhập ⇒ null.
    */
-  async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string; names: string[] } | null> {
+  /** imei mà CHÍNH cửa sổ đã dùng để đăng nhập (phiên Zalo gắn với thiết bị này) — xem IMEI_SCAN. */
+  async readImei(): Promise<{ imei?: string; key?: string; keys: string[] }> {
+    if (!this.alive()) return { keys: [] };
+    try {
+      const r = (await this.win!.webContents.executeJavaScript(IMEI_SCAN, true)) as { hits: { key: string; imei: string }[]; keys: string[] };
+      const hit = r?.hits?.[0];
+      return { ...(hit ? { imei: hit.imei, key: hit.key } : {}), keys: r?.keys ?? [] };
+    } catch {
+      return { keys: [] };
+    }
+  }
+
+  async exportSession(): Promise<{ cookies: Record<string, unknown>[]; userAgent: string; names: string[]; imei?: string; imeiKey?: string; storeKeys: string[] } | null> {
     if (!this.alive() || this.status().loggedIn !== true) return null;
     const cs = await electronSession.fromPartition(PARTITION).cookies.get({}).catch(() => []);
     const zaloish = cs.filter((c) => /(^|\.)(zalo\.me|zadn\.vn|zdn\.vn|zaloapp\.com)$/i.test(c.domain || ''));
@@ -269,7 +303,9 @@ class ZaloWeb {
         ...(c.expirationDate ? { expires: new Date(c.expirationDate * 1000).toISOString() } : {}),
       };
     });
-    return cookies.length ? { cookies, userAgent: ZALO_WEB_UA, names: cs.map((c) => c.name) } : null;
+    if (!cookies.length) return null;
+    const dev = await this.readImei();
+    return { cookies, userAgent: ZALO_WEB_UA, names: cs.map((c) => c.name), ...(dev.imei ? { imei: dev.imei, imeiKey: dev.key } : {}), storeKeys: dev.keys };
   }
 
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
