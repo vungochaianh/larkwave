@@ -8,6 +8,7 @@
 const assert = require('node:assert');
 const {
   nextStepAfterTurn,
+  waitingOnUser,
   AUTO_CONTINUE_MAX,
   CTX_HANDOFF_AT,
   AUTO_CONTINUE_PROMPT,
@@ -198,3 +199,20 @@ assert.ok(/shouldPersistSession\(/.test(save), 'larkSaveSession phải dùng lu�
 // Bỏ qua thì vẫn phải NHỚ Base vào bản nháp, nếu không lần lưu sau lại lấy danh sách cũ.
 assert.ok(/this\.draftBases\.set\(id, bases\)/.test(save), 'bỏ qua ghi đĩa thì vẫn phải cập nhật bản nháp');
 console.log('✓ larkSaveSession dùng luật chung, và vẫn nhớ Base vào bản nháp khi chưa ghi đĩa');
+
+// ── Vòng lặp "Tự chạy tiếp" (lỗi thật 18/10/2026) ───────────────────────────────────────────────
+// Agent trả lời "bạn bấm vào nhóm … rồi nhắn đọc tiếp" + "còn thiếu từ 1/10 đến 16/10". Câu đó bị
+// đọc thành (a) ngày 1/10 là tiến độ "1 trên 10", (b) "chưa xong" ⇒ tự chạy tiếp 4 lần in lại y hệt.
+const choNguoiDung = 'Việc chưa xong. Bạn bấm vào nhóm Đầu tư AI trong cửa sổ Zalo Web, rồi nhắn mình "đọc tiếp".';
+assert.strictEqual(waitingOnUser(choNguoiDung), true, 'câu chờ người dùng phải nhận ra được');
+assert.strictEqual(waitingOnUser('Đã tạo xong 8 bảng và 10 workflow.'), false);
+assert.strictEqual(
+  nextStepAfterTurn({ hasConclusion: true, conclusionSaysUnfinished: true, conclusionWaitsOnUser: true, usedTools: true, ctxUsed: 0.2, autoLeft: 3, canHandoff: true }),
+  'none',
+  'đang chờ người dùng ⇒ KHÔNG tự chạy tiếp',
+);
+// Ngày tháng kiểu Việt không phải tiến độ.
+assert.strictEqual(saysUnfinished('Còn thiếu từ 1/10 đến 16/10, đã xong ngày 17/10.'), false, 'ngày 1/10 không phải "1 trên 10"');
+assert.strictEqual(saysUnfinished('Mới dựng 8/24 bảng.'), true, 'tiến độ thật vẫn nhận ra');
+assert.strictEqual(saysUnfinished('Hạn chót 5/10/2026, mọi thứ đã xong.'), false);
+console.log('✓ tự chạy tiếp: dừng khi chờ người dùng; ngày tháng không bị đọc thành tiến độ');

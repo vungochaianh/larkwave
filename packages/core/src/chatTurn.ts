@@ -30,6 +30,26 @@ export const CTX_HANDOFF_AT = 0.85;
  * "còn 17 bảng", "chưa xong", "tiếp tục …" — chứ không bắt mọi chữ "tiếp theo", vì một báo cáo
  * hoàn chỉnh vẫn hay có mục "bước tiếp theo bạn nên làm".
  */
+/**
+ * Câu trả lời đang CHỜ NGƯỜI DÙNG làm một việc ngoài tầm với của agent (bấm vào đâu đó, quét mã, bật
+ * quyền…). Đó là một KẾT LUẬN hợp lệ — chạy lại chỉ ra y hệt.
+ *
+ * Lỗi thật 18/10/2026: agent trả lời "bạn bấm vào nhóm … rồi nhắn 'đọc tiếp'", câu đó có chữ "chưa xong"
+ * nên bị coi là lượt dở ⇒ tự chạy tiếp 4 lần, lần nào cũng in lại đúng câu đó. Tốn lượt AI, và người dùng
+ * thấy app như bị loạn.
+ */
+export function waitingOnUser(text: string): boolean {
+  const t = (text || '').trim();
+  if (!t) return false;
+  return (
+    /\b(bạn|anh|chị)\s+(cần\s+)?(bấm|nhấp|mở|quét|chọn|vào|đăng\s*nhập|bật|cho\s*phép|xác\s*nhận)\b/i.test(t) ||
+    /\b(nhờ|chờ|đợi)\s+(bạn|anh|chị)\b/i.test(t) ||
+    /\bnhắn\s+(mình|tôi)\s+["“']?(đọc\s*tiếp|tiếp|xong)/i.test(t) ||
+    /\brồi\s+nhắn\s+(mình|tôi)\b/i.test(t) ||
+    /\b(please|you\s+need\s+to|waiting\s+for\s+you)\b/i.test(t)
+  );
+}
+
 export function saysUnfinished(text: string): boolean {
   const t = (text || '').trim();
   if (!t) return false;
@@ -37,7 +57,14 @@ export function saysUnfinished(text: string): boolean {
   for (const m of t.matchAll(/\b(\d{1,5})\s*\/\s*(\d{1,5})\b/g)) {
     const a = Number(m[1]);
     const b = Number(m[2]);
-    if (b > 0 && a < b) return true;
+    if (!(b > 0 && a < b)) continue;
+    // NGÀY THÁNG kiểu Việt (1/10, 16/10, 5/10/2026) KHÔNG phải tiến độ. Lỗi thật 18/10/2026: câu
+    // "còn thiếu từ 1/10 đến 16/10" bị đọc thành "mới xong 1 trên 10" ⇒ tự chạy tiếp vô hạn.
+    const at = m.index ?? 0;
+    const before = t.slice(Math.max(0, at - 14), at).toLowerCase();
+    const after = t.slice(at + m[0].length, at + m[0].length + 14);
+    const dateLike = (a <= 31 && b <= 12) || /^\s*\/\s*\d{2,4}/.test(after) || /(ngày|từ|đến|tới|hôm|tháng)\s*$/i.test(before);
+    if (!dateLike) return true;
   }
   return (
     /\bcòn\s+(lại\s+)?\d+/i.test(t) ||
@@ -50,6 +77,8 @@ export function saysUnfinished(text: string): boolean {
 export interface TurnEndState {
   /** Lượt vừa rồi kết thúc bằng một câu trả lời CÓ CHỮ của agent chưa. */
   hasConclusion: boolean;
+  /** Câu kết luận đang CHỜ người dùng thao tác (xem `waitingOnUser`) ⇒ không tự chạy tiếp. */
+  conclusionWaitsOnUser?: boolean;
   /** Câu kết luận đó có TỰ NÓI là còn dở không (xem `saysUnfinished`). */
   conclusionSaysUnfinished?: boolean;
   /** Lượt vừa rồi có gọi công cụ nào không. */
@@ -100,6 +129,9 @@ export type TurnNextStep =
  *  4. Ngữ cảnh đầy → chạy tiếp trong phiên cũ cũng vô ích, phải nén trước.
  */
 export function nextStepAfterTurn(s: TurnEndState): TurnNextStep {
+  // ĐANG CHỜ NGƯỜI DÙNG thì dừng hẳn, dù câu trả lời có nói "chưa xong": chạy lại cũng ra y hệt
+  // (xem waitingOnUser). Xét TRƯỚC mọi thứ khác.
+  if (s.hasConclusion && s.conclusionWaitsOnUser) return 'none';
   // Có kết luận nhưng chính nó nói còn dở ("8/24 bảng", "còn 17 bảng") thì KHÔNG phải xong.
   // Đây là ca đã lọt lưới một lần: người dùng đọc câu tự tin rồi ngồi chờ, việc thì đứng im.
   if (s.hasConclusion && !s.conclusionSaysUnfinished) {

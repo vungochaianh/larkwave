@@ -239,17 +239,33 @@ export const connectorTools: LarkToolDef[] = [
   {
     name: 'zalo_web_read',
     description:
-      'ĐỌC nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (chỉ dùng trong kỹ năng Zalo). Tự cuộn lên để tải thêm lịch sử rồi trả về phần chữ đang hiển thị. ' +
-      'Dùng cho tin CŨ mà zalo_read_chat/zalo_sync không lấy được. KHÔNG cần phiên zca. Người dùng phải đăng nhập + mở đúng hội thoại TRONG CỬA SỔ Zalo Web trước (zalo_web_open). ' +
-      'Báo "đang ở trang đăng nhập" ⇒ nhờ người dùng quét QR trong cửa sổ. Báo "không có hội thoại nào" ⇒ nhờ họ bấm vào đúng hội thoại trong cửa sổ. ' +
-      'Trả về chữ thô của cả hội thoại (tên người + nội dung + giờ xen kẽ) — tự tóm tắt / trích theo yêu cầu, nói rõ đây là nội dung đọc từ cửa sổ Zalo Web.',
+      'ĐỌC hội thoại trong cửa sổ Zalo Web (chỉ dùng trong kỹ năng Zalo). TỰ MỞ hội thoại theo tên nếu truyền `chat` ' +
+      '(ĐỪNG bắt người dùng tự bấm vào nhóm — cửa sổ do app điều khiển), rồi tự cuộn lên tải thêm lịch sử và trả về phần chữ. ' +
+      'Dùng cho tin CŨ mà zalo_read_chat/zalo_sync không lấy được. KHÔNG cần phiên zca; chỉ cần cửa sổ đã ĐĂNG NHẬP (zalo_web_open). ' +
+      'Kết quả có `chatNotFound` + `candidates` ⇒ không thấy hội thoại tên đó: xem danh sách gợi ý rồi gọi lại với tên đúng. ' +
+      'Báo "đang ở trang đăng nhập" ⇒ mới cần nhờ người dùng quét QR trong cửa sổ. ' +
+      'Trả về chữ thô của hội thoại (tên người + nội dung + giờ xen kẽ) — tự tóm tắt / trích theo yêu cầu, nói rõ đọc từ cửa sổ Zalo Web.',
     gated: false,
-    inputSchema: { type: 'object', additionalProperties: false, properties: { ...account, scrolls: { type: 'number', description: 'Số lần cuộn lên để tải thêm lịch sử (mặc định 12, càng nhiều càng cũ nhưng lâu hơn).' } } },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ...account,
+        chat: str('TÊN hội thoại/nhóm cần đọc — công cụ tự mở nó trong cửa sổ. Bỏ trống = đọc hội thoại đang mở.'),
+        scrolls: { type: 'number', description: 'Số lần cuộn lên để tải thêm lịch sử (mặc định 12, càng nhiều càng cũ nhưng lâu hơn).' },
+      },
+    },
     exec: async (input) => {
       connectorGate('zalo_web_read');
-      const r = await (await zalo()).webRead({ ...(typeof input.scrolls === 'number' ? { scrolls: input.scrolls } : {}) });
-      if (r.empty) return { empty: true, note: 'Không thấy hội thoại nào đang mở trong cửa sổ Zalo Web. Nhờ người dùng bấm vào đúng hội thoại trong cửa sổ đó rồi thử lại.' };
-      return { chat: r.title || '(không rõ tên)', truncated: r.truncated, text: r.text };
+      const r = await (await zalo()).webRead({
+        ...(typeof input.scrolls === 'number' ? { scrolls: input.scrolls } : {}),
+        ...(input.chat ? { chat: String(input.chat) } : {}),
+      });
+      if (r.chatNotFound) {
+        return { chatNotFound: r.chatNotFound, candidates: r.candidates, note: `Không thấy hội thoại tên "${r.chatNotFound}" trong cửa sổ. Xem "candidates" rồi gọi lại với đúng tên; nếu danh sách trống thì cửa sổ chưa tải xong.` };
+      }
+      if (r.empty) return { empty: true, note: 'Mở được nhưng chưa thấy nội dung — gọi lại (kèm `chat`) sau vài giây, hoặc tăng `scrolls`.' };
+      return { chat: r.openedChat || r.title || '(không rõ tên)', truncated: r.truncated, text: r.text };
     },
   },
   {

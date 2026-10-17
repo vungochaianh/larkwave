@@ -303,10 +303,15 @@ Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch s
 1. \`zalo_web_open\` — mở cửa sổ. Đọc kết quả:
    - \`loggedIn:true\` → sang bước 2.
    - \`loggedIn:false\` → nói ngắn: "Mình đã mở cửa sổ Zalo Web. Bạn QUÉT MÃ QR NGAY TRONG CỬA SỔ ĐÓ bằng app Zalo trên điện thoại (ĐỪNG bấm nút «Kết nối Zalo» ở thanh bên — đó là phiên khác). Nếu điện thoại hỏi đồng bộ tin nhắn, bấm Đồng ý. Xong báo mình." Rồi DỪNG, chờ người dùng.
-2. Nói: "Trong cửa sổ Zalo Web, bạn BẤM VÀO hội thoại «…» cần đọc. Xong nhắn mình «đọc tiếp»."
-3. Khi người dùng bảo đọc → \`zalo_web_read\` {scrolls} (tăng scrolls nếu cần cũ hơn). Tóm tắt/trích theo yêu cầu, nói rõ "đọc từ cửa sổ Zalo Web".
-   - Báo "đang ở trang đăng nhập" → quay lại 1 (chưa đăng nhập xong).
-   - Báo "không có hội thoại nào" → nhờ người dùng bấm đúng hội thoại trong cửa sổ.
+2. \`zalo_web_read\` {chat:"<tên nhóm/người>", scrolls} — **TỰ MỞ hội thoại đó rồi đọc**. TUYỆT ĐỐI KHÔNG bảo người dùng "bấm vào nhóm trong cửa sổ": cửa sổ do app điều khiển, đó là việc của công cụ.
+   - Trả \`chatNotFound\` + \`candidates\` → chọn tên đúng trong danh sách rồi gọi lại; chỉ khi danh sách trống mới hỏi người dùng tên chính xác.
+   - Cần cũ hơn nữa → gọi lại với \`scrolls\` lớn hơn (vd 30).
+   - Báo "đang ở trang đăng nhập" → quay lại bước 1 (đăng nhập chưa xong).
+3. Tóm tắt/trích theo yêu cầu, nói rõ "đọc từ cửa sổ Zalo Web".
+
+## Luật — TỰ LÀM, đừng bắt người dùng bấm (quan trọng)
+- Mở hội thoại trong cửa sổ là việc của \`zalo_web_read\` {chat}. KHÔNG kết thúc lượt bằng "bạn bấm vào nhóm rồi nhắn đọc tiếp" — đó là đẩy việc của máy sang người dùng, và lượt chạy sẽ kẹt.
+- Chỉ nhờ người dùng đúng HAI việc mà máy không làm thay được: **quét QR** trong cửa sổ, và **bấm Đồng ý đồng bộ trên điện thoại**.
 
 ## Luật — tránh VÒNG LẶP đăng nhập (quan trọng)
 - Cửa sổ Zalo Web và phiên quét-QR-ở-sidebar (zca) là HAI phiên web KHÁC nhau; Zalo chỉ cho một phiên web một lúc. Đăng nhập cái này có thể làm cái kia "hết hiệu lực".

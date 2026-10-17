@@ -308,6 +308,64 @@ class ZaloWeb {
     return { cookies, userAgent: ZALO_WEB_UA, names: cs.map((c) => c.name), ...(dev.imei ? { imei: dev.imei, imeiKey: dev.key } : {}), storeKeys: dev.keys };
   }
 
+  /**
+   * MỞ một hội thoại trong cửa sổ theo TÊN — agent tự làm, không bắt người dùng bấm (lỗi UX 18/10/2026:
+   * trợ lý cứ bảo "bạn bấm vào nhóm …" rồi chờ, trong khi cửa sổ là do app điều khiển).
+   *
+   * Không bám tên lớp CSS: gõ tên vào ô tìm của Zalo (input/contenteditable đầu ở cột trái), đợi kết quả,
+   * rồi bấm vào mục có CHỮ khớp tên. Trả về đã mở được chưa + tên mục đã bấm.
+   */
+  async openChat(name: string): Promise<{ opened: boolean; clicked?: string; candidates: string[] }> {
+    if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở.');
+    const js = `(async () => {
+      const want = ${JSON.stringify(String(name || '').trim())};
+      const fold = (x) => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
+      const target = fold(want);
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height > 14 && r.top < innerHeight && r.left < innerWidth * 0.55; };
+      // 1) Gõ tên vào ô tìm (cột trái) để Zalo lọc danh sách.
+      const box = [...document.querySelectorAll('input[type="text"], input:not([type]), [contenteditable="true"]')].find(vis);
+      if (box) {
+        try {
+          box.focus();
+          if (box.tagName === 'INPUT') {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            setter.call(box, want);
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            box.textContent = want;
+            box.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          }
+          await sleep(1200);
+        } catch (e) { /* không gõ được thì dò thẳng danh sách */ }
+      }
+      // 2) Tìm mục có chữ khớp tên, nằm ở cột trái, và là phần tử NHỎ NHẤT chứa chữ đó (tránh bấm cả khung).
+      const pick = () => {
+        const all = [...document.querySelectorAll('div,li,a,span')].filter((el) => {
+          if (!vis(el)) return false;
+          const t = fold(el.textContent);
+          return t && t.length < 160 && t.includes(target);
+        });
+        all.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+        return all[0] || null;
+      };
+      let el = pick();
+      if (!el) { await sleep(1200); el = pick(); }
+      const candidates = [...document.querySelectorAll('div,li,a')].filter(vis).map((e) => (e.textContent || '').trim()).filter((t) => t && t.length < 60).slice(0, 25);
+      if (!el) return { opened: false, candidates };
+      const clicked = (el.textContent || '').trim().slice(0, 80);
+      // Bấm vào hàng hội thoại: leo lên vài cấp cho trúng vùng bấm được của Zalo.
+      let node = el;
+      for (let i = 0; i < 4 && node.parentElement; i++) {
+        node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        node = node.parentElement;
+      }
+      await sleep(1500);
+      return { opened: true, clicked, candidates };
+    })()`;
+    return (await this.win!.webContents.executeJavaScript(js, true)) as { opened: boolean; clicked?: string; candidates: string[] };
+  }
+
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */
   async readOpen(scrolls = 12): Promise<ZaloWebRead> {
     if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở. Dùng zalo_web_open, rồi mở đúng hội thoại cần đọc TRONG CỬA SỔ ĐÓ.');

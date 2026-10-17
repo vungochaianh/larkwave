@@ -502,10 +502,21 @@ class ZaloService {
     return zaloWeb.status();
   }
 
-  /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (người dùng tự mở đúng hội thoại + đồng bộ điện thoại). */
-  async webRead(opts: { scrolls?: number } = {}): Promise<ZaloWebRead> {
+  /**
+   * Đọc hội thoại trong cửa sổ Zalo Web. Có `chat` thì TỰ MỞ hội thoại đó trước (không bắt người dùng bấm
+   * — lỗi UX 18/10/2026); không có thì đọc hội thoại đang mở.
+   */
+  async webRead(opts: { scrolls?: number; chat?: string } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[] }> {
     await zaloWeb.open(false); // đảm bảo cửa sổ tồn tại (không bắt buộc hiện ra)
-    return zaloWeb.readOpen(opts.scrolls ?? 12);
+    let opened: { opened: boolean; clicked?: string; candidates: string[] } | null = null;
+    if (opts.chat?.trim()) {
+      opened = await zaloWeb.openChat(opts.chat.trim());
+      if (!opened.opened) {
+        return { title: '', text: '', truncated: false, empty: true, chatNotFound: opts.chat.trim(), candidates: opened.candidates.slice(0, 20) };
+      }
+    }
+    const r = await zaloWeb.readOpen(opts.scrolls ?? 12);
+    return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}) };
   }
 }
 

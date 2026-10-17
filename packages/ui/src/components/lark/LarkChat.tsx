@@ -10,7 +10,7 @@ import { renderUserText } from '../chat/renderUserText';
 import { LoadingOutlined, SendOutlined, RobotOutlined, PlusOutlined, DeleteOutlined, DatabaseOutlined, PaperClipOutlined, CloseOutlined, FileTextOutlined, ShareAltOutlined, LinkOutlined, GlobalOutlined, StopOutlined, InfoCircleOutlined, SearchOutlined, ReloadOutlined, CopyOutlined, EditOutlined, ShrinkOutlined, ArrowsAltOutlined, WarningOutlined, CheckCircleFilled, MenuOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { exportTranscriptPdf } from '../../exportPdf';
 import type { LarkBaseRef, LarkChatEvent, LarkChatMode, LarkNoteDoc, LarkSessionMeta, RuntimeAdapter } from '@larkwave/core';
-import { AUTO_CONTINUE_MAX, AUTO_CONTINUE_PROMPT, nextStepAfterTurn, saysUnfinished } from '@larkwave/core';
+import { AUTO_CONTINUE_MAX, AUTO_CONTINUE_PROMPT, nextStepAfterTurn, saysUnfinished, waitingOnUser } from '@larkwave/core';
 import { messageDigest } from '../../messageDigest';
 import { useAgentBusy } from '../../useAgentBusy';
 import { accountApi, getToken } from '../../account/api';
@@ -1032,6 +1032,8 @@ export function LarkChat({
           hasConclusion: !!ketLuan,
           // Kết luận tự nhận còn dở ("8/24 bảng", "còn 17 bảng") thì không tính là xong.
           conclusionSaysUnfinished: !!ketLuan && saysUnfinished(ketLuan),
+          // Đang chờ người dùng bấm/quét ⇒ dừng, chạy lại cũng ra y hệt (lỗi vòng lặp 18/10/2026).
+          conclusionWaitsOnUser: !!ketLuan && waitingOnUser(ketLuan),
           usedTools: cur.some((it) => it.kind === 'tool'),
           ctxUsed: ctxRef.current?.percentUsed ?? null,
           autoLeft: autoLeftRef.current,
