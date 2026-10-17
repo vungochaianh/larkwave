@@ -158,6 +158,9 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 
 ## Bẫy đã gặp
 
+- **Kiểm API key: 400 từ `/v1/messages` KHÔNG có nghĩa là key sai.** Với key mới tạo, đó gần như luôn là "credit
+  balance is too low" (tài khoản chưa nạp tiền). Dùng `checkAnthropicKey` (`@larkwave/core`): kiểm đăng nhập bằng
+  `GET /v1/models` (chỉ 401/403 mới là key sai), rồi thử dùng; lỗi ở bước thử thì trả `warning` kèm câu của Anthropic.
 - **API key Anthropic không chỉ có dạng `sk-ant-api…`.** Từ 10/2026 Console cấp cả `sk-ant-usr-…`.
   Nhận diện khoá bằng `apps/desktop/main/runtime/claudeKeyKind.ts`, đừng viết regex tiền tố mới. Hàm đó
   chỉ loại những dạng biết chắc không phải API key (token đăng nhập `oat`, admin key…), còn lại để lần
