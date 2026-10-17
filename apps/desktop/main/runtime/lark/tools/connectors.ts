@@ -262,7 +262,12 @@ export const connectorTools: LarkToolDef[] = [
         ...(input.chat ? { chat: String(input.chat) } : {}),
       });
       if (r.chatNotFound) {
-        return { chatNotFound: r.chatNotFound, candidates: r.candidates, note: `Không thấy hội thoại tên "${r.chatNotFound}" trong cửa sổ. Xem "candidates" rồi gọi lại với đúng tên; nếu danh sách trống thì cửa sổ chưa tải xong.` };
+        return {
+          chatNotFound: r.chatNotFound,
+          candidates: r.candidates,
+          ...(r.webHistoryLimit ? { webHistoryLimit: r.webHistoryLimit } : {}),
+          note: `Không MỞ được hội thoại "${r.chatNotFound}" trong cửa sổ Zalo Web. Xem "candidates" (những mục cửa sổ đang thấy) rồi gọi lại với đúng tên. Danh sách trống ⇒ cửa sổ chưa tải xong hoặc chưa đăng nhập.`,
+        };
       }
       if (r.empty) {
         return {
@@ -274,7 +279,12 @@ export const connectorTools: LarkToolDef[] = [
             'này vào câu trả lời để nhóm phát triển sửa. KHÔNG bắt người dùng bấm lại hay đồng bộ lại.',
         };
       }
-      return { chat: r.openedChat || r.title || '(không rõ tên)', truncated: r.truncated, text: r.text };
+      return {
+        chat: r.openedChat || r.title || '(không rõ tên)',
+        truncated: r.truncated,
+        ...(r.webHistoryLimit ? { webHistoryLimit: `Zalo Web tự giới hạn: ${r.webHistoryLimit}. Tin cũ hơn mốc này KHÔNG có trên Zalo Web — nói thật với người dùng, chỉ Zalo PC mới có.` } : {}),
+        text: r.text,
+      };
     },
   },
   {

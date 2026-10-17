@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.15',
+    date: '2026-10-18',
+    items: [
+      "Sửa lỗi KHÔNG mở được nhóm trong cửa sổ Zalo Web: trước đây app bấm bằng sự kiện giả lập nên Zalo bỏ qua — ô tìm ra đúng nhóm nhưng bên phải vẫn là màn hình chào mừng, và vì thế đọc ra rỗng. Nay app gửi CÚ CLICK CHUỘT THẬT vào đúng toạ độ, rồi kiểm chứng đã mở được hội thoại chưa.",
+      "Nói thật về giới hạn của Zalo Web: trang này chỉ giữ tin từ một mốc ngày nhất định (Zalo tự ghi trong ô tìm, ví dụ \"trước ngày 04/10\" phải dùng Zalo PC). Trợ lý sẽ báo đúng mốc đó thay vì hứa lấy được rồi thử đi thử lại.",
+    ],
+  },
+  {
     version: '0.1.14',
     date: '2026-10-18',
     items: [

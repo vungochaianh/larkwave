@@ -305,6 +305,7 @@ Người dùng muốn thêm tin Zalo CŨ (đọc thấy quá ít, cần lịch s
    - \`loggedIn:false\` → nói ngắn: "Mình đã mở cửa sổ Zalo Web. Bạn QUÉT MÃ QR NGAY TRONG CỬA SỔ ĐÓ bằng app Zalo trên điện thoại (ĐỪNG bấm nút «Kết nối Zalo» ở thanh bên — đó là phiên khác). Nếu điện thoại hỏi đồng bộ tin nhắn, bấm Đồng ý. Xong báo mình." Rồi DỪNG, chờ người dùng.
 2. \`zalo_web_read\` {chat:"<tên nhóm/người>", scrolls} — **TỰ MỞ hội thoại đó rồi đọc**. TUYỆT ĐỐI KHÔNG bảo người dùng "bấm vào nhóm trong cửa sổ": cửa sổ do app điều khiển, đó là việc của công cụ.
    - Trả \`chatNotFound\` + \`candidates\` → chọn tên đúng trong danh sách rồi gọi lại; chỉ khi danh sách trống mới hỏi người dùng tên chính xác.
+   - Trả \`webHistoryLimit\` → ZALO WEB TỰ GIỚI HẠN lịch sử (vd chỉ có tin từ 04/10). Nói THẬT điều này: tin cũ hơn mốc đó không có trên Zalo Web, chỉ Zalo PC mới có. ĐỪNG hứa lấy được rồi thử đi thử lại.
    - Cần cũ hơn nữa → gọi lại với \`scrolls\` lớn hơn (vd 30).
    - Trả \`empty\` + \`diag\` → thử LẠI ĐÚNG MỘT LẦN với scrolls lớn hơn; vẫn rỗng thì DỪNG và nói thẳng: "bộ đọc của Larkwave không lấy được nội dung từ cửa sổ (không phải nhóm không có tin)", kèm NGUYÊN khối \`diag\`. KHÔNG bắt người dùng bấm/đồng bộ lại, KHÔNG đoán là nhóm trống.
    - Báo "đang ở trang đăng nhập" → quay lại bước 1 (đăng nhập chưa xong).

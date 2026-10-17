@@ -438,24 +438,27 @@ class ZaloWeb {
   }
 
   /**
-   * MỞ một hội thoại trong cửa sổ theo TÊN — agent tự làm, không bắt người dùng bấm (lỗi UX 18/10/2026:
-   * trợ lý cứ bảo "bạn bấm vào nhóm …" rồi chờ, trong khi cửa sổ là do app điều khiển).
+   * MỞ một hội thoại trong cửa sổ theo TÊN — agent tự làm, không bắt người dùng bấm.
    *
-   * Không bám tên lớp CSS: gõ tên vào ô tìm của Zalo (input/contenteditable đầu ở cột trái), đợi kết quả,
-   * rồi bấm vào mục có CHỮ khớp tên. Trả về đã mở được chưa + tên mục đã bấm.
+   * BÀI HỌC 18/10/2026 (ảnh người dùng gửi): gõ tên vào ô tìm thì CHẠY (Zalo hiện đúng 1 kết quả), nhưng
+   * `dispatchEvent(new MouseEvent('click'))` KHÔNG mở được hội thoại — Zalo bỏ qua sự kiện giả lập. Nay lấy
+   * TOẠ ĐỘ của hàng kết quả rồi bắn CLICK CHUỘT THẬT bằng `webContents.sendInputEvent` (sự kiện tin cậy, y
+   * như người dùng bấm), rồi KIỂM CHỨNG đã rời màn hình chào mừng chưa.
    */
-  async openChat(name: string): Promise<{ opened: boolean; clicked?: string; candidates: string[] }> {
+  async openChat(name: string): Promise<{ opened: boolean; clicked?: string; candidates: string[]; webHistoryLimit?: string }> {
     if (!this.alive()) throw new Error('Cửa sổ Zalo Web chưa mở.');
-    const js = `(async () => {
-      const want = ${JSON.stringify(String(name || '').trim())};
-      const fold = (x) => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
-      const target = fold(want);
-      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-      const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height > 14 && r.top < innerHeight && r.left < innerWidth * 0.55; };
-      // 1) Gõ tên vào ô tìm (cột trái) để Zalo lọc danh sách.
-      const box = [...document.querySelectorAll('input[type="text"], input:not([type]), [contenteditable="true"]')].find(vis);
-      if (box) {
-        try {
+    const wc = this.win!.webContents;
+    const want = String(name || '').trim();
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    // 1) Gõ tên vào ô tìm (cột trái) để Zalo lọc danh sách.
+    await wc
+      .executeJavaScript(
+        `(() => {
+          const want = ${JSON.stringify(want)};
+          const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height > 14 && r.left < innerWidth * 0.5; };
+          const box = [...document.querySelectorAll('input[type="text"], input[type="search"], input:not([type]), [contenteditable="true"]')].find(vis);
+          if (!box) return false;
           box.focus();
           if (box.tagName === 'INPUT') {
             const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -465,34 +468,74 @@ class ZaloWeb {
             box.textContent = want;
             box.dispatchEvent(new InputEvent('input', { bubbles: true }));
           }
-          await sleep(1200);
-        } catch (e) { /* không gõ được thì dò thẳng danh sách */ }
-      }
-      // 2) Tìm mục có chữ khớp tên, nằm ở cột trái, và là phần tử NHỎ NHẤT chứa chữ đó (tránh bấm cả khung).
-      const pick = () => {
-        const all = [...document.querySelectorAll('div,li,a,span')].filter((el) => {
-          if (!vis(el)) return false;
-          const t = fold(el.textContent);
-          return t && t.length < 160 && t.includes(target);
-        });
-        all.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
-        return all[0] || null;
-      };
-      let el = pick();
-      if (!el) { await sleep(1200); el = pick(); }
-      const candidates = [...document.querySelectorAll('div,li,a')].filter(vis).map((e) => (e.textContent || '').trim()).filter((t) => t && t.length < 60).slice(0, 25);
-      if (!el) return { opened: false, candidates };
-      const clicked = (el.textContent || '').trim().slice(0, 80);
-      // Bấm vào hàng hội thoại: leo lên vài cấp cho trúng vùng bấm được của Zalo.
-      let node = el;
-      for (let i = 0; i < 4 && node.parentElement; i++) {
-        node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-        node = node.parentElement;
-      }
-      await sleep(1500);
-      return { opened: true, clicked, candidates };
-    })()`;
-    return (await this.win!.webContents.executeJavaScript(js, true)) as { opened: boolean; clicked?: string; candidates: string[] };
+          return true;
+        })()`,
+        true,
+      )
+      .catch(() => false);
+    await sleep(1600);
+
+    // 2) Tìm TOẠ ĐỘ hàng kết quả khớp tên (ở cột trái, dưới ô tìm).
+    const found = (await wc
+      .executeJavaScript(
+        `(() => {
+          const want = ${JSON.stringify(want)};
+          const fold = (x) => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
+          const target = fold(want);
+          const rows = [...document.querySelectorAll('div,li,a')].filter((el) => {
+            const r = el.getBoundingClientRect();
+            if (r.width < 80 || r.height < 24 || r.height > 110) return false;
+            if (r.left > innerWidth * 0.5 || r.top < 80) return false;
+            const t = fold(el.textContent);
+            return t && t.length < 120 && t.includes(target);
+          });
+          // Hàng "sát" nhất: phần tử nhỏ nhất bao được tên (tránh bắt cả khung danh sách).
+          rows.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+          const el = rows[0];
+          const candidates = [...document.querySelectorAll('div,li,a')]
+            .filter((e) => { const r = e.getBoundingClientRect(); return r.left < innerWidth * 0.5 && r.width > 80 && r.height > 24 && r.height < 110; })
+            .map((e) => (e.textContent || '').trim())
+            .filter((t) => t && t.length < 60)
+            .slice(0, 25);
+          // Ghi chú GIỚI HẠN của chính Zalo Web (vd "tìm tin nhắn trước ngày 04/10/2026").
+          const limit = (document.body.innerText.match(/tin nhắn trước ngày\s*[\d/]+/i) || [])[0] || '';
+          if (!el) return { ok: false, candidates, limit };
+          const r = el.getBoundingClientRect();
+          return { ok: true, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), label: (el.textContent || '').trim().slice(0, 80), candidates, limit };
+        })()`,
+        true,
+      )
+      .catch(() => null)) as { ok: boolean; x?: number; y?: number; label?: string; candidates: string[]; limit?: string } | null;
+
+    const candidates = found?.candidates ?? [];
+    const webHistoryLimit = found?.limit || undefined;
+    if (!found?.ok || found.x === undefined || found.y === undefined) return { opened: false, candidates, ...(webHistoryLimit ? { webHistoryLimit } : {}) };
+
+    // 3) CLICK CHUỘT THẬT (sự kiện tin cậy) — chỗ mà sự kiện giả lập thất bại.
+    const pt = { x: found.x, y: found.y };
+    wc.sendInputEvent({ type: 'mouseMove', ...pt });
+    await sleep(80);
+    wc.sendInputEvent({ type: 'mouseDown', ...pt, button: 'left', clickCount: 1 });
+    await sleep(60);
+    wc.sendInputEvent({ type: 'mouseUp', ...pt, button: 'left', clickCount: 1 });
+    await sleep(1800);
+
+    // 4) Kiểm chứng: đã rời màn hình chào mừng / đã có khung tin chưa.
+    const opened = (await wc
+      .executeJavaScript(
+        `(() => {
+          const t = document.body ? document.body.innerText : '';
+          if (/Chào mừng đến với Zalo/i.test(t)) return false;
+          const el = document.elementFromPoint(Math.round(innerWidth * 0.68), Math.round(innerHeight * 0.5));
+          let n = el, deep = false;
+          while (n && n !== document.body) { if (n.scrollHeight > n.clientHeight + 24 && n.clientHeight > 120) { deep = true; break; } n = n.parentElement; }
+          return deep || t.length > 400;
+        })()`,
+        true,
+      )
+      .catch(() => false)) as boolean;
+
+    return { opened, ...(found.label ? { clicked: found.label } : {}), candidates, ...(webHistoryLimit ? { webHistoryLimit } : {}) };
   }
 
   /** Đọc nội dung hội thoại ĐANG MỞ trong cửa sổ Zalo Web (cuộn lên `scrolls` lần để tải thêm lịch sử). */

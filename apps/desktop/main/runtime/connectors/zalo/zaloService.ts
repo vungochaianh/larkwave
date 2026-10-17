@@ -513,18 +513,26 @@ class ZaloService {
    * Đọc hội thoại trong cửa sổ Zalo Web. Có `chat` thì TỰ MỞ hội thoại đó trước (không bắt người dùng bấm
    * — lỗi UX 18/10/2026); không có thì đọc hội thoại đang mở.
    */
-  async webRead(opts: { scrolls?: number; chat?: string } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[] }> {
+  async webRead(opts: { scrolls?: number; chat?: string } = {}): Promise<ZaloWebRead & { openedChat?: string; chatNotFound?: string; candidates?: string[]; webHistoryLimit?: string }> {
     this.store();
     await zaloWeb.open(false); // đảm bảo cửa sổ tồn tại (không bắt buộc hiện ra)
-    let opened: { opened: boolean; clicked?: string; candidates: string[] } | null = null;
+    let opened: { opened: boolean; clicked?: string; candidates: string[]; webHistoryLimit?: string } | null = null;
     if (opts.chat?.trim()) {
       opened = await zaloWeb.openChat(opts.chat.trim());
       if (!opened.opened) {
-        return { title: '', text: '', truncated: false, empty: true, chatNotFound: opts.chat.trim(), candidates: opened.candidates.slice(0, 20) };
+        return {
+          title: '',
+          text: '',
+          truncated: false,
+          empty: true,
+          chatNotFound: opts.chat.trim(),
+          candidates: opened.candidates.slice(0, 20),
+          ...(opened.webHistoryLimit ? { webHistoryLimit: opened.webHistoryLimit } : {}),
+        };
       }
     }
     const r = await zaloWeb.readOpen(opts.scrolls ?? 12);
-    return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}) };
+    return { ...r, ...(opened?.clicked ? { openedChat: opened.clicked } : {}), ...(opened?.webHistoryLimit ? { webHistoryLimit: opened.webHistoryLimit } : {}) };
   }
 }
 
