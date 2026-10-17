@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.12',
+    date: '2026-10-18',
+    items: [
+      "Trợ lý TỰ MỞ nhóm/hội thoại trong cửa sổ Zalo Web rồi đọc — không còn bắt bạn bấm vào nhóm rồi nhắn \"đọc tiếp\". Chỉ còn hai việc cần bạn: quét QR trong cửa sổ và bấm Đồng ý đồng bộ trên điện thoại.",
+      "Hết vòng lặp \"Tự chạy tiếp\": lượt đang chờ bạn thao tác nay được coi là đã kết luận, app không tự chạy lại và in y hệt nữa. Ngày tháng kiểu Việt (1/10, 16/10) không còn bị đọc nhầm thành tiến độ \"1 trên 10\".",
+    ],
+  },
+  {
     version: '0.1.11',
     date: '2026-10-18',
     items: [
