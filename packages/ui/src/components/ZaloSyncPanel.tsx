@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, App as AntApp, Button, Collapse, Popconfirm, Select, Space, Switch, Tag, Typography } from 'antd';
 import { CloudDownloadOutlined, DeleteOutlined, EyeInvisibleOutlined, GlobalOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { RuntimeAdapter, ZaloSyncStatus, ZaloWebStatus } from '@larkwave/core';
@@ -24,6 +24,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
   const [st, setSt] = useState<ZaloSyncStatus | null>(null);
   const [unsupported, setUnsupported] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const autoAdopted = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!call) return null;
@@ -31,6 +32,18 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
       const s = (await call('zaloSyncStatus')) as ZaloSyncStatus;
       setSt(s);
       setUnsupported(false);
+      // Cửa sổ Web vừa đăng nhập xong mà phiên gửi (zca) chưa sẵn sàng ⇒ TỰ GỘP một lần (không cần bấm).
+      if (s.web.loggedIn === true && !s.accounts.some((a) => a.status === 'ready') && !autoAdopted.current) {
+        autoAdopted.current = true;
+        try {
+          await call('zaloWebAdopt');
+          const s2 = (await call('zaloSyncStatus')) as ZaloSyncStatus;
+          setSt(s2);
+          return s2;
+        } catch {
+          /* lõi cũ chưa có zaloWebAdopt / gộp lỗi — người dùng bấm nút gộp tay */
+        }
+      }
       return s;
     } catch (e) {
       if (/không hợp lệ/i.test(String((e as Error)?.message))) setUnsupported(true);
@@ -131,7 +144,7 @@ export function ZaloSyncPanel({ runtime, embedded }: { runtime: RuntimeAdapter; 
         </Text>
         <Space wrap>
           {!web?.exists || !web.visible ? (
-            <Button type="primary" icon={<GlobalOutlined />} disabled={!ready} loading={busy === 'webOpen'} onClick={() => run('webOpen', () => call('zaloWebOpen', { show: true }))}>
+            <Button type="primary" icon={<GlobalOutlined />} loading={busy === 'webOpen'} onClick={() => run('webOpen', () => call('zaloWebOpen', { show: true }))}>
               {t('zsync.webOpen', 'Mở cửa sổ Zalo Web')}
             </Button>
           ) : (
