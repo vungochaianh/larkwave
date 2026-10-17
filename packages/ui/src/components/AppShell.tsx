@@ -13,6 +13,9 @@ import { FEATURE_FRIENDS } from '../features';
 import { UpdateBanner } from './UpdateBanner';
 import { VersionFooter } from './VersionFooter';
 import { AgentGuideModal } from './AgentGuideModal';
+import { FixCenter } from './fix/FixCenter';
+import { FixBadge } from './fix/FixBadge';
+import { SafeMount } from './fix/SafeMount';
 import { AgentActivity } from './AgentActivity';
 import { NetworkBanner } from './NetworkBanner';
 import { useAccountAuth } from '../account/auth';
@@ -459,6 +462,12 @@ function AppShellInner({
     <ConfigProvider theme={mode === 'dark' ? darkTheme : lightTheme}>
       <AntApp message={{ maxCount: 3 }} notification={{ placement: 'topRight' }}>
         <SessionDeadWatcher />
+        {/* Trợ lý kiểm tra miễn phí + "sửa nhanh" (mở thẳng modal kết nối) — chỉ bản desktop. */}
+        {runtime.kind === 'desktop' && (
+          <SafeMount>
+            <FixCenter />
+          </SafeMount>
+        )}
         <Layout style={{ minHeight: '100vh', background: V.layer }}>
           <Sider width={248} collapsedWidth={72} collapsible collapsed={collapsed} trigger={null}
             style={{ position: 'sticky', top: 0, height: '100vh', background: V.surface, borderRight: `1px solid ${V.border}` }}>
@@ -477,6 +486,11 @@ function AppShellInner({
                   : sectionTitle}
               </span>
               <div style={{ flex: 1 }} />
+              {runtime.kind === 'desktop' && (
+                <SafeMount>
+                  <FixBadge />
+                </SafeMount>
+              )}
               {headerExtra}
               <Tooltip title={locale === 'en' ? 'Chuyển sang Tiếng Việt' : 'Switch to English'}>
                 <Button

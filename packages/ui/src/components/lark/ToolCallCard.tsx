@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Tag } from 'antd';
+import { Button, Tag } from 'antd';
+import { fixTargetForToolError, openFix } from '../fix/fixRules';
 import { V } from '../../theme';
 import { useI18n } from '../../i18n';
 import {
@@ -168,6 +169,12 @@ export function ToolCallCard({ call }: { call: ToolCallState }) {
         <div style={{ marginTop: 4, color: softTier ? V.textSub : '#EF4444', wordBreak: 'break-word' }}>
           → {call.error}
         </div>
+      )}
+      {call.status === 'error' && fixTargetForToolError(call.error) && (
+        // Lỗi "chưa kết nối" có cách sửa một chạm: mở thẳng modal kết nối (QR Zalo / Gmail).
+        <Button size="small" type="primary" style={{ marginTop: 6 }} onClick={() => openFix(fixTargetForToolError(call.error)!, call.error)}>
+          {fixTargetForToolError(call.error) === 'zalo' ? 'Kết nối Zalo (quét QR)' : 'Kết nối Gmail'}
+        </Button>
       )}
     </div>
   );

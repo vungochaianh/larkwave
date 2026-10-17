@@ -1,4 +1,5 @@
-import { Alert } from 'antd';
+import { Alert, Button } from 'antd';
+import { openFix } from './fix/fixRules';
 import { apiFetch } from '../account/api';
 
 /**
@@ -81,21 +82,21 @@ export function RunnerErrorCard({
           'chat.fixAuth.s1',
           'Đây là lỗi của Claude CLI trên MÁY BẠN, không liên quan tài khoản Larkwave (bạn vẫn đang đăng nhập bình thường).',
         ),
-        tr('chat.fixAuth.s2', 'Mở Cài đặt → mục Claude: bấm "Đăng nhập lại", hoặc dán lại API key/token còn hiệu lực.'),
+        tr('chat.fixAuth.s2', 'Bấm "Đăng nhập lại Claude" bên dưới, hoặc "Dùng API key" để dán key/token còn hiệu lực.'),
         tr(
           'chat.fixAuth.s3',
           'Nếu dùng API key: kiểm tra key chưa bị thu hồi và còn số dư tại console.anthropic.com → Billing.',
         ),
         tr('chat.fixAuth.s4', 'Claude CLI có thể đã cũ — cập nhật rồi thử lại: npm i -g @anthropic-ai/claude-code'),
-        tr('chat.fixAuth.s5', 'Hoặc chuyển sang tab "API riêng" (dán API key) / đổi runner khác trong Cài đặt.'),
+        tr('chat.fixAuth.s5', 'Hoặc đổi sang runner khác ở chip động cơ trên đầu khung chat.'),
       ]
     : [
         tr(
           'chat.fixCredit.s1',
           'Nạp thêm credit cho tài khoản Anthropic của key đang dùng tại console.anthropic.com → Billing.',
         ),
-        tr('chat.fixCredit.s2', 'Hoặc đăng nhập Claude bằng thuê bao Pro/Max trong Cài đặt → mục Claude.'),
-        tr('chat.fixCredit.s3', 'Hoặc đổi sang runner/API key khác trong Cài đặt.'),
+        tr('chat.fixCredit.s2', 'Hoặc bấm "Dùng gói Claude" để đăng nhập thuê bao Pro/Max.'),
+        tr('chat.fixCredit.s3', 'Hoặc bấm "Kiểm / đổi API key" để xem lý do Anthropic trả về và đổi key khác.'),
       ];
   return (
     <Alert
@@ -109,6 +110,15 @@ export function RunnerErrorCard({
               <li key={i}>{s}</li>
             ))}
           </ol>
+          {/* Sửa một chạm — mở thẳng modal (FixCenter), không bắt người dùng lần vào Cài đặt. */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <Button size="small" type="primary" onClick={() => openFix(auth ? 'claude' : 'claudeKeys', title)}>
+              {auth ? tr('chat.fixAuth.btnLogin', 'Đăng nhập lại Claude') : tr('chat.fixCredit.btnKey', 'Kiểm / đổi API key')}
+            </Button>
+            <Button size="small" onClick={() => openFix(auth ? 'claudeKeys' : 'claude', title)}>
+              {auth ? tr('chat.fixAuth.btnKey', 'Dùng API key') : tr('chat.fixCredit.btnLogin', 'Dùng gói Claude')}
+            </Button>
+          </div>
           <div style={{ marginTop: 8, fontSize: 12.5, opacity: 0.85 }}>
             {tr('chat.fixKeep', 'Hội thoại được giữ nguyên — sửa xong gửi lại tin là chạy tiếp.')}
           </div>

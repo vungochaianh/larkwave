@@ -32,6 +32,8 @@ import { AskUserModal, type PendingAsk } from './AskUserModal';
 import { findAnswer, isToolAllowed, rememberAnswer, rememberTool, type RememberScope } from './agentPrefs';
 import { takeLarkPrompt } from './larkHandoff';
 import { API_KEYS_CHANGED_EVENT, apiKeyReadyFrom } from './engineChip';
+import { connectorForPrompt, openFix } from '../fix/fixRules';
+import type { GmailConnectorAccount, ZaloConnectorStatus } from '@larkwave/core';
 import { useI18n } from '../../i18n';
 
 const { Text } = Typography;
@@ -921,6 +923,24 @@ export function LarkChat({
     // chối ảnh, và lỗi bị nuốt. Cùng lỗi đã sửa ở AgentChat.
     const atts = attachments.map((a) => ({ name: a.name, dataBase64: a.dataBase64, mime: a.mime }));
     if ((!prompt && !atts.length) || busy || handoffBusy || !runtime.larkChat) return;
+    // Kỹ năng Zalo/Gmail ("/zalo-…", "/gmail-…") mà chưa kết nối: mở THẲNG modal kết nối (QR / Gmail) thay
+    // vì để agent chạy rồi báo lỗi. Lệnh vẫn nằm trong ô nhập — kết nối xong bấm Gửi lại.
+    const need = !auto ? connectorForPrompt(prompt) : null;
+    if (need && runtime.connectorsCall) {
+      const ready = await (need === 'zalo'
+        ? (runtime.connectorsCall('zaloStatus') as Promise<ZaloConnectorStatus>).then((z) => z.accounts.some((a) => a.status === 'ready'))
+        : (runtime.connectorsCall('gmailList') as Promise<GmailConnectorAccount[]>).then((g) => g.length > 0)
+      ).catch(() => true);
+      if (!ready) {
+        openFix(
+          need,
+          need === 'zalo'
+            ? 'Kỹ năng này cần Zalo — quét mã QR bằng app Zalo trên điện thoại, xong bấm Gửi lại.'
+            : 'Kỹ năng này cần Gmail — nhập địa chỉ + mật khẩu ứng dụng, xong bấm Gửi lại.',
+        );
+        return;
+      }
+    }
     const effective = prompt || tr('chat.analyzeFiles', 'Đọc + phân tích các file đính kèm giúp tôi.');
     // Keep image attachments IN the transcript (bounded ~1.5MB/img) so they show in the
     // chat history AND in a shared conversation — not just as a "📎 name" text marker.

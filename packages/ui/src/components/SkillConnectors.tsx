@@ -16,7 +16,20 @@ const QR_LIVE = new Set(['starting', 'awaiting-scan', 'scanned', 'authenticating
  * đây; agent không tự thao tác — nó chỉ dùng kết nối qua công cụ zalo_ / gmail_ BÊN TRONG một kỹ năng
  * (bộ dựng sẵn "Zalo & Gmail" hoặc kỹ năng tự soạn), và lần gửi nào cũng hỏi.
  */
-export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
+export function SkillConnectors({
+  runtime,
+  only,
+  autoQr,
+  onConnected,
+}: {
+  runtime: RuntimeAdapter;
+  /** Chỉ hiện một phần, mở sẵn, không đầu mục — dùng trong modal "sửa nhanh" (FixCenter). */
+  only?: 'zalo' | 'gmail';
+  /** Zalo: mở là tạo mã QR luôn (người dùng bấm "Kết nối Zalo" từ thông báo / thẻ lỗi). */
+  autoQr?: boolean;
+  /** Vừa kết nối xong (Zalo sẵn sàng / thêm được Gmail). */
+  onConnected?: (what: 'zalo' | 'gmail') => void;
+}) {
   const { t } = useI18n();
   const { message } = AntApp.useApp();
   const call = runtime.connectorsCall?.bind(runtime);
@@ -26,7 +39,8 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [name, setName] = useState('');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!only);
+  const autoStarted = useRef(false);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -43,6 +57,23 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Mở từ "sửa nhanh": chưa có tài khoản Zalo sẵn sàng và chưa có mã ⇒ tạo QR ngay, khỏi bấm thêm.
+  useEffect(() => {
+    if (!autoQr || only !== 'zalo' || !call || !zalo || autoStarted.current) return;
+    autoStarted.current = true;
+    const ready = zalo.accounts.some((a) => a.status === 'ready');
+    if (!ready && !QR_LIVE.has(zalo.qr.state)) void call('zaloQrStart').then(() => refresh()).catch(() => undefined);
+  }, [autoQr, only, call, zalo, refresh]);
+
+  // Báo cho modal biết đã kết nối xong (đóng modal / kiểm lại).
+  const wasReady = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!onConnected || !zalo) return;
+    const ready = zalo.accounts.some((a) => a.status === 'ready');
+    if (wasReady.current === false && ready) onConnected('zalo');
+    wasReady.current = ready;
+  }, [zalo, onConnected]);
 
   // Trong lúc mã QR còn sống: hỏi trạng thái mỗi 1,5 giây (ảnh mã đổi khi hết hạn, kết quả quét…).
   const qrState = zalo?.qr.state;
@@ -83,7 +114,8 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
   const showQr = !!qr && (QR_LIVE.has(qr.state) || ['expired', 'declined', 'error'].includes(qr.state));
 
   return (
-    <div style={{ border: `1px solid ${V.borderSub}`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, background: V.surface }}>
+    <div style={only ? undefined : { border: `1px solid ${V.borderSub}`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, background: V.surface }}>
+      {!only && (<>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <ApiOutlined style={{ color: V.textFaint }} />
         <Text strong>{t('skills.conn.title', 'Kết nối cho kỹ năng: Zalo · Gmail')}</Text>
@@ -100,10 +132,12 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
           'Kết nối do app giữ (mã hoá trên máy). Agent KHÔNG tự thao tác Zalo/Gmail: chỉ dùng trong các kỹ năng "Đọc tin Zalo", "Gửi tin Zalo", "Đọc thư Gmail", "Gửi thư Gmail" (hoặc kỹ năng bạn tự soạn có dùng công cụ zalo_/gmail_), chỉ trong cuộc trò chuyện của bạn — và lần gửi nào cũng hỏi bạn trước.',
         )}
       </Text>
+      </>)}
 
       {open && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: only ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: only ? 0 : 12 }}>
           {/* ── Zalo ── */}
+          {only !== 'gmail' && (
           <div style={{ border: `1px solid ${V.borderSub}`, borderRadius: 10, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <MessageOutlined />
@@ -152,7 +186,10 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
             </Text>
           </div>
 
+          )}
+
           {/* ── Gmail ── */}
+          {only !== 'zalo' && (
           <div style={{ border: `1px solid ${V.borderSub}`, borderRadius: 10, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <MailOutlined />
@@ -186,6 +223,7 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
                     async () => {
                       await call('gmailAdd', { email: email.trim(), appPassword: pass, name: name.trim() || undefined });
                       setPass('');
+                      onConnected?.('gmail');
                     },
                     t('skills.conn.gmailOk', 'Đã kết nối Gmail (đã kiểm gửi + đọc).'),
                   )
@@ -198,6 +236,7 @@ export function SkillConnectors({ runtime }: { runtime: RuntimeAdapter }) {
               {t('skills.conn.gmailNote', 'Tạo mật khẩu ứng dụng ở myaccount.google.com/apppasswords (tài khoản phải bật xác thực 2 bước) — KHÔNG dùng mật khẩu Gmail thường. App kiểm gửi (SMTP) + đọc (IMAP) trước khi lưu; đọc thư không đánh dấu đã đọc.')}
             </Text>
           </div>
+          )}
         </div>
       )}
     </div>

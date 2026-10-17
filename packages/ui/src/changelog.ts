@@ -19,6 +19,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Kỹ năng Zalo & Gmail: kết nối Zalo cá nhân (quét QR) và Gmail (mật khẩu ứng dụng) ở Kỹ năng → Kết nối. Bộ kỹ năng dựng sẵn mới: Đọc & tóm tắt tin Zalo, Gửi tin Zalo, Đọc & tìm thư Gmail, Gửi thư Gmail — gọi bằng /zalo-doc-tin, /zalo-gui-tin, /gmail-doc-thu, /gmail-gui-thu hoặc hỏi tự nhiên.",
       "Agent KHÔNG tự thao tác Zalo/Gmail: chỉ dùng trong kỹ năng có dùng đúng công cụ đó (dựng sẵn hoặc kỹ năng bạn tự soạn), chỉ trong cuộc trò chuyện của bạn — không chạy ở lịch tự động hay bot Lark trong nhóm. Lần gửi nào cũng hỏi bạn trước, kể cả khi bật Tự động duyệt.",
       "An toàn khi gửi: Zalo tối thiểu 8 giây giữa hai tin, tối đa 30 tin/giờ; Gmail tối đa 10 người nhận/thư, 40 thư/giờ. Đọc thư không đánh dấu đã đọc; tin Zalo chỉ giữ trong bộ nhớ, không ghi ra đĩa.",
+      "Trợ lý kiểm tra (miễn phí, không dùng AI): nút khiên \"Kiểm tra\" trên thanh đầu tự kiểm Claude/Gemini đã cài + đăng nhập chưa, API key, Zalo, Gmail — thiếu thứ cần thiết thì báo ngay kèm nút \"Sửa ngay\" mở thẳng chỗ sửa (đăng nhập, dán key, quét QR Zalo, nhập Gmail), không phải vào Cài đặt.",
+      "Sửa một chạm ở chỗ gặp lỗi: thẻ lỗi Claude có nút \"Đăng nhập lại Claude\" / \"Dùng API key\"; công cụ Zalo/Gmail báo chưa kết nối có nút kết nối; gõ /zalo-… hay /gmail-… khi chưa kết nối thì mở luôn bảng quét QR / Gmail.",
       "Kiểm API key Claude nói đúng nguyên nhân thay vì \"HTTP 400\": key mới tạo mà tài khoản Anthropic chưa nạp credit giờ được báo là key ĐÚNG kèm lời nhắc nạp tiền ở console.anthropic.com → Billing.",
     ],
   },

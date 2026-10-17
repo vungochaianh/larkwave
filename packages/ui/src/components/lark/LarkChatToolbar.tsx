@@ -20,6 +20,7 @@ import { useI18n } from '../../i18n';
 import { autoTip, engineModel, SOURCE_LABEL, type RunSource } from './engineChip';
 import type { LarkFrameCtl } from './larkLayout';
 import { filterBaseOptions, mergeBaseOptions, toggleBase, type BaseOption } from './larkConversations';
+import { openFix, type FixTarget } from '../fix/fixRules';
 
 const { Text } = Typography;
 
@@ -298,6 +299,17 @@ export function LarkChatToolbar({
       {eng.warn && (
         <div data-testid="lark-engine-warn" style={{ borderRadius: 8, padding: '8px 10px', background: tint(eng.warn.level === 'error' ? ERR : WARN, '14'), border: `1px solid ${tint(eng.warn.level === 'error' ? ERR : WARN, '55')}`, fontSize: 12.5, lineHeight: 1.45 }}>
           <div>{eng.warn.text}</div>
+          {(() => {
+            // Sửa một chạm: mở thẳng modal cài / đăng nhập / thêm key (FixCenter) thay vì bảo vào Cài đặt.
+            const k = eng.warn!.kind;
+            const target =
+              k === 'notInstalled' ? `runner:${runnerId}` : k === 'needsLogin' ? (runnerId === 'claude' ? 'claude' : `runner:${runnerId}`) : k === 'apiNoKey' ? (runnerId === 'claude' ? 'claudeKeys' : `runner:${runnerId}`) : null;
+            return target ? (
+              <Button size="small" type="primary" style={{ marginTop: 6 }} onClick={() => openFix(target as FixTarget, eng.warn!.text)}>
+                {t('chat.fixNow', 'Sửa ngay')}
+              </Button>
+            ) : null;
+          })()}
           {eng.warn.command && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
               <code style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, padding: '3px 6px', borderRadius: 6, background: V.surfaceMuted, border: `1px solid ${V.borderSub}` }}>{eng.warn.command}</code>
