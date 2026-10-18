@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.20',
+    date: '2026-10-18',
+    items: [
+      "Sửa đúng lỗi \"cuộn tới đầu nhóm rồi mà đọc ra rỗng\": phần lấy chữ dùng cách đọc bắt trình duyệt tính lại bố cục cả hội thoại — với nhóm cả tháng (hàng chục nghìn tin) thì quá nặng nên lệnh bị huỷ. Nay đọc theo từng hàng tin, nhẹ hơn nhiều lần.",
+      "Hết báo nhầm \"ngày cũ nhất\": những chuỗi kiểu \"3/4\" nằm trong câu chữ không còn bị hiểu là vạch ngày.",
+    ],
+  },
+  {
     version: '0.1.19',
     date: '2026-10-18',
     items: [

@@ -115,19 +115,41 @@ function scrollStepScript(n: number): string {
   })()`;
 }
 
-/** Lấy nội dung + thông tin chẩn đoán (chạy MỘT lần, sau khi đã cuộn xong). */
+/**
+ * Lấy nội dung + chẩn đoán (chạy MỘT lần, sau khi đã cuộn xong).
+ *
+ * BÀI HỌC 18/10/2026 (lỗi cuối của chuỗi này): bản trước gọi `area.innerText`. Sau khi cuộn tới đầu một nhóm
+ * cả tháng, `innerText` ÉP TÍNH LẠI BỐ CỤC của hàng chục nghìn tin ⇒ quá nặng, Electron trả "Script failed to
+ * execute" ở TẦNG NGOÀI (không vào nổi try trong trang). Phần cuộn vẫn chạy ngon ⇒ triệu chứng "cuộn tới nơi
+ * rồi mà đọc ra rỗng". Nay duyệt TỪNG HÀNG con và lấy `textContent` (không ép bố cục), cộng dồn tới trần.
+ */
 function extractScript(maxText: number): string {
   return `(() => {
     ${AREA_FN}
     const a = __lwArea();
-    const clean = (x) => (x || '').replace(/\n{3,}/g, '\n\n').trim();
-    let text = clean(a.innerText);
+    const MAX = ${maxText};
+    // Tìm danh sách HÀNG tin: đi sâu qua các lớp bọc chỉ có đúng một con.
+    let list = a.children && a.children.length ? a.children : [a];
+    for (let d = 0; d < 4 && list.length === 1 && list[0].children && list[0].children.length > 1; d++) list = list[0].children;
+    const parts = [];
+    let len = 0, truncated = false, rows = 0;
+    const cap = Math.min(list.length, 30000);
+    for (let i = 0; i < cap; i++) {
+      const t = (list[i].textContent || '').trim();
+      if (!t) continue;
+      rows++;
+      if (len + t.length > MAX) { truncated = true; break; }
+      parts.push(t);
+      len += t.length + 1;
+    }
+    let text = parts.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();
     const areaLen = text.length;
-    const bodyText = clean(document.body ? document.body.innerText : '');
-    let how = 'area';
-    if (text.length < 20 && bodyText.length > text.length) { text = bodyText; how = 'body'; }
-    const truncated = text.length > ${maxText};
-    if (truncated) text = text.slice(-${maxText});
+    let how = 'rows';
+    if (text.length < 20) {
+      text = (a.textContent || '').slice(0, MAX).trim();
+      how = 'areaText';
+      if (text.length < 20) { text = (document.body ? document.body.textContent || '' : '').slice(0, MAX).trim(); how = 'bodyText'; }
+    }
     let title = '';
     const h1 = document.querySelector('[class*="header"] [class*="name"], [class*="conv"] [class*="title"], header h1, header h2');
     if (h1 && h1.textContent) title = h1.textContent.trim().slice(0, 120);
@@ -136,9 +158,8 @@ function extractScript(maxText: number): string {
       if (top && top.textContent) title = top.textContent.trim().slice(0, 120);
     }
     try { a.scrollTop = a.scrollHeight; } catch (e) {}
-    // Zalo tự ghi RANH GIỚI lịch sử ngay trong khung hội thoại: "Sử dụng Zalo PC để tìm tin nhắn trước ngày 04/10/2026".
-    const lim = ((text + ' ' + bodyText).match(/tìm tin nhắn trước ngày\s*([\d./-]+)/i) || [])[1] || '';
-    return { empty: !text, title, text, truncated, how, areaLen, bodyLen: bodyText.length, tag: (a.tagName || '').toLowerCase(), cls: String(a.className || '').slice(0, 80), limitDate: lim };
+    const lim = (text.match(/tìm tin nhắn trước ngày\\s*([\\d./-]+)/i) || [])[1] || '';
+    return { empty: !text, title, text, truncated, how, areaLen, bodyLen: rows, tag: (a.tagName || '').toLowerCase(), cls: String(a.className || '').slice(0, 80), limitDate: lim };
   })()`;
 }
 
@@ -147,11 +168,14 @@ function oldestDate(text: string): { ts: number; label: string } {
   const now = new Date();
   let ts = Infinity;
   let label = '';
-  for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g)) {
-    const d = Number(m[1]);
-    const mo = Number(m[2]);
-    if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
-    const t = new Date(m[3] ? Number(m[3]) : now.getFullYear(), mo - 1, d).getTime();
+  // CHỈ nhận vạch ngày thật: dd/mm/yyyy, hoặc dd/mm với CẢ HAI là 2 chữ số. Một chuỗi như "3/4" lẫn trong
+  // câu chữ KHÔNG tính (lỗi thật 18/10/2026: báo nhầm "ngày cũ nhất là 3/4").
+  for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b|\b(\d{2})\/(\d{2})\b/g)) {
+    const d = Number(m[1] ?? m[4]);
+    const mo = Number(m[2] ?? m[5]);
+    const yr = m[3];
+    if (!d || !mo || d < 1 || d > 31 || mo < 1 || mo > 12) continue;
+    const t = new Date(yr ? Number(yr) : now.getFullYear(), mo - 1, d).getTime();
     if (t < ts) {
       ts = t;
       label = m[0];
@@ -529,7 +553,7 @@ class ZaloWeb {
             .filter((t) => t && t.length < 60)
             .slice(0, 25);
           // Ghi chú GIỚI HẠN của chính Zalo Web (vd "tìm tin nhắn trước ngày 04/10/2026").
-          const limit = (document.body.innerText.match(/tin nhắn trước ngày\s*[\d/]+/i) || [])[0] || '';
+          const limit = ((document.body.textContent || '').match(/tin nhắn trước ngày\s*[\d/]+/i) || [])[0] || '';
           if (!el) return { ok: false, candidates, limit };
           const r = el.getBoundingClientRect();
           return { ok: true, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), label: (el.textContent || '').trim().slice(0, 80), candidates, limit };
@@ -554,7 +578,7 @@ class ZaloWeb {
     // 4) Kiểm chứng: đã rời màn hình chào mừng / đã có khung tin chưa.
     const okR = await this.runJs<boolean>(
         `(() => {
-          const t = document.body ? document.body.innerText : '';
+          const t = document.body ? (document.body.textContent || '').slice(0, 200000) : '';
           if (/Chào mừng đến với Zalo/i.test(t)) return false;
           const el = document.elementFromPoint(Math.round(innerWidth * 0.68), Math.round(innerHeight * 0.5));
           let n = el, deep = false;
