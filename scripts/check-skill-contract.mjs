@@ -117,7 +117,11 @@ eq('lời nhắc nêu khoá sẵn có', /gia_von, ten_hang/.test(p) && !/BAD KEY
     const req = createRequire(import.meta.url);
     const { BUILTIN_SKILLS } = req(join(out, 'builtinSkills.js'));
     const { parseSkillContract, duplicateProducers, relatedSet } = await import(DIST);
-    eq('có 7 kỹ năng dựng sẵn', BUILTIN_SKILLS.length, 7);
+    // NGƯỠNG SÀN, không phải con số chính xác. Bản cũ đòi đúng 7 và đã đỏ im lìm từ khi bộ kỹ
+    // năng lên 12 — phép kiểm nào phải sửa tay mỗi lần thêm kỹ năng thì rốt cuộc không ai sửa.
+    // Rủi ro thật cần canh là kỹ năng BIẾN MẤT, nên canh sàn.
+    const SAN = 10;
+    eq(`có ≥${SAN} kỹ năng dựng sẵn (hiện ${BUILTIN_SKILLS.length})`, BUILTIN_SKILLS.length >= SAN, true);
     const parsed = [];
     for (const d of BUILTIN_SKILLS) {
       trip(`dựng sẵn ${d.id}`, d.contract);

@@ -1,5 +1,5 @@
-// Guards the skill slash-command helper: the API copy must stay identical to the core copy, and the
-// slug/parse rules must keep behaving. The two files exist because apps/api depends on
+// Guards the skill slash-command helper: the slug/parse rules must keep behaving.
+// (Trước 19/10/2026 file này còn so bản chép ở apps/api; apps/api đã gỡ khỏi repo. Cũ: tồn tại vì apps/api phụ thuộc
 // @larkwave/shared only (not @larkwave/core), so the logic is duplicated on purpose.
 // Run from the repo root:  node scripts/check-skill-commands.mjs
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const CORE = 'packages/core/src/skillCommand.ts';
-const API = 'apps/api/src/skills/skill-command.util.ts';
 const MENU = 'packages/ui/src/components/SlashCommandMenu.tsx';
 /** Compare from the first export onward — only the file header comment may differ. */
 const body = (p) => {
@@ -24,7 +23,9 @@ const check = (ok, label, extra = '') => {
   if (!ok) failed++;
 };
 
-check(body(CORE) === body(API), 'API mirror is in sync with packages/core', `${CORE} and ${API} have diverged — copy the core body over.`);
+// Phép so bản-sao-chéo-repo đã chuyển sang `check-duplicates.mjs` (nó biết đường tới repo
+// Toolswave và bỏ qua gọn khi máy không có repo đó). Ở đây chỉ giữ phần KIỂM HÀNH VI, vốn là
+// thứ thực sự bảo vệ luật slug/parse.
 
 // Every built-in composer command must be reserved, or a user skill could shadow it and the
 // composer would offer two different meanings for the same "/word".

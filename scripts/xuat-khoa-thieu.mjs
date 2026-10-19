@@ -33,7 +33,8 @@ const duyet = (d) => {
     else if (/\.tsx?$/.test(f)) tep.push(p);
   }
 };
-for (const g of ['apps/web/src', 'packages/ui/src']) duyet(path.join(ROOT, g));
+// apps/web đã gỡ 19/10/2026 (bản sao không deploy) — chỉ còn packages/ui là thứ desktop thật sự gói.
+for (const g of ['packages/ui/src']) duyet(path.join(ROOT, g));
 
 const thieu = new Map();
 for (const f of tep) {

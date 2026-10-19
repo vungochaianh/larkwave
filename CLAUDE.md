@@ -18,8 +18,9 @@ Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris
   user, cùng gói %, cùng OAuth, cùng hạn mức 3 thiết bị.
 - Dữ liệu Lark cũ của app Toolswave được nhập một lần, chỉ ĐỌC thư mục của Toolswave. Xem
   [docs/migrate-from-toolswave.md](docs/migrate-from-toolswave.md).
-- `apps/api` và `apps/web` của repo này **KHÔNG được deploy**. Vẫn giữ typecheck/test xanh, nhưng
-  desktop không gọi tới chúng.
+- **Repo này CHỈ có `apps/desktop`.** `apps/api` + `apps/web` (bản sao máy chủ, không deploy ở đâu)
+  đã gỡ ngày 19/10/2026 — 328 tệp chết. Cần xem mã máy chủ thì đọc ở `/Users/deveris/app`, và
+  `.toolswave-sync.json` đã loại trừ hai cây đó để `sync-from-toolswave.mjs` không kéo lại.
 - `test-accounts.local.md` (gitignored) là tài khoản của DB local `larkwave`. Chúng **không** đăng
   nhập được vào API thật.
 - Máy chủ thật là repo Toolswave **`/Users/deveris/app`**: `apps/api` + `apps/web`. Ở đó có route
@@ -44,8 +45,8 @@ pnpm --filter @larkwave/shared build && pnpm --filter @larkwave/core build   # L
 pnpm --filter @larkwave/ui typecheck
 pnpm --filter @larkwave/desktop typecheck:desktop
 bash apps/desktop/test/run.sh                  # test desktop/core (node, không mở cửa sổ)
-(cd apps/api && npx jest)
-node scripts/check-duplicates.mjs              # các cặp tệp chép nguyên văn phải khớp
+node scripts/check-duplicates.mjs              # cặp tệp chép tay phải khớp (bản 'tw:' so với /Users/deveris/app)
+node scripts/check-skill-commands.mjs          # helper lệnh /: core ↔ bản API của Toolswave
 node scripts/check-toolswave-api.mjs           # mọi đường app gọi phải có trên API Toolswave
 node scripts/handoff.mjs                       # đầu phiên: git/phiên bản/bản đang phát hành
 ```
@@ -174,7 +175,8 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   - Khoá máy chủ: `/Users/deveris/app/.deploy-secrets`.
   - App Secret và cookie Lark của người dùng không bao giờ được rời khỏi máy.
 - Script phát hành bị chặn bằng `ALLOW_DEPLOY=1`. Bản đẩy lên tới mọi máy đã cài.
-- **Không** deploy `apps/api`/`apps/web` của repo này. **Không** `prisma db push` vào DB Toolswave.
+- **Không** `prisma db push` vào DB Toolswave. (Repo này không còn `apps/api`/`apps/web` để lỡ tay
+  deploy nữa — gỡ 19/10/2026.)
 - Deploy máy chủ Toolswave (khi cần đổi API): chạy `deploy/ci-deploy.sh` ở `/Users/deveris/app`.
   - Script rsync cả cây làm việc, nên phải `git status` trước.
   - Gặp link "Tailscale SSH requires an additional check": chuyển link cho người dùng duyệt và để lệnh
@@ -237,7 +239,8 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 - **Nhiều desktop cùng một tài khoản.** Lệnh relay phát cho mọi desktop. Máy chủ chỉ cho một máy nhận
   mỗi lượt: chat gửi `deviceId` và dừng khi nhận `{claimed:true}`; lượt chia sẻ thua thì nhận 409
   `LUOT_DA_CO_MAY_NHAN`.
-- `apps/web` dùng một bản Next.js có thay đổi phá vỡ; đọc `apps/web/AGENTS.md` trước khi sửa.
+- Sửa gì phía web/máy chủ thì làm ở `/Users/deveris/app` — ở đó `apps/web` dùng một bản Next.js có
+  thay đổi phá vỡ, đọc `apps/web/AGENTS.md` trước khi sửa.
 
 ## Tài liệu
 
