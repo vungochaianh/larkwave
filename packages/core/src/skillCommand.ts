@@ -2,9 +2,15 @@
  * Skill slash-commands — the shared, dependency-free rules for turning a skill name into a
  * `/command` shortcut, validating it, and finding those shortcuts inside a chat message.
  *
- * SOURCE OF TRUTH. `apps/api/src/skills/skill-command.util.ts` is a byte-for-byte mirror of the
- * logic below (the API package cannot import @larkwave/core), so any change here must be applied
- * there too — otherwise the web composer and the server would disagree on what `/sieu-ba` means.
+ * BẢN DUY NHẤT CỦA LARKWAVE — từ 19/10/2026 không còn bản chép nào phải giữ cho khớp.
+ *
+ * Trước đây đây là "source of truth" cho bản sao `apps/api/src/skills/skill-command.util.ts`, và
+ * gián tiếp phải đi cùng nhịp với Toolswave. Cả hai mối đó đã đứt: `apps/api` của repo này là bản
+ * sao không deploy, đã gỡ; Toolswave thì dừng. Larkwave và Appwave nay TÁCH RIÊNG — mỗi bên tự
+ * quyết luật lệnh `/` của mình.
+ *
+ * Nhớ: `RESERVED_SKILL_COMMANDS` dưới đây khác bản Appwave một cách CÓ CHỦ Ý (Larkwave giữ thêm
+ * `run`/`chay`/`app` cho bot Lark). Đừng "sửa cho giống nhau".
  */
 
 /** Max length of a command slug (without the leading "/"). */

@@ -6,46 +6,29 @@
  * KHÔNG được import lẫn nhau. Nhân bản có chủ đích thì được — nhân bản rồi LỆCH NHAU thì là lớp
  * lỗi lặng lẽ nhất ở đây: sửa một bên, bên kia âm thầm chạy sai.
  *
- * Trước file này chỉ có đúng MỘT cặp được canh (skillCommand), và script canh nó không nằm trong
- * bất kỳ quy trình nào — tức trên thực tế không cặp nào được canh cả.
- *
  *   node scripts/check-duplicates.mjs
  *
  * Thoát khác 0 khi có cặp lệch. Chạy trước mỗi lần deploy/dựng bản cài.
+ *
+ * CHỈ CANH TRONG REPO NÀY (từ 19/10/2026). Trước đó còn so với bản chép ở `apps/api`, rồi so với
+ * repo Toolswave. Cả hai mối đã đứt: `apps/api` là bản sao không deploy, đã gỡ; Toolswave thì dừng.
+ * Larkwave và Appwave nay tách riêng — `skillCommand` và `ooxml` mỗi bên tự làm chủ bản của mình,
+ * cố ý khác nhau, nên không còn gì để so. Đừng dựng lại phép so chéo repo.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * Tiền tố `tw:` = file nằm ở repo TOOLSWAVE (mặc định `../app`), không phải repo này.
- *
- * Từ 19/10/2026 repo này không còn `apps/api`/`apps/web` — chúng là bản sao không deploy ở đâu.
- * Bản đối chiếu ĐÚNG là bản trên máy chủ thật: so với một bản sao đông lạnh chỉ cho cảm giác an
- * toàn giả, vì máy chủ đổi mà ở đây vẫn báo "khớp". Đổi chỗ bằng `--toolswave <đường/dẫn>`.
- */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const twArg = process.argv.indexOf('--toolswave');
-const TW = path.resolve(twArg >= 0 ? process.argv[twArg + 1] : path.join(ROOT, '..', 'app'));
-const at = (p) => (p.startsWith('tw:') ? path.join(TW, p.slice(3)) : path.join(ROOT, p));
+const at = (p) => path.join(ROOT, p);
 
-/** Mỗi cặp: [nhãn, file A, file B]. `tw:` = ở repo Toolswave. */
+/** Mỗi cặp: [nhãn, file A, file B] — đường dẫn tương đối từ gốc repo. */
 const PAIRS = [
-  [
-    'skillCommand',
-    'packages/core/src/skillCommand.ts',
-    'tw:apps/api/src/skills/skill-command.util.ts',
-  ],
   [
     'claudeKeyKind (phân loại khoá Anthropic)',
     'apps/desktop/main/runtime/claudeKeyKind.ts',
     'packages/ui/src/claudeKeyKind.ts',
-  ],
-  [
-    'ooxml (bộ đọc xlsx/docx)',
-    'tw:apps/api/src/uploads/ooxml.ts',
-    'apps/desktop/main/runtime/lark/ooxml.ts',
   ],
 ];
 
@@ -62,17 +45,8 @@ function normalize(src) {
 const hash = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 
 let bad = 0;
-if (!existsSync(TW)) {
-  console.log(`ⓘ không thấy repo Toolswave ở ${TW} — bỏ qua các cặp 'tw:'. Chỉ định bằng --toolswave <đường/dẫn>.`);
-}
 for (const [label, a, b] of PAIRS) {
   const [pa, pb] = [at(a), at(b)];
-  // Bên Toolswave không có trên máy này (ví dụ máy Windows): BỎ QUA, đừng báo đỏ — cặp này
-  // không kiểm được chứ không phải đã lệch.
-  if ((a.startsWith('tw:') || b.startsWith('tw:')) && !existsSync(TW)) {
-    console.log(`– ${label}: bỏ qua (cần repo Toolswave)`);
-    continue;
-  }
   if (!existsSync(pa) || !existsSync(pb)) {
     console.error(`✗ ${label}: thiếu file (${!existsSync(pa) ? pa : pb})`);
     bad++;

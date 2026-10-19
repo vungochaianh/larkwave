@@ -67,13 +67,11 @@ Chạy app để kiểm thì **không bật cửa sổ** — lệnh đầy đủ
 - [ ] **Mốc ngày Zalo Web chịu nạp.** Zalo chỉ nạp lịch sử tới một ngày rồi hiện "tìm tin nhắn trước
       ngày…". Đây là **giới hạn phía Zalo, không sửa được từ app**; 0.1.18 báo thật mốc đó thay vì im
       lặng. Đừng nhận nhầm thành lỗi của mình (đã nhận nhầm một lần, mất mấy bản).
-- [ ] **`check-duplicates.mjs` đang ĐỎ ở cặp `ooxml` — cố ý để đỏ.** Bản desktop ở đây đi TRƯỚC máy
-      chủ: nó có thêm đoạn hiện công thức cho ô `<f>` chưa có `<v>` (tệp tự dựng, chưa ai mở bằng
-      Excel), nếu không cột kiểu "Thành tiền" trông như mất dữ liệu.
-      `/Users/deveris/app/apps/api/src/uploads/ooxml.ts` và Appwave đều **chưa có** bản vá này —
-      nghĩa là bộ đọc xlsx trên máy chủ đang đọc thiếu. Lệch này bị bản sao `apps/api` đông lạnh che
-      suốt, chỉ lộ ra khi gỡ nó (19/10/2026). Việc cần làm: chép 6 dòng đó sang repo Toolswave (và
-      Appwave) rồi deploy — hoặc quyết định để lệch và ghi rõ lý do.
+- [ ] **Appwave thiếu bản vá `ooxml` mà Larkwave có.** Bản ở đây hiện công thức cho ô `<f>` chưa có
+      `<v>` (tệp tự dựng, chưa ai mở bằng Excel), nếu không cột kiểu "Thành tiền" trông như mất dữ
+      liệu. Lệch này bị bản sao `apps/api` đông lạnh che suốt, chỉ lộ ra khi gỡ nó (19/10/2026).
+      Toolswave đã dừng nên không chép về đó nữa; còn lại một câu hỏi: có chép 6 dòng sang
+      `appwave/apps/desktop/main/runtime/chat/ooxml.ts` không. **Chưa chép.**
 
 ## 6. CẤM — không mở lại
 

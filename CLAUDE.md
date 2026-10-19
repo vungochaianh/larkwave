@@ -45,7 +45,7 @@ pnpm --filter @larkwave/shared build && pnpm --filter @larkwave/core build   # L
 pnpm --filter @larkwave/ui typecheck
 pnpm --filter @larkwave/desktop typecheck:desktop
 bash apps/desktop/test/run.sh                  # test desktop/core (node, không mở cửa sổ)
-node scripts/check-duplicates.mjs              # cặp tệp chép tay phải khớp (bản 'tw:' so với /Users/deveris/app)
+node scripts/check-duplicates.mjs              # cặp tệp chép tay TRONG repo phải khớp
 node scripts/check-skill-commands.mjs          # helper lệnh /: core ↔ bản API của Toolswave
 node scripts/check-toolswave-api.mjs           # mọi đường app gọi phải có trên API Toolswave
 node scripts/handoff.mjs                       # đầu phiên: git/phiên bản/bản đang phát hành
