@@ -241,6 +241,9 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 
 ## Tài liệu
 
+- **[docs/ban-giao-phien.md](docs/ban-giao-phien.md) — ĐỌC ĐẦU TIÊN khi mở lại phiên ở repo này:**
+  đang đứng ở bản nào, việc gì còn treo (cần tài khoản Zalo thật), cấm gì, và các bẫy đã trả giá
+  bằng nhiều bản phát hành.
 - [docs/lark-web-api.md](docs/lark-web-api.md): API nội bộ của Lark web (ghi bản ghi, đính tệp,
   workflow…), đã đo trên Lark thật.
 - [docs/lark-browser.md](docs/lark-browser.md): trang Lark web, CDP, chế độ ẩn.
