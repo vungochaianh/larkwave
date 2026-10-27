@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.22',
+    date: '2026-10-27',
+    items: [
+      "Cửa sổ đăng nhập Zalo vẫn kẹt ở logo + \"Tiếng Việt / English\" trên một số máy: bản 0.1.21 không nhận ra trang kẹt khi mạng có thêm một lời gọi khác bị treo, nên không tự tải lại. Nay nhận ra trong mọi trường hợp, và nếu tải lại không ăn thua thì tự xoá dữ liệu đăng nhập cũ của cửa sổ (cookie, bộ đệm) để vào lại như máy mới.",
+      "Khi vẫn không ra mã QR, cửa sổ Zalo hiện ngay một dòng báo lý do thật (mất kết nối tới Zalo, Zalo từ chối kèm mã lỗi, hay mạng/tường lửa chặn) và nút Thử lại.",
+    ],
+  },
+  {
     version: '0.1.21',
     date: '2026-10-27',
     items: [

@@ -80,7 +80,11 @@ class ZaloService {
       decrypt: (b) => safeStorage.decryptString(b),
     });
     // Cửa sổ Zalo Web giữ đăng nhập qua lần tắt app bằng chính kho mã hoá này.
-    zaloWeb.setPersist({ load: () => this.storeInst!.loadWebCookies(), save: (c) => void this.storeInst!.saveWebCookies(c) });
+    zaloWeb.setPersist({
+      load: () => this.storeInst!.loadWebCookies(),
+      save: (c) => void this.storeInst!.saveWebCookies(c),
+      clear: () => this.storeInst!.clearWebCookies(),
+    });
     return this.storeInst;
   }
 

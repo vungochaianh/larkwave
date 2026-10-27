@@ -224,11 +224,60 @@ const IMEI_SCAN = `(() => {
 const LOGIN_PAGE_SCAN = `(() => {
   const root = document.getElementById('app') || document.body;
   if (!root) return { blank: true, qrEmpty: false };
-  const text = (root.textContent || '').replace(/\\s+/g, '').length;
+  const note = document.getElementById('larkwave-zalo-note');
+  const len = (el) => (el && el.textContent || '').replace(/\\s+/g, '').length;
+  const text = len(root) - (note && root.contains(note) ? len(note) : 0);
   const media = root.querySelectorAll('img,svg,canvas,input,button,iframe').length;
   const qr = root.querySelector('.qrcode');
-  const qrEmpty = !!qr && !qr.querySelector('svg,img,canvas') && !(qr.textContent || '').trim();
+  // KHÔNG xét chữ: ô QR luôn chứa sẵn "Mã QR hết hạn / Lấy mã mới" (ẩn) kể cả khi qr/generate hỏng (đo 27/10/2026).
+  const qrEmpty = !!qr && !qr.querySelector('svg,img,canvas');
   return { blank: media === 0 && text < 40, qrEmpty };
+})()`;
+
+/**
+ * Hỏi lại `logininfo` NGAY TRONG TRANG (cùng lời gọi trang tự làm) để câu báo nói ra lý do THẬT.
+ *
+ * BÀI HỌC 27/10/2026 (0.1.21 vẫn kẹt ở máy người dùng): trang kẹt y hệt ảnh cả khi logininfo trả HTTP 200 nhưng
+ * `error_code` ≠ 0, hoặc trả HTML (proxy/tường lửa chèn trang) — webRequest chỉ thấy "HTTP 200", vô dụng.
+ */
+const LOGIN_INFO_PROBE = `(async () => {
+  const s = document.querySelector('script[src*="/main-"]');
+  const v = ((s && s.src.match(/main-(\\d+)/)) || [])[1] || '';
+  const cont = new URLSearchParams(location.search).get('continue') || 'https://chat.zalo.me/';
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const res = await fetch('/account/logininfo', { method: 'POST', credentials: 'include', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'continue=' + encodeURIComponent(cont) + (v ? '&v=' + v : '') });
+    const txt = await res.text();
+    let j;
+    try { j = JSON.parse(txt); } catch (e) { return { http: res.status, notJson: txt.replace(/\\s+/g, ' ').slice(0, 80) }; }
+    return { http: res.status, code: j.error_code, msg: String(j.error_message || '').slice(0, 120) };
+  } catch (e) {
+    return { err: ctl.signal.aborted ? 'không trả lời sau 8 giây' : String((e && e.message) || e).slice(0, 120) };
+  } finally { clearTimeout(t); }
+})()`;
+
+/** Dải báo của Larkwave chèn lên trang đăng nhập (người dùng nhìn thấy ngay trong cửa sổ). "Thử lại" = #larkwave-retry. */
+const loginNoteScript = (msg: string, retry: boolean): string => `(() => {
+  let b = document.getElementById('larkwave-zalo-note');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'larkwave-zalo-note';
+    b.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;width:calc(100% - 32px);max-width:640px;box-sizing:border-box;padding:12px 16px;border-radius:8px;background:#fff7e6;border:1px solid #f5b041;color:#4a3000;font:14px/1.5 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.12)';
+    const m = document.createElement('div');
+    m.className = 'lw-m';
+    const a = document.createElement('a');
+    a.className = 'lw-r';
+    a.href = '#larkwave-retry';
+    a.textContent = 'Thử lại';
+    a.style.cssText = 'display:inline-block;margin-top:8px;font-weight:600;color:#0068ff';
+    b.append(m, a);
+    (document.body || document.documentElement).appendChild(b);
+  }
+  b.querySelector('.lw-m').textContent = ${JSON.stringify(msg)};
+  b.querySelector('.lw-r').style.display = ${retry ? "''" : "'none'"};
+  return true;
 })()`;
 
 /**
@@ -247,9 +296,17 @@ const APP_READY_SCAN = `(() => [...document.querySelectorAll('input[type="text"]
  */
 const CHAT_CONFIRM_MS = 12_000;
 
-/** Kẹt liền bao lâu thì tự tải lại, và tự tải lại tối đa mấy lần trước khi báo người dùng. */
+/**
+ * Kẹt liền bao lâu thì tự cứu, và các bậc cứu theo thứ tự (hết bậc mà vẫn kẹt ⇒ báo người dùng):
+ *   1. tải lại thường — mạng chập chờn một lần;
+ *   2. XOÁ SẠCH dữ liệu của cửa sổ (cookie, storage, bộ đệm, cookie đã lưu) rồi nạp lại = như máy mới. Trên partition
+ *      sạch trang đăng nhập luôn ra QR; còn máy người dùng có cookie cũ — nhất là cookie phiên zca mà `seedCookies`
+ *      nhét vào (phiên zca gắn imei KHÁC) — là thứ duy nhất khác với máy thử. Chỉ tới đây khi đang ở trang đăng
+ *      nhập ⇒ chưa đăng nhập ⇒ không mất gì;
+ *   3. tải lại bỏ qua bộ đệm.
+ */
 const LOGIN_STUCK_MS = 10_000;
-const LOGIN_MAX_RELOADS = 3;
+const LOGIN_STEPS = ['reload', 'reset', 'hard'] as const;
 
 const onLoginPage = (url: string): boolean => {
   try {
@@ -267,7 +324,7 @@ class ZaloWeb {
   private navUrl = '';
   private lastNavAt = 0;
   /** Lưu/nạp cookie cửa sổ qua các lần tắt app (zaloService nối vào kho mã hoá). */
-  private persist: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void } | null = null;
+  private persist: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void; clear?: () => void } | null = null;
   private saveTimer: ReturnType<typeof setInterval> | null = null;
   private restored = false;
   /** Canh trang đăng nhập kẹt (xem LOGIN_PAGE_SCAN). */
@@ -280,13 +337,16 @@ class ZaloWeb {
   /** Kết quả gần nhất của logininfo / qr/generate — để câu báo nói ra lý do THẬT thay vì "không hiện QR". */
   private loginApi = new Map<string, { at: number; result?: string }>();
   private loginApiHooked = false;
+  /** Request đang chờ (theo id) + lỗi mạng gần nhất theo host — "trang treo vì cái gì". */
+  private inflight = new Map<number, { host: string; at: number }>();
+  private netErrors = new Map<string, string>();
   /** Đã thấy ứng dụng chat.zalo.me dựng xong (APP_READY_SCAN) kể từ lần điều hướng gần nhất. */
   private appReady = false;
   /** Lúc trang vào chat.zalo.me (0 = không ở đó) — cho mốc dự phòng CHAT_CONFIRM_MS. */
   private chatSince = 0;
 
-  /** Nối kho giữ cookie cửa sổ (mã hoá) — xem zaloStore.loadWebCookies/saveWebCookies. */
-  setPersist(p: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void }): void {
+  /** Nối kho giữ cookie cửa sổ (mã hoá) — xem zaloStore.loadWebCookies/saveWebCookies/clearWebCookies. */
+  setPersist(p: { load: () => ZaloWebCookie[]; save: (c: ZaloWebCookie[]) => void; clear?: () => void }): void {
     this.persist = p;
   }
 
@@ -302,11 +362,14 @@ class ZaloWeb {
    * mình không có manh mối nào. Nay bọc try/catch NGAY TRONG trang: luôn trả `{ok,value}` hoặc `{ok:false,error}`
    * với câu lỗi THẬT, và nơi gọi tự quyết định đi tiếp hay dừng — một script hỏng không giết cả lượt.
    */
-  private async runJs<T>(expr: string): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  private async runJs<T>(expr: string, now = false): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
     if (!this.alive()) return { ok: false, error: 'cửa sổ Zalo Web chưa mở' };
     const wrapped = `(async () => { try { return { __ok: true, v: await (${expr}) }; } catch (e) { return { __ok: false, e: String((e && e.message) || e).slice(0, 300) }; } })()`;
     try {
-      const r = (await this.win!.webContents.executeJavaScript(wrapped, true)) as { __ok?: boolean; v?: T; e?: string };
+      // `now`: chạy NGAY trên khung chính. webContents.executeJavaScript của Electron CHỜ `did-stop-loading` khi trang
+      // còn đang tải — còn một request treo (Google Analytics, font… — đo 27/10/2026) là chờ mãi.
+      const wc = this.win!.webContents;
+      const r = (await (now ? wc.mainFrame.executeJavaScript(wrapped, true) : wc.executeJavaScript(wrapped, true))) as { __ok?: boolean; v?: T; e?: string };
       if (r?.__ok) return { ok: true, value: r.v as T };
       return { ok: false, error: r?.e || 'script trả về rỗng' };
     } catch (e) {
@@ -417,7 +480,11 @@ class ZaloWeb {
       } else if (full || !this.chatSince) this.chatSince = Date.now();
     };
     wc.on('did-navigate', (_e, url) => bump(url, true));
-    wc.on('did-navigate-in-page', (_e, url) => bump(url));
+    wc.on('did-navigate-in-page', (_e, url) => {
+      // Nút "Thử lại" trên dải báo của Larkwave (loginNoteScript).
+      if (/#larkwave-retry$/.test(url)) return void this.retryLogin();
+      bump(url);
+    });
     wc.on('did-stop-loading', () => bump());
     wc.on('did-start-loading', () => (this.lastNavAt = Date.now()));
   }
@@ -427,32 +494,60 @@ class ZaloWeb {
     if (this.loginApiHooked) return;
     this.loginApiHooked = true;
     const wr = electronSession.fromPartition(PARTITION).webRequest;
-    const filter = { urls: ['https://id.zalo.me/account/*'] };
-    const key = (url: string) => /\/account\/(logininfo|authen\/qr\/generate)(\?|$)/.exec(url)?.[1];
-    const done = (url: string, result: string) => {
-      const k = key(url);
+    const key = (url: string) => /^https:\/\/id\.zalo\.me\/account\/(logininfo|authen\/qr\/generate)(\?|$)/.exec(url)?.[1];
+    const host = (url: string) => /^\w+:\/\/([^/]+)/.exec(url)?.[1] || '';
+    const done = (d: { id: number; url: string }, result: string, failed: boolean) => {
+      this.inflight.delete(d.id);
+      if (failed && host(d.url) && !/ERR_(ABORTED|CACHE_MISS)/.test(result)) this.netErrors.set(host(d.url), result);
+      const k = key(d.url);
       const cur = k ? this.loginApi.get(k) : undefined;
       if (!k || !cur) return;
       const s = Math.round((Date.now() - cur.at) / 1000);
       this.loginApi.set(k, { at: cur.at, result: s >= 2 ? `${result} sau ${s}s` : result });
     };
-    wr.onSendHeaders(filter, (d) => {
+    // onBeforeRequest (không phải onSendHeaders): thấy cả request hỏng TRƯỚC khi gửi được header (DNS, bị chặn…).
+    wr.onBeforeRequest((d, cb) => {
+      if (this.inflight.size > 500) this.inflight.clear();
+      this.inflight.set(d.id, { host: host(d.url), at: Date.now() });
       const k = key(d.url);
       if (k) this.loginApi.set(k, { at: Date.now() });
+      cb({});
     });
-    wr.onCompleted(filter, (d) => done(d.url, `HTTP ${d.statusCode}`));
-    wr.onErrorOccurred(filter, (d) => done(d.url, d.error));
+    wr.onCompleted((d) => done(d, `HTTP ${d.statusCode}`, false));
+    wr.onErrorOccurred((d) => done(d, d.error, true));
   }
 
   private loginApiNote(): string {
     const now = Date.now();
-    return [...this.loginApi].map(([k, v]) => `${k}: ${v.result ?? `chưa trả lời sau ${Math.round((now - v.at) / 1000)}s`}`).join('; ');
+    const api = [...this.loginApi].map(([k, v]) => `${k}: ${v.result ?? `chưa trả lời sau ${Math.round((now - v.at) / 1000)}s`}`);
+    const slow = new Map<string, number>();
+    for (const r of this.inflight.values()) if (now - r.at > 8000) slow.set(r.host, Math.max(slow.get(r.host) ?? 0, now - r.at));
+    const hang = [...slow].slice(0, 4).map(([h, ms]) => `${h} (${Math.round(ms / 1000)}s)`);
+    const errs = [...this.netErrors].slice(-4).map(([h, e]) => `${h}: ${e}`);
+    return [...api, ...(hang.length ? [`đang treo: ${hang.join(', ')}`] : []), ...(errs.length ? [`lỗi mạng: ${errs.join(', ')}`] : [])].join('; ');
   }
 
-  /** runJs có trần giờ: trang treo hẳn thì executeJavaScript không bao giờ trả, kẻo nhịp canh/settle chết theo. */
+  /** Lý do THẬT (LOGIN_INFO_PROBE) thành câu cho người dùng; kèm lời khuyên hợp với từng loại. */
+  private async diagnoseLogin(): Promise<string> {
+    const r = await this.runJsCapped<{ http?: number; code?: number; msg?: string; notJson?: string; err?: string }>(LOGIN_INFO_PROBE, 10_000);
+    if (r.ok !== true) return `không hỏi lại được máy chủ đăng nhập (${r.error})`;
+    const v = r.value;
+    if (v.err) return `máy không kết nối được tới id.zalo.me (${v.err}) — kiểm tra mạng, VPN/proxy, tường lửa hoặc phần mềm chặn quảng cáo`;
+    if (v.notJson !== undefined)
+      return `id.zalo.me trả về một trang lạ thay vì dữ liệu Zalo (HTTP ${v.http}: "${v.notJson}") — thường do proxy/tường lửa/mạng công ty chặn`;
+    if (v.code !== undefined && v.code !== 0) return `Zalo từ chối trang đăng nhập: "${v.msg || 'không rõ'}" (mã ${v.code}, HTTP ${v.http}) — đợi vài phút rồi Thử lại, hoặc thử mạng khác`;
+    const qr = this.loginApi.get('authen/qr/generate')?.result;
+    if (qr && !/^HTTP 200/.test(qr)) return `Zalo không tạo được mã QR (${qr}) — kiểm tra mạng rồi Thử lại`;
+    return 'máy chủ Zalo trả lời bình thường nhưng trang vẫn không dựng mã QR';
+  }
+
+  /**
+   * runJs chạy NGAY (không chờ trang tải xong — xem `now` ở runJs) và có trần giờ: renderer treo hẳn thì
+   * executeJavaScript không bao giờ trả, kẻo nhịp canh/settle chết theo.
+   */
   private runJsCapped<T>(expr: string, ms = 5000): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
     return Promise.race([
-      this.runJs<T>(expr),
+      this.runJs<T>(expr, true),
       new Promise<{ ok: false; error: string }>((res) => setTimeout(() => res({ ok: false, error: 'hết giờ' }), ms)),
     ]);
   }
@@ -488,13 +583,19 @@ class ZaloWeb {
   }
 
   /**
-   * Một nhịp canh (2 giây/lần, chỉ làm việc khi đang ở id.zalo.me): trang kẹt liền LOGIN_STUCK_MS ⇒ tự tải lại, tối
-   * đa LOGIN_MAX_RELOADS lần (từ lần 2 bỏ qua bộ đệm); vẫn kẹt ⇒ dừng và để câu báo ở `status().loginStuck`.
+   * Một nhịp canh (2 giây/lần, chỉ làm việc khi đang ở id.zalo.me): trang kẹt liền LOGIN_STUCK_MS ⇒ đi tiếp một bậc
+   * của LOGIN_STEPS; hết bậc mà vẫn kẹt ⇒ hỏi lại logininfo lấy lý do thật, để câu báo ở `status().loginStuck` và
+   * hiện dải báo + nút "Thử lại" ngay trên trang. Vẫn canh tiếp: trang tự lành (người dùng tự tải lại) ⇒ xoá câu báo.
+   *
+   * Script không chạy được trong trang cũng tính là kẹt (trang treo hẳn); chỉ lúc đang điều hướng mới bỏ qua.
    */
   private async checkLogin(): Promise<void> {
     if (!this.alive()) return this.stopLoginWatch();
     if (!onLoginPage(this.navUrl)) {
-      if (this.stuckSince || this.autoReloads || this.loginStuck) this.resetLoginWatch();
+      this.stuckSince = 0;
+      // Chỉ xoá bộ đếm khi ĐÃ ĐĂNG NHẬP thật: bậc "reset" nạp lại từ chat.zalo.me ⇒ trang đi ngang chat.zalo.me
+      // trước khi quay về id.zalo.me — xoá ở đó là thang cứu lặp vô tận, không bao giờ tới câu báo (đo 27/10/2026).
+      if ((this.autoReloads || this.loginStuck) && this.loginState(this.navUrl) === true) this.resetLoginWatch();
       // Ở chat.zalo.me: dò luôn ứng dụng đã dựng chưa, để status() (giao diện hỏi 4 giây/lần) sớm biết đã đăng nhập.
       if (!this.appReady && !this.loginChecking && urlLoggedIn(this.navUrl) === true) {
         this.loginChecking = true;
@@ -502,37 +603,77 @@ class ZaloWeb {
       }
       return;
     }
-    if (this.loginChecking || this.loginStuck) return;
+    if (this.loginChecking) return;
     this.loginChecking = true;
     try {
       const r = await this.runJsCapped<{ blank: boolean; qrEmpty: boolean }>(LOGIN_PAGE_SCAN);
-      if (r.ok !== true || !this.alive() || !onLoginPage(this.navUrl)) return; // giữa lúc điều hướng
-      if (!r.value.blank && !r.value.qrEmpty) {
-        this.resetLoginWatch();
+      if (!this.alive() || !onLoginPage(this.navUrl) || Date.now() - this.lastNavAt < 1500) return; // giữa lúc điều hướng
+      if (r.ok === true && !r.value.blank && !r.value.qrEmpty) {
+        if (this.stuckSince || this.autoReloads || this.loginStuck) this.resetLoginWatch();
+        return;
+      }
+      const what = r.ok !== true ? `trang không trả lời (${r.error})` : r.value.blank ? 'trang không dựng khung đăng nhập' : 'ô mã QR rỗng';
+      if (this.loginStuck) {
+        void this.runJsCapped(loginNoteScript(`Larkwave: ${this.loginStuck}`, true)); // trang vừa tự tải lại ⇒ chèn lại dải báo
         return;
       }
       const now = Date.now();
       if (!this.stuckSince) this.stuckSince = now;
       if (now - this.stuckSince < LOGIN_STUCK_MS) return;
-      const what = r.value.blank ? 'trang không dựng khung đăng nhập' : 'ô mã QR rỗng';
       const why = this.loginApiNote();
-      if (this.autoReloads >= LOGIN_MAX_RELOADS) {
+      if (this.autoReloads >= LOGIN_STEPS.length) {
+        const real = await this.diagnoseLogin();
+        if (!this.alive() || !onLoginPage(this.navUrl)) return;
         this.loginStuck =
-          `Trang đăng nhập Zalo không hiện mã QR (${what}, đã tự tải lại ${this.autoReloads} lần)${why ? ` — ${why}` : ''}. ` +
-          'Kiểm tra mạng rồi bấm Tải lại; vẫn vậy thì Đóng hẳn cửa sổ và mở lại.';
+          `Trang đăng nhập Zalo không hiện mã QR (${what}; đã tự thử lại ${this.autoReloads} lần, kể cả xoá dữ liệu đăng nhập cũ của cửa sổ). ` +
+          `Lý do: ${real}.${why ? ` [${why}]` : ''}`;
         console.warn(`[zaloWeb] ${this.loginStuck}`);
+        void this.runJsCapped(loginNoteScript(`Larkwave: ${this.loginStuck}`, true));
         return;
       }
-      this.autoReloads++;
+      const step = LOGIN_STEPS[this.autoReloads++];
       this.stuckSince = 0;
-      console.warn(`[zaloWeb] ${what} — tự tải lại lần ${this.autoReloads}${why ? ` (${why})` : ''}`);
-      this.lastNavAt = now;
+      console.warn(`[zaloWeb] ${what} — tự cứu bậc ${this.autoReloads} (${step})${why ? ` [${why}]` : ''}`);
+      await this.runJsCapped(
+        loginNoteScript(`Larkwave: trang đăng nhập Zalo chưa hiện mã QR — đang tự thử lại (${this.autoReloads}/${LOGIN_STEPS.length})…`, false),
+        1500,
+      );
+      if (!this.alive()) return;
+      this.lastNavAt = Date.now();
       const wc = this.win!.webContents;
-      if (this.autoReloads > 1) wc.reloadIgnoringCache();
+      if (step === 'reset') {
+        await this.wipeLoginData();
+        if (this.alive()) void this.win!.loadURL(ZALO_WEB_URL, { userAgent: ZALO_WEB_UA }).catch(() => undefined);
+      } else if (step === 'hard') wc.reloadIgnoringCache();
       else wc.reload();
     } finally {
       this.loginChecking = false;
     }
+  }
+
+  /**
+   * Xoá SẠCH dữ liệu của partition cửa sổ (cookie, localStorage/IndexedDB, service worker, bộ đệm) + cookie đã lưu.
+   * CHỈ gọi khi đang kẹt ở trang đăng nhập (= chưa đăng nhập, không mất phiên nào). Không động tới phiên zca.
+   */
+  private async wipeLoginData(): Promise<void> {
+    const ses = electronSession.fromPartition(PARTITION);
+    try {
+      this.persist?.clear?.();
+    } catch {
+      /* kho lỗi không chặn việc dọn partition */
+    }
+    await ses.clearStorageData().catch(() => undefined);
+    await ses.clearCache().catch(() => undefined);
+    this.netErrors.clear();
+    this.loginApi.clear();
+  }
+
+  /** Nút "Thử lại" trên dải báo: canh lại từ đầu và nạp lại từ chat.zalo.me. */
+  private retryLogin(): void {
+    if (!this.alive()) return;
+    this.resetLoginWatch();
+    this.lastNavAt = Date.now();
+    void this.win!.loadURL(ZALO_WEB_URL, { userAgent: ZALO_WEB_UA }).catch(() => undefined);
   }
 
   /**

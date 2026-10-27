@@ -1,6 +1,6 @@
 # Bàn giao phiên — Larkwave
 
-**Chốt ngày 27/10/2026 ở bản 0.1.21.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
+**Chốt ngày 27/10/2026 ở bản 0.1.22.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
 việc chuyển sang Appwave. Tệp này để mở lại phiên ở đây mà không phải đọc lại cả lịch sử.
 
 > Đây là tài liệu **trạng thái**, không phải nhật ký. Sửa tại chỗ khi trạng thái đổi, đừng cộng dồn.
@@ -12,8 +12,8 @@ việc chuyển sang Appwave. Tệp này để mở lại phiên ở đây mà k
 
 | | |
 |---|---|
-| Bản đang phát hành | **0.1.21** (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
-| Commit cuối | "0.1.21: cửa sổ đăng nhập Zalo kẹt không ra QR…" (xem `git log -1`) |
+| Bản đang phát hành | **0.1.22** (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
+| Commit cuối | "0.1.22: trang đăng nhập Zalo vẫn kẹt…" (xem `git log -1`) |
 | Cây làm việc | sạch |
 | Remote `origin` | **CHƯA CÓ** — mã chỉ nằm trên máy Mac này. Đừng tự tạo remote; hỏi người dùng đặt ở đâu. |
 | Test | 546 bài qua (`bash apps/desktop/test/run.sh`) |
@@ -87,9 +87,15 @@ Không viết lại dưới bất kỳ tên nào. Đường thay thế đã ch�
   mới sửa — đoán rồi phát hành thử là cái giá của 13 bản trong một ngày.
 - **`innerText` ép trình duyệt tính lại bố cục** của toàn bộ hội thoại → chết trên nhóm cả tháng.
   Dùng `textContent` từng hàng. Áp dụng cho mọi script đọc trang, không riêng Zalo.
-- **Trang đăng nhập Zalo (id.zalo.me) kẹt mãi nếu `POST /account/logininfo` hỏng/treo một lần**: chỉ
-  còn logo + "Tiếng Việt / English", không QR, Zalo không tự thử lại. `checkLogin()` trong `zaloWeb.ts`
-  tự tải lại (tối đa 3 lần) rồi báo `loginStuck` (0.1.21). Đừng gỡ bộ canh đó.
+- **Trang đăng nhập Zalo (id.zalo.me) kẹt mãi nếu `POST /account/logininfo` hỏng/treo, HOẶC trả HTTP 200
+  mà `error_code` ≠ 0, hoặc trả HTML** (proxy/tường lửa): chỉ còn logo + "Tiếng Việt / English", không QR,
+  Zalo không tự thử lại. `checkLogin()` trong `zaloWeb.ts` đi thang cứu `LOGIN_STEPS` (tải lại → XOÁ SẠCH
+  partition như máy mới → tải lại bỏ bộ đệm), rồi hỏi lại logininfo lấy lý do thật (`LOGIN_INFO_PROBE`), báo
+  `loginStuck` + dải báo có nút "Thử lại" ngay trên trang. Đừng gỡ bộ canh đó.
+  - 0.1.21 hụt ở máy người dùng vì **`webContents.executeJavaScript` CHỜ `did-stop-loading`** khi trang còn
+    request treo (Google Analytics, font…) ⇒ script dò không bao giờ chạy ⇒ không tự cứu. Script canh phải
+    chạy bằng `mainFrame.executeJavaScript` (`runJs(expr, true)` / `runJsCapped`).
+  - Bậc xoá sạch đi ngang chat.zalo.me: đừng xoá bộ đếm chỉ vì rời id.zalo.me, kẻo thang cứu lặp vô tận.
 - **chat.zalo.me khi CHƯA đăng nhập đứng yên 2–7 giây rồi mới chuyển sang id.zalo.me.** Đừng kết luận
   "đã đăng nhập" theo URL: `loginState()` chờ thấy ô tìm cột trái, hoặc 12 giây không bị chuyển (0.1.21).
 - **Zalo chỉ cho MỘT phiên web một lúc.** Phiên QR của zca và cửa sổ Zalo Web đá nhau. Đó là lý do
