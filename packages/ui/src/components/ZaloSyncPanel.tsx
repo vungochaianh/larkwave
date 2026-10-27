@@ -162,7 +162,11 @@ export function ZaloSyncPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <GlobalOutlined style={{ color: OK }} />
           <Text strong>{t('zsync.web', 'Cửa sổ Zalo Web')}</Text>
-          {web?.exists && <Tag color={web.loggedIn ? 'green' : 'orange'}>{web.loggedIn ? t('zsync.webIn', 'đã đăng nhập') : t('zsync.webOut', 'chưa đăng nhập')}</Tag>}
+          {web?.exists && (
+            <Tag color={web.loggedIn ? 'green' : web.loggedIn === false ? 'orange' : 'default'}>
+              {web.loggedIn ? t('zsync.webIn', 'đã đăng nhập') : web.loggedIn === false ? t('zsync.webOut', 'chưa đăng nhập') : t('zsync.webLoading', 'đang tải…')}
+            </Tag>
+          )}
           {web?.exists && !web.visible && <Tag>{t('zsync.webHidden', 'đang ẩn')}</Tag>}
         </div>
         <Text type="secondary" style={{ fontSize: 12.5 }}>
@@ -196,7 +200,8 @@ export function ZaloSyncPanel({
             </>
           )}
         </Space>
-        {web?.exists && !web.loggedIn && (
+        {web?.exists && web.loggedIn === false && web.loginStuck && <Alert type="warning" showIcon style={{ fontSize: 12.5 }} message={web.loginStuck} />}
+        {web?.exists && web.loggedIn === false && !web.loginStuck && (
           <Alert type="info" showIcon style={{ fontSize: 12.5 }} message={t('zsync.webLoginHint', 'Cửa sổ đang ở trang đăng nhập — quét QR / đăng nhập ngay trong cửa sổ đó. Nếu điện thoại hỏi "đồng bộ tin nhắn", bấm Đồng ý để có lịch sử cũ.')} />
         )}
         {web?.loggedIn && (

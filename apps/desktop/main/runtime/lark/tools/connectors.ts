@@ -230,7 +230,12 @@ export const connectorTools: LarkToolDef[] = [
       return {
         opened: st.exists,
         loggedIn: st.loggedIn ?? false,
-        hint: st.loggedIn
+        ...(st.loginStuck ? { loginStuck: st.loginStuck } : {}),
+        hint: st.loginStuck
+          ? `Trang đăng nhập Zalo trong cửa sổ bị kẹt, không hiện mã QR: ${st.loginStuck} Báo đúng như vậy cho người dùng, đừng bảo họ quét QR.`
+          : st.exists && st.loggedIn === undefined
+          ? 'Cửa sổ Zalo Web còn đang tải, CHƯA RÕ đã đăng nhập chưa. Đợi vài giây rồi gọi lại zalo_web_open (gọi lại không nạp lại trang).'
+          : st.loggedIn
           ? 'Cửa sổ Zalo Web đã mở và ĐÃ đăng nhập. Nhờ người dùng BẤM VÀO đúng hội thoại cần đọc trong cửa sổ (và bấm Đồng ý đồng bộ trên điện thoại nếu được hỏi), rồi gọi zalo_web_read. ĐỪNG bảo họ quét QR nữa.'
           : 'Cửa sổ Zalo Web vừa mở, CHƯA đăng nhập — nhờ người dùng QUÉT QR NGAY TRONG CỬA SỔ ĐÓ (đừng dùng nút "Kết nối Zalo" ở sidebar). Đăng nhập xong, mở hội thoại cần đọc rồi báo mình.',
       };

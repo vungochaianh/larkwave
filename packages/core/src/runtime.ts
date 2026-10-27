@@ -2312,6 +2312,8 @@ export interface ZaloWebStatus {
   url?: string;
   title?: string;
   lastReadAt?: number;
+  /** Trang đăng nhập kẹt không ra mã QR dù lõi đã tự tải lại (lõi ≥ 0.1.21) — câu báo kèm lý do. */
+  loginStuck?: string;
 }
 
 export interface ZaloWebRead {

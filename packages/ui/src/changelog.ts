@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.21',
+    date: '2026-10-27',
+    items: [
+      "Sửa cửa sổ đăng nhập Zalo đứng yên ở logo + \"Tiếng Việt / English\", không hiện mã QR. Nguyên nhân: trang đăng nhập của Zalo chỉ dựng mã QR sau khi một lời gọi tới máy chủ Zalo trả về; lời gọi đó hỏng một lần (mạng chập chờn, máy chủ bận) là trang kẹt luôn. Nay Larkwave tự nhận ra và tải lại trang (tối đa 3 lần); vẫn không được thì Cài đặt → Đồng bộ tin Zalo báo rõ lý do.",
+      "Hết báo nhầm \"đã đăng nhập\" trong vài giây đầu khi mở cửa sổ Zalo Web: trang Zalo đứng ở màn hình chat vài giây rồi mới chuyển sang trang quét QR, nên trước đây trợ lý có lúc bảo bạn mở hội thoại trong khi cửa sổ đang chờ quét QR.",
+    ],
+  },
+  {
     version: '0.1.20',
     date: '2026-10-18',
     items: [
