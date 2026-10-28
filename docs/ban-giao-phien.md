@@ -1,7 +1,8 @@
 # Bàn giao phiên — Larkwave
 
-**Chốt ngày 27/10/2026 ở bản 0.1.22.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
-việc chuyển sang Appwave. Tệp này để mở lại phiên ở đây mà không phải đọc lại cả lịch sử.
+**Chốt ngày 28/10/2026 ở bản 0.1.22.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
+việc chuyển sang Appwave. Việc mở còn lại là **bản Windows** (đang bàn giao sang máy Windows). Tệp
+này để mở lại phiên ở đây mà không phải đọc lại cả lịch sử.
 
 > Đây là tài liệu **trạng thái**, không phải nhật ký. Sửa tại chỗ khi trạng thái đổi, đừng cộng dồn.
 > Quy trình bàn giao Mac ↔ Windows nằm ở skill `ban-giao` (`.claude/skills/ban-giao`), khác tệp này.
@@ -12,11 +13,19 @@ việc chuyển sang Appwave. Tệp này để mở lại phiên ở đây mà k
 
 | | |
 |---|---|
-| Bản đang phát hành | **0.1.22** (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
-| Commit cuối | "0.1.22: trang đăng nhập Zalo vẫn kẹt…" (xem `git log -1`) |
-| Cây làm việc | sạch |
-| Remote `origin` | **CHƯA CÓ** — mã chỉ nằm trên máy Mac này. Đừng tự tạo remote; hỏi người dùng đặt ở đâu. |
+| Bản đang phát hành | **0.1.22** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
+| Windows | **chưa có bản nào** — máy Windows đang nhận bàn giao: [may-phat-hanh-windows.md](may-phat-hanh-windows.md) |
+| Remote `origin` | `https://gitlab.com/toolswave/larkwave` — **riêng tư**, tạo 28/10/2026, nhánh `main` |
+| Commit cuối / cây làm việc | đo bằng `node scripts/handoff.mjs`, đừng tin dòng ghi tay |
 | Test | 546 bài qua (`bash apps/desktop/test/run.sh`) |
+
+**Link cài** (README cũng có):
+
+- Trang tải, luôn là bản mới nhất: <https://toolswave.net/larkwave>
+- macOS 0.1.22: <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.22/Larkwave-0.1.22-universal.dmg>
+- Windows (khi máy Windows phát hành xong): `…/larkwave-desktop/<bản>/Larkwave-<bản>-win.exe`
+- Manifest app + trang cùng đọc: <https://toolswave.net/api/apps-release/larkwave>
+- Mọi bản (registry công khai, project 83700259): <https://gitlab.com/deveris.vu/toolswave-desktop-release/-/packages>
 
 ## 2. Mở lại phiên thì chạy gì trước
 
@@ -55,7 +64,17 @@ Chạy app để kiểm thì **không bật cửa sổ** — lệnh đầy đủ
 | [`skills/builtinSkills.ts`](../apps/desktop/main/runtime/skills/builtinSkills.ts) | `lw-zalo-doc-tin`, `lw-zalo-dong-bo` |
 | [`test/zaloSync.cjs`](../apps/desktop/test/zaloSync.cjs) | kiểm sổ tin + lưu đĩa, dữ liệu giả, không chạm mạng |
 
-## 5. CÒN TREO — cần tài khoản Zalo thật mới kết luận được
+## 5. CÒN TREO
+
+- [ ] **Bản Windows đầu tiên** — việc của MÁY WINDOWS, máy Mac không dựng được `.exe`. Các bước:
+      [may-phat-hanh-windows.md](may-phat-hanh-windows.md). `win-release.ps1` mới sửa tên gói ngày
+      28/10/2026 (trước đó gọi `@toolswave/*`, chạy là hỏng) và **chưa chạy lần nào** trên Windows.
+      Larkwave cũng chưa từng chạy trên Windows: thử tay theo danh sách trong tài liệu đó trước khi báo
+      người dùng.
+- [ ] **0.1.22 — trang đăng nhập Zalo kẹt ở máy người dùng**: đã thử 7 tình huống giả, chưa có xác nhận
+      từ máy thật. Còn kẹt thì cửa sổ Zalo hiện dòng báo vàng ghi lý do thật — xin người dùng ảnh dòng đó.
+
+**Cần tài khoản Zalo thật mới kết luận được:**
 
 - [ ] **Đọc nhóm cả tháng trên 0.1.20.** Bản này sửa gốc "cuộn tới nơi mà đọc rỗng" (bỏ `innerText`)
       nhưng **chưa chạy trên tài khoản thật**. Phép thử: nhờ trợ lý "tóm tắt nhóm Đầu tư AI tháng 10".

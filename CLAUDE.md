@@ -5,10 +5,10 @@ Toolswave ngày 06/10/2026. Màn chính là **Lark × Agents**: chat với một
 web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo automation/workflow (luôn để
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
-**Trạng thái (27/10/2026):**
+**Trạng thái (28/10/2026):**
 - Bản **0.1.22 macOS đã phát hành**: https://toolswave.net/larkwave.
 - Code-push giao diện đang bật.
-- Chưa có bản Windows.
+- Chưa có bản Windows: đang bàn giao sang máy Windows, xem [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md).
 - Bản cài ký ad-hoc, chưa notarize.
 
 ## Kiến trúc thật (khác những gì cây thư mục gợi ý)
@@ -255,5 +255,6 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   (`node scripts/sync-from-toolswave.mjs --dry`).
 - [docs/migrate-from-toolswave.md](docs/migrate-from-toolswave.md), [docs/code-push.md](docs/code-push.md),
   [docs/desktop-architecture.md](docs/desktop-architecture.md).
-- Skill `ban-giao` (`.claude/skills/ban-giao`): bàn giao Mac ↔ Windows. **Hiện repo chưa có remote
-  `origin`**, nên mã chỉ nằm trên máy Mac này. Đừng tự tạo remote; hỏi người dùng nơi đặt repo.
+- Skill `ban-giao` (`.claude/skills/ban-giao`): bàn giao Mac ↔ Windows. Remote `origin` là
+  `https://gitlab.com/toolswave/larkwave` (**riêng tư**, người dùng chọn ngày 28/10/2026). Đừng đổi
+  sang nơi khác hay chuyển sang công khai khi người dùng chưa quyết.

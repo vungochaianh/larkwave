@@ -13,12 +13,15 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+# Terminal của VS Code đặt ELECTRON_RUN_AS_NODE=1 ⇒ mọi lệnh chạm Electron chết lặng (mã 0). Gỡ cho cả phiên.
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+
 Write-Host '==> kiểm tra môi trường' -ForegroundColor Cyan
 $nodeMajor = (node -p "process.versions.node.split('.')[0]")
 if ([int]$nodeMajor -lt 20) { throw "Cần Node >= 20, máy này đang $nodeMajor" }
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw 'Chưa có pnpm — chạy: npm i -g pnpm' }
 
-if (-not (Test-Path '.env')) { throw 'Thiếu .env (chỉ cần dòng GITLAB_TOKEN=...) — xem README phần Windows.' }
+if (-not (Test-Path '.env')) { throw 'Thiếu .env (chỉ cần dòng GITLAB_TOKEN=...) — xem docs\may-phat-hanh-windows.md.' }
 # Nạp .env: chỉ lấy GITLAB_TOKEN, bỏ qua mọi dòng khác. Máy này không cần biết khoá nào khác.
 Get-Content '.env' | ForEach-Object {
   if ($_ -match '^\s*GITLAB_TOKEN\s*=\s*(.+)\s*$') { $env:GITLAB_TOKEN = $Matches[1].Trim() }
@@ -32,29 +35,32 @@ Write-Host '==> cài phụ thuộc' -ForegroundColor Cyan
 pnpm install --frozen-lockfile
 if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm install --frozen-lockfile (mã $LASTEXITCODE)" }
 
-# @toolswave/core PHẢI dựng trước: bản dựng desktop gói core từ dist/ chứ không từ src/ và không
+# @larkwave/core PHẢI dựng trước: bản dựng desktop gói core từ dist/ chứ không từ src/ và không
 # tự dựng lại. Core cũ ⇒ một kênh IPC thành undefined ⇒ màn hình trắng khi mở app. Đây là lớp lỗi
-# đã làm hỏng bản 1.0.92, và nó không kêu thành lỗi lúc dựng.
+# đã làm hỏng bản 1.0.92 (thời Toolswave), và nó không kêu thành lỗi lúc dựng.
 #
-# @toolswave/shared cũng vậy, và chỗ này trước đây BỎ SÓT. Kiểm main của từng gói thì rõ:
+# @larkwave/shared cũng vậy. Kiểm main của từng gói thì rõ:
 #   core   main=dist/index.js   → phải dựng
-#   shared main=dist/index.js   → phải dựng   ← thiếu
+#   shared main=dist/index.js   → phải dựng
 #   ui     main=src/index.ts    → gói từ nguồn, không cần
-# Desktop không phụ thuộc shared trực tiếp, nhưng @toolswave/ui thì có — nên shared cũ đi vào bản
+# Desktop không phụ thuộc shared trực tiếp, nhưng @larkwave/ui thì có — nên shared cũ đi vào bản
 # cài qua đường ui, đúng lớp lỗi của core và cũng im lặng y như vậy.
-Write-Host '==> dựng @toolswave/shared + @toolswave/core (BẮT BUỘC trước khi đóng gói)' -ForegroundColor Cyan
-pnpm --filter @toolswave/shared build
-if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @toolswave/shared build (mã $LASTEXITCODE)" }
-pnpm --filter @toolswave/core build
-if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @toolswave/core build (mã $LASTEXITCODE)" }
+#
+# Tên gói: script này chép từ Toolswave và tới 28/10/2026 vẫn gọi @toolswave/* + `--filter desktop`
+# — tên không tồn tại trong repo này, nên chạy là hỏng ngay bước đầu. Tên đúng ở package.json từng gói.
+Write-Host '==> dựng @larkwave/shared + @larkwave/core (BẮT BUỘC trước khi đóng gói)' -ForegroundColor Cyan
+pnpm --filter @larkwave/shared build
+if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @larkwave/shared build (mã $LASTEXITCODE)" }
+pnpm --filter @larkwave/core build
+if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @larkwave/core build (mã $LASTEXITCODE)" }
 
 Write-Host '==> kiểm kiểu' -ForegroundColor Cyan
-pnpm --filter desktop exec tsc --noEmit
-if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter desktop exec tsc --noEmit (mã $LASTEXITCODE)" }
+pnpm --filter @larkwave/desktop typecheck:desktop
+if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @larkwave/desktop typecheck:desktop (mã $LASTEXITCODE)" }
 
 Write-Host '==> đóng gói bản Windows' -ForegroundColor Cyan
-pnpm --filter desktop dist:win
-if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter desktop dist:win (mã $LASTEXITCODE)" }
+pnpm --filter @larkwave/desktop dist:win
+if ($LASTEXITCODE -ne 0) { throw "Bước thất bại: pnpm --filter @larkwave/desktop dist:win (mã $LASTEXITCODE)" }
 
 Write-Host '==> tải lên GitLab' -ForegroundColor Cyan
 # push-installers chặn mặc định (nó PHÁT HÀNH lên registry công khai); chạy script này là đã chủ ý phát hành.

@@ -60,5 +60,4 @@ thiếu khoá, thiếu quyền, thiếu cấu hình — thật ra chỉ là mã 
 
 ## Đọc thêm
 
-- `docs/may-phat-hanh-windows.md` — dựng máy Windows, mang khoá sang, chạy gì ở đâu
-- `docs/phat-hanh-windows.md` — đường phát hành bản Windows bằng token hẹp
+- `docs/may-phat-hanh-windows.md` — dựng máy Windows (một lần) và phát hành bản Windows bằng token hẹp
