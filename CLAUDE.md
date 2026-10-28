@@ -256,5 +256,6 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 - [docs/migrate-from-toolswave.md](docs/migrate-from-toolswave.md), [docs/code-push.md](docs/code-push.md),
   [docs/desktop-architecture.md](docs/desktop-architecture.md).
 - Skill `ban-giao` (`.claude/skills/ban-giao`): bàn giao Mac ↔ Windows. Remote `origin` là
-  `https://gitlab.com/toolswave/larkwave` (**riêng tư**, người dùng chọn ngày 28/10/2026). Đừng đổi
-  sang nơi khác hay chuyển sang công khai khi người dùng chưa quyết.
+  `https://gitlab.com/toolswave/larkwave` (**riêng tư**, người dùng chọn ngày 28/10/2026). Từ 28/10/2026 mã
+  cũng là mã nguồn mở (MIT) ở remote `github` = `https://github.com/vungochaianh/larkwave` (**công khai**,
+  người dùng quyết). Push lên cả hai; repo công khai nên tuyệt đối không commit khoá/`.env`.

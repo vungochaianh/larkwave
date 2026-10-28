@@ -16,6 +16,7 @@ này để mở lại phiên ở đây mà không phải đọc lại cả lịc
 | Bản đang phát hành | **0.1.22** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
 | Windows | **chưa có bản nào** — máy Windows đang nhận bàn giao: [may-phat-hanh-windows.md](may-phat-hanh-windows.md) |
 | Remote `origin` | `https://gitlab.com/toolswave/larkwave` — **riêng tư**, tạo 28/10/2026, nhánh `main` |
+| Remote `github` | `https://github.com/vungochaianh/larkwave` — **công khai, mã nguồn mở MIT** từ 28/10/2026 |
 | Commit cuối / cây làm việc | đo bằng `node scripts/handoff.mjs`, đừng tin dòng ghi tay |
 | Test | 546 bài qua (`bash apps/desktop/test/run.sh`) |
 

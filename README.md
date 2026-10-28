@@ -32,7 +32,8 @@ tiết: [docs/TACH-APP.md](docs/TACH-APP.md).
 
 ## Mã nguồn
 
-- Repo: `https://gitlab.com/toolswave/larkwave` (**riêng tư**, nhóm `toolswave`).
+- Mã nguồn mở, giấy phép [MIT](LICENSE): <https://github.com/vungochaianh/larkwave>.
+- Bản làm việc chính (máy Mac ↔ Windows bàn giao qua đây): `https://gitlab.com/toolswave/larkwave` (riêng tư).
 - Máy chủ (API + trang web) **không** nằm ở đây mà ở repo Toolswave `gitlab.com/toolswave/app`.
 
 ## Thành phần
