@@ -13,6 +13,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.23',
+    date: '2026-10-28',
+    items: [
+      "Sửa lỗi báo \"Tài khoản Claude đã hết credit API\" dù máy đã đăng nhập gói Claude (Pro/Max): khi API key lưu trong app hết credit, Larkwave đã định tự chạy lại bằng đăng nhập Claude của máy nhưng lượt chạy lại hỏng lặng lẽ. Nay lượt đó chạy được và câu trả lời hiện ra bình thường; từ lượt sau app đi thẳng bằng gói Claude, không thử lại key đã cạn.",
+      "Mở lại một hội thoại cũ không còn làm lượt kế tiếp phải nạp lại toàn bộ lịch sử (nhanh hơn, ít tốn hơn, AI nhớ trọn kết quả công cụ của các lượt trước).",
+    ],
+  },
+  {
     version: '0.1.22',
     date: '2026-10-27',
     items: [

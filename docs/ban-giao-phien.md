@@ -1,6 +1,6 @@
 # Bàn giao phiên — Larkwave
 
-**Chốt ngày 28/10/2026 ở bản 0.1.22.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
+**Chốt ngày 28/10/2026 ở bản 0.1.23.** Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
 việc chuyển sang Appwave. Việc mở còn lại là **bản Windows** (đang bàn giao sang máy Windows). Tệp
 này để mở lại phiên ở đây mà không phải đọc lại cả lịch sử.
 
@@ -13,17 +13,17 @@ này để mở lại phiên ở đây mà không phải đọc lại cả lịc
 
 | | |
 |---|---|
-| Bản đang phát hành | **0.1.22** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
+| Bản đang phát hành | **0.1.23** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` |
 | Windows | **chưa có bản nào** — máy Windows đang nhận bàn giao: [may-phat-hanh-windows.md](may-phat-hanh-windows.md) |
 | Remote `origin` | `https://gitlab.com/toolswave/larkwave` — **riêng tư**, tạo 28/10/2026, nhánh `main` |
 | Remote `github` | `https://github.com/vungochaianh/larkwave` — **công khai, mã nguồn mở MIT** từ 28/10/2026 |
 | Commit cuối / cây làm việc | đo bằng `node scripts/handoff.mjs`, đừng tin dòng ghi tay |
-| Test | 546 bài qua (`bash apps/desktop/test/run.sh`) |
+| Test | 551 bài qua (`bash apps/desktop/test/run.sh`) |
 
 **Link cài** (README cũng có):
 
 - Trang tải, luôn là bản mới nhất: <https://toolswave.net/larkwave>
-- macOS 0.1.22: <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.22/Larkwave-0.1.22-universal.dmg>
+- macOS 0.1.23: <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.23/Larkwave-0.1.23-universal.dmg>
 - Windows (khi máy Windows phát hành xong): `…/larkwave-desktop/<bản>/Larkwave-<bản>-win.exe`
 - Manifest app + trang cùng đọc: <https://toolswave.net/api/apps-release/larkwave>
 - Mọi bản (registry công khai, project 83700259): <https://gitlab.com/deveris.vu/toolswave-desktop-release/-/packages>
@@ -74,6 +74,10 @@ Chạy app để kiểm thì **không bật cửa sổ** — lệnh đầy đủ
       người dùng.
 - [ ] **0.1.22 — trang đăng nhập Zalo kẹt ở máy người dùng**: đã thử 7 tình huống giả, chưa có xác nhận
       từ máy thật. Còn kẹt thì cửa sổ Zalo hiện dòng báo vàng ghi lý do thật — xin người dùng ảnh dòng đó.
+- [ ] **0.1.23 — "hết credit API" dù đã đăng nhập gói Max**: gốc là API key lưu trong app (Cài đặt → API
+      key) đã cạn, đè lên đăng nhập của máy; lượt chạy lại bằng thuê bao im lặng vì `--session-id` trùng.
+      Đã sửa + test bằng `claude` giả, chưa xác nhận trên máy người dùng có key cạn thật. Máy Mac này vẫn
+      còn key đó trong `claude/keys.bin` — người dùng có thể tự xoá ở "Kiểm / đổi API key".
 
 **Cần tài khoản Zalo thật mới kết luận được:**
 

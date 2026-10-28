@@ -1,6 +1,6 @@
 # Bàn giao sang máy Windows — dựng và phát hành Larkwave cho Windows
 
-**Trạng thái (28/10/2026):** Larkwave **chưa có bản Windows nào**. Bản đang phát hành là 0.1.22, chỉ
+**Trạng thái (28/10/2026):** Larkwave **chưa có bản Windows nào**. Bản đang phát hành là 0.1.23, chỉ
 có macOS. Mã nằm ở `gitlab.com/toolswave/larkwave` (**riêng tư**). Tài liệu này dành cho người ngồi
 máy Windows, kể cả một phiên Claude Code mở trên máy đó.
 

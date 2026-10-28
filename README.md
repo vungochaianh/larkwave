@@ -24,7 +24,7 @@ máy. Tài khoản và dữ liệu trong video là dữ liệu mẫu.
 | | Link |
 |---|---|
 | Trang tải (luôn là bản mới nhất) | <https://toolswave.net/larkwave> |
-| macOS 0.1.22 (universal, tải thẳng) | <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.22/Larkwave-0.1.22-universal.dmg> |
+| macOS 0.1.23 (universal, tải thẳng) | <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.23/Larkwave-0.1.23-universal.dmg> |
 | Windows | **chưa có**: máy Windows đang được bàn giao, xem [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md) |
 | Manifest phát hành (app và trang tải cùng đọc) | <https://toolswave.net/api/apps-release/larkwave> |
 | Mọi bản cũ (registry) | <https://gitlab.com/deveris.vu/toolswave-desktop-release/-/packages> |
