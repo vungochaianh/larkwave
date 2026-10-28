@@ -52,7 +52,13 @@ bật mà báo `HTTP Basic: Access denied`, máy đang giữ thông tin đăng n
 
 ### 4. Mang khoá hẹp sang
 
-Trên **máy Mac** (một lần):
+**Đã có sẵn một tệp:** `/Users/deveris/app/win-deploy-token.txt` trên máy Mac. Tệp được tạo ngày
+16/09/2026 thời Toolswave, có quyền `write_package_registry` trên project 83700259 (cùng registry
+với gói `larkwave-desktop`) và hết hạn 16/09/2027. Ngày 28/10/2026 đã kiểm trên GitLab: token chưa
+bị thu hồi. Chép tệp này sang máy Windows thành `C:\lw\larkwave\.env` là xong. Chỉ khi tệp đó hết
+hạn hoặc bị thu hồi mới cần tạo token mới.
+
+Tạo token mới trên **máy Mac**:
 
 ```bash
 cd /Users/deveris/larkwave
