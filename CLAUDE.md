@@ -202,6 +202,11 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   - Đổi luật hoặc công cụ thì `promptFingerprint` (`systemPrompt.ts`) đổi, và `larkService.chat` xoay
     sang phiên mới rồi mồi lại lịch sử.
   - Triệu chứng: "AI cứ làm theo luật cũ / nhắc chế độ Hỏi đáp không tồn tại".
+- **Claude CLI có lỗi CHỈ in ra stderr** (thoát 1, stdout rỗng), vd `--session-id X` khi phiên X đã có
+  → `Error: Session ID X is already in use.` `runOnce` (`larkAgent.ts`) bắt ca này để `--resume`, và mọi
+  lần thoát lỗi không có `result` đều hiện stderr. Câu lỗi API thô đến dưới dạng tin assistant
+  `model:'<synthetic>'`: giữ lại, đừng đẩy thành chữ, nếu không `diagnoseRunnerError` thay cả câu trả
+  lời bằng thẻ "hết credit". Lỗi 28/10/2026: khoá app cạn, lượt chạy lại bằng gói Max im lặng.
 - **Ba đường chạy một lượt Lark** (`runLarkAgent` trong `larkAgent.ts`):
   - Claude: `runLarkChat`, đi cầu MCP.
   - Gemini: `runLarkGemini` (`larkGeminiAgent.ts`), đi CÙNG cầu MCP, từ 0.1.4.

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppMode, BuildEvent, ClaudeLoginEvent, ClaudeStatus, KeyValidation } from '@larkwave/core';
@@ -143,10 +144,11 @@ export interface ClaudeRunOptions {
 // A negative is NOT cached — the user may install the CLI mid-session and recover.
 let claudeAvailableCache = false;
 
-/** True when the app would inject a stored API key / pasted token into `claude`'s env (so a credit
- *  error might be that key being out of credit, not the user's own subscription). */
-export function hasInjectedCredential(): boolean {
-  return !!(getActiveKey() || getStoredToken());
+/** Dấu nhận diện (băm, không lộ khoá) của khoá/token app đang bơm vào `claude` — null nếu không có.
+ *  Dùng để nhớ "khoá NÀY đã hết credit" mà không giữ chính khoá; người dùng đổi khoá ⇒ dấu đổi. */
+export function injectedCredentialId(): string | null {
+  const cred = getActiveKey() || getStoredToken();
+  return cred ? createHash('sha256').update(cred).digest('hex').slice(0, 16) : null;
 }
 
 /** True if a usable `claude` binary is on PATH. */

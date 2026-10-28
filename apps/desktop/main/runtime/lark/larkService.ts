@@ -197,7 +197,7 @@ import { reportLine, wrapToolsForReport } from './autoRunRecorder';
 import { buildXlsx } from './fileBuild';
 import { toolswaveDataDirCandidates } from './filePaths';
 import type { LarkToolDef } from './tools/types';
-import { claudeAvailable, hasInjectedCredential } from '../claudeRunner';
+import { claudeAvailable, injectedCredentialId } from '../claudeRunner';
 import { tryAcquire, release, currentOwner, isBusy, maxConcurrent, type Lease } from '../agentLock';
 import { PluginHost } from '../plugins/pluginHost';
 import { AutomationEngine } from './automationEngine';
@@ -329,6 +329,10 @@ export class LarkService {
   /** Runners whose direct-API key was seen out of credit → skip the API (use the CLI) for the rest
    *  of the session instead of retrying the dead key every turn. Cleared when API prefs change. */
   private apiCreditOut = new Set<string>();
+  /** Dấu (injectedCredentialId) của khoá/token app đã thấy hết credit/không hợp lệ khi bơm vào CLI →
+   *  các lượt sau chạy thẳng bằng đăng nhập Claude của máy, thay vì mỗi lượt hỏng một lần rồi mới
+   *  chạy lại. Đổi khoá ⇒ dấu đổi ⇒ tự thử khoá mới. */
+  private drainedCredential: string | null = null;
 
   /**
    * Dừng một lượt Lark. Không truyền hội thoại = dừng TẤT CẢ (thoát app, đổi tài khoản, ngắt kết
@@ -1012,6 +1016,9 @@ export class LarkService {
       started: true,
       runner: s.runner || 'claude',
       model: s.model,
+      // Thiếu dòng này thì lượt đầu sau khi mở tab luôn thấy `promptPrint` khác ⇒ xoay phiên CLI mới
+      // + mồi lại lịch sử, dù luật không đổi (cùng nguồn với loadTurnState).
+      promptPrint: s.promptPrint,
     });
     return {
       items: Array.isArray(s.items) ? s.items : [],
@@ -4752,7 +4759,9 @@ export class LarkService {
     // The CLI spawn injects a stored API key (if any) into claude's env — so a credit error may be
     // THAT key being drained while the user's own `claude` subscription is fine. When set, recover
     // by retrying on the subscription (key stripped).
-    const keyInjected = hasInjectedCredential();
+    const credId = injectedCredentialId();
+    const skipDrainedKey = !!credId && credId === this.drainedCredential;
+    const keyInjected = !!credId && !skipDrainedKey;
 
     /**
      * Đọc cờ tự-động-duyệt LÚC HỎI, không phải lúc bắt đầu lượt.
@@ -4829,6 +4838,7 @@ export class LarkService {
           autoApprove,
           allowVersionHint: true, // xem nhánh trên
           allowFileTools: true, // lượt của chính chủ máy — xem LarkAgentDeps.allowFileTools
+          ...(skipDrainedKey ? { preferSubscription: true } : {}),
           attachDir,
           attachNames,
           generalMode: general,
@@ -4894,6 +4904,7 @@ export class LarkService {
           // Most common real cause: a stored/active API key was injected into claude's env and is
           // out of credit (or invalid), hijacking a working subscription. Re-run THIS turn on the
           // user's OWN claude login (key stripped) — works for both general + Lark chats.
+          this.drainedCredential = credId;
           yield { type: 'text', delta: '\n\n_(API key trong app hết credit/không hợp lệ — chuyển sang đăng nhập Claude CLI của bạn, giữ nguyên hội thoại…)_\n\n' };
           const fb = runLarkAgent(turnPrompt, input.mode, {
             fileContext: turnFiles,
@@ -4903,7 +4914,10 @@ export class LarkService {
             model,
             transcript,
             runnerSwitchNote,
-            session,
+            // Lần chạy đầu đã TẠO/nối phiên này (kể cả khi hỏng, CLI vẫn ghi lượt vào phiên) → nối
+            // tiếp. `--session-id` lần nữa thì CLI từ chối "already in use" (lỗi 28/10/2026).
+            // Phiên chưa có (lần đầu đi đường API) → nhánh resume-missing tự mở mới + mồi lịch sử.
+            session: { id: session.id, resume: true },
             extraTools: this.plugins.collectTools(),
             autoApprove,
             attachDir,
@@ -4929,6 +4943,7 @@ export class LarkService {
           this.apiCreditOut.add(runner); // don't hammer the dead key on the next turns
           yield { type: 'text', delta: '\n\n_(API hết credit — tự chuyển sang Claude CLI/subscription, giữ nguyên hội thoại…)_\n\n' };
           const fb = runLarkAgent(turnPrompt, input.mode, {
+            ...(skipDrainedKey ? { preferSubscription: true } : {}), // khoá app đã biết là cạn — đừng bơm lại
             fileContext: turnFiles,
             client: client ?? undefined,
             systemPrompt,

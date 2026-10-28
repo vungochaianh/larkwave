@@ -375,9 +375,10 @@ export async function* runLarkChat(
 
   // Run the CLI once. Resolves 'resume-missing' when we tried to --resume a session
   // the local CLI doesn't have (restored from server backup, synced from another
-  // device, or pruned) so the caller can retry fresh; otherwise 'ok'.
+  // device, or pruned) so the caller can retry fresh; 'in-use' when `--session-id` named a session
+  // that already exists (caller --resumes it instead); otherwise 'ok'.
   const runOnce = (sessionArgs: string[], promptOverride?: string) =>
-    new Promise<'ok' | 'resume-missing'>((resolve) => {
+    new Promise<'ok' | 'resume-missing' | 'in-use'>((resolve) => {
       // baseArgs[0..1] are ['-p', finalPrompt]; swap in a seeded prompt when re-seeding context.
       const promptText = promptOverride ?? finalPrompt;
       // Prompt rất dài (lịch sử nối lại) → stdin, không nhồi vào argv (xem STDIN_PROMPT_MIN_CHARS).
@@ -419,6 +420,10 @@ export async function* runLarkChat(
       }
       let buf = '';
       let resumeMissing = false;
+      let sawResult = false;
+      let spawnFailed = false;
+      let heldSynthetic = '';
+      let stderrTail = '';
       child.stdout!.on('data', (chunk: Buffer) => {
         buf += chunk.toString('utf8');
         let nl: number;
@@ -453,6 +458,19 @@ export async function* runLarkChat(
             }
             continue;
           }
+          // Tin assistant do CHÍNH CLI dựng (`model: '<synthetic>'`) — chủ yếu là câu lỗi API thô, vd
+          // "Credit balance is too low" (đo 28/10/2026, kèm `error: 'billing_error'`). Giữ lại tới
+          // sự kiện `result`: lượt hỏng thì BỎ, vì lỗi đã đi bằng sự kiện `error` (tiếng Việt). Nếu đẩy
+          // ngay thành chữ thì nó dính vào đầu bong bóng, và khi larkService chạy lại thành công bằng
+          // thuê bao, giao diện (diagnoseRunnerError) vẫn thấy chữ "credit" và thay CẢ câu trả lời
+          // bằng thẻ "hết credit".
+          if (obj?.type === 'assistant' && obj.message?.model === '<synthetic>') {
+            heldSynthetic += (obj.message.content || [])
+              .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+              .map((b: any) => b.text)
+              .join('');
+            continue;
+          }
           // The final assembled assistant message usually DUPLICATES the streamed text
           // → skip it, unless streaming somehow didn't cover it (defensive fallback).
           if (obj?.type === 'assistant' && obj.message?.usage && typeof obj.message.usage === 'object') {
@@ -469,6 +487,9 @@ export async function* runLarkChat(
             continue;
           }
           if (obj?.type === 'result') {
+            sawResult = true;
+            if (!obj.is_error && heldSynthetic.trim()) push({ type: 'text', delta: heldSynthetic });
+            heldSynthetic = '';
             // Context telemetry — how full the resumed conversation is. The renderer warns
             // + offers a fresh session as this approaches the model window.
             const usage = contextUsageFromResult(lastAssistantUsage ? { usage: lastAssistantUsage } : obj, cliModel);
@@ -505,8 +526,12 @@ export async function* runLarkChat(
           }
         }
       });
-      child.stderr!.on('data', () => {
-        /* CLI diagnostics — ignored; errors surface via the result event / close code */
+      // Lỗi thường đi qua sự kiện `result`. Nhưng có lỗi CLI chỉ in ra stderr rồi thoát 1, không
+      // một dòng stdout nào — vd `Error: Session ID … is already in use.` Bỏ qua stderr thì lượt đó
+      // im lặng hoàn toàn: đúng lỗi 28/10/2026, lượt chạy lại bằng thuê bao sau khi API key hết
+      // credit không ra gì, người dùng chỉ thấy thẻ "hết credit" dù đã đăng nhập gói Max.
+      child.stderr!.on('data', (chunk: Buffer) => {
+        stderrTail = (stderrTail + chunk.toString('utf8')).slice(-2000);
       });
       child.on('error', (err: NodeJS.ErrnoException) => {
         // ENOENT = the `claude` binary isn't on PATH → give an actionable message instead
@@ -515,10 +540,21 @@ export async function* runLarkChat(
           err.code === 'ENOENT'
             ? 'Không tìm thấy Claude CLI. Hãy cài đặt (npm i -g @anthropic-ai/claude-code) rồi đăng nhập, hoặc dán token trong phần cài đặt Claude.'
             : `Không gọi được Claude CLI: ${err.message}`;
+        spawnFailed = true;
         push({ type: 'error', message });
         resolve('ok'); // spawn failure — nothing to retry
       });
-      child.on('close', () => resolve(resumeMissing ? 'resume-missing' : 'ok'));
+      child.on('close', (code) => {
+        if (resumeMissing) return resolve('resume-missing');
+        if (!sawResult && /session id \S+ is already in use/i.test(stderrTail)) return resolve('in-use');
+        // Không có `result` thì không biết lượt hỏng hay không — trả chữ đã giữ, đừng nuốt.
+        if (!sawResult && heldSynthetic.trim()) push({ type: 'text', delta: heldSynthetic });
+        if (!sawResult && !spawnFailed && code !== 0 && !deps.signal?.aborted) {
+          const line = stderrTail.trim().split('\n').filter(Boolean).pop() || `Claude CLI thoát với mã ${code}`;
+          push({ type: 'error', message: friendlyRunnerError(line) });
+        }
+        resolve('ok');
+      });
     });
 
   const finish = () => {
@@ -558,7 +594,10 @@ export async function* runLarkChat(
     } else {
       // Fresh session. When we carried a transcript (e.g. switched runner → claude), seed it so the
       // new session continues the SAME conversation instead of starting empty.
-      await runOnce(['--session-id', deps.session.id], historyForSeed ? seededPrompt : undefined);
+      const status = await runOnce(['--session-id', deps.session.id], historyForSeed ? seededPrompt : undefined);
+      // Phiên đã có trên máy (vd lượt chạy lại bằng thuê bao ngay sau một lần hỏng đã tạo nó) →
+      // nối vào chính phiên đó: nó đã mang sẵn lịch sử mồi của lần trước.
+      if (status === 'in-use') await runOnce(['--resume', deps.session.id]);
     }
     finish();
   })();
