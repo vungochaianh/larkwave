@@ -5,8 +5,9 @@ Toolswave ngày 06/10/2026. Màn chính là **Lark × Agents**: chat với một
 web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo automation/workflow (luôn để
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
-**Trạng thái (28/10/2026):**
-- Bản **0.1.23 macOS đã phát hành**: https://toolswave.net/larkwave.
+**Trạng thái (19/11/2026):**
+- Bản **0.1.24 macOS đã phát hành** ("Cài AI": AI miễn phí trên máy + Claude một bấm): https://toolswave.net/larkwave.
+  0.1.23 chỉ dựng ở máy, chưa từng lên registry — 0.1.24 gồm luôn bản sửa của nó.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows: đang bàn giao sang máy Windows, xem [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md).
 - Bản cài ký ad-hoc, chưa notarize.
