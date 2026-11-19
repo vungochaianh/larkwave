@@ -1,6 +1,6 @@
 # Bàn giao phiên — Larkwave
 
-**Chốt ngày 19/11/2026 ở bản 0.1.24** ("Cài AI" — xem CLAUDE.md). Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
+**Chốt ngày 20/11/2026 ở bản 0.1.25** (dùng không cần tài khoản + "Cài AI" — xem CLAUDE.md). Larkwave đã *tạm nghiệm thu và đóng gói*; trọng tâm công
 việc chuyển sang Appwave. Việc mở còn lại là **bản Windows** (đang bàn giao sang máy Windows). Tệp
 này để mở lại phiên ở đây mà không phải đọc lại cả lịch sử.
 
@@ -13,17 +13,17 @@ này để mở lại phiên ở đây mà không phải đọc lại cả lịc
 
 | | |
 |---|---|
-| Bản đang phát hành | **0.1.24** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` (manifest 8/8 ngày 19/11/2026) |
+| Bản đang phát hành | **0.1.25** macOS (.dmg + code-push), live tại `https://toolswave.net/larkwave` (manifest 8/8 ngày 20/11/2026) |
 | Windows | **chưa có bản nào** — máy Windows đang nhận bàn giao: [may-phat-hanh-windows.md](may-phat-hanh-windows.md) |
 | Remote `origin` | `https://gitlab.com/toolswave/larkwave` — **riêng tư**, tạo 28/10/2026, nhánh `main` |
 | Remote `github` | `https://github.com/vungochaianh/larkwave` — **công khai, mã nguồn mở MIT** từ 28/10/2026 |
 | Commit cuối / cây làm việc | đo bằng `node scripts/handoff.mjs`, đừng tin dòng ghi tay |
-| Test | 564 bài qua (`bash apps/desktop/test/run.sh`) |
+| Test | 570 bài qua (`bash apps/desktop/test/run.sh`) |
 
 **Link cài** (README cũng có):
 
 - Trang tải, luôn là bản mới nhất: <https://toolswave.net/larkwave>
-- macOS 0.1.23: <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.23/Larkwave-0.1.23-universal.dmg>
+- macOS 0.1.25: <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.25/Larkwave-0.1.25-universal.dmg>
 - Windows (khi máy Windows phát hành xong): `…/larkwave-desktop/<bản>/Larkwave-<bản>-win.exe`
 - Manifest app + trang cùng đọc: <https://toolswave.net/api/apps-release/larkwave>
 - Mọi bản (registry công khai, project 83700259): <https://gitlab.com/deveris.vu/toolswave-desktop-release/-/packages>

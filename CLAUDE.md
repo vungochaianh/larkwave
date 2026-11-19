@@ -5,9 +5,9 @@ Toolswave ngày 06/10/2026. Màn chính là **Lark × Agents**: chat với một
 web thật của người dùng. Agent đọc/ghi Base, Sheet, Doc, Drive, tạo automation/workflow (luôn để
 TẮT), xuất tệp, và chạy lịch tự động. Đi kèm có Trợ lý AI chung, Kỹ năng, điều khiển từ xa.
 Larkwave **không có phần dựng app**, phần đó nằm ở `/Users/deveris/appwave`.
-**Trạng thái (19/11/2026):**
-- Bản **0.1.24 macOS đã phát hành** ("Cài AI": AI miễn phí trên máy + Claude một bấm): https://toolswave.net/larkwave.
-  0.1.23 chỉ dựng ở máy, chưa từng lên registry — 0.1.24 gồm luôn bản sửa của nó.
+**Trạng thái (20/11/2026):**
+- Bản **0.1.25 macOS đã phát hành** (dùng không cần tài khoản: "dữ liệu chỉ trên máy"): https://toolswave.net/larkwave.
+  0.1.24 có "Cài AI" (AI miễn phí trên máy + Claude một bấm). 0.1.23 chỉ dựng ở máy, chưa từng lên registry.
 - Code-push giao diện đang bật.
 - Chưa có bản Windows: đang bàn giao sang máy Windows, xem [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md).
 - Bản cài ký ad-hoc, chưa notarize.
@@ -127,7 +127,7 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   (ipcAdapter xoá phương thức khi lõi cũ thiếu kênh) nên code-push vẫn chạy trên lõi 0.1.0.
 - Màn Tổng quan: Lark "đã kết nối" khi có phiên web hoặc App ID (trước chỉ tính App ID); "Trình AI" tính cả AI trên máy.
 
-## Chế độ "dữ liệu chỉ trên máy" (lõi 0.1.25, CHƯA phát hành)
+## Chế độ "dữ liệu chỉ trên máy" (từ 0.1.25)
 
 - Người dùng muốn (19/11/2026): bản mã nguồn mở dùng được **không cần tài khoản Toolswave, không gửi gì lên máy chủ**.
   Nút "Dùng ngay — không cần tài khoản" ở màn đăng nhập (`data-testid="login-local-mode"`).
