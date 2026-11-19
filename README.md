@@ -21,7 +21,8 @@ máy. Tài khoản và dữ liệu trong video là dữ liệu mẫu.
 
 ### Cài AI miễn phí ngay trong app (0.1.24)
 
-<!-- VIDEO CÀI AI: sửa README trên github.com, kéo tệp HDSD-Larkwave-Cai-AI-ngan.mp4 thả vào dòng này → GitHub hiện trình phát -->
+https://github.com/user-attachments/assets/d86e7049-8c9b-4bdc-9776-2a6a5c9a80d1
+
 
 Không cần cài Claude hay mở terminal: **Cài đặt → Cài AI** để Larkwave tự tải Ollama và một mô hình mở chạy ngay
 trên máy (miễn phí, không cần tài khoản, dữ liệu không rời máy), hoặc cài Claude một bấm bằng trình cài chính thức
