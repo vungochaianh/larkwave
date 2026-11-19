@@ -61,6 +61,7 @@ import type {
   LarkBrowserRect,
   LarkBrowserState,
   LarkWebAccounts,
+  LocalAiStatus,
   ConnectorOp,
   LarkWebBase,
   LarkUiTemplate,
@@ -88,6 +89,11 @@ interface Bridge {
   quitApp(): Promise<void>;
   claudeStatus(): Promise<ClaudeStatus>;
   claudeLogout(): Promise<void>;
+  claudeInstall?(): Promise<{ ok: boolean; error?: string; log?: string }>;
+  localAiStatus?(): Promise<LocalAiStatus>;
+  localAiInstall?(): Promise<LocalAiStatus>;
+  localAiPull?(model: string): Promise<LocalAiStatus>;
+  localAiUse?(model: string): Promise<LocalAiStatus>;
   claudeSetToken(token: string): Promise<ClaudeStatus>;
   claudeClearToken(): Promise<ClaudeStatus>;
   claudeListKeys(): Promise<ApiKeyList>;
@@ -309,6 +315,9 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
       // Lõi < 0.1.5 chưa có kết nối Zalo/Gmail cho kỹ năng → giao diện hiện "cần bản cài mới".
       if (!b.connectorsCall) (this as Record<string, unknown>).connectorsCall = undefined;
       if (!b.larkUiTemplateList) (this as Record<string, unknown>).larkUiTemplateList = undefined;
+      // Lõi < 0.1.24 chưa có "Cài AI" (AI trên máy + Claude một bấm) → giao diện ẩn các nút đó.
+      if (!b.localAiStatus) for (const k of ['localAiStatus', 'localAiInstall', 'localAiPull', 'localAiUse']) (this as Record<string, unknown>)[k] = undefined;
+      if (!b.claudeInstall) (this as Record<string, unknown>).claudeInstall = undefined;
     }
   }
 
@@ -599,6 +608,23 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
     if (!this.bridge.connectorsCall) return Promise.reject(new Error('Kết nối Zalo/Gmail cần bản cài mới (.dmg 0.1.5).'));
     return this.bridge.connectorsCall(op, payload);
   }
+  // ── Cài AI (0.1.24) ──
+  localAiStatus(): Promise<LocalAiStatus> {
+    return this.bridge.localAiStatus!();
+  }
+  localAiInstall(): Promise<LocalAiStatus> {
+    return this.bridge.localAiInstall!();
+  }
+  localAiPull(model: string): Promise<LocalAiStatus> {
+    return this.bridge.localAiPull!(model);
+  }
+  localAiUse(model: string): Promise<LocalAiStatus> {
+    return this.bridge.localAiUse!(model);
+  }
+  claudeInstall(): Promise<{ ok: boolean; error?: string; log?: string }> {
+    return this.bridge.claudeInstall!();
+  }
+
   larkWebAccounts(): Promise<LarkWebAccounts> {
     if (!this.bridge.larkWebAccounts) return Promise.reject(new Error('Quản lý tài khoản Lark cần bản cài mới (.dmg).'));
     return this.bridge.larkWebAccounts();

@@ -4,6 +4,7 @@ import { buildQuickAsks, CUSTOM_ASKS_KEY, emptyExamples, mergeChips, parseCustom
 import { LarkChatToolbar } from './LarkChatToolbar';
 import type { MenuProps } from 'antd';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { LOCAL_AI_CHANGED_EVENT } from '../LocalAiSetup';
 import { Alert, App, Badge, Button, Checkbox, Drawer, Dropdown, Grid, Input, Modal, Popover, Segmented, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { AttachmentPreview, type PreviewableAttachment } from '../AttachmentPreview';
 import { renderUserText } from '../chat/renderUserText';
@@ -549,9 +550,22 @@ export function LarkChat({
   const [claudeKeys, setClaudeKeys] = useState<{ keys: { active: boolean }[] } | null>(null);
   /** Đã kết nối custom app (App ID) chưa — quyết định nút "Hỏi nhanh" dùng tool Open API hay phiên Lark web. */
   const [appConnected, setAppConnected] = useState(true);
-  /** Nguồn chạy agent: CLI trên máy · khoá API riêng · gói Larkwave (MAIC). */
-  const [runSource, setRunSource] = useState<'cli' | 'api' | 'maic'>('cli');
+  /** Nguồn chạy agent: CLI trên máy · AI miễn phí trên máy · khoá API riêng · gói Larkwave (MAIC). */
+  const [runSource, setRunSource] = useState<'cli' | 'api' | 'maic' | 'local'>('cli');
   const [maicAvailable, setMaicAvailable] = useState(false);
+  /** AI trên máy (Ollama — lõi ≥ 0.1.24): đang chạy + có mô hình, và mô hình đang dùng. */
+  const [localReady, setLocalReady] = useState<boolean | undefined>(undefined);
+  const [localModel, setLocalModel] = useState<string | undefined>(undefined);
+  const refreshLocal = useCallback(() => {
+    if (!runtime.localAiStatus) return;
+    runtime
+      .localAiStatus()
+      .then((l) => {
+        setLocalReady(l.running && l.models.length > 0);
+        setLocalModel(l.activeModel && l.models.some((m) => m.id === l.activeModel) ? l.activeModel : l.models[0]?.id);
+      })
+      .catch(() => undefined);
+  }, [runtime]);
 
   // Load the persisted auto-approve preference.
   useEffect(() => {
@@ -561,6 +575,7 @@ export function LarkChat({
       setStatusKeyReady(s.apiKeyReady);
       setRunSource(s.larkRunSource ?? (s.apiMode ? 'api' : 'cli'));
       setMaicAvailable(!!s.maicAvailable);
+      refreshLocal();
       if (s.defaultRunner) setRunnerId(s.defaultRunner);
       if (s.defaultModel) setRunnerModel(s.defaultModel);
     }).catch(() => undefined);
@@ -578,22 +593,31 @@ export function LarkChat({
         .then((s) => {
           setStatusKeyReady(s.apiKeyReady);
           setAppConnected(!!s.connected);
+          if (s.larkRunSource) setRunSource(s.larkRunSource);
         })
         .catch(() => undefined);
+      refreshLocal();
     };
     const onFocus = () => refresh();
     const onKeys = () => refresh(true);
     runtime.claude?.listKeys?.().then(setClaudeKeys).catch(() => undefined);
     window.addEventListener('focus', onFocus);
     window.addEventListener(API_KEYS_CHANGED_EVENT, onKeys);
+    window.addEventListener(LOCAL_AI_CHANGED_EVENT, onKeys);
     return () => {
       window.removeEventListener('focus', onFocus);
       window.removeEventListener(API_KEYS_CHANGED_EVENT, onKeys);
+      window.removeEventListener(LOCAL_AI_CHANGED_EVENT, onKeys);
     };
   }, [runtime]);
 
-  const pickRunSource = (src: 'cli' | 'api' | 'maic') => {
+  const pickRunSource = (src: 'cli' | 'api' | 'maic' | 'local') => {
     setRunSource(src);
+    // AI trên máy đã có mô hình → ghi luôn mô hình (riêng máy) cùng nguồn chạy.
+    if (src === 'local' && localModel && runtime.localAiUse) {
+      runtime.localAiUse(localModel).then(() => refreshLocal()).catch(() => undefined);
+      return;
+    }
     runtime.larkSetAgentPrefs
       ?.({ larkRunSource: src })
       .then((s) => setStatusKeyReady(s.apiKeyReady))
@@ -971,7 +995,8 @@ export function LarkChat({
     ]);
     const startedAt = Date.now();
     try {
-      lastAgentRef.current = `${runnerId}${runnerModel ? ` · ${runnerModel}` : ''}`;
+      // Nhãn "ai đã trả lời": AI trên máy không liên quan runner CLI đang chọn — ghi đúng mô hình đã chạy.
+      lastAgentRef.current = runSource === 'local' && localModel ? `máy · ${localModel}` : `${runnerId}${runnerModel ? ` · ${runnerModel}` : ''}`;
       for await (const ev of runtime.larkChat({
         prompt: effective,
         mode,
@@ -1662,6 +1687,9 @@ export function LarkChat({
           onRunSource={pickRunSource}
           apiKeyReady={apiKeyReadyFrom(statusKeyReady, runnerId, claudeKeys)}
           maicAvailable={maicAvailable}
+          localSupported={!!runtime.localAiStatus}
+          localReady={localReady}
+          localModel={localModel}
           appConnected={appConnected}
           autoMode={autoMode}
           onAuto={(on) => void changeAuto(on)}

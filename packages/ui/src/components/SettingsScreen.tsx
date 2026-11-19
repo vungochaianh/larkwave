@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Card, Typography, Space, Tag, Button, Input, Switch, Alert, List, Modal, Popconfirm, Spin, Tooltip, message, Grid } from 'antd';
-import { ApiOutlined, CheckCircleFilled, ReloadOutlined, CloudServerOutlined, CopyOutlined, MessageOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
+import { ApiOutlined, CheckCircleFilled, DesktopOutlined, ReloadOutlined, CloudServerOutlined, CopyOutlined, MessageOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
 import type { AgentClientStatus, AgentWebhookTokenInfo, RunnerStatusInfo, TelegramLinkResponse } from '@larkwave/core';
 import { useRuntime } from '../RuntimeProvider';
 import { ClaudeConnect } from './ClaudeConnect';
+import { LocalAiSetup } from './LocalAiSetup';
 import { ClaudeKeyManager } from './ClaudeKeyManager';
 import { DeviceManager } from './DeviceManager';
 import { BRAND, V, OK, WARN, BLUE, CARD_SHADOW } from '../theme';
@@ -823,6 +824,13 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
    * cột lệch hẳn nhau. Giờ: trái = Trình AI (thẻ cao nhất, là việc chính của trang này), phải = API
    * Keys + Thiết bị + Điều khiển từ xa — tổng chiều cao hai bên xấp xỉ nhau. Hẹp thì về một cột.
    */
+  // "Cài AI" (lõi ≥ 0.1.24): AI miễn phí trên máy. Claude một bấm nằm ngay trong thẻ Trình AI bên dưới.
+  const aiSetupCard = runtime.localAiStatus ? (
+    <Card title={<CardTitle icon={<DesktopOutlined />} color={OK}>{t('ui.aiSetup.cardTitle', 'Cài AI')}</CardTitle>} style={CARD_STYLE}>
+      <LocalAiSetup runtime={runtime} showClaude={false} />
+    </Card>
+  ) : null;
+
   return (
     <div style={{ width: '100%' }}>
       <PageHeader
@@ -832,6 +840,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
 
       {cols === 1 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {aiSetupCard}
           <RunnersPanel />
           {zaloCard}
           {apiKeysCard}
@@ -841,6 +850,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+            {aiSetupCard}
             <RunnersPanel />
             {zaloCard}
           </div>

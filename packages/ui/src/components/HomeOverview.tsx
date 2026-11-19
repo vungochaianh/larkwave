@@ -4,6 +4,7 @@ import { Card, Typography, Button, Tag, Tooltip } from 'antd';
 import { PlusOutlined, FieldTimeOutlined, CheckCircleFilled, RobotOutlined, ThunderboltOutlined, CoffeeOutlined, BulbOutlined, ExperimentOutlined, SyncOutlined, ArrowRightOutlined, RightOutlined, ReloadOutlined, DatabaseOutlined, MessageOutlined, PartitionOutlined, ApiOutlined, CloudServerOutlined, FireOutlined, ExclamationCircleFilled, WarningOutlined, TrophyOutlined, TeamOutlined, GiftOutlined } from '@ant-design/icons';
 import { useRuntime } from '../RuntimeProvider';
 import { V, BRAND, BRAND_GRADIENT, CARD_SHADOW, OK, WARN, ERR, BLUE } from '../theme';
+import { openFix } from './fix/fixRules';
 import { HubPeople } from './HubCommunity';
 import { BrandGlyph } from './BrandMark';
 import { FEATURE_FRIENDS } from '../features';
@@ -102,7 +103,10 @@ export function HomeOverview({
 
   // ── Lark ──────────────────────────────────────────────────────────────────
   const hasLark = !!runtime.larkStatus;
-  const [lark, setLark] = useState<{ connected: boolean; apiMode?: boolean; bases?: number; sessions?: number; autos?: number } | null>(null);
+  // `connected` = Lark dùng được: custom app (Open API) HOẶC phiên web đã đăng nhập (đường chính "không cần
+  // App ID"). Trước 0.1.24 chỉ tính App ID nên người đăng nhập bằng QR vẫn thấy "Chưa kết nối".
+  // `local` = AI miễn phí trên máy (Ollama, cài trong app) đang chạy và có mô hình — tên mô hình.
+  const [lark, setLark] = useState<{ connected: boolean; apiMode?: boolean; web?: boolean; local?: string; bases?: number; sessions?: number; autos?: number } | null>(null);
   const [larkLoading, setLarkLoading] = useState(hasLark);
   useEffect(() => {
     if (!hasLark) return;
@@ -110,12 +114,20 @@ export function HomeOverview({
     (async () => {
       try {
         const st = await runtime.larkStatus!();
-        const [bases, sessions, autos] = await Promise.all([
+        // IPC dò trước (`?.`): giao diện code-push phải chạy cả trên lõi cũ không có các kênh này.
+        const [bases, sessions, autos, webInfo, webAccs, localAi] = await Promise.all([
           runtime.larkListBases?.().then((b) => b.length).catch(() => undefined),
           runtime.larkSessions?.().then((s) => s.length).catch(() => undefined),
           runtime.larkListAutomations?.().then((a) => a.length).catch(() => undefined),
+          runtime.larkWebStatus?.().catch(() => null),
+          runtime.larkWebAccounts?.().catch(() => null),
+          runtime.localAiStatus?.().catch(() => null),
         ]);
-        if (alive) setLark({ connected: !!st?.connected, apiMode: !!st?.apiMode, bases, sessions, autos });
+        // Phiên web: trang Lark đang sống, HOẶC đã có tài khoản Lark đăng nhập (trang chỉ được tạo khi mở
+        // màn Lark, nên lúc mới mở app `larkWebStatus` còn false dù cookie vẫn hợp lệ).
+        const web = !!webInfo?.connected || !!webAccs?.accounts?.some((a) => !!a.host);
+        const local = localAi?.running && localAi.models.length ? (localAi.activeModel ?? localAi.models[0].id) : undefined;
+        if (alive) setLark({ connected: !!st?.connected || web, apiMode: !!st?.connected && !!st?.apiMode, web, local, bases, sessions, autos });
       } catch { if (alive) setLark({ connected: false }); }
       finally { if (alive) setLarkLoading(false); }
     })();
@@ -194,7 +206,7 @@ export function HomeOverview({
   // ── health rows ─────────────────────────────────────────────────────────────
   type HealthRow = { key: string; icon: ReactNode; label: string; done: boolean; loading: boolean; sub: string; cta: string; onClick: () => void };
   const healthRows: HealthRow[] = [
-    { key: 'ai', icon: <RobotOutlined />, label: 'Trình AI (CLI)', loading: runnersReady === null, done: (runnersReady ?? 0) > 0, sub: (runnersReady ?? 0) > 0 ? `${runnersReady}/${runnersTotal} CLI sẵn sàng` : 'Chưa kết nối AI nào', cta: 'Kết nối', onClick: () => nav('settings') },
+    { key: 'ai', icon: <RobotOutlined />, label: 'Trình AI', loading: runnersReady === null, done: (runnersReady ?? 0) > 0 || !!lark?.local, sub: (runnersReady ?? 0) > 0 ? `${runnersReady}/${runnersTotal} CLI sẵn sàng${lark?.local ? ' · AI trên máy' : ''}` : lark?.local ? `AI miễn phí trên máy · ${lark.local}` : 'Chưa có AI — bấm Cài AI', cta: runtime.localAiStatus ? 'Cài AI' : 'Kết nối', onClick: () => (runtime.localAiStatus ? openFix('aiSetup') : nav('settings')) },
     ...(hasLark ? [{ key: 'lark', icon: <ApiOutlined />, label: 'Lark', loading: lark === null, done: !!lark?.connected, sub: lark?.connected ? (lark.apiMode ? 'API trực tiếp' : 'Phiên web đang hoạt động') : 'Chưa kết nối', cta: 'Kết nối', onClick: () => nav('lark') } as HealthRow] : []),
     ...(hasCms ? [{ key: 'keeper', icon: <CloudServerOutlined />, label: 'Máy VM giữ phiên', loading: cms === null, done: !!cms?.keeperOnline, sub: cms?.keeperOnline ? 'Đang chạy 24/7' : 'Ngoại tuyến', cta: 'Mở', onClick: () => nav('cms-sync') } as HealthRow] : []),
     ...(user ? [{ key: 'skill', icon: <ExperimentOutlined />, label: 'Kỹ năng đầu tiên', loading: ov === null, done: (ov?.skills ?? 0) > 0, sub: (ov?.skills ?? 0) > 0 ? `${ov?.skills} kỹ năng` : 'Chưa có kỹ năng nào', cta: 'Tạo', onClick: () => nav('skills') } as HealthRow] : []),

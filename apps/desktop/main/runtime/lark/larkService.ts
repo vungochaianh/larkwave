@@ -210,6 +210,9 @@ import { runLarkApiAgent } from './larkApiAgent';
 import { runLarkMaicAgent } from './larkMaicAgent';
 import { getActiveKey } from '../claudeKeyStore';
 import { getProviderKey } from '../runners/runnerTokenStore';
+import { listRunnerStatus } from '../runners/registry';
+import { pickRunSource } from './runSource';
+import { ollama } from '../localAi/ollama';
 import { resolveTool } from './tools';
 import { isDeleteToolName } from './larkToolExec';
 import { buildSystemPrompt, buildGeneralSystemPrompt, buildReadOnlyAssistantPrompt, buildAgentSystemPrompt, buildTurnContextBlock, buildUnattendedBlock, buildWebSessionPrompt, mergeTurnBases, nowLine } from './systemPrompt';
@@ -218,7 +221,7 @@ import { LarkWebhook, type BotMessage } from './webhook';
 import { TunnelManager } from './tunnel';
 import { getLarkWebSession } from './larkWebSession';
 import { CmsSyncService, CMS_SYNC_DEFAULT_BASE, setSharedCmsBaseUrl, type CmsSyncJob } from './cmsSyncService';
-import type { LarkWebInfo, LarkWebAccounts, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo, SkillProposal } from '@larkwave/core';
+import type { LarkWebInfo, LarkWebAccounts, LarkWebBase, LarkFileActionInput, LarkFileActionResult, LarkAutoRunReport, LarkAutoFileSource, LarkAutomationFolderInfo, SkillProposal, LarkRunSource, LocalAiStatus } from '@larkwave/core';
 import { getAgentSkillLearner } from './skillBridge';
 
 /**
@@ -3458,6 +3461,50 @@ export class LarkService {
     return ok;
   }
 
+  /**
+   * NGUỒN CHẠY HIỆU LỰC của Lark × Agents — để người mới cài KHÔNG phải cài thêm AI nào.
+   *
+   * Người dùng đã tự chọn nguồn (`larkRunSource`) → giữ nguyên lựa chọn đó. Chưa từng chọn → dùng CLI
+   * trên máy nếu trình đang chọn đã sẵn sàng; nếu chưa (máy mới, chưa cài Claude…) mà đã đăng nhập tài
+   * khoản Larkwave và máy chủ bật Gói Larkwave → chạy Gói Larkwave: đăng nhập + quét QR Lark là chat được.
+   *
+   * `status()` trả CÙNG giá trị này cho giao diện, nên chip nguồn chạy hiện đúng "Gói Larkwave", và lần
+   * lưu tuỳ chọn kế tiếp ghi giá trị đó xuống (không bị nhảy về 'cli' rồi ghi đè như trước).
+   */
+  private async effectiveRunSource(): Promise<LarkRunSource> {
+    const s = this.store.getSettings();
+    // Đã chọn / API: trả ngay, khỏi dò CLI và Ollama (status() được gọi rất thường xuyên).
+    if (s.larkRunSource || s.apiMode) return pickRunSource({ chosen: s.larkRunSource, apiMode: s.apiMode, runnerReady: false, localReady: false });
+    const runner = s.defaultRunner || 'claude';
+    const runnerReady = !!(await listRunnerStatus().catch(() => [])).find((x) => x.id === runner)?.ready;
+    let localReady = false;
+    if (!runnerReady) {
+      const st = await ollama.status().catch(() => null);
+      localReady = !!st?.running && (st?.models.length ?? 0) > 0;
+    }
+    return pickRunSource({ runnerReady, localReady });
+  }
+
+  /** Mô hình AI trên máy sẽ dùng: đã chọn (riêng máy) và vẫn còn trên máy; không thì mô hình đầu tiên. */
+  private async localModelToUse(): Promise<string | undefined> {
+    const st = await ollama.status().catch(() => null);
+    const want = this.store.getMachinePrefs().localModel;
+    const ids = st?.models.map((m) => m.id) ?? [];
+    return want && ids.includes(want) ? want : ids[0];
+  }
+
+  /** AI miễn phí trên máy — trạng thái cho màn "Cài AI". */
+  async localAiStatus(): Promise<LocalAiStatus> {
+    return ollama.status(this.store.getMachinePrefs().localModel);
+  }
+
+  /** Dùng mô hình này cho Lark × Agents: ghi mô hình (riêng máy) + đặt nguồn chạy 'local'. */
+  async localAiUse(model: string): Promise<LocalAiStatus> {
+    this.store.setMachinePrefs({ localModel: model });
+    this.store.setSettings({ larkRunSource: 'local', apiMode: false });
+    return this.localAiStatus();
+  }
+
   /** Run ONE general turn on the server via MAIC (hosted Claude). No local CLI. */
   private async *runHostedChat(input: LarkChatInput): AsyncGenerator<LarkChatEvent> {
     const token = this.accountTokenGetter?.();
@@ -3778,7 +3825,8 @@ export class LarkService {
         apiMode,
         // Cũng trả ở nhánh CHƯA kết nối: thiếu thì mở app lần đầu, lựa chọn nguồn chạy nhảy về
         // 'cli' rồi lần lưu kế tiếp ghi đè mất lựa chọn thật của người dùng.
-        larkRunSource: settings.larkRunSource ?? (apiMode ? 'api' : 'cli'),
+        larkRunSource: await this.effectiveRunSource(),
+        localModel: this.store.getMachinePrefs().localModel,
         // Trước 0.1.5 nhánh này thiếu trường này ⇒ giao diện báo "Chưa có API key" dù key đã lưu.
         apiKeyReady: this.apiReady(defaultRunner),
         maicAvailable: !!this.accountTokenGetter?.() && this.maicAvailCache?.ok !== false,
@@ -3796,7 +3844,8 @@ export class LarkService {
       defaultModel,
       apiMode,
       apiKeyReady: this.apiReady(defaultRunner),
-      larkRunSource: settings.larkRunSource ?? (apiMode ? 'api' : 'cli'),
+      larkRunSource: await this.effectiveRunSource(),
+      localModel: this.store.getMachinePrefs().localModel,
       // Chỉ hiện lựa chọn "gói Larkwave" khi máy chủ THẬT SỰ có MAIC và người dùng đã đăng nhập.
       // Bày một lựa chọn rồi báo lỗi khi bấm thì tệ hơn là không bày.
       maicAvailable: !!this.accountTokenGetter?.() && this.maicAvailCache?.ok !== false,
@@ -3809,7 +3858,7 @@ export class LarkService {
     runner?: string;
     model?: string;
     apiMode?: boolean;
-    larkRunSource?: 'cli' | 'api' | 'maic';
+    larkRunSource?: LarkRunSource;
   }): Promise<LarkConnection> {
     this.store.setSettings({
       defaultRunner: prefs.runner,
@@ -4749,13 +4798,22 @@ export class LarkService {
     const apiKey = apiMode ? this.resolveApiKey(runner) : null;
     // Ran the DIRECT API (vs the local CLI). Skip the API if its key was already seen out of
     // credit this session → go straight to the CLI/subscription (no dead-key retry every turn).
-    // Tạo workflow luôn chạy CLI trên máy: đường API/MAIC dựng bộ công cụ theo `mode` (không có
-    // bộ riêng của chế độ này) và cần client Open API — chế độ này cố ý không đòi.
+    // Đường API trực tiếp dựng bộ công cụ theo `mode` và cần client Open API — chưa có App ID thì
+    // lượt chạy rơi về CLI. (Đường MAIC bên dưới đã không còn đòi client — xem onMaic.)
     const onApi = !!(apiMode && apiKey && !general && client && !this.apiCreditOut.has(runner));
     // NGUỒN CHẠY THỨ BA: gói Larkwave (MAIC). Không cần CLI cài trên máy, không cần khoá API
     // riêng — máy chủ giữ khoá MAIC, chặn theo gói của người dùng và ghi sổ token; công cụ Lark
     // vẫn chạy TRÊN MÁY NÀY nên App Secret không rời máy. Xem larkMaicAgent.ts.
-    const onMaic = !!(this.store.getSettings().larkRunSource === 'maic' && !general && client && this.accountTokenGetter?.());
+    // Từ 0.1.24 KHÔNG còn đòi custom app (App ID): không có client thì MAIC nhận bộ công cụ phiên web
+    // (agentTools withOpenApi:false — 55 công cụ, dưới trần 64 của máy chủ), y như đường CLI. Người
+    // đăng nhập Lark bằng QR + tài khoản Larkwave là đủ, không cài CLI, không khoá API.
+    // 'maic' chỉ chạy khi người dùng TỰ chọn Gói Larkwave (không còn tự chuyển sang AI máy chủ).
+    const src = !general ? await this.effectiveRunSource() : null;
+    const onMaic = !!(src === 'maic' && this.accountTokenGetter?.());
+    // NGUỒN CHẠY THỨ TƯ (0.1.24): AI MIỄN PHÍ TRÊN MÁY — Ollama do app tự cài (màn "Cài AI"), gọi kiểu
+    // OpenAI qua apiRunner (provider 'ollama'). Không cần tài khoản AI, không cần khoá, không cần App ID:
+    // không có client thì nhận bộ công cụ phiên web như mọi đường khác.
+    const onLocal = src === 'local';
     // The CLI spawn injects a stored API key (if any) into claude's env — so a credit error may be
     // THAT key being drained while the user's own `claude` subscription is fine. When set, recover
     // by retrying on the subscription (key stripped).
@@ -4789,10 +4847,42 @@ export class LarkService {
     if (laneId) getLarkWebSession().setLaneBusy(laneId, true);
     try {
       let inner: AsyncGenerator<LarkChatEvent>;
-      if (onMaic) {
+      if (onLocal) {
+        const run = await ollama.ensureRunning();
+        const localModel = run ? await this.localModelToUse() : undefined;
+        if (!run || !localModel) {
+          const message = !run
+            ? 'AI trên máy chưa cài hoặc chưa chạy. Mở Cài đặt → "Cài AI" để cài AI miễn phí trên máy.'
+            : 'Chưa có mô hình AI nào trên máy. Mở Cài đặt → "Cài AI" để tải một mô hình.';
+          inner = (async function* (): AsyncGenerator<LarkChatEvent> {
+            yield { type: 'error', message };
+            yield { type: 'done' };
+          })();
+        } else {
+          inner = runLarkApiAgent(turnPrompt, input.mode, {
+            files: turnFiles,
+            client: client ?? undefined,
+            baseTools: (m) => agentTools({ withOpenApi: !!client, mode: m }),
+            apiBase: `${run.base}/v1`,
+            systemPrompt,
+            runner: 'ollama',
+            model: localModel,
+            apiKey: 'ollama',
+            history: this.buildApiHistory(stored?.items ?? [], seedBudget),
+            extraTools: this.plugins.collectTools(),
+            autoApprove,
+            autoApproveTool,
+            allowVersionHint: true,
+            awaitConfirm: confirm,
+            signal: abort.signal,
+          });
+        }
+      } else if (onMaic) {
         inner = runLarkMaicAgent(turnPrompt, input.mode, {
           files: turnFiles,
-          client: client!,
+          client: client ?? undefined,
+          // CÙNG bộ công cụ hợp nhất với đường CLI: có App ID → đủ bộ; chưa có → bộ phiên web.
+          baseTools: (m) => agentTools({ withOpenApi: !!client, mode: m }),
           systemPrompt,
           accountToken: this.accountTokenGetter!()!,
           ...(model ? { model } : {}),

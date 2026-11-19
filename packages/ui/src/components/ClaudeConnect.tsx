@@ -20,7 +20,7 @@ function open(runtime: ReturnType<typeof useRuntime>, url: string) {
  * `claude` / `/login` flow but as a recognizable GUI: status → login (opens the
  * browser OAuth) → done. Calls `onReady` once connected.
  */
-export function ClaudeConnect({ onReady }: { onReady: () => void }) {
+export function ClaudeConnect({ onReady, embedded }: { onReady: () => void; embedded?: boolean }) {
   const runtime = useRuntime();
   const { t } = useI18n();
   const [st, setSt] = useState<ClaudeStatus | null>(null);
@@ -29,6 +29,8 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
   const [logLine, setLogLine] = useState('');
   const [token, setToken] = useState('');
   const [savingToken, setSavingToken] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installErr, setInstallErr] = useState('');
 
   const refresh = useCallback(async () => {
     const s = await runtime.claude!.status().catch(() => null);
@@ -99,6 +101,21 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
     }
   };
 
+  /** Cài một bấm (lõi ≥ 0.1.24): trình cài CHÍNH THỨC của Anthropic — không cần Node/npm, không mở terminal. */
+  const install = async () => {
+    setInstalling(true);
+    setInstallErr('');
+    try {
+      const r = await runtime.claudeInstall!();
+      if (!r.ok) setInstallErr([r.error, r.log].filter(Boolean).join('\n'));
+    } catch (e) {
+      setInstallErr((e as Error)?.message || String(e));
+    } finally {
+      setInstalling(false);
+      await refresh();
+    }
+  };
+
   const clearToken = async () => {
     const s = await runtime.claude!.clearToken().catch(() => null);
     if (s) setSt(s);
@@ -107,8 +124,8 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
   const step = !st ? 0 : !st.installed ? 0 : !st.loggedIn ? 1 : 2;
 
   return (
-    <div style={{ maxWidth: 560, margin: '40px auto 0' }}>
-      <Card>
+    <div style={embedded ? undefined : { maxWidth: 560, margin: '40px auto 0' }}>
+      <Card bordered={!embedded} styles={embedded ? { body: { padding: 0 } } : undefined}>
         <div style={{ textAlign: 'center', marginBottom: 18 }}>
           <div style={{ width: 56, height: 56, borderRadius: 16, background: BRAND_GRADIENT, margin: '0 auto 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 26 }}>
             <CloudOutlined />
@@ -133,7 +150,17 @@ export function ClaudeConnect({ onReady }: { onReady: () => void }) {
             message={t('ui.claude.notFound', 'Chưa tìm thấy Claude CLI')}
             description={
               <Space direction="vertical" size={4}>
-                <Text>{t('ui.claude.installCmd', 'Cài bằng lệnh:')}</Text>
+                {runtime.claudeInstall && (
+                  <>
+                    <Button type="primary" loading={installing} onClick={() => void install()} data-testid="claude-install">
+                      {installing ? t('ui.claude.installing', 'Đang cài Claude…') : t('ui.claude.installAuto', 'Cài Claude tự động')}
+                    </Button>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{t('ui.claude.installAutoDesc', 'Chạy trình cài chính thức của Anthropic — không cần Node/npm, không phải mở terminal.')}</Text>
+                    {installErr && <Alert type="error" showIcon message={t('ui.claude.installFailed', 'Cài chưa được')} description={<pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: 11.5 }}>{installErr}</pre>} />}
+                    <Text type="secondary" style={{ fontSize: 12, marginTop: 6 }}>{t('ui.claude.orInstallCmd', 'Hoặc cài bằng lệnh:')}</Text>
+                  </>
+                )}
+                {!runtime.claudeInstall && <Text>{t('ui.claude.installCmd', 'Cài bằng lệnh:')}</Text>}
                 <Text code copyable>npm i -g @anthropic-ai/claude-code</Text>
                 <Link onClick={() => open(runtime, 'https://docs.claude.com/claude-code')}>{t('ui.claude.installGuide', 'Hướng dẫn cài đặt →')}</Link>
                 <Button icon={<ReloadOutlined />} onClick={refresh}>{t('ui.claude.recheck', 'Kiểm tra lại')}</Button>

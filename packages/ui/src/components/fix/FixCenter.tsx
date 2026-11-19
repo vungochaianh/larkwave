@@ -7,6 +7,7 @@ import { useRuntime } from '../../RuntimeProvider';
 import { ERR, OK, V, WARN } from '../../theme';
 import { AgentGuideModal } from '../AgentGuideModal';
 import { ClaudeConnect } from '../ClaudeConnect';
+import { LocalAiSetup } from '../LocalAiSetup';
 import { ClaudeKeyManager } from '../ClaudeKeyManager';
 import { SkillConnectors } from '../SkillConnectors';
 import { ZaloSyncPanel } from '../ZaloSyncPanel';
@@ -39,18 +40,21 @@ export function FixCenter() {
   const check = useCallback(async (): Promise<HealthIssue[]> => {
     setChecking(true);
     try {
-      const [list, st, keys, zalo, gmail] = await Promise.all([
+      const [list, st, keys, zalo, gmail, local] = await Promise.all([
         runtime.runners?.list().catch(() => [] as RunnerStatusInfo[]) ?? Promise.resolve([] as RunnerStatusInfo[]),
         runtime.larkStatus?.().catch(() => null) ?? Promise.resolve(null),
         runtime.claude?.listKeys?.().catch(() => null) ?? Promise.resolve(null),
         runtime.connectorsCall ? (runtime.connectorsCall('zaloStatus') as Promise<ZaloConnectorStatus>).catch(() => null) : Promise.resolve(null),
         runtime.connectorsCall ? (runtime.connectorsCall('gmailList') as Promise<GmailConnectorAccount[]>).catch(() => null) : Promise.resolve(null),
+        runtime.localAiStatus ? runtime.localAiStatus().catch(() => null) : Promise.resolve(null),
       ]);
       setRunners(list || []);
       const found = healthIssues({
         runners: list || [],
         activeRunner: st?.defaultRunner || 'claude',
         runSource: st?.larkRunSource ?? (st?.apiMode ? 'api' : 'cli'),
+        canSetupAi: !!runtime.localAiStatus,
+        localReady: local ? local.running && local.models.length > 0 : undefined,
         apiKeyReady: typeof st?.apiKeyReady === 'boolean' ? st.apiKeyReady : undefined,
         claudeKeys: keys,
         zalo: zalo ? { connected: zalo.accounts.some((a) => a.status === 'ready') } : null,
@@ -138,7 +142,9 @@ export function FixCenter() {
   }
 
   const title =
-    target === 'claude'
+    target === 'aiSetup'
+      ? 'Cài AI'
+      : target === 'claude'
       ? 'Kết nối Claude'
       : target === 'claudeKeys'
         ? 'API key Claude'
@@ -156,6 +162,7 @@ export function FixCenter() {
         <div style={{ marginBottom: 12, fontSize: 13, color: V.textSub }}>{open.reason}</div>
       )}
       {target === 'claude' && <ClaudeConnect onReady={close} />}
+      {target === 'aiSetup' && <LocalAiSetup runtime={runtime} onUsed={() => void check()} />}
       {target === 'claudeKeys' && <ClaudeKeyManager embedded onActiveChange={() => void check()} />}
       {target === 'zalo' && <SkillConnectors runtime={runtime} only="zalo" autoQr onConnected={() => setTimeout(close, 1200)} />}
       {target === 'gmail' && <SkillConnectors runtime={runtime} only="gmail" onConnected={() => setTimeout(close, 800)} />}

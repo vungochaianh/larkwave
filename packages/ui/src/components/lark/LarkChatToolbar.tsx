@@ -155,6 +155,9 @@ export function LarkChatToolbar({
   apiKeyReady,
   maicAvailable,
   appConnected,
+  localSupported = false,
+  localReady,
+  localModel,
   autoMode,
   onAuto,
   frame,
@@ -178,6 +181,12 @@ export function LarkChatToolbar({
   maicAvailable: boolean;
   /** Đã kết nối Lark Bot (App ID) chưa — "API trực tiếp" cần nó (xem engineWarn). */
   appConnected?: boolean;
+  /** Lõi có "Cài AI" (AI miễn phí trên máy + Claude một bấm) — lõi ≥ 0.1.24. */
+  localSupported?: boolean;
+  /** AI trên máy đang chạy + có mô hình. */
+  localReady?: boolean;
+  /** Mô hình AI trên máy đang dùng. */
+  localModel?: string;
   autoMode: boolean | null;
   onAuto: (on: boolean) => void;
   /** Bố cục chat: nút mở/đóng khung Lark bên phải. */
@@ -216,7 +225,7 @@ export function LarkChatToolbar({
       alive = false;
     };
   }, [runtime]);
-  const eng = engineModel({ runners, runnerId, model, runSource, apiKeyReady, maicAvailable, appConnected });
+  const eng = engineModel({ runners, runnerId, model, runSource, apiKeyReady, maicAvailable, appConnected, localReady, localModel });
   const active = runners.find((r) => r.id === runnerId);
 
   const toggle = (b: BaseOption) => {
@@ -250,7 +259,7 @@ export function LarkChatToolbar({
     <div data-testid="lark-engine-panel" style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: V.textFaint, marginBottom: 4 }}>{t('chat.engineSource', 'NGUỒN CHẠY')}</div>
-        {(['cli', 'api', 'maic'] as RunSource[]).map((s) => {
+        {((localSupported ? ['cli', 'local', 'api', 'maic'] : ['cli', 'api', 'maic']) as RunSource[]).map((s) => {
           const dis = s === 'maic' && !maicAvailable;
           const on = runSource === s;
           return (
@@ -267,12 +276,23 @@ export function LarkChatToolbar({
               <span style={{ flex: 1, fontSize: 13 }}>
                 {SOURCE_LABEL[s]}
                 {s === 'api' && !apiKeyReady ? <span style={{ color: V.textFaint }}> · {t('chat.noKey', 'thiếu key')}</span> : null}
+                {s === 'local' && !localReady ? <span style={{ color: V.textFaint }}> · {t('chat.localNotReady', 'chưa cài')}</span> : null}
               </span>
             </div>
           );
         })}
       </div>
-      {runSource !== 'maic' && (
+      {runSource === 'local' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            {t('chat.localModel', 'Mô hình')}: <b>{localModel || t('chat.localNoModel', 'chưa có')}</b>
+          </span>
+          <Button size="small" onClick={() => openFix('aiSetup' as FixTarget)} data-testid="lark-open-ai-setup">
+            {t('chat.openAiSetup', 'Cài AI')}
+          </Button>
+        </div>
+      )}
+      {runSource !== 'maic' && runSource !== 'local' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <Select
             size="small"
@@ -303,7 +323,7 @@ export function LarkChatToolbar({
             // Sửa một chạm: mở thẳng modal cài / đăng nhập / thêm key (FixCenter) thay vì bảo vào Cài đặt.
             const k = eng.warn!.kind;
             const target =
-              k === 'notInstalled' ? `runner:${runnerId}` : k === 'needsLogin' ? (runnerId === 'claude' ? 'claude' : `runner:${runnerId}`) : k === 'apiNoKey' ? (runnerId === 'claude' ? 'claudeKeys' : `runner:${runnerId}`) : null;
+              k === 'localOff' || (k === 'notInstalled' && localSupported) ? 'aiSetup' : k === 'notInstalled' ? `runner:${runnerId}` : k === 'needsLogin' ? (runnerId === 'claude' ? 'claude' : `runner:${runnerId}`) : k === 'apiNoKey' ? (runnerId === 'claude' ? 'claudeKeys' : `runner:${runnerId}`) : null;
             return target ? (
               <Button size="small" type="primary" style={{ marginTop: 6 }} onClick={() => openFix(target as FixTarget, eng.warn!.text)}>
                 {t('chat.fixNow', 'Sửa ngay')}

@@ -21,7 +21,12 @@ import {
  * only read-only tools; Build mode exposes the full set.
  */
 export interface LarkApiAgentDeps {
-  client: LarkClient;
+  /** Client Open API (custom app). Có thể KHÔNG có (AI trên máy + phiên web): khi đó `baseTools` đưa bộ phiên web. */
+  client?: LarkClient;
+  /** Bộ công cụ nền theo chế độ. Mặc định (hành vi cũ): đủ bộ, bộ chỉ đọc cho 'ask'. */
+  baseTools?: (m: LarkChatMode) => LarkToolDef[];
+  /** Ghi đè địa chỉ API (AI trên máy: cổng thật của Ollama, vd http://127.0.0.1:11435/v1). */
+  apiBase?: string;
   systemPrompt: string;
   runner: string; // claude | grok | gemini | codex
   model?: string;
@@ -86,7 +91,7 @@ export async function* runLarkApiAgent(
   const { registry, execTool } = createToolBridge(
     mode,
     // Đường DESKTOP: bộ công cụ đầy đủ + ghi chú phiên bản. Máy nền tự đưa bộ của nó.
-    { ...deps, baseTools: (m: LarkChatMode) => (m === 'ask' ? readOnlyTools() : allTools()), versionNote },
+    { ...deps, client: deps.client as LarkClient, baseTools: deps.baseTools ?? ((m: LarkChatMode) => (m === 'ask' ? readOnlyTools() : allTools())), versionNote },
     push,
   );
   const apiTools: ApiTool[] = [...registry.values()].map((t) => ({
@@ -109,6 +114,7 @@ export async function* runLarkApiAgent(
         tools: apiTools,
         execTool,
         signal: deps.signal,
+        ...(deps.apiBase ? { base: deps.apiBase } : {}),
       })) {
         if (ev.type === 'text') push({ type: 'text', delta: ev.delta });
         else if (ev.type === 'error') push({ type: 'error', message: ev.message });

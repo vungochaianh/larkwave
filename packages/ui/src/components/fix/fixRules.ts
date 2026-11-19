@@ -8,7 +8,7 @@
  * AppShell) mở đúng modal.
  */
 
-export type FixTarget = 'checklist' | 'claude' | 'claudeKeys' | 'zalo' | 'zaloWeb' | 'zaloSync' | 'gmail' | `runner:${string}`;
+export type FixTarget = 'checklist' | 'claude' | 'claudeKeys' | 'zalo' | 'zaloWeb' | 'zaloSync' | 'gmail' | 'aiSetup' | `runner:${string}`;
 
 export const OPEN_FIX_EVENT = 'larkwave:open-fix';
 /** FixCenter báo số việc CẦN sửa (error + warn) sau mỗi lần kiểm — FixBadge hiện số này. */
@@ -52,8 +52,12 @@ export interface HealthInput {
   runners: HealthRunner[];
   /** Runner Lark × Agents đang dùng (larkStatus.defaultRunner). */
   activeRunner: string;
-  /** Nguồn chạy: CLI trên máy / API key riêng / gói Larkwave. */
-  runSource: 'cli' | 'api' | 'maic';
+  /** Nguồn chạy: CLI trên máy / API key riêng / gói Larkwave / AI miễn phí trên máy. */
+  runSource: 'cli' | 'api' | 'maic' | 'local';
+  /** Lõi có màn "Cài AI" (≥ 0.1.24): chưa có AI thì mở thẳng màn đó thay vì hướng dẫn cài CLI. */
+  canSetupAi?: boolean;
+  /** AI trên máy (Ollama) đang chạy và đã có mô hình. */
+  localReady?: boolean;
   /** Kho key nhóm của Claude (null = lõi không có). */
   claudeKeys?: { keys: { active: boolean; valid?: boolean }[] } | null;
   /** Lõi báo có key cho runner đang dùng (nguồn API). */
@@ -80,10 +84,17 @@ export function healthIssues(i: HealthInput): HealthIssue[] {
   const fixRunner: FixTarget = i.activeRunner === 'claude' ? 'claude' : `runner:${i.activeRunner}`;
   if (i.runSource === 'cli' && r) {
     if (!r.installed) {
-      out.push({ id: `runner-missing:${r.id}`, level: 'error', title: `Chưa cài ${r.label}`, detail: `Lark × Agents đang chạy bằng ${name} nhưng máy chưa có ${r.label}.`, fix: `runner:${r.id}`, fixLabel: 'Hướng dẫn cài' });
+      out.push(
+        i.canSetupAi
+          ? { id: `runner-missing:${r.id}`, level: 'error', title: 'Chưa có AI để chạy Lark × Agents', detail: `Máy chưa có ${r.label}. Mở "Cài AI": cài AI miễn phí chạy trên máy, hoặc cài ${name} một bấm.`, fix: 'aiSetup', fixLabel: 'Cài AI' }
+          : { id: `runner-missing:${r.id}`, level: 'error', title: `Chưa cài ${r.label}`, detail: `Lark × Agents đang chạy bằng ${name} nhưng máy chưa có ${r.label}.`, fix: `runner:${r.id}`, fixLabel: 'Hướng dẫn cài' },
+      );
     } else if (!r.loggedIn) {
       out.push({ id: `runner-login:${r.id}`, level: 'error', title: `${name} chưa đăng nhập`, detail: `Đăng nhập ${name} (hoặc dán API key) để Lark × Agents chạy được.`, fix: fixRunner, fixLabel: `Đăng nhập ${name}` });
     }
+  }
+  if (i.runSource === 'local' && i.localReady === false) {
+    out.push({ id: 'local-ai', level: 'error', title: 'AI trên máy chưa sẵn sàng', detail: 'Đang chọn chạy bằng AI miễn phí trên máy nhưng chưa cài xong hoặc chưa tải mô hình nào.', fix: 'aiSetup', fixLabel: 'Cài AI' });
   }
   if (i.runSource === 'api' && i.apiKeyReady === false) {
     out.push({

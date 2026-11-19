@@ -77,6 +77,11 @@ export const IPC = {
   claudeLogin: 'tw:claudeLogin', // invoke → stream id
   claudeLoginEvent: 'tw:claudeLoginEvent', // main → renderer push (per stream id)
   claudeLogout: 'tw:claudeLogout',
+  claudeInstall: 'tw:claudeInstall', // chạy trình cài chính thức của Anthropic (0.1.24)
+  localAiStatus: 'tw:localAiStatus', // AI miễn phí trên máy (Ollama) — 0.1.24
+  localAiInstall: 'tw:localAiInstall',
+  localAiPull: 'tw:localAiPull',
+  localAiUse: 'tw:localAiUse',
   claudeSetToken: 'tw:claudeSetToken', // desktop: paste an API key / OAuth token
   claudeClearToken: 'tw:claudeClearToken',
   // Managed Anthropic API keys (team access)

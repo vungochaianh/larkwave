@@ -95,9 +95,12 @@ const SID2 = 'ad99aa4b-1b37-41b6-a3b8-765d8b499620';
     const projects = join(homedir(), '.claude', 'projects');
     if (!existsSync(projects)) return;
     const dirs = new Set(readdirSync(projects));
+    // Cả bản cài (@larkwave/desktop): Claude Code tự dọn phiên cũ (~30 ngày), nên máy chỉ còn dùng bản cài
+    // thì thư mục dev/Toolswave vẫn còn mà không slug nào của chúng còn — bài này từng trượt vì thế.
     const roots = [
       join(homedir(), 'Library', 'Application Support', '@toolswave', 'desktop', 'lark', 'work'),
       join(homedir(), 'Library', 'Application Support', '@larkwave', 'desktop (development)', 'lark', 'work'),
+      join(homedir(), 'Library', 'Application Support', '@larkwave', 'desktop', 'lark', 'work'),
     ];
     let checked = 0;
     for (const r of roots) {

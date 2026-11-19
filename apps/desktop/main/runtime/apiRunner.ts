@@ -18,7 +18,7 @@
  * Messages API (claude-api skill) and defaults to `claude-opus-4-8`.
  */
 
-export type ApiProvider = 'anthropic' | 'openai' | 'xai' | 'google';
+export type ApiProvider = 'anthropic' | 'openai' | 'xai' | 'google' | 'ollama';
 
 /** Map a desktop runner id → the direct-API provider + its default model + endpoint. */
 export const API_PROVIDER: Record<string, { provider: ApiProvider; base: string; defaultModel: string; keyHint: string }> = {
@@ -26,6 +26,9 @@ export const API_PROVIDER: Record<string, { provider: ApiProvider; base: string;
   grok: { provider: 'xai', base: 'https://api.x.ai/v1', defaultModel: 'grok-4', keyHint: 'xai-…' },
   gemini: { provider: 'google', base: 'https://generativelanguage.googleapis.com/v1beta', defaultModel: 'gemini-2.5-pro', keyHint: 'AIza…' },
   codex: { provider: 'openai', base: 'https://api.openai.com/v1', defaultModel: 'gpt-5', keyHint: 'sk-…' },
+  // AI miễn phí TRÊN MÁY (0.1.24): Ollama do app tự cài, nói kiểu OpenAI ở /v1. Không cần khoá; địa chỉ thật
+  // (cổng riêng của app, hoặc 11434 nếu người dùng tự cài Ollama) truyền vào lúc chạy qua `base`.
+  ollama: { provider: 'ollama', base: 'http://127.0.0.1:11435/v1', defaultModel: 'qwen3:8b', keyHint: '' },
 };
 
 /** Resolve the concrete API model id from a runner id + a (possibly CLI-style) model hint. */
@@ -41,6 +44,8 @@ export function resolveApiModel(runnerId: string, model?: string): string {
   }
   // gemini catalog ids are already valid API ids (gemini-2.5-pro/flash).
   if (runnerId === 'gemini') return /^gemini-/.test(model) ? model : def;
+  // AI trên máy: id là tên mô hình Ollama đã tải (vd qwen3:8b) — dùng nguyên.
+  if (runnerId === 'ollama') return model;
   // grok/codex catalog ids are CLI-specific → use the API default unless it looks like an API id.
   if (runnerId === 'grok') return /^grok-/.test(model) && /latest|\d/.test(model) ? model : def;
   // (xAI redirects retired slugs to the current model, so a close-enough grok-* id still works.)
@@ -77,6 +82,8 @@ export interface RunApiAgentOptions {
   maxRounds?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  /** Ghi đè địa chỉ API (AI trên máy: cổng thật của Ollama). */
+  base?: string;
 }
 
 const DEFAULT_ROUNDS = 12;
@@ -90,7 +97,7 @@ export async function* runApiAgent(opts: RunApiAgentOptions): AsyncGenerator<Api
     yield { type: 'done' };
     return;
   }
-  if (!opts.apiKey) {
+  if (!opts.apiKey && cfg.provider !== 'ollama') {
     yield { type: 'error', message: `Chưa có API key cho ${opts.runnerId}. Dán key ở phần cài đặt agent.` };
     yield { type: 'done' };
     return;
@@ -101,8 +108,8 @@ export async function* runApiAgent(opts: RunApiAgentOptions): AsyncGenerator<Api
   try {
     if (cfg.provider === 'anthropic') {
       yield* runAnthropic(cfg.base, opts.apiKey, model, opts, maxRounds, maxTokens);
-    } else if (cfg.provider === 'openai' || cfg.provider === 'xai') {
-      yield* runOpenAICompatible(cfg.provider, cfg.base, opts.apiKey, model, opts, maxRounds, maxTokens);
+    } else if (cfg.provider === 'openai' || cfg.provider === 'xai' || cfg.provider === 'ollama') {
+      yield* runOpenAICompatible(cfg.provider, opts.base || cfg.base, opts.apiKey || 'ollama', model, opts, maxRounds, maxTokens);
     } else {
       yield* runGemini(cfg.base, opts.apiKey, model, opts, maxRounds);
     }
@@ -188,7 +195,7 @@ async function* runAnthropic(
 
 // ── OpenAI-compatible (OpenAI + xAI Grok) chat/completions ───────────────────
 async function* runOpenAICompatible(
-  provider: 'openai' | 'xai',
+  provider: 'openai' | 'xai' | 'ollama',
   base: string,
   key: string,
   model: string,
@@ -221,7 +228,9 @@ async function* runOpenAICompatible(
     const data = (await res.json()) as { choices: { message: Msg; finish_reason: string }[] };
     const msg = data.choices?.[0]?.message;
     if (!msg) return;
-    if (msg.content) yield { type: 'text', delta: msg.content };
+    // Mô hình "suy nghĩ" chạy trên máy (Qwen3…) có thể trả kèm khối <think>…</think> — không phải câu trả lời.
+    const shown = provider === 'ollama' && msg.content ? stripThink(msg.content) : msg.content;
+    if (shown) yield { type: 'text', delta: shown };
     messages.push(msg);
     const calls = msg.tool_calls ?? [];
     if (!calls.length) return;
@@ -403,4 +412,9 @@ async function textFor(value: unknown): Promise<string> {
     phan_dau: raw.slice(0, TOOL_TEXT_CAP),
   };
   return JSON.stringify(wrapper);
+}
+
+/** Bỏ khối suy nghĩ <think>…</think> (kể cả khối chưa đóng ở đầu) khỏi chữ trả lời của mô hình trên máy. */
+export function stripThink(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^\s*<think>[\s\S]*$/, '').trimStart();
 }

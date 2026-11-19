@@ -13,6 +13,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.24',
+    date: '2026-11-19',
+    items: [
+      "Mới: \"Cài AI\" ngay trong app (Cài đặt → thẻ đầu tiên). Cài AI MIỄN PHÍ chạy trên máy bằng một bấm: Larkwave tự tải Ollama và một mô hình mở (gợi ý theo RAM máy), không cần tài khoản, dữ liệu không rời máy, chạy được khi không có mạng. Chọn \"AI miễn phí trên máy\" ở chip mô hình để Lark × Agents chạy bằng nó — không cần App ID.",
+      "Mới: cài Claude một bấm — nút \"Cài Claude tự động\" chạy trình cài chính thức của Anthropic, không cần Node/npm hay mở terminal, rồi đăng nhập như cũ.",
+      "Máy chưa có AI nào: cảnh báo trong khung chat và ô Sức khoẻ hệ thống mở thẳng màn \"Cài AI\" thay vì bảo chép lệnh cài.",
+      "Màn Tổng quan báo đúng \"Đã kết nối\" khi bạn đăng nhập Lark bằng mã QR (trước đây chỉ tính khi có App ID nên luôn báo \"Chưa kết nối\").",
+      "Gồm cả bản sửa của 0.1.23 (hết báo nhầm \"hết credit API\" khi máy đã đăng nhập gói Claude).",
+    ],
+  },
+  {
     version: '0.1.23',
     date: '2026-10-28',
     items: [

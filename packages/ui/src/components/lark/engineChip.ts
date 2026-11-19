@@ -20,7 +20,7 @@ export interface RunnerLite {
   models?: { id: string; label: string }[];
 }
 
-export type RunSource = 'cli' | 'api' | 'maic';
+export type RunSource = 'cli' | 'api' | 'maic' | 'local';
 
 export interface EngineInput {
   runners: RunnerLite[];
@@ -32,9 +32,13 @@ export interface EngineInput {
   /** Đã kết nối Lark Bot (App ID) chưa. Đường "API trực tiếp" cần nó để gọi công cụ Lark; thiếu thì lượt
    *  chạy bằng CLI trên máy (vẫn tiêm API key đã lưu). Không truyền = không biết ⇒ không báo. */
   appConnected?: boolean;
+  /** AI trên máy (Ollama) đang chạy + có mô hình. Không truyền = lõi không có (coi như chưa sẵn sàng). */
+  localReady?: boolean;
+  /** Mô hình AI trên máy đang dùng (vd qwen3:8b). */
+  localModel?: string;
 }
 
-export type EngineWarnKind = 'notInstalled' | 'needsLogin' | 'outdated' | 'apiNoKey' | 'apiNeedsApp' | 'maicOff';
+export type EngineWarnKind = 'notInstalled' | 'needsLogin' | 'outdated' | 'apiNoKey' | 'apiNeedsApp' | 'maicOff' | 'localOff';
 
 export interface EngineWarn {
   kind: EngineWarnKind;
@@ -57,8 +61,8 @@ export interface EngineModel {
   dot: 'warn' | 'error' | null;
 }
 
-export const SOURCE_LABEL: Record<RunSource, string> = { cli: 'CLI trên máy', api: 'API riêng', maic: 'Gói Larkwave' };
-const SOURCE_SHORT: Record<RunSource, string> = { cli: '', api: 'API', maic: 'Gói' };
+export const SOURCE_LABEL: Record<RunSource, string> = { cli: 'CLI trên máy', api: 'API riêng', maic: 'Gói Larkwave', local: 'AI miễn phí trên máy' };
+const SOURCE_SHORT: Record<RunSource, string> = { cli: '', api: 'API', maic: 'Gói', local: '' };
 const DEFAULT_UPDATE = 'npm i -g @anthropic-ai/claude-code';
 
 /** "Claude Fable (mới nhất)" → "Fable"; "Claude Opus 4.6" → "Opus 4.6"; "grok-4" → "grok-4". */
@@ -78,6 +82,12 @@ export function shortRunnerLabel(label: string | undefined): string {
 }
 
 export function engineModel(i: EngineInput): EngineModel {
+  if (i.runSource === 'local') {
+    // AI trên máy: chip hiện "Máy · <mô hình>" — không liên quan runner CLI đang chọn.
+    const warn = engineWarn(i, undefined, 'AI trên máy');
+    const modelLabel = i.localModel || 'chưa có mô hình';
+    return { label: `Máy · ${modelLabel}`, runnerLabel: 'AI trên máy', modelLabel, sourceLabel: SOURCE_LABEL.local, warn, dot: warn ? warn.level : null };
+  }
   const r = i.runners.find((x) => x.id === i.runnerId);
   const runnerLabel = r?.label || i.runnerId || 'AI';
   const models = r?.models || [];
@@ -105,6 +115,7 @@ export function engineWarn(i: EngineInput, r: RunnerLite | undefined, runnerLabe
     return null;
   }
   if (i.runSource === 'maic') return i.maicAvailable ? null : { kind: 'maicOff', level: 'error', text: 'Gói Larkwave cần đăng nhập tài khoản Larkwave.' };
+  if (i.runSource === 'local') return i.localReady ? null : { kind: 'localOff', level: 'error', text: 'AI trên máy chưa sẵn sàng — bấm "Cài AI" để cài và tải một mô hình.' };
   if (!r) return null;
   if (!r.installed) return { kind: 'notInstalled', level: 'error', text: `Chưa cài ${r.label}.`, command: r.installHint || (r.id === 'claude' ? DEFAULT_UPDATE : undefined) };
   if (!r.ready) return { kind: 'needsLogin', level: 'error', text: `${r.label} cần đăng nhập/key.` };

@@ -21,7 +21,11 @@ import type { TurnFileContext } from './fileContext';
  * tiến trình nên không phải gửi lại bối cảnh mỗi bước.
  */
 export interface LarkMaicAgentDeps {
-  client: LarkClient;
+  /** Client Open API (custom app). Có thể KHÔNG có: người chỉ đăng nhập Lark bằng QR vẫn chạy được với
+   *  bộ công cụ phiên web (xem `baseTools`) — đúng như đường CLI truyền `client ?? undefined`. */
+  client?: LarkClient;
+  /** Bộ công cụ nền theo chế độ. Mặc định (giữ hành vi cũ): đủ bộ khi có client, bộ chỉ đọc cho 'ask'. */
+  baseTools?: (m: LarkChatMode) => LarkToolDef[];
   systemPrompt: string;
   /** Token tài khoản Larkwave — máy chủ dùng nó để chặn hạn mức và ghi sổ đúng người. */
   accountToken: string;
@@ -53,8 +57,10 @@ export async function* runLarkMaicAgent(
   };
   const { registry, execTool } = createToolBridge(
     mode,
-    // Chạy trên MÁY NGƯỜI DÙNG nên dùng bộ công cụ đầy đủ, y như đường CLI và API trực tiếp.
-    { ...deps, baseTools: (m) => (m === 'ask' ? readOnlyTools() : allTools()) },
+    // Chạy trên MÁY NGƯỜI DÙNG nên dùng bộ công cụ đầy đủ, y như đường CLI và API trực tiếp. Không có
+    // client thì nơi gọi đưa bộ phiên web (agentTools withOpenApi:false); công cụ trong bộ đó không đụng
+    // tới client, nên `undefined` ở đây là đúng hợp đồng (đường CLI/MCP cũng làm thế).
+    { ...deps, client: deps.client as LarkClient, baseTools: deps.baseTools ?? ((m) => (m === 'ask' ? readOnlyTools() : allTools())) },
     push,
   );
 
@@ -67,6 +73,9 @@ export async function* runLarkMaicAgent(
     yield { type: 'error', message: 'Không có công cụ Lark nào khả dụng cho chế độ này.' };
     return;
   }
+  // Máy chủ chỉ nhận 64 công cụ đầu (agent.service maicToolsStream: tools.slice(0, 64)). Quá trần thì
+  // phần đuôi bị cắt LẶNG LẼ — ghi lại để thấy khi soát log, đừng để model "quên" công cụ không lý do.
+  if (tools.length > 64) console.warn(`[maic] ${tools.length} công cụ > trần 64 của máy chủ — phần đuôi sẽ bị cắt`);
 
   let res: Response;
   try {

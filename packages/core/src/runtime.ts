@@ -425,11 +425,49 @@ export interface LarkConnection {
   apiMode?: boolean;
   /** True when apiMode is on AND the default runner has a usable API key. */
   apiKeyReady?: boolean;
-  /** Nguồn chạy agent Lark: 'cli' (CLI trên máy) | 'api' (khoá riêng) | 'maic' (gói Larkwave). */
-  larkRunSource?: 'cli' | 'api' | 'maic';
+  /** Nguồn chạy agent Lark: 'cli' (CLI trên máy) | 'api' (khoá riêng) | 'maic' (gói Larkwave) |
+   *  'local' (AI miễn phí chạy trên máy qua Ollama — app tự cài, xem LocalAiStatus). */
+  larkRunSource?: LarkRunSource;
+  /** Mô hình AI trên máy đang dùng cho nguồn 'local' (vd qwen3:8b). */
+  localModel?: string;
   /** Máy chủ có cấu hình trợ lý hosted (MAIC) không — quyết định lựa chọn "gói Larkwave" có hiện. */
   maicAvailable?: boolean;
   /** Set when a connect/test attempt failed (surfaced to the UI). */
+  error?: string;
+}
+
+/** Nguồn chạy của Lark × Agents. */
+export type LarkRunSource = 'cli' | 'api' | 'maic' | 'local';
+
+/** Một mô hình AI trên máy (đã tải, hoặc gợi ý tải). */
+export interface LocalAiModel {
+  id: string;
+  label: string;
+  sizeGb: number;
+  /** RAM tối thiểu nên có để chạy mượt (gợi ý). */
+  minRamGb?: number;
+}
+
+/** Trạng thái AI miễn phí trên máy (Ollama). */
+export interface LocalAiStatus {
+  /** Hệ điều hành này có hỗ trợ cài tự động không. */
+  supported: boolean;
+  /** Đã có Ollama (do app cài, hoặc người dùng tự cài sẵn). */
+  installed: boolean;
+  /** Máy chủ Ollama đang chạy và trả lời. */
+  running: boolean;
+  /** Đang dùng Ollama người dùng tự cài (cổng 11434) thay vì bản app tự cài. */
+  external?: boolean;
+  version?: string;
+  /** Mô hình đã tải về máy. */
+  models: LocalAiModel[];
+  /** Mô hình đang dùng cho Lark × Agents (nếu nguồn chạy là 'local'). */
+  activeModel?: string;
+  /** Mô hình gợi ý tải, theo RAM máy. */
+  recommended: LocalAiModel[];
+  ramGb: number;
+  /** Việc đang chạy nền (tải Ollama / tải mô hình) + tiến độ 0–100. */
+  busy?: { kind: 'install' | 'pull'; pct: number; text: string; model?: string };
   error?: string;
 }
 
@@ -2084,7 +2122,17 @@ export interface RuntimeAdapter {
   larkWebListBases?(input?: { query?: string }): Promise<LarkWebBase[]>;
   /** Open a saved conversation — resumes its Claude session, returns items + bases. */
   larkSwitchSession?(id: string): Promise<{ items: unknown[]; bases?: LarkBaseRef[]; runner?: string; model?: string }>;
-  larkSetAgentPrefs?(prefs: { runner?: string; model?: string; apiMode?: boolean; larkRunSource?: 'cli' | 'api' | 'maic' }): Promise<LarkConnection>;
+  larkSetAgentPrefs?(prefs: { runner?: string; model?: string; apiMode?: boolean; larkRunSource?: LarkRunSource }): Promise<LarkConnection>;
+  /** AI miễn phí trên máy (Ollama do app tự cài vào thư mục riêng, cổng riêng). Lõi < 0.1.24 không có. */
+  localAiStatus?(): Promise<LocalAiStatus>;
+  /** Bắt đầu tải + cài Ollama (chạy nền; theo dõi tiến độ qua `localAiStatus().busy`). */
+  localAiInstall?(): Promise<LocalAiStatus>;
+  /** Bắt đầu tải một mô hình (chạy nền; tiến độ qua `busy`). */
+  localAiPull?(model: string): Promise<LocalAiStatus>;
+  /** Dùng mô hình này cho Lark × Agents (đặt nguồn chạy 'local'). */
+  localAiUse?(model: string): Promise<LocalAiStatus>;
+  /** Cài Claude Code bằng trình cài CHÍNH THỨC của Anthropic (không cần Node/npm). Chờ tới khi xong. */
+  claudeInstall?(): Promise<{ ok: boolean; error?: string; log?: string }>;
   /** Persist the open conversation's items (+ its applied Bases). */
   larkSaveSession?(id: string, items: unknown[], bases?: LarkBaseRef[]): Promise<void>;
   /** Delete a saved conversation. */

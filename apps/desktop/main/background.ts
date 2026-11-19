@@ -446,6 +446,12 @@ function registerIpc(win: BrowserWindow) {
   ipcMain.handle(IPC.larkUserLogout, () => runtime.larkUserLogout());
   ipcMain.handle(IPC.larkWebConnect, (_e, url?: string) => runtime.larkWebConnect!(url));
   ipcMain.handle(IPC.larkWebStatus, () => runtime.larkWebStatus!());
+  // Cài AI (0.1.24) — AI miễn phí trên máy (Ollama) + Claude một bấm.
+  ipcMain.handle(IPC.localAiStatus, () => runtime.localAiStatus!());
+  ipcMain.handle(IPC.localAiInstall, () => runtime.localAiInstall!());
+  ipcMain.handle(IPC.localAiPull, (_e, model: string) => runtime.localAiPull!(model));
+  ipcMain.handle(IPC.localAiUse, (_e, model: string) => runtime.localAiUse!(model));
+  ipcMain.handle(IPC.claudeInstall, () => runtime.claudeInstall!());
   ipcMain.handle(IPC.larkWebDisconnect, () => runtime.larkWebDisconnect!());
   ipcMain.handle(IPC.larkWebReveal, () => runtime.larkWebReveal!());
   ipcMain.handle(IPC.larkWebSetWorkflowUrl, (_e, url: string) => runtime.larkWebSetWorkflowUrl!(url));

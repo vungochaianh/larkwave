@@ -238,8 +238,8 @@ export class SecretStore {
   }
   /** User preferences for the Lark agent (e.g. auto-approving writes). */
   getSettings(): { autoApprove?: boolean; defaultRunner?: string; defaultModel?: string; apiMode?: boolean; webHost?: string | null; cmsSyncBaseUrl?: string; hostedMode?: boolean;
-    /** Nguồn chạy agent Lark: 'cli' (mặc định) | 'api' (khoá riêng) | 'maic' (gói Larkwave). */
-    larkRunSource?: 'cli' | 'api' | 'maic' } {
+    /** Nguồn chạy agent Lark: 'cli' (mặc định) | 'api' (khoá riêng) | 'maic' (gói Larkwave) | 'local' (AI trên máy). */
+    larkRunSource?: 'cli' | 'api' | 'maic' | 'local' } {
     try {
       const s = JSON.parse(readFileSync(this.settingsPath(), 'utf8'));
       return s && typeof s === 'object' ? s : {};
@@ -248,8 +248,8 @@ export class SecretStore {
     }
   }
   setSettings(s: { autoApprove?: boolean; defaultRunner?: string; defaultModel?: string; apiMode?: boolean; webHost?: string | null; cmsSyncBaseUrl?: string; hostedMode?: boolean;
-    /** Nguồn chạy agent Lark: 'cli' (mặc định) | 'api' (khoá riêng) | 'maic' (gói Larkwave). */
-    larkRunSource?: 'cli' | 'api' | 'maic' }): void {
+    /** Nguồn chạy agent Lark: 'cli' (mặc định) | 'api' (khoá riêng) | 'maic' (gói Larkwave) | 'local' (AI trên máy). */
+    larkRunSource?: 'cli' | 'api' | 'maic' | 'local' }): void {
     writeFileSync(this.settingsPath(), JSON.stringify({ ...this.getSettings(), ...s }, null, 2));
   }
 
@@ -258,7 +258,7 @@ export class SecretStore {
     return join(this.dir, 'machine-prefs.json');
   }
   /** `workflowAuto`: chế độ Tạo workflow tự ghi phần cộng-thêm không hỏi (mặc định BẬT). */
-  getMachinePrefs(): { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string } {
+  getMachinePrefs(): { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string; /** Mô hình AI trên máy (Ollama) — riêng máy: mô hình chỉ có ở máy đã tải. */ localModel?: string } {
     try {
       const s = JSON.parse(readFileSync(this.machinePrefsPath(), 'utf8'));
       return s && typeof s === 'object' ? s : {};
@@ -266,7 +266,7 @@ export class SecretStore {
       return {};
     }
   }
-  setMachinePrefs(p: { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string }): void {
+  setMachinePrefs(p: { workflowAuto?: boolean; runnerId?: string; webAccounts?: WebAccountEntry[]; webAccountActive?: string; localModel?: string }): void {
     writeFileSync(this.machinePrefsPath(), JSON.stringify({ ...this.getMachinePrefs(), ...p }, null, 2));
   }
 

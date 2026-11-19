@@ -108,6 +108,24 @@ Sau khi tải lên:
 Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
 [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md).
 
+## "Cài AI": người dùng tự cài AI ngay trong app (từ 0.1.24)
+
+- Người dùng muốn (19/11/2026): **không dùng AI của máy chủ**; người mới không phải tự cài Claude bằng terminal.
+  Màn "Cài AI" (`packages/ui/src/components/LocalAiSetup.tsx`): thẻ đầu ở Cài đặt + modal FixCenter đích `aiSetup`.
+- **AI miễn phí trên máy** = nguồn chạy thứ tư `local` (cạnh cli/api/maic). `main/runtime/localAi/ollama.ts` tải
+  bản Ollama chính thức (GitHub, MIT) vào `<userData>/ai/ollama`, chạy `ollama serve` ở **cổng riêng 11435**
+  (Ollama người dùng tự cài đang chạy ở 11434 thì dùng luôn), mô hình ở `<userData>/ai/models`,
+  `OLLAMA_CONTEXT_LENGTH=32768` (lời nhắc + 55 công cụ). Lark × Agents gọi kiểu OpenAI qua `apiRunner`
+  provider `ollama` (không khoá, `max_tokens`, lọc `<think>`), bộ công cụ phiên web nên **không cần App ID**.
+  Mô hình gợi ý: qwen3:4b / qwen3:8b / gpt-oss:20b (theo RAM). Mô hình đang dùng lưu ở machine-prefs `localModel`.
+- **Claude một bấm**: `localAi/claudeInstall.ts` chạy trình cài chính thức `curl -fsSL https://claude.ai/install.sh | bash`
+  (Windows: `irm https://claude.ai/install.ps1 | iex`). KHÔNG đóng gói Claude Code vào bản cài (phần mềm độc quyền).
+- Chọn nguồn (`lark/runSource.ts`): đã chọn → giữ; CLI sẵn sàng → cli; chưa CLI mà có AI trên máy → local.
+  **Không bao giờ tự chọn `maic`** (AI máy chủ) — chỉ khi người dùng tự chọn Gói Larkwave.
+- IPC mới (lõi 0.1.24): `localAiStatus/Install/Pull/Use`, `claudeInstall`. Giao diện dò `runtime.localAiStatus`
+  (ipcAdapter xoá phương thức khi lõi cũ thiếu kênh) nên code-push vẫn chạy trên lõi 0.1.0.
+- Màn Tổng quan: Lark "đã kết nối" khi có phiên web hoặc App ID (trước chỉ tính App ID); "Trình AI" tính cả AI trên máy.
+
 ## Kết nối Zalo / Gmail cho kỹ năng (từ 0.1.5)
 
 - Người dùng muốn: **agent không tự thao tác Zalo/Gmail, chỉ dùng qua kỹ năng** — giống Social Wave
