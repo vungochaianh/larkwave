@@ -19,6 +19,18 @@ máy. Tài khoản và dữ liệu trong video là dữ liệu mẫu.
 
 ▶ [Bản đầy đủ 3:20 (MP4, 28 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave.mp4) · [Bản ngắn 1:40 (MP4, 9 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-ngan.mp4) · [Phụ đề .srt](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave.srt)
 
+### Cài AI miễn phí ngay trong app (0.1.24)
+
+<!-- VIDEO CÀI AI: sửa README trên github.com, kéo tệp HDSD-Larkwave-Cai-AI-ngan.mp4 thả vào dòng này → GitHub hiện trình phát -->
+
+Không cần cài Claude hay mở terminal: **Cài đặt → Cài AI** để Larkwave tự tải Ollama và một mô hình mở chạy ngay
+trên máy (miễn phí, không cần tài khoản, dữ liệu không rời máy), hoặc cài Claude một bấm bằng trình cài chính thức
+của Anthropic.
+
+[![Cài AI cho Larkwave — 1:40](docs/media/hdsd-cai-ai-thumb.jpg)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-AI.mp4)
+
+▶ [Video Cài AI 1:40 (MP4, 14 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-AI.mp4) · [Bản 720p (9 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-AI-ngan.mp4) · [Phụ đề .srt](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-AI.srt)
+
 ## Tải và cài
 
 | | Link |
