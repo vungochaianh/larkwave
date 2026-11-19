@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Alert, App, Button, Card, Divider, Form, Input, Segmented, Space, Typography } from 'antd';
-import { GoogleOutlined, GithubOutlined, GitlabOutlined, LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons';
+import { DesktopOutlined, GoogleOutlined, GithubOutlined, GitlabOutlined, LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons';
 import { useRuntime } from '../RuntimeProvider';
 import { BRAND_GRADIENT } from '../theme';
 import { accountApi, oauthUrl, ApiError, type AuthConfig } from './api';
@@ -38,7 +38,8 @@ export function LoginView() {
   const runtime = useRuntime();
   const { t } = useI18n();
   const { message } = App.useApp();
-  const { login, register, beginOAuth } = useAccountAuth();
+  const { login, register, beginOAuth, localSupported, enterLocalMode } = useAccountAuth();
+  const [goingLocal, setGoingLocal] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [busy, setBusy] = useState(false);
   const [cfg, setCfg] = useState<AuthConfig | null>(null);
@@ -229,6 +230,17 @@ export function LoginView() {
               {cfg.gitlab && <Button block icon={<GitlabOutlined />} onClick={() => openOAuth('gitlab')}>{t('login2.continueGitlab', 'Tiếp tục với GitLab')}</Button>}
             </Space>
           </>
+        )}
+
+        {localSupported && (
+          <div data-testid="login-local-mode" style={{ marginTop: 16, padding: 12, borderRadius: 10, border: '1px dashed #C9CFE0', background: '#FAFBFF' }}>
+            <Button block size="large" icon={<DesktopOutlined />} loading={goingLocal} onClick={async () => { setGoingLocal(true); try { await enterLocalMode(); } finally { setGoingLocal(false); } }}>
+              {t('login2.localMode', 'Dùng ngay — không cần tài khoản')}
+            </Button>
+            <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12, textAlign: 'center' }}>
+              {t('login2.localModeDesc', 'Dữ liệu chỉ nằm trên máy này: không sao lưu, không đồng bộ lên máy chủ. Có thể đăng nhập tài khoản sau.')}
+            </Text>
+          </div>
         )}
 
         <div style={{ textAlign: 'center', marginTop: 14 }}>

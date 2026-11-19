@@ -436,6 +436,12 @@ export interface LarkConnection {
   error?: string;
 }
 
+/** Chế độ "dữ liệu chỉ trên máy" (0.1.25). `forced` = bản tự dựng đặt LARKWAVE_LOCAL_ONLY=1. */
+export interface LocalModeState {
+  on: boolean;
+  forced: boolean;
+}
+
 /** Nguồn chạy của Lark × Agents. */
 export type LarkRunSource = 'cli' | 'api' | 'maic' | 'local';
 
@@ -2133,6 +2139,10 @@ export interface RuntimeAdapter {
   localAiUse?(model: string): Promise<LocalAiStatus>;
   /** Cài Claude Code bằng trình cài CHÍNH THỨC của Anthropic (không cần Node/npm). Chờ tới khi xong. */
   claudeInstall?(): Promise<{ ok: boolean; error?: string; log?: string }>;
+  /** Chế độ "dữ liệu chỉ trên máy" (lõi ≥ 0.1.25): dùng không cần tài khoản, không gọi máy chủ Larkwave. */
+  localMode?(): Promise<LocalModeState>;
+  /** Bật/tắt chế độ chỉ trên máy. Bật = rời tài khoản (xoá token đã lưu). Bị cưỡng bức thì không tắt được. */
+  setLocalMode?(on: boolean): Promise<LocalModeState>;
   /** Persist the open conversation's items (+ its applied Bases). */
   larkSaveSession?(id: string, items: unknown[], bases?: LarkBaseRef[]): Promise<void>;
   /** Delete a saved conversation. */

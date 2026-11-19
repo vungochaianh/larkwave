@@ -127,6 +127,22 @@ Chi tiết: [docs/code-push.md](docs/code-push.md). Bản Windows:
   (ipcAdapter xoá phương thức khi lõi cũ thiếu kênh) nên code-push vẫn chạy trên lõi 0.1.0.
 - Màn Tổng quan: Lark "đã kết nối" khi có phiên web hoặc App ID (trước chỉ tính App ID); "Trình AI" tính cả AI trên máy.
 
+## Chế độ "dữ liệu chỉ trên máy" (lõi 0.1.25, CHƯA phát hành)
+
+- Người dùng muốn (19/11/2026): bản mã nguồn mở dùng được **không cần tài khoản Toolswave, không gửi gì lên máy chủ**.
+  Nút "Dùng ngay — không cần tài khoản" ở màn đăng nhập (`data-testid="login-local-mode"`).
+- Cờ do MAIN giữ: `main/localMode.ts` → `<userData>/local-mode.json`. `LARKWAVE_LOCAL_ONLY=1` ép bật (giao diện không
+  tắt được). Không giữ ở localStorage vì code-push đổi origin.
+- Khi bật, mọi cửa ra máy chủ ở main đi qua `localModeOn()`:
+  - `accountFetch` và `accountUpload` trả `LOCAL_MODE_BLOCKED`; `accountGetToken` và token của lõi Lark trả null;
+  - relay không bootstrap, không cho bật; checkUpdate, applyUpdate và manifest code-push đều bỏ qua.
+  - `test/localMode.cjs` canh các chốt này. Thêm một lời gọi máy chủ mới thì phải đặt chốt và thêm vào test đó.
+- Giao diện: `LOCAL_USER` (id `''` ⇒ khoang Lark `_local`, tên "Bạn"). Hook an toàn là `useLocalModeFlag()`.
+  - Cài đặt thay thẻ Thiết bị, Nhập Toolswave và Điều khiển từ xa bằng thẻ giải thích.
+  - NetworkBanner không dò `/health`.
+- Kiểm thật (app ẩn + proxy ghi log): 0 lời gọi máy chủ sau khi bấm, và 0 lời gọi kể cả lúc khởi động lại.
+  Rời chế độ thì màn đăng nhập gọi `/auth/config` như cũ.
+
 ## Kết nối Zalo / Gmail cho kỹ năng (từ 0.1.5)
 
 - Người dùng muốn: **agent không tự thao tác Zalo/Gmail, chỉ dùng qua kỹ năng** — giống Social Wave

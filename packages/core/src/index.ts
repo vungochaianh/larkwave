@@ -82,6 +82,8 @@ export const IPC = {
   localAiInstall: 'tw:localAiInstall',
   localAiPull: 'tw:localAiPull',
   localAiUse: 'tw:localAiUse',
+  localModeGet: 'tw:localModeGet', // chế độ "dữ liệu chỉ trên máy" — 0.1.25
+  localModeSet: 'tw:localModeSet',
   claudeSetToken: 'tw:claudeSetToken', // desktop: paste an API key / OAuth token
   claudeClearToken: 'tw:claudeClearToken',
   // Managed Anthropic API keys (team access)

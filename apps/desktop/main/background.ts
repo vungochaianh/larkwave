@@ -16,6 +16,7 @@ import { openAuthWindow } from './authWindow';
 import { isExecutableName, isInsideDir } from './runtime/lark/filePaths';
 import { openLarkAuthWindow } from './runtime/lark/larkOAuth';
 import { resolveRenderer, downloadAndOpenInstaller, type UpdateInfo } from './codePush';
+import { localModeOn, localModeState, setLocalMode, LOCAL_MODE_BLOCKED } from './localMode';
 import { AccountCache } from './accountCache';
 import { AccountTokenStore } from './accountTokenStore';
 import { hiddenMode } from './hiddenMode';
@@ -75,13 +76,26 @@ function registerIpc(win: BrowserWindow) {
   // Origin-independent account token: localStorage is per-origin, but codePush can load the
   // renderer from either app:// (bundled) or pages.dev (remote) → a token saved on one origin
   // is lost on the other. Mirror it here so the session survives an origin flip.
-  ipcMain.handle(IPC.accountGetToken, () => accountTokenStore.get());
+  // Chế độ "dữ liệu chỉ trên máy": không có token tài khoản nào đi ra khỏi main.
+  ipcMain.handle(IPC.accountGetToken, () => (localModeOn() ? null : accountTokenStore.get()));
   ipcMain.handle(IPC.accountSetToken, (_e, token: string | null) => accountTokenStore.set(token ?? null));
+  ipcMain.handle(IPC.localModeGet, () => localModeState());
+  ipcMain.handle(IPC.localModeSet, (_e, on: boolean) => {
+    const st = setLocalMode(!!on);
+    // Vào chế độ chỉ trên máy = rời tài khoản: xoá token đã lưu, tắt điều khiển từ xa đang chạy.
+    if (st.on) {
+      accountTokenStore.set(null);
+      try { void agentClient.setEnabled(false); } catch { /* chưa bật */ }
+    }
+    return st;
+  });
   // origin (localhost / app://) isn't in the API's allowlist, so a direct renderer
   // fetch is blocked; routing here makes the whole account system work on desktop.
   ipcMain.handle(
     IPC.accountFetch,
     async (_e, req: { url: string; method?: string; headers?: Record<string, string>; body?: string }) => {
+      // Chế độ chỉ trên máy: không một lời gọi nào tới máy chủ tài khoản.
+      if (localModeOn()) return LOCAL_MODE_BLOCKED;
       const method = (req.method ?? 'GET').toUpperCase();
       // Offline-first (Phase 0): cache successful GETs + serve the last-known data
       // when apia is unreachable / 5xx, so account views render instead of blanking.
@@ -121,6 +135,7 @@ function registerIpc(win: BrowserWindow) {
       req: { url: string; field: string; filename: string; mimeType?: string; bytes: Uint8Array; headers?: Record<string, string> },
     ) => {
       try {
+        if (localModeOn()) return LOCAL_MODE_BLOCKED;
         if (new URL(req.url).origin !== new URL(API_BASE).origin) {
           return { ok: false, status: 0, text: '{"message":"Chặn origin không hợp lệ"}' };
         }
@@ -286,7 +301,8 @@ function registerIpc(win: BrowserWindow) {
   // ── Remote control ("Điều khiển từ xa") agent client ─────────────────────────
   // The renderer forwards the Larkwave account JWT (needed to open the SSE stream).
   ipcMain.handle(IPC.agentStatus, (_e, token?: string) => agentClient.status(token));
-  ipcMain.handle(IPC.agentSetEnabled, (_e, on: boolean, token?: string) => agentClient.setEnabled(on, token));
+  // Chế độ chỉ trên máy: điều khiển từ xa đi qua máy chủ → không cho BẬT (tắt thì vẫn cho).
+  ipcMain.handle(IPC.agentSetEnabled, (_e, on: boolean, token?: string) => (on && localModeOn() ? agentClient.setEnabled(false) : agentClient.setEnabled(on, token)));
   ipcMain.handle(IPC.agentRegenToken, (_e, token: string) => agentClient.regenerateToken(token));
   ipcMain.handle(IPC.agentCreateToken, (_e, name: string, token?: string) => agentClient.createToken(name, token as string));
   ipcMain.handle(IPC.agentListTokens, (_e, token?: string) => agentClient.listTokens(token));
@@ -371,11 +387,11 @@ function registerIpc(win: BrowserWindow) {
 
   // ── Code push (renderer OTA) ────────────────────────────────────────────────
   ipcMain.handle(IPC.checkUpdate, async (): Promise<UpdateInfo> => {
-    if (!isProd) return { remote: false, reinstall: false, current: app.getVersion() };
+    if (!isProd || localModeOn()) return { remote: false, reinstall: false, current: app.getVersion() };
     return (await resolveRenderer(localHomeUrl)).info;
   });
   ipcMain.handle(IPC.applyUpdate, async (): Promise<UpdateInfo> => {
-    if (!isProd) return { remote: false, reinstall: false, current: app.getVersion() };
+    if (!isProd || localModeOn()) return { remote: false, reinstall: false, current: app.getVersion() };
     const r = await resolveRenderer(localHomeUrl);
     await win.loadURL(r.url); // hot-swap the renderer to the pushed build
     return r.info;
@@ -813,7 +829,8 @@ if (!gotInstanceLock) {
     // the persisted JWT can be read and the command stream reconnected on its own
     // (an idle machine starts receiving phone commands without opening Settings).
     try {
-      agentClient.bootstrap();
+      // Chế độ chỉ trên máy: không nối luồng lệnh từ xa của máy chủ.
+      if (!localModeOn()) agentClient.bootstrap();
     } catch (e) {
       console.error('[boot] agentClient.bootstrap failed:', e);
     }
@@ -827,7 +844,8 @@ if (!gotInstanceLock) {
       let target = localHomeUrl;
       try {
         // resolveRenderer tự nạp ảnh chụp phiên bản cho các lượt agent (xem codePush).
-        target = (await resolveRenderer(localHomeUrl)).url;
+        // Chế độ chỉ trên máy: luôn dùng giao diện đóng gói, không hỏi manifest / không tải giao diện từ xa.
+        if (!localModeOn()) target = (await resolveRenderer(localHomeUrl)).url;
       } catch (e) {
         console.error('[boot] resolveRenderer failed — using bundled renderer:', e);
       }

@@ -37,7 +37,7 @@ của Anthropic.
 | | Link |
 |---|---|
 | Trang tải (luôn là bản mới nhất) | <https://toolswave.net/larkwave> |
-| macOS 0.1.23 (universal, tải thẳng) | <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.23/Larkwave-0.1.23-universal.dmg> |
+| macOS 0.1.25 (universal, tải thẳng) | <https://gitlab.com/api/v4/projects/83700259/packages/generic/larkwave-desktop/0.1.25/Larkwave-0.1.25-universal.dmg> |
 | Windows | **chưa có**: máy Windows đang được bàn giao, xem [docs/may-phat-hanh-windows.md](docs/may-phat-hanh-windows.md) |
 | Manifest phát hành (app và trang tải cùng đọc) | <https://toolswave.net/api/apps-release/larkwave> |
 | Mọi bản cũ (registry) | <https://gitlab.com/deveris.vu/toolswave-desktop-release/-/packages> |
@@ -47,6 +47,26 @@ của Anthropic.
 - **Tài khoản:** dùng chung tài khoản Toolswave. App gọi `https://api.toolswave.net/v1`. Dữ liệu Lark
   của app Toolswave cũ được nhập tự động.
 - **Cập nhật:** giao diện tự cập nhật (code-push) khi mở app. Đổi lõi thì app nhắc tải bản cài mới.
+
+## Dùng không cần tài khoản: dữ liệu chỉ trên máy (từ 0.1.25)
+
+Ở màn đăng nhập, bấm **"Dùng ngay — không cần tài khoản"**. Từ lúc đó app **không gọi máy chủ
+Larkwave/Toolswave**: không token, không sao lưu/đồng bộ hội thoại, không điều khiển từ xa, không
+code-push. App giữ chế độ này cả sau khi khởi động lại. Muốn dùng tài khoản thì mở menu tài khoản ở góc
+dưới bên trái → **Đăng nhập tài khoản Larkwave**.
+
+- **AI:** dùng AI miễn phí trên máy (thẻ **Cài AI**: Ollama + mô hình mở) hoặc Claude/Gemini/Grok/Codex
+  CLI của chính bạn. Gói Larkwave (AI máy chủ) cần tài khoản.
+- **Lark:** agent dùng phiên Lark web bạn đăng nhập ngay trong app. Cookie và App Secret không rời máy.
+- **Dữ liệu nằm ở đâu:** thư mục dữ liệu của app, gồm hội thoại, kỹ năng, lịch, tệp xuất, phiên Lark
+  và mô hình AI:
+  - macOS: `~/Library/Application Support/Larkwave/`
+  - Windows: `%APPDATA%\Larkwave\`
+  - Cờ chế độ nằm ở `local-mode.json`, dữ liệu Lark ở khoang `lark/accounts/_local/`.
+- **Bản tự dựng từ mã nguồn:** đặt `LARKWAVE_LOCAL_ONLY=1` để **ép** chế độ này (giao diện không tắt
+  được), ví dụ `LARKWAVE_LOCAL_ONLY=1 /Applications/Larkwave.app/Contents/MacOS/Larkwave`.
+- **Cần tài khoản:** điều khiển từ xa qua điện thoại, chia sẻ cuộc trò chuyện, sao lưu đám mây, Gói
+  Larkwave và nhập dữ liệu từ app Toolswave cũ.
 
 Larkwave tách từ Toolswave ngày 06/10/2026 và **không có** phần dựng app (phần đó ở Appwave). Chi
 tiết: [docs/TACH-APP.md](docs/TACH-APP.md).

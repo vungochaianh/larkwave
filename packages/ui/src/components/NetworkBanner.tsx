@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert } from 'antd';
 import { useRuntime } from '../RuntimeProvider';
 import { accountApi } from '../account/api';
+import { useLocalModeFlag } from '../account/auth';
 
 /**
  * Offline-first (Phase 0) status banner. Polls the apia liveness probe (GET /health,
@@ -16,9 +17,12 @@ export function NetworkBanner() {
   const runtime = useRuntime();
   const [offline, setOffline] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  // Chế độ chỉ trên máy: không có máy chủ để "mất kết nối" — không dò /health (main cũng chặn lời gọi).
+  const localMode = useLocalModeFlag();
 
   useEffect(() => {
     if (runtime.kind !== 'desktop') return; // web: no proxy/cache layer
+    if (localMode) { setOffline(false); return; }
     let dead = false;
     let fails = 0;
     const check = async () => {
@@ -42,7 +46,7 @@ export function NetworkBanner() {
       dead = true;
       clearInterval(id);
     };
-  }, [runtime]);
+  }, [runtime, localMode]);
 
   if (!offline || dismissed) return null;
   return (

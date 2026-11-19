@@ -13,6 +13,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.25',
+    date: '2026-11-19',
+    items: [
+      "Mới: dùng Larkwave KHÔNG cần tài khoản. Ở màn đăng nhập bấm \"Dùng ngay — không cần tài khoản\": hội thoại, kỹ năng, lịch, tệp xuất và phiên Lark chỉ nằm trên máy này, app không gọi máy chủ Larkwave (không sao lưu, không đồng bộ, không điều khiển từ xa). Chạy AI bằng \"AI miễn phí trên máy\" hoặc Claude/Gemini/Grok/Codex của bạn. Muốn dùng tài khoản thì vào menu tài khoản → Đăng nhập tài khoản Larkwave.",
+      "Bản tự dựng từ mã nguồn mở: đặt LARKWAVE_LOCAL_ONLY=1 để luôn chạy ở chế độ dữ liệu chỉ trên máy.",
+      "Sửa: khi thanh bên thu gọn, dòng đầu của menu tài khoản chỉ hiện một chữ cái thay vì cả dòng.",
+    ],
+  },
+  {
     version: '0.1.24',
     date: '2026-11-19',
     items: [

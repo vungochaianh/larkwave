@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { App as AntApp, ConfigProvider, Layout, Menu, Button, Dropdown, Tooltip, Badge } from 'antd';
-import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { DashboardOutlined, BulbOutlined, NodeIndexOutlined, UserOutlined, SettingOutlined, RobotOutlined, MessageOutlined, PartitionOutlined, CloudServerOutlined, MenuOutlined, PlusOutlined, LogoutOutlined, DesktopOutlined, MailOutlined, CommentOutlined, TeamOutlined, FieldTimeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import type { RunnerStatusInfo } from '@larkwave/core';
 import { lightTheme, darkTheme, BRAND_GRADIENT, BRAND, V } from '../theme';
 import { BrandGlyph } from './BrandMark';
@@ -82,7 +82,7 @@ function LogoMark({ size = 30 }: { size?: number }) {
 
 /** Larkwave account (Google/email login) shown in sidebar for desktop. Primary identity. */
 function UserBlock({ collapsed, selected, onGo, hasSettings }: { collapsed: boolean; selected: string; onGo: (key: string) => void; hasSettings: boolean }) {
-  const { user, logout } = useAccountAuth();
+  const { user, logout, localMode, localForced, leaveLocalMode } = useAccountAuth();
   const { t } = useI18n();
   if (!user) return null;
   const active = ACCOUNT_KEYS.includes(selected);
@@ -92,10 +92,21 @@ function UserBlock({ collapsed, selected, onGo, hasSettings }: { collapsed: bool
     if (typeof window !== 'undefined') window.location.reload();
   };
 
-  const menu = {
+  // Chế độ "dữ liệu chỉ trên máy": không có hồ sơ/gói/dung lượng/đăng xuất — chỉ Cài đặt + nút đăng nhập tài khoản.
+  const localMenu = {
     selectedKeys: active ? [selected] : [],
     items: [
-      { key: 'who', disabled: true, label: user.email },
+      { key: 'who', disabled: true, icon: <DesktopOutlined />, label: t('app.localModeWho', 'Máy này · dữ liệu chỉ trên máy') },
+      { type: 'divider' as const },
+      ...(hasSettings ? [{ key: 'tw-settings', icon: <SettingOutlined />, label: t('app.nav.settings', 'Cài đặt'), onClick: () => onGo('tw-settings') }] : []),
+      ...(localForced ? [] : [{ type: 'divider' as const }, { key: 'leave-local', icon: <UserOutlined />, label: t('app.localModeLogin', 'Đăng nhập tài khoản Larkwave'), onClick: () => void leaveLocalMode() }]),
+    ],
+  };
+  const menu = localMode ? localMenu : {
+    selectedKeys: active ? [selected] : [],
+    items: [
+      // Có icon: khi thanh bên thu gọn, antd chỉ hiện chữ đầu của mục không icon ("M" thay cho cả dòng).
+      { key: 'who', disabled: true, icon: <MailOutlined />, label: user.email },
       { type: 'divider' as const },
       { key: 'tw-profile', icon: <UserOutlined />, label: t('app.nav.profile', 'Hồ sơ & Gói'), onClick: () => onGo('tw-profile') },
       { key: 'tw-storage', icon: <CloudServerOutlined />, label: t('app.nav.storage', 'Dung lượng'), onClick: () => onGo('tw-storage') },
@@ -119,7 +130,7 @@ function UserBlock({ collapsed, selected, onGo, hasSettings }: { collapsed: bool
               <div style={{ fontWeight: 600, fontSize: 13, color: V.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user.name || user.email?.split('@')[0] || 'Người dùng'}
               </div>
-              <div style={{ marginTop: 2, fontSize: 11, color: V.textSub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
+              <div style={{ marginTop: 2, fontSize: 11, color: V.textSub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{localMode ? t('app.localModeSub', 'Dữ liệu chỉ trên máy') : user.email}</div>
             </div>
           )}
           {!collapsed && <SettingOutlined style={{ color: active ? BRAND : V.textFaint, fontSize: 14 }} />}

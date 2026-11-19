@@ -15,6 +15,7 @@ import type { View } from './HomeScreen';
 import { useI18n } from '../i18n';
 import { ToolswaveImportCard } from '../account/ToolswaveImport';
 import { ZaloSyncPanel } from './ZaloSyncPanel';
+import { useLocalModeFlag } from '../account/auth';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -809,13 +810,32 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
       <ClaudeKeyManager key={keyReload} embedded />
     </Card>
   );
-  const devicesCard = (
+  // Chế độ "dữ liệu chỉ trên máy": thiết bị đăng nhập, nhập từ Toolswave và điều khiển từ xa đều cần tài khoản
+  // (đi qua máy chủ) → thay bằng MỘT thẻ giải thích, khỏi hiện lỗi "Không tải được danh sách thiết bị".
+  const localMode = useLocalModeFlag();
+  const devicesCard = localMode ? null : (
     <>
       <Card style={CARD_STYLE}>
         <DeviceManager />
       </Card>
       <ToolswaveImportCard style={CARD_STYLE} />
     </>
+  );
+  const remoteCard = localMode ? (
+    <Card
+      data-testid="settings-local-mode"
+      title={<CardTitle icon={<DesktopOutlined />} color={OK}>{t('ui.localMode.title', 'Dữ liệu chỉ trên máy')}</CardTitle>}
+      style={CARD_STYLE}
+    >
+      <Paragraph style={{ marginTop: 0, fontSize: 13 }}>
+        {t('ui.localMode.desc', 'Bạn đang dùng Larkwave không cần tài khoản: hội thoại, kỹ năng, lịch, tệp xuất và phiên Lark chỉ nằm trên máy này — không sao lưu, không đồng bộ lên máy chủ.')}
+      </Paragraph>
+      <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12.5 }}>
+        {t('ui.localMode.needAccount', 'Điều khiển từ xa qua điện thoại, chia sẻ cuộc trò chuyện, sao lưu và Gói Larkwave cần đăng nhập tài khoản (menu tài khoản ở góc dưới bên trái).')}
+      </Paragraph>
+    </Card>
+  ) : (
+    <RemoteControlPanel onNav={onNav} />
   );
 
   /*
@@ -845,7 +865,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
           {zaloCard}
           {apiKeysCard}
           {devicesCard}
-          <RemoteControlPanel onNav={onNav} />
+          {remoteCard}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
@@ -857,7 +877,7 @@ export function SettingsScreen({ onNav, cmsAllowed }: { onNav?: (v: View) => voi
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
             {apiKeysCard}
             {devicesCard}
-            <RemoteControlPanel onNav={onNav} />
+            {remoteCard}
           </div>
         </div>
       )}

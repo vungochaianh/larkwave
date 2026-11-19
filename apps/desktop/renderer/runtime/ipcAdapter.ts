@@ -62,6 +62,7 @@ import type {
   LarkBrowserState,
   LarkWebAccounts,
   LocalAiStatus,
+  LocalModeState,
   ConnectorOp,
   LarkWebBase,
   LarkUiTemplate,
@@ -94,6 +95,8 @@ interface Bridge {
   localAiInstall?(): Promise<LocalAiStatus>;
   localAiPull?(model: string): Promise<LocalAiStatus>;
   localAiUse?(model: string): Promise<LocalAiStatus>;
+  localModeGet?(): Promise<LocalModeState>;
+  localModeSet?(on: boolean): Promise<LocalModeState>;
   claudeSetToken(token: string): Promise<ClaudeStatus>;
   claudeClearToken(): Promise<ClaudeStatus>;
   claudeListKeys(): Promise<ApiKeyList>;
@@ -318,6 +321,8 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
       // Lõi < 0.1.24 chưa có "Cài AI" (AI trên máy + Claude một bấm) → giao diện ẩn các nút đó.
       if (!b.localAiStatus) for (const k of ['localAiStatus', 'localAiInstall', 'localAiPull', 'localAiUse']) (this as Record<string, unknown>)[k] = undefined;
       if (!b.claudeInstall) (this as Record<string, unknown>).claudeInstall = undefined;
+      // Lõi < 0.1.25 chưa có chế độ "dữ liệu chỉ trên máy" → màn đăng nhập không hiện nút dùng không tài khoản.
+      if (!b.localModeGet) for (const k of ['localMode', 'setLocalMode']) (this as Record<string, unknown>)[k] = undefined;
     }
   }
 
@@ -623,6 +628,12 @@ export class IpcRuntimeAdapter implements RuntimeAdapter {
   }
   claudeInstall(): Promise<{ ok: boolean; error?: string; log?: string }> {
     return this.bridge.claudeInstall!();
+  }
+  localMode(): Promise<LocalModeState> {
+    return this.bridge.localModeGet!();
+  }
+  setLocalMode(on: boolean): Promise<LocalModeState> {
+    return this.bridge.localModeSet!(on);
   }
 
   larkWebAccounts(): Promise<LarkWebAccounts> {

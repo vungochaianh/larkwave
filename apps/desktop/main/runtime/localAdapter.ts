@@ -9,6 +9,7 @@ import type { AuthState, ClaudeControls, LarkAppRef, LarkAutomation, LarkAutomat
 import { claudeAvailable, claudeLogin, claudeLogout, claudeStatus, clearClaudeToken, runClaude, setClaudeToken, validateKey } from './claudeRunner';
 import { addKey as addClaudeKey, isApiKey, listKeys as listClaudeKeys, removeKey as removeClaudeKey, setActiveKey as setActiveClaudeKey } from './claudeKeyStore';
 import { LarkService } from './lark/larkService';
+import { localModeOn } from '../localMode';
 import { ollama } from './localAi/ollama';
 import { installClaude } from './localAi/claudeInstall';
 import { invalidateRunnerStatus } from './runners/registry';
@@ -147,7 +148,8 @@ export class LocalRuntimeAdapter implements RuntimeAdapter {
     );
     // Phase 1b — let hosted (MAIC) general chat call the server on the signed-in account's behalf.
     const accountTokens = new AccountTokenStore(baseDir);
-    this.lark.setAccountTokenGetter(() => accountTokens.get());
+    // Chế độ "dữ liệu chỉ trên máy": không đưa token ⇒ sao lưu/đồng bộ, relay, chia sẻ, Gói Larkwave đều tự bỏ qua.
+    this.lark.setAccountTokenGetter(() => (localModeOn() ? null : accountTokens.get()));
     void this.lark.initBot(); // resume the bot listener if it was enabled
   }
 
