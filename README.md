@@ -8,7 +8,8 @@ năng), điều khiển từ xa.
 
 ## 🎬 Video hướng dẫn sử dụng
 
-<!-- VIDEO: sửa README trên github.com, kéo tệp HDSD-Larkwave-ngan.mp4 thả vào dòng này → GitHub chèn link user-attachments và hiện trình phát ngay trong README -->
+https://github.com/user-attachments/assets/e639c159-65c0-4dac-a684-e5b0c1970d53
+
 
 Bản ngắn 1:40: hỏi đáp dữ liệu Base, ghi bản ghi có xin phép, xuất Excel. Bản đầy đủ 3:20 có các chương: Tổng
 quan → kết nối Lark bằng QR → hỏi đáp Base → ghi có xin phép → xuất Excel → lịch tự động → Kỹ năng → trình AI trên
