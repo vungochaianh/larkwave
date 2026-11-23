@@ -19,6 +19,16 @@ máy. Tài khoản và dữ liệu trong video là dữ liệu mẫu.
 
 ▶ [Bản đầy đủ 3:20 (MP4, 28 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave.mp4) · [Bản ngắn 1:40 (MP4, 9 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-ngan.mp4) · [Phụ đề .srt](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave.srt)
 
+### Cài đặt & bắt đầu: không cần tài khoản (0.1.25)
+
+[![Cài đặt Larkwave & bắt đầu — 1:58](docs/media/hdsd-cai-dat-thumb.jpg)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-Dat.mp4)
+
+Hai cách cài trên macOS: tải bản cài `.dmg`, hoặc tự dựng từ mã nguồn — lệnh trong video chạy thật trên một bản
+clone sạch (xem [Tự dựng từ mã nguồn](#tự-dựng-từ-mã-nguồn-macos)). Sau đó bấm **Dùng ngay — không cần tài khoản**
+(dữ liệu chỉ nằm trên máy), đăng nhập Lark bằng mã QR và hỏi câu đầu tiên.
+
+▶ [Video Cài đặt 1:58 (MP4, 20 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-Dat.mp4) · [Bản 720p (9 MB)](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-Dat-ngan.mp4) · [Phụ đề .srt](https://github.com/vungochaianh/larkwave/releases/download/video-hdsd/HDSD-Larkwave-Cai-Dat.srt)
+
 ### Cài AI miễn phí ngay trong app (0.1.24)
 
 https://github.com/user-attachments/assets/d86e7049-8c9b-4bdc-9776-2a6a5c9a80d1
