@@ -68,6 +68,25 @@ dưới bên trái → **Đăng nhập tài khoản Larkwave**.
 - **Cần tài khoản:** điều khiển từ xa qua điện thoại, chia sẻ cuộc trò chuyện, sao lưu đám mây, Gói
   Larkwave và nhập dữ liệu từ app Toolswave cũ.
 
+## Tự dựng từ mã nguồn (macOS)
+
+Cần macOS, git, Node.js 20 trở lên (đã thử với Node 25) và pnpm 9 (`corepack enable` hoặc
+`npm i -g pnpm@9`).
+
+```bash
+git clone https://github.com/vungochaianh/larkwave.git
+cd larkwave
+pnpm install
+pnpm --filter @larkwave/shared build && pnpm --filter @larkwave/core build
+cd apps/desktop
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm dist:mac
+```
+
+- Bản cài ra ở `apps/desktop/dist/Larkwave-<phiên bản>-universal.dmg`. Đã thử trên một bản clone sạch
+  ngày 23/11/2026: `pnpm install` khoảng 1 phút, `dist:mac` khoảng 2 phút.
+- Dựng shared + core **trước** desktop. Bỏ bước này thì app trắng màn hình mà lúc dựng không báo lỗi.
+- Chạy thử không cần dựng bản cài: `pnpm dev` trong `apps/desktop`.
+
 Larkwave tách từ Toolswave ngày 06/10/2026 và **không có** phần dựng app (phần đó ở Appwave). Chi
 tiết: [docs/TACH-APP.md](docs/TACH-APP.md).
 
